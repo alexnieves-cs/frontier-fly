@@ -95,7 +95,7 @@ async function record(browser, base, scenario) {
   const dir = join(RAW, scenario.id);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
-  const context = await browser.newContext({ viewport: SIZE });
+  const context = await browser.newContext({ viewport: SIZE, locale: 'en-US' });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(String(error)));

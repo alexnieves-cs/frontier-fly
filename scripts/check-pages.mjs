@@ -60,7 +60,8 @@ function pageNames() {
 }
 
 async function checkPage(browser, url) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  // Match the e2e device profile. With LANG=C, headless Chromium reports a locale Intl rejects.
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (error) => errors.push(String(error)));
