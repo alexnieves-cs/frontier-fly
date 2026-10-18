@@ -224,8 +224,49 @@ export class ExplorerEnv implements Env {
     return cloneDroneState(this.state);
   }
 
+  /** Observation at a pose, without touching the episode RNG or drone state. */
+  observeAt(x: number, y: number, z: number, yaw = 0): Float32Array {
+    if (!this.spec || !this.physics) throw new Error('observeAt before reset');
+    const ghost = makeDroneState([x, y, z], yaw);
+    const out = new Float32Array(this.obs.length);
+    const quiet = new SensorNoise(zeroNoise(), new RNG(1, 'probe'));
+    sense(
+      {
+        world: this.physics,
+        state: ghost,
+        spec: this.spec,
+        visited: this.visited,
+        yawRate: 0,
+        floor: this.floorAt(z),
+        stepsLeft: Math.max(0, this.maxSteps - this.steps),
+        maxSteps: this.maxSteps,
+        lighting: this.cfg.lighting,
+        noise: quiet,
+        prevVel: [0, 0, 0],
+      },
+      out,
+    );
+    return out;
+  }
+
   get visitedGrid(): Uint8Array {
     return this.visited;
+  }
+
+  get episodeLighting() {
+    return this.cfg.lighting;
+  }
+
+  /** Live lighting edits. The policy observation stays lidar/IMU based. */
+  setLighting(partial: { timeOfDay?: number; flashlightOn?: boolean; sensorMode?: EpisodeConfig['lighting']['sensorMode']; lightsOn?: boolean }): void {
+    if (partial.timeOfDay != null) this.cfg.lighting.timeOfDay = partial.timeOfDay;
+    if (partial.flashlightOn != null) this.cfg.lighting.flashlightOn = partial.flashlightOn;
+    if (partial.sensorMode != null) this.cfg.lighting.sensorMode = partial.sensorMode;
+    if (partial.lightsOn != null) this.cfg.lighting.interiorLightsOn.fill(partial.lightsOn ? 1 : 0);
+  }
+
+  get building(): BuildingSpec | null {
+    return this.spec;
   }
 
   get coverage(): number {

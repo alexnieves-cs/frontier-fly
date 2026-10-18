@@ -1,4 +1,6 @@
+import { startApp } from './ui/app';
+
 const root = document.querySelector('#app');
-if (root) {
-  root.textContent = 'frontier-fly';
+if (root instanceof HTMLElement) {
+  void startApp(root);
 }
