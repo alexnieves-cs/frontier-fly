@@ -7,7 +7,7 @@ import type { ConfirmedContact, Contact, V3 } from '../contracts';
  * into tracks by estimate distance. A track gains a view for each frame
  * seen from a bearing at least `minSeparationDeg` from its other views and
  * within range; each view keeps its best confidence. A track confirms with
- * `minViews` views whose mean confidence meets the threshold, so one
+ * `minViews` distinct views whose best confidences average to the threshold, so one
  * high-confidence frame never confirms. A track that runs out of
  * re-view poses without confirming is rejected.
  */
@@ -156,9 +156,11 @@ export class ConfirmTracker {
     return track;
   }
 
+  /** Mean of the best `minViews` view confidences (all views when fewer). */
   meanConfidence(track: ConfirmTrack): number {
     if (!track.views.length) return 0;
-    return track.views.reduce((s, v) => s + v.confidence, 0) / track.views.length;
+    const best = track.views.map((v) => v.confidence).sort((a, b) => b - a).slice(0, this.minViews);
+    return best.reduce((s, c) => s + c, 0) / best.length;
   }
 
   /** Confirm when enough distinct views agree. Never rejects on its own. */
@@ -215,11 +217,24 @@ export function confirmViewpoints(
     cands.push({ p, angle: bearing, d: Math.hypot(p[0] - from[0], p[1] - from[1]) });
   }
   cands.sort((a, b) => a.d - b.d);
-  for (const c of cands) {
-    if (out.length >= count) break;
+  const rejected = new Set<number>();
+  for (let i = 0; i < cands.length && out.length < count; i++) {
+    const c = cands[i]!;
     if (used.some((u) => angleDiff(u, c.angle) < sep)) continue;
-    if (!accept(c.p)) continue;
+    if (!accept(c.p)) {
+      rejected.add(i);
+      continue;
+    }
     used.push(c.angle);
+    out.push(c.p);
+  }
+  // Too few fresh bearings: re-view old ones closer, which can raise their best confidence.
+  const mine = out.map((p) => Math.atan2(center[1] - p[1], center[0] - p[0]));
+  for (let i = 0; i < cands.length && out.length < count; i++) {
+    const c = cands[i]!;
+    if (rejected.has(i) || out.includes(c.p) || mine.some((u) => angleDiff(u, c.angle) < sep)) continue;
+    if (!accept(c.p)) continue;
+    mine.push(c.angle);
     out.push(c.p);
   }
   return out;

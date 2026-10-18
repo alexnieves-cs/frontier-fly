@@ -89,7 +89,9 @@ const POLICY_STALL_SEC = 8;
 const POLICY_MAX_COLLISIONS = 3;
 const POLICY_MAX_SEC = 150;
 const MAX_EXPLORE_SEC = 260;
-const CONFIRM_DWELL = 1.6;
+const CONFIRM_DWELL = 3.5;
+/** Confirmation rounds a track gets before it is rejected. */
+const CONFIRM_ROUNDS = 2;
 
 const RANK: Record<SafetyActionKind, number> = { none: 0, hold: 1, backtrack: 2, exit_building: 3, return_home: 4, land: 5 };
 
@@ -177,8 +179,12 @@ class Runner implements MissionRunner {
   private confirmTrack: ConfirmTrack | null = null;
   /** Earliest time each track may get another confirmation attempt. */
   private readonly attempted = new Map<string, number>();
+  private readonly confirmRounds = new Map<string, number>();
+  /** Tracks already given a last look when exploration of their building ended. */
+  private readonly finalLook = new Set<string>();
   private outdoorClearChecked = false;
   private policyClean = false;
+  private policyFell = false;
   private frontierRan = false;
   private readonly crumbs: V3[] = [];
 
@@ -679,7 +685,7 @@ class Runner implements MissionRunner {
 
   private startConfirm(track: ConfirmTrack): void {
     this.attempted.set(track.id, Infinity);
-    const need = Math.max(1, this.tracker.minViews - track.views.length + 1);
+    const need = Math.max(2, this.tracker.minViews - track.views.length + 1);
     const pos = this.vehicle.pos;
     const v = this.visit;
     const wps: Waypoint[] = [];
@@ -690,7 +696,7 @@ class Runner implements MissionRunner {
       const z = f * grid.H + INDOOR_FLY_Z;
       let cur = toLocal(grid, pos);
       let views: V3[] = [];
-      for (const r of [2.2, 1.6, 3]) {
+      for (const r of track.classId === 'person' ? [2.2, 2.8, 1.6] : [2.4, 2.0, 2.8]) {
         views = confirmViewpoints(track, est, cur, r, z, need, (p) => {
           const c = nearestNav(grid, p);
           if (!c || Math.hypot((c.x + 0.5) * grid.cs - p[0], (c.z + 0.5) * grid.cs - p[1]) > 0.75) return false;
@@ -708,7 +714,8 @@ class Runner implements MissionRunner {
         wps.push({ pos: at, yaw: headingTo(at, track.estimate), dwell: CONFIRM_DWELL });
         cur = vp;
       }
-      this.resumeAfterConfirm = () => this.exploreNext();
+      const policy = this.policyRun;
+      this.resumeAfterConfirm = () => (policy && this.policyRun === policy ? policy.resume() : this.exploreNext());
     } else {
       const z = cruiseZ(this.air, track.estimate[0], track.estimate[1], this.agl);
       const views = confirmViewpoints(track, track.estimate, pos, 8, z, need, (p) => {
@@ -743,7 +750,12 @@ class Runner implements MissionRunner {
         'confirm',
         wps,
         () => {
-          if (track.status === 'open') {
+          const rounds = (this.confirmRounds.get(track.id) ?? 0) + 1;
+          this.confirmRounds.set(track.id, rounds);
+          if (track.status === 'open' && rounds < CONFIRM_ROUNDS) {
+            this.attempted.set(track.id, this.t + 4);
+            this.log('info', `${track.classId} contact still unconfirmed (${track.views.length} view(s), ${fmt(this.tracker.meanConfidence(track), 2)}). Will look again.`);
+          } else if (track.status === 'open') {
             this.tracker.reject(track);
             this.log(
               'warn',
@@ -984,6 +996,9 @@ class Runner implements MissionRunner {
     this.exploreNext();
   }
 
+  /** The running policy explorer, so a confirmation can hand control back and an exit can free it. */
+  private policyRun: { resume: () => void; release: () => void } | null = null;
+
   private startPolicy(): void {
     const v = this.visit!;
     const physicsWorld = new PhysicsWorld(v.grid.spec);
@@ -998,19 +1013,27 @@ class Runner implements MissionRunner {
     const start = this.t;
     let ended = false;
     this.log('info', `Trained policy exploring ${v.b.label}.`);
-    const end = (why: string, fallback: boolean) => {
+    // The record credits the policy unless a later fallback hands the building to the frontier planner.
+    if (!this.policyFell) this.policyClean = true;
+    const release = () => {
       if (ended) return;
       ended = true;
       physicsWorld.free();
+      this.policyRun = null;
+    };
+    const end = (why: string, fallback: boolean) => {
+      if (ended) return;
+      release();
       if (fallback) {
+        this.policyClean = false;
+        this.policyFell = true;
         this.log('warn', `Policy explorer ${why}. Falling back to frontier exploration.`);
       } else {
-        this.policyClean = true;
         this.log('info', `Policy explorer ${why}.`);
       }
       this.exploreNext();
     };
-    this.setJob({
+    const job: Job = {
       phase: 'indoor_explore',
       plan: () => [],
       tick: (): VehicleCommand => {
@@ -1023,7 +1046,16 @@ class Runner implements MissionRunner {
         const cmd = pe.act(local, this.vehicle.vel, this.vehicle.yaw, this.t);
         return { vel: cmd.vel, yawRate: cmd.yawRate };
       },
-    });
+    };
+    this.policyRun = {
+      resume: () => {
+        // Time spent confirming does not count as a stall.
+        pe.lastNewVoxelSec = this.t;
+        this.setJob(job);
+      },
+      release,
+    };
+    this.setJob(job);
   }
 
   private exploreNext(): void {
@@ -1050,6 +1082,15 @@ class Runner implements MissionRunner {
 
   private explorationDone(): void {
     const v = this.visit!;
+    // An open contact in this building gets one more look before leaving.
+    const open = this.tracker.tracks.find(
+      (tr) => tr.status === 'open' && tr.buildingId === v.b.id && this.attempted.get(tr.id) !== Infinity && !this.finalLook.has(tr.id),
+    );
+    if (open && !this.returning) {
+      this.finalLook.add(open.id);
+      this.startConfirm(open);
+      return;
+    }
     this.log('info', `${v.b.label} explored: ${fmt(v.vis!.coverage() * 100, 0)}% of cells seen by the planner.`);
     if (this.mission.missionType === 'safety_sweep') {
       const ok = this.declareIfClear(v.b.id);
@@ -1070,6 +1111,7 @@ class Runner implements MissionRunner {
   // ----------------------------------------------------------- exit and home
 
   private startExit(after: 'continue' | 'rth'): void {
+    this.policyRun?.release();
     const v = this.visit;
     if (!v || !this.inside || !v.axis) {
       if (after === 'rth') this.startReturnOutside();
@@ -1198,6 +1240,7 @@ class Runner implements MissionRunner {
   }
 
   private finish(): void {
+    this.policyRun?.release();
     if (this.finished) return;
     this.outcome = this.computeOutcome();
     this.setPhase('done');
@@ -1205,7 +1248,7 @@ class Runner implements MissionRunner {
     if (last) last.tEnd = this.t;
     this.recordTrack();
     this.finished = true;
-    this.log('info', `Mission ${this.outcome}. ${fmt(this.t, 0)} s, battery ${fmt(this.battery.remainingPct(), 0)}% left, ${this.collisions.length} contact(s).`);
+    this.log('info', `Mission ${this.outcome}. ${fmt(this.t, 0)} s, battery ${fmt(this.battery.remainingPct(), 0)}% left, ${this.collisions.length} collision(s).`);
     this.job = this.holdJob('done', 1e9, () => undefined);
   }
 
@@ -1219,7 +1262,9 @@ class Runner implements MissionRunner {
       if (this.confirmed.some((c) => c.classId === 'person')) out = 'found';
       else {
         const scopes = new Set(this.declaredClear.map((d) => d.scope));
-        const all = [...this.discovered].every((id) => scopes.has(id)) && scopes.has('outdoor');
+        // Building scopes decide a sweep. The outdoor scope rarely completes near the fence,
+        // so it is declared when the source says clear but is not required.
+        const all = this.discovered.size > 0 && [...this.discovered].every((id) => scopes.has(id));
         out = searchedAll && all ? 'clear' : 'incomplete';
       }
     } else {

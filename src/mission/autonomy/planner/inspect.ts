@@ -7,12 +7,13 @@ import { type Airspace, buildingBox, dot, legBetween, operable, pointFree, sub }
 
 /**
  * Envelope inspection. An orbit of viewpoints at standoff around the shell,
- * at opening height, plus two looks across the roof for hatches. Openings
+ * at opening height, each looking square at the face and then toward its
+ * middle, plus two looks across the roof for hatches. Openings
  * count as observed only when the camera actually saw them: inside the FOV,
  * within range, facing the camera, and with a clear ray.
  */
 
-export const CAMERA_ASPECT = 16 / 9;
+export const CAMERA_ASPECT = 4 / 3;
 /** Openings further than this are not resolved well enough to measure. */
 export const INSPECT_RANGE = 9;
 
@@ -27,6 +28,8 @@ export interface InspectStep {
 interface Viewpoint {
   pos: V3;
   yaw: number;
+  /** Second heading toward the middle of the face, so openings near it fall inside the FOV. */
+  midYaw: number | null;
   angle: number;
 }
 
@@ -46,7 +49,8 @@ function faceViewpoints(building: MissionBuilding, physics: OutdoorPhysics, air:
         const [x, y] = face.at(f, s);
         const pos: V3 = [x, y, z];
         if (!operable(air, x, y, 1) || !pointFree(physics, pos, 0.5)) continue;
-        out.push({ pos, yaw: face.yaw, angle: Math.atan2(y - box.cy, x - box.cx) });
+        const [mx, my] = face.at(0.5, 0);
+        out.push({ pos, yaw: face.yaw, midYaw: Math.atan2(my - y, mx - x), angle: Math.atan2(y - box.cy, x - box.cx) });
         break;
       }
     }
@@ -64,7 +68,7 @@ function roofViewpoints(building: MissionBuilding, physics: OutdoorPhysics): Vie
   ] as const) {
     const pos: V3 = [x, y, z];
     if (!pointFree(physics, pos, 0.5)) continue;
-    out.push({ pos, yaw: Math.atan2(box.cy - y, box.cx - x), angle: 0 });
+    out.push({ pos, yaw: Math.atan2(box.cy - y, box.cx - x), midYaw: null, angle: 0 });
   }
   return out;
 }
@@ -88,6 +92,7 @@ export function planInspection(building: MissionBuilding, start: V3, physics: Ou
     if (!leg) continue;
     for (let i = 0; i < leg.length - 1; i++) steps.push({ pos: leg[i]!, yaw: null, dwell: 0 });
     steps.push({ pos: view.pos, yaw: view.yaw, dwell: 0.8 });
+    if (view.midYaw !== null) steps.push({ pos: view.pos, yaw: view.midYaw, dwell: 0.8 });
     cur = view.pos;
   }
   return steps;
