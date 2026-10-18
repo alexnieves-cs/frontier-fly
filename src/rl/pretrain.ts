@@ -16,6 +16,7 @@ export async function trainExplorer(opts?: {
   envs?: number;
   steps?: number;
   seed?: number;
+  onUpdate?: (info: { update: number; meanCoverage: number; stepsPerSec: number; episodes: number }) => void;
 }): Promise<{ checkpoint: Checkpoint; meanCoverage: number; stepsPerSec: number }> {
   const updates = opts?.updates ?? 8;
   const nEnvs = opts?.envs ?? 2;
@@ -61,19 +62,23 @@ export async function trainExplorer(opts?: {
       truncated: arrays.truncated,
       nextValue: last,
     });
-    await trainer.update({
-      obs: arrays.obs,
-      actions: arrays.actions,
-      logp: arrays.logp,
-      advantages: gae.advantages,
-      returns: gae.returns,
-      n: arrays.n,
-    });
+    await trainer.update(
+      {
+        obs: arrays.obs,
+        actions: arrays.actions,
+        logp: arrays.logp,
+        advantages: gae.advantages,
+        returns: gae.returns,
+        n: arrays.n,
+      },
+      { epochs: 3, minibatch: 128 },
+    );
     trainer.pullWeights();
     meanCoverage = outcome.episodes.length
       ? outcome.episodes.reduce((s, e) => s + e.coverage, 0) / outcome.episodes.length
       : meanCoverage;
     stepsPerSec = outcome.stepsPerSec;
+    opts?.onUpdate?.({ update, meanCoverage, stepsPerSec, episodes: outcome.episodes.length });
   }
   const state = norm.toJSON();
   const checkpoint: Checkpoint = {

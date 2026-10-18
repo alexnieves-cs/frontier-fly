@@ -9,7 +9,7 @@ export class RewardChart {
   constructor(el: HTMLElement, color = '#3dff9a') {
     this.plot = new uPlot(
       {
-        width: el.clientWidth || 420,
+        width: Math.max(160, el.clientWidth || 420),
         height: 150,
         cursor: { show: false },
         legend: { show: false },

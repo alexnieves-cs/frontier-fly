@@ -169,7 +169,12 @@ export class ThreeView implements Renderer {
     if (this.gl) {
       configureShadows(this.gl, this.sun, this.quality, span);
       this.post?.composer.dispose();
-      this.post = makePost(this.gl, this.scene, this.mainCam, this.quality);
+      try {
+        this.post = makePost(this.gl, this.scene, this.mainCam, this.quality);
+      } catch (error) {
+        console.warn('post stack unavailable', error);
+        this.post = null;
+      }
     }
     let shadowBudget = this.quality === 'high' ? 4 : 0;
     for (const entry of this.built.lights) {

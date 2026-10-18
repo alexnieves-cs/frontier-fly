@@ -115,7 +115,13 @@ class Session {
       [this.q('#chart-cover'), '#3ee0c5'],
       [this.q('#chart-entropy'), '#8ec5ff'],
     ] as const;
-    for (const [el, color] of chartHost) this.charts.push(new RewardChart(el, color));
+    for (const [el, color] of chartHost) {
+      try {
+        this.charts.push(new RewardChart(el, color));
+      } catch (error) {
+        console.warn('chart init failed', error);
+      }
+    }
     window.addEventListener('resize', () => this.resize());
   }
 
