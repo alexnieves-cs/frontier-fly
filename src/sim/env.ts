@@ -14,7 +14,7 @@ import { SensorNoise } from './dynamics/noise';
 import { QuadrotorDynamics } from './dynamics/quad';
 import { cloneDroneState, makeDroneState, scaleAction } from './drone';
 import { defaultLighting, isLowLight } from './lighting';
-import { rawReward } from './reward';
+import { ProgressTracker, rawReward, type ProgressPenalty } from './reward';
 import { markVisited, sense } from './sensors';
 import { initPhysics, PhysicsWorld } from './world';
 import { isWalkable } from '../gen/validate';
@@ -59,6 +59,8 @@ export class ExplorerEnv implements Env {
   private frontierDist = 0;
   private done = false;
   private rng = new RNG(1);
+  private progress = new ProgressTracker();
+  private penalty: ProgressPenalty | undefined;
 
   reset(spec: BuildingSpec, seed: number, cfg?: EpisodeConfig): Float32Array {
     if (this.physics) this.physics.free();
@@ -105,6 +107,8 @@ export class ExplorerEnv implements Env {
     this.prevYaw = 0;
     this.prevVel = [0, 0, 0];
     this.frontierDist = frontierDistance(spec, this.visited, this.state.pos);
+    this.progress.reset(this.state.pos[0], this.state.pos[1]);
+    this.penalty = undefined;
     const base = Math.max(400, Math.min(2500, Math.round(spec.reachableVoxels * 1.5)));
     this.maxSteps = this.cfg.maxSteps ?? base;
     this.stallLimit = this.cfg.stallSteps ?? STALL_STEPS;
@@ -197,7 +201,7 @@ export class ExplorerEnv implements Env {
     const nextFrontier = frontierDistance(spec, this.visited, this.state.pos);
     const shaping = 1.5 * (this.frontierDist - nextFrontier);
     this.frontierDist = nextFrontier;
-    const reward = rawReward({
+    const base = rawReward({
       newVoxels,
       newRoom,
       newFloor,
@@ -207,6 +211,8 @@ export class ExplorerEnv implements Env {
       prevAction: this.prevAction,
       coverage,
     }) + shaping;
+    this.penalty = this.progress.update(this.state.pos[0], this.state.pos[1], newVoxels, action);
+    const reward = base - this.penalty.total;
     this.prevAction.set(action.length >= 4 ? action.subarray(0, 4) : action);
     this.prevVel = [this.state.vel[0], this.state.vel[1], this.state.vel[2]];
     this.steps += 1;
@@ -348,6 +354,7 @@ export class ExplorerEnv implements Env {
       newRoom,
       newFloor,
       success,
+      penalty: this.penalty,
     };
   }
 }
