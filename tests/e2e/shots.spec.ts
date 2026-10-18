@@ -83,8 +83,12 @@ test('fpv at night shows the hud', async ({ page }) => {
   await expect(page.locator('#hud')).toBeVisible();
   await page.screenshot({ path: `${out}/fpv.png` });
   expect(readFileSync(`${out}/fpv.png`).length).toBeGreaterThan(20_000);
-  for (let i = 0; i < 12; i++) {
-    await page.screenshot({ path: `${frames}/fpv-${String(i).padStart(2, '0')}.png` });
-    await page.waitForTimeout(140);
+  // The extra frames exist so a local run can rebuild docs/media/fpv.gif.
+  // On CI each full-page shot of the high preset can take long enough to blow the test budget.
+  if (!process.env.CI) {
+    for (let i = 0; i < 12; i++) {
+      await page.screenshot({ path: `${frames}/fpv-${String(i).padStart(2, '0')}.png` });
+      await page.waitForTimeout(140);
+    }
   }
 });
