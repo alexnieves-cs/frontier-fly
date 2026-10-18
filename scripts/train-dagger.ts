@@ -2,7 +2,7 @@
  * DAgger (+ optional anchored PPO fine-tune) for the indoor policy.
  * Usage: npm run train:dagger -- --out /tmp/dagger.json [--iters 4] [--bc-episodes 16]
  *        [--episodes 12] [--bc-epochs 6] [--retrain-epochs 3] [--capacity 60000]
- *        [--seed 11] [--ppo-updates 0] [--init ckpt.json]
+ *        [--seed 11] [--ppo-updates 0] [--init ckpt.json] [--lr 1e-3] [--no-reweight]
  * Writes the DAgger checkpoint to --out and, with --ppo-updates N, the anchored
  * PPO result to <out>.ppo.json. Never writes public/checkpoints unless --out says so.
  */
@@ -36,6 +36,11 @@ async function main() {
     capacity: num('capacity', 60_000),
     beta0: num('beta0', 0.5),
     betaDecay: num('beta-decay', 0.5),
+    lr: num('lr', 1e-3),
+    maxStall: num('max-stall', 300),
+    weighting: args.includes('--no-reweight')
+      ? { divergeBoost: 0, stallBoost: 0, collisionBoost: 0 }
+      : undefined,
     init: init ? parseCheckpoint(readFileSync(init, 'utf8')) : undefined,
     onIter: (m) => {
       const v = m.validation;
@@ -50,7 +55,8 @@ async function main() {
   });
   console.log(`dagger best iter ${result.bestIter}`);
   writeFileSync(out, serializeCheckpoint(result.checkpoint));
-  console.log(`wrote ${out}`);
+  writeFileSync(out.replace(/\.json$/, '') + '.last.json', serializeCheckpoint(result.lastCheckpoint));
+  console.log(`wrote ${out} (best) and .last.json`);
   const ppoUpdates = num('ppo-updates', 0);
   if (ppoUpdates > 0) {
     const tuned = await ppoFinetune({

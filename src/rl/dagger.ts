@@ -481,6 +481,8 @@ export interface TrainDaggerResult {
   dataset: DaggerDataset;
   /** Round whose weights were returned. */
   bestIter: number;
+  /** Weights after the final round, whatever validation said. */
+  lastCheckpoint: Checkpoint;
 }
 
 function pickStage(stages: number[], weights: number[], rng: RNG): number {
@@ -598,7 +600,8 @@ export async function trainDagger(opts: TrainDaggerOpts = {}): Promise<TrainDagg
     metrics.push(m);
     opts.onIter?.(m);
   }
+  const lastCheckpoint = checkpointFromPolicy(policy);
   policy.setWeights(bestWeights);
   env.dispose();
-  return { checkpoint: checkpointFromPolicy(policy), metrics, dataset, bestIter };
+  return { checkpoint: checkpointFromPolicy(policy), metrics, dataset, bestIter, lastCheckpoint };
 }
