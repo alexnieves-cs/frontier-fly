@@ -2,6 +2,7 @@ import { generateBuilding } from '../gen/building';
 import { Curriculum } from '../rl/curriculum';
 import { ACT_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
+import type { BuildingSpec, EpisodeConfig } from '../shared/types';
 import { createEnv, defaultEpisodeConfig, type ExplorerEnv } from '../sim/env';
 import { lightingPreset, type LightingPreset } from '../sim/lighting';
 
@@ -27,13 +28,12 @@ export function evalSteps(stage: number): number {
   return stage <= 1 ? 1000 : 2400;
 }
 
-export async function coverEpisode(
-  policy: CoveragePolicy,
+/** Building, env seed and config of one eval episode. Shared with the parallel eval. */
+export function evalEpisodeSetup(
   stage: number,
   seed: number,
   lighting: LightingPreset,
-): Promise<number> {
-  const env = await createEnv();
+): { spec: BuildingSpec; envSeed: number; cfg: EpisodeConfig & { maxSteps: number } } {
   const params = new Curriculum().genParams(stage, new RNG(seed, `eval-${stage}`));
   const spec = generateBuilding(params);
   const nRooms = spec.floors.reduce((n, floor) => n + floor.rooms.length, 0);
@@ -43,7 +43,18 @@ export async function coverEpisode(
   cfg.maxCollisions = 16;
   cfg.dynamics = 'kinematic';
   cfg.lighting = lightingPreset(lighting, nRooms);
-  let obs = env.reset(spec, params.seed, cfg);
+  return { spec, envSeed: params.seed, cfg: cfg as EpisodeConfig & { maxSteps: number } };
+}
+
+export async function coverEpisode(
+  policy: CoveragePolicy,
+  stage: number,
+  seed: number,
+  lighting: LightingPreset,
+): Promise<number> {
+  const env = await createEnv();
+  const { spec, envSeed, cfg } = evalEpisodeSetup(stage, seed, lighting);
+  let obs = env.reset(spec, envSeed, cfg);
   policy.reset?.();
   let coverage = 0;
   for (let t = 0; t < cfg.maxSteps; t++) {
