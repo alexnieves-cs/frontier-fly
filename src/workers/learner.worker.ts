@@ -21,14 +21,27 @@ let trainer: TfTrainer | null = null;
 let policy: InferPolicy | null = null;
 let updates = 0;
 
-async function boot(weights: ArrayBuffer[]): Promise<void> {
+async function pickBackend(): Promise<string> {
+  try {
+    if (await tf.setBackend('webgl')) {
+      await tf.ready();
+      return tf.getBackend();
+    }
+  } catch {
+    /* Node and some headless sessions have no WebGL. */
+  }
   await tf.setBackend('cpu');
   await tf.ready();
+  return tf.getBackend();
+}
+
+async function boot(weights: ArrayBuffer[]): Promise<void> {
+  const backend = await pickBackend();
   policy = new InferPolicy(OBS_DIM, ACT_DIM, [256, 128], 1);
   policy.setWeights(weights);
-  trainer = new TfTrainer(policy, 3e-4);
+  trainer = new TfTrainer(policy, 3e-4, false);
   await trainer.ready();
-  self.postMessage({ type: 'learner-ready' });
+  self.postMessage({ type: 'learner-ready', backend });
 }
 
 self.onmessage = (event: MessageEvent<RolloutMsg | BootMsg>) => {

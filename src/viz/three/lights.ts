@@ -19,6 +19,18 @@ export function applySkyLights(
 ): void {
   const dir = sky.sunDir;
   sun.position.set(dir[0] * 24, Math.max(0.4, dir[2]) * 24, dir[1] * 24);
+  const night = sky.night;
+  if (night > 0.55) {
+    sun.position.set(dir[0] * 24, Math.max(0.35, dir[2]) * 18, dir[1] * 24);
+    sun.intensity = 0.22 * night;
+    sun.color.setRGB(0.62, 0.72, 0.95);
+    sun.visible = true;
+    ambient.intensity = 0.025 + (flashlightOn ? 0.03 : 0);
+    hemi.intensity = 0.08;
+    hemi.color.setRGB(0.12, 0.16, 0.28);
+    hemi.groundColor.setRGB(0.02, 0.015, 0.02);
+    return;
+  }
   sun.intensity = sky.sunIntensity;
   sun.color.setRGB(sky.sunColor[0], sky.sunColor[1], sky.sunColor[2]);
   sun.visible = sky.sunIntensity > 0.05;

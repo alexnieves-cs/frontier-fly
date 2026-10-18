@@ -377,9 +377,7 @@ class Session {
           this.heatmap = { w: msg.w, d: msg.d, values: msg.values, arrows: msg.arrows };
         },
       });
-      const cores = navigator.hardwareConcurrency || 4;
-      const n = Math.max(1, Math.min(4, cores - 2));
-      this.pool.start(this.launch.seed, n);
+      this.pool.start(this.launch.seed, 2);
     } else {
       this.pool.resume();
     }

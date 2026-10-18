@@ -11,6 +11,7 @@ export interface MaterialSet {
   glass: THREE.MeshPhysicalMaterial;
   metal: THREE.MeshStandardMaterial;
   frame: THREE.MeshStandardMaterial;
+  door: THREE.MeshStandardMaterial;
   ceiling: THREE.MeshStandardMaterial;
   depth: THREE.MeshDepthMaterial;
 }
@@ -51,9 +52,31 @@ export function makeMaterials(seed: number, quality: QualityPreset): MaterialSet
     color: '#d7dee6',
   });
   const frame = new THREE.MeshStandardMaterial({ color: '#5c4634', roughness: 0.6, metalness: 0.05 });
+  const door = new THREE.MeshStandardMaterial({ color: '#6b4a30', roughness: 0.55, metalness: 0.04 });
   const ceiling = new THREE.MeshStandardMaterial({ color: '#d9d4cc', roughness: 0.9, metalness: 0 });
   const depth = new THREE.MeshDepthMaterial();
-  return { textures, wall, concrete, floor, glass, metal, frame, ceiling, depth };
+  return { textures, wall, concrete, floor, glass, metal, frame, door, ceiling, depth };
+}
+
+export function applyPbr(
+  set: MaterialSet,
+  maps: { wall: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }; floor: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }; concrete: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }; door: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture } },
+): void {
+  const use = (mat: THREE.MeshStandardMaterial, pack: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }, tint?: string) => {
+    mat.map = pack.color;
+    mat.roughnessMap = pack.rough;
+    mat.normalMap = pack.normal;
+    mat.normalScale = new THREE.Vector2(0.6, 0.6);
+    if (tint) mat.color.set(tint);
+    else mat.color.set('#ffffff');
+    mat.needsUpdate = true;
+  };
+  use(set.wall, maps.wall);
+  use(set.ceiling, maps.wall, '#f2efe8');
+  use(set.floor, maps.floor);
+  use(set.concrete, maps.concrete);
+  use(set.door, maps.door);
+  use(set.frame, maps.door);
 }
 
 export function materialFor(set: MaterialSet, surface: number, kind: string): THREE.Material {

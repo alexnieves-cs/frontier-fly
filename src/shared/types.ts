@@ -111,6 +111,8 @@ export interface EpisodeConfig {
   /** Optional overrides used by tests and the curriculum. */
   maxSteps?: number;
   stallSteps?: number;
+  /** Hard collisions before the episode ends. Defaults to MAX_HARD_COLLISIONS. */
+  maxCollisions?: number;
 }
 
 export interface Env {

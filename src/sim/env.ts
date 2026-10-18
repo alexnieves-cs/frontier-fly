@@ -18,6 +18,7 @@ import { rawReward } from './reward';
 import { markVisited, sense } from './sensors';
 import { initPhysics, PhysicsWorld } from './world';
 import { isWalkable } from '../gen/validate';
+import { frontierDistance } from './frontier';
 
 export function defaultEpisodeConfig(stage = 0, nRooms = 1): EpisodeConfig {
   return {
@@ -55,6 +56,7 @@ export class ExplorerEnv implements Env {
   private yawRate = 0;
   private prevYaw = 0;
   private prevVel: [number, number, number] = [0, 0, 0];
+  private frontierDist = 0;
   private done = false;
   private rng = new RNG(1);
 
@@ -102,6 +104,7 @@ export class ExplorerEnv implements Env {
     this.yawRate = 0;
     this.prevYaw = 0;
     this.prevVel = [0, 0, 0];
+    this.frontierDist = frontierDistance(spec, this.visited, this.state.pos);
     const base = Math.max(400, Math.min(2500, Math.round(spec.reachableVoxels * 1.5)));
     this.maxSteps = this.cfg.maxSteps ?? base;
     this.stallLimit = this.cfg.stallSteps ?? STALL_STEPS;
@@ -191,6 +194,9 @@ export class ExplorerEnv implements Env {
     else this.stall += 1;
 
     const coverage = spec.reachableVoxels > 0 ? this.visitedCount / spec.reachableVoxels : 0;
+    const nextFrontier = frontierDistance(spec, this.visited, this.state.pos);
+    const shaping = 1.5 * (this.frontierDist - nextFrontier);
+    this.frontierDist = nextFrontier;
     const reward = rawReward({
       newVoxels,
       newRoom,
@@ -200,14 +206,14 @@ export class ExplorerEnv implements Env {
       action,
       prevAction: this.prevAction,
       coverage,
-    });
+    }) + shaping;
     this.prevAction.set(action.length >= 4 ? action.subarray(0, 4) : action);
     this.prevVel = [this.state.vel[0], this.state.vel[1], this.state.vel[2]];
     this.steps += 1;
 
     const success = coverage >= COVERAGE_SUCCESS;
     const truncated = this.stall >= this.stallLimit;
-    const crashed = this.hard > MAX_HARD_COLLISIONS;
+    const crashed = this.hard > (this.cfg.maxCollisions ?? MAX_HARD_COLLISIONS);
     const oob = !this.inside(this.state.pos);
     this.done = success || truncated || crashed || oob || this.steps >= this.maxSteps;
     const obs = this.observe();

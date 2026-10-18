@@ -16,6 +16,8 @@ Day chase, night with the flashlight, and the FPV feed. Captured headlessly in C
 
 ![FPV flight](docs/media/fpv.gif)
 
+![Training dashboard during a live PPO update](docs/media/train.png)
+
 ## Setup
 
 ```bash
@@ -63,7 +65,7 @@ flowchart LR
     Viz --> Cams[FPV + HUD / Chase / Overview]
     UI --> Charts[uPlot + coverage map]
   end
-  subgraph EnvW[Env worker]
+  subgraph EnvW[Env workers]
     Gen[Building generator] --> Phys[Rapier world]
     Phys --> Dyn[Quadrotor or kinematic]
     Dyn --> Sens[Lidar, IMU, occupancy]
@@ -71,7 +73,7 @@ flowchart LR
   subgraph LearnW[Learner worker]
     Pol[TF.js policy] --> PPO[PPO update]
   end
-  EnvW -- rollouts --> LearnW
+  EnvW -- SharedArrayBuffer rollouts --> LearnW
   LearnW -- weights --> EnvW
   EnvW -- showcase state --> Viz
 ```
@@ -83,16 +85,22 @@ flowchart LR
 - Seeded buildings: BSP rooms, doors, hallways from stage 3, shafts when there is more than one floor, and a reachability check that retries with `seed + 1`.
 - Kinematic flight and a 6-DoF quadrotor with a velocity-to-attitude cascade, motor lag, and drag. Physics steps at 400 Hz in quad mode. Rapier builds the colliders and casts the lidar.
 - Observation is 306 floats: 40 lidar ranges, IMU, altitude, a 16×16 egocentric map, floor index, and time remaining. The action is `[vx, vy, vz, yawRate]`.
-- PPO in TensorFlow.js, GAE, running observation and reward normalization, and a six-stage curriculum. Rollouts and updates run in Web Workers.
+- PPO in TensorFlow.js, GAE, running observation and reward normalization, and a six-stage curriculum. Up to four env workers write rollouts into `SharedArrayBuffer`s. Inference uses a SIMD WASM gemm when the runtime has it.
 - Chase, FPV, and overview cameras, a canvas HUD, day/night lighting, per-room lights, a flashlight, and IR/depth display modes.
 - Live return, coverage, and entropy charts, a top-down coverage map, a policy heatmap once training has weights, and a replay scrubber at 1×, 4×, and 16×.
 - A checkpoint in `public/checkpoints/pretrained.json`, plus download and IndexedDB save/load.
 
 ## Honest limits
 
-The shipped checkpoint is an early stage-0 PPO run, not a policy that sweeps buildings. Fifty updates (one environment, 256 steps each, about 86 seconds of wall clock on this machine) moved finished-episode coverage from about 5% to **35%**. Rollouts during that run were about **2,100** environment steps/s before the TensorFlow.js update. It does **not** meet the spec bar of 80% stage-0 coverage, 60% on a fresh stage-3 seed, or night coverage within 90% of day coverage.
+The shipped policy is a 306→256→128 network. It was behavior-cloned from a privileged frontier teacher (that teacher can see the visited grid; the network cannot) and then fine-tuned with PPO. The reward is the spec's coverage, room, floor, collision, smoothness, and time terms, plus a distance-to-frontier shaping term. Training episodes on early stages are allowed more than the spec's 3 hard collisions so they do not die on the first doorway.
 
-A kinematic env step measured **0.16 ms** in Node (about 6,000 steps/s), inside the 0.3 ms budget. The quad hover, step-response, and million-step tests pass. Headless Chrome on this machine, with ANGLE software WebGL2 and no discrete GPU, rendered the high preset at about **5 fps** and the low preset at about **16 fps**. That does not meet the 45 fps bar, and it was not measured on a mid-range laptop GPU. WebGPU is requested when the quality preset is high and an adapter answers within 350 ms; this capture stayed on WebGL2. There is no TAA, SSR, or baked global illumination. Worker messages use transferable buffers. The COOP/COEP headers are set so a `SharedArrayBuffer` path can be added later. Numbers from the capture are in `docs/media/capture.json`.
+On four stage-0 seeds the deterministic policy covered **78.5%, 75.7%, 77.1%, and 65.3%** (mean **74.1%**). The spec bar is 80%. Night-dark on those same seeds averaged **69.8%**, which is **94%** of the day mean, so the night-versus-day ratio clears 90% here. On three fresh stage-3 seeds the day coverage was **24.3%, 17.8%, and 22.7%** (mean **21.6%**). That misses the 60% bar. The same teacher, not the network, covers a stage-0 room past 95% and averaged about 66% on three stage-3 buildings. The network does not reproduce that.
+
+A kinematic step measured **0.18 ms** in Node (about 5,600 steps/s), inside the 0.3 ms budget. Four worker threads stepping that env summed to about **24,000** environment steps/s, above the 10k target. The same four workers running an untrained network, and rebuilding the building whenever an episode ends, summed to about **6,500** steps/s, which is under 10k. Batched SIMD inference is about **0.05 ms** per environment at batch 8. The learner tries the TensorFlow.js WebGL backend and falls back to CPU. Node training for this checkpoint used CPU. A separate TensorFlow.js WASM or WebGPU package is not bundled; the SIMD gemm is a small kernel in `src/rl/gemm.ts`.
+
+Furniture, door leaves, and propeller wash are visual. Rapier colliders are still the building grid, so a chair does not stop the drone.
+
+Headless Chrome on this machine, with ANGLE software WebGL2 and no discrete GPU, rendered the high preset at about **7 fps** and the low preset at about **23 fps**. That does not meet 45 / 60 fps, and it was not measured on a laptop GPU. WebGPU is requested when the quality preset is high and an adapter answers within 350 ms; this capture stayed on WebGL2. High quality runs SSAO, bloom, and SMAA. Three's TAA pass accumulates only while the camera is nearly still, because that pass has no motion vectors. FPV adds an afterimage trail and a lens/vignette shader. There is no SSR and no baked global illumination. Numbers from the capture are in `docs/media/capture.json`. Asset licenses are in [CREDITS.md](CREDITS.md). Every shipped texture and the HDRI is under 5 MB, so nothing is in Git LFS.
 
 ## Scripts
 

@@ -109,6 +109,7 @@ export class TfTrainer {
   constructor(
     private readonly policy: InferPolicy,
     private readonly lr = LEARNING_RATE,
+    private readonly forceCpu = true,
   ) {}
 
   async ready(): Promise<void> {
@@ -191,9 +192,53 @@ export class TfTrainer {
     };
   }
 
+  /**
+   * Behavior clone a continuous teacher. Targets are pre-tanh means, so a
+   * deterministic act() reproduces the teacher action.
+   */
+  async imitate(
+    obs: Float32Array,
+    actions: Float32Array,
+    n: number,
+    opts?: { epochs?: number; minibatch?: number; onEpoch?: (epoch: number, loss: number) => void },
+  ): Promise<number> {
+    await this.ready();
+    if (n <= 0) return 0;
+    const epochs = opts?.epochs ?? 4;
+    const minibatch = opts?.minibatch ?? 256;
+    const targets = new Float32Array(n * this.policy.actDim);
+    for (let i = 0; i < targets.length; i++) {
+      const clipped = Math.min(0.999, Math.max(-0.999, actions[i] ?? 0));
+      targets[i] = Math.atanh(clipped);
+    }
+    let last = 0;
+    for (let epoch = 0; epoch < epochs; epoch++) {
+      const order = shuffled(n, this.rng);
+      let total = 0;
+      let count = 0;
+      for (let start = 0; start < n; start += minibatch) {
+        const mbIdx = order.slice(start, Math.min(n, start + minibatch));
+        last = this.imitateBatch(
+          gatherFlat(obs, mbIdx, this.policy.obsDim),
+          gatherFlat(targets, mbIdx, this.policy.actDim),
+          mbIdx.length,
+        );
+        total += last;
+        count += 1;
+      }
+      const mean = count > 0 ? total / count : last;
+      opts?.onEpoch?.(epoch, mean);
+      last = mean;
+    }
+    this.pullWeights();
+    return last;
+  }
+
   private async init(): Promise<void> {
-    const ok = await tf.setBackend('cpu');
-    if (!ok) throw new Error('failed to set tfjs cpu backend');
+    if (this.forceCpu) {
+      const ok = await tf.setBackend('cpu');
+      if (!ok) throw new Error('failed to set tfjs cpu backend');
+    }
     await tf.ready();
     this.shapes = weightShapes(this.policy.obsDim, this.policy.actDim, this.policy.hidden);
     const buffers = this.policy.getWeights();
@@ -210,6 +255,29 @@ export class TfTrainer {
 
   private assertReady(): void {
     if (!this.initialized || !this.optimizer) throw new Error('Call ready() before using TfTrainer');
+  }
+
+  private imitateBatch(obs: Float32Array, targets: Float32Array, mb: number): number {
+    const obsT = tf.tensor2d(obs, [mb, this.policy.obsDim]);
+    const tgt = tf.tensor2d(targets, [mb, this.policy.actDim]);
+    const w1 = this.vars[0]!;
+    const b1 = this.vars[1]!;
+    const w2 = this.vars[2]!;
+    const b2 = this.vars[3]!;
+    const wMean = this.vars[4]!;
+    const bMean = this.vars[5]!;
+    const trunk = [w1, b1, w2, b2, wMean, bMean];
+    const lossOf = () => {
+      const h = tf.tanh(tf.add(tf.matMul(obsT, w1), b1));
+      const h2 = tf.tanh(tf.add(tf.matMul(h, w2), b2));
+      const mean = tf.add(tf.matMul(h2, wMean), bMean);
+      return tf.mean(tf.square(tf.sub(mean, tgt)));
+    };
+    const before = tf.tidy(() => lossOf().dataSync()[0] ?? Number.NaN);
+    const cost = this.optimizer!.minimize(() => lossOf() as tf.Scalar, true, trunk);
+    cost?.dispose();
+    tf.dispose([obsT, tgt]);
+    return before;
   }
 
   private applyMinibatch(

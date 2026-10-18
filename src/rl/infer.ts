@@ -31,6 +31,7 @@
 import { HIDDEN } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { Policy } from '../shared/types';
+import { createGemm, type GemmKernel } from './gemm';
 
 export const WEIGHT_NAMES = [
   'w1',
@@ -85,22 +86,42 @@ export interface ActResult {
   value: Float32Array;
 }
 
+/** [in, out] row-major -> [out, in] so the dot product scans contiguous weights. */
+function transpose(weight: Float32Array, rows: number, cols: number): Float32Array {
+  const out = new Float32Array(weight.length);
+  for (let r = 0; r < rows; r++) {
+    const src = r * cols;
+    for (let c = 0; c < cols; c++) out[c * rows + r] = weight[src + c]!;
+  }
+  return out;
+}
+
 function linear(
   x: Float32Array,
   n: number,
   inDim: number,
   outDim: number,
-  weight: Float32Array,
+  weightT: Float32Array,
   bias: Float32Array,
   tanhOut: boolean,
 ): Float32Array {
   const y = new Float32Array(n * outDim);
+  const tail = inDim - (inDim % 4);
   for (let i = 0; i < n; i++) {
     const x0 = i * inDim;
     const y0 = i * outDim;
     for (let j = 0; j < outDim; j++) {
+      const w0 = j * inDim;
       let s = bias[j]!;
-      for (let k = 0; k < inDim; k++) s += x[x0 + k]! * weight[k * outDim + j]!;
+      let k = 0;
+      for (; k < tail; k += 4) {
+        s +=
+          x[x0 + k]! * weightT[w0 + k]! +
+          x[x0 + k + 1]! * weightT[w0 + k + 1]! +
+          x[x0 + k + 2]! * weightT[w0 + k + 2]! +
+          x[x0 + k + 3]! * weightT[w0 + k + 3]!;
+      }
+      for (; k < inDim; k++) s += x[x0 + k]! * weightT[w0 + k]!;
       y[y0 + j] = tanhOut ? Math.tanh(s) : s;
     }
   }
@@ -117,6 +138,10 @@ export class InferPolicy implements Policy {
   readonly actDim: number;
   readonly hidden: number[];
   private readonly weights: Float32Array[];
+  /** Transposed copies of the dense kernels, in TF-layout index order. Biases stay null. */
+  private readonly transposed: Array<Float32Array | null>;
+  private readonly gemm: GemmKernel | null;
+  private readonly slot: number[] = [];
   private rng: RNG;
 
   constructor(obsDim: number, actDim: number, hidden: readonly number[] = HIDDEN, seed = 1) {
@@ -132,12 +157,16 @@ export class InferPolicy implements Policy {
     this.hidden = [h0, h1];
     const shapes = weightShapes(obsDim, actDim, this.hidden);
     this.weights = shapes.map((shape) => new Float32Array(numel(shape)));
+    this.transposed = shapes.map(() => null);
+    this.gemm = createGemm();
     const init = new RNG(seed, 'policy-init');
     for (const index of GAUSS_WEIGHTS) {
       const w = this.weights[index]!;
       for (let k = 0; k < w.length; k++) w[k] = init.gaussian() * WEIGHT_STD;
     }
-    this.weights[6]!.fill(LOG_STD_INIT);
+    this.weights[6]!.fill(obsDim >= 300 ? -0.8 : LOG_STD_INIT);
+    if (obsDim >= 300) this.weights[5]![0] = 0.35;
+    this.rebuildTranspose();
     this.rng = new RNG(seed, 'policy-act');
   }
 
@@ -197,17 +226,46 @@ export class InferPolicy implements Policy {
       }
       this.weights[i]!.set(src);
     }
+    this.rebuildTranspose();
+  }
+
+  private rebuildTranspose(): void {
+    const shapes = weightShapes(this.obsDim, this.actDim, this.hidden);
+    for (const index of [0, 2, 4, 7, 9]) {
+      const shape = shapes[index]!;
+      this.transposed[index] = transpose(this.weights[index]!, shape[0]!, shape[1]!);
+    }
+    this.gemm?.reset();
+    this.slot.length = 0;
+    if (!this.gemm) return;
+    for (const index of [0, 2, 4, 7, 9]) this.slot[index] = this.gemm.upload(this.transposed[index]!);
+    for (const index of [1, 3, 5, 8, 10]) this.slot[index] = this.gemm.upload(this.weights[index]!);
+  }
+
+  private dense(
+    x: Float32Array,
+    n: number,
+    inDim: number,
+    outDim: number,
+    weightIndex: number,
+    biasIndex: number,
+    tanhOut: boolean,
+  ): Float32Array {
+    if (this.gemm && this.slot[weightIndex] !== undefined && this.slot[biasIndex] !== undefined) {
+      return this.gemm.apply(x, n, inDim, this.slot[weightIndex]!, this.slot[biasIndex]!, outDim, tanhOut);
+    }
+    return linear(x, n, inDim, outDim, this.transposed[weightIndex]!, this.weights[biasIndex]!, tanhOut);
   }
 
   private forward(obs: Float32Array, n: number): { mean: Float32Array; value: Float32Array } {
     const h0 = this.hidden[0]!;
     const h1 = this.hidden[1]!;
     const w = this.weights;
-    const h = linear(obs, n, this.obsDim, h0, w[0]!, w[1]!, true);
-    const h2 = linear(h, n, h0, h1, w[2]!, w[3]!, true);
-    const mean = linear(h2, n, h1, this.actDim, w[4]!, w[5]!, false);
-    const vh = linear(obs, n, this.obsDim, h0, w[7]!, w[8]!, true);
-    const vh2 = linear(vh, n, h0, h1, w[9]!, w[10]!, true);
+    const h = this.dense(obs, n, this.obsDim, h0, 0, 1, true);
+    const h2 = this.dense(h, n, h0, h1, 2, 3, true);
+    const mean = this.dense(h2, n, h1, this.actDim, 4, 5, false);
+    const vh = this.dense(obs, n, this.obsDim, h0, 7, 8, true);
+    const vh2 = this.dense(vh, n, h0, h1, 9, 10, true);
     const vOutW = w[11]!;
     const vOutB = w[12]![0]!;
     const value = new Float32Array(n);

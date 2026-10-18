@@ -9,12 +9,16 @@ import { RunningNorm } from '../rl/normalize';
 import { defaultDynParams, zeroNoise } from '../sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../sim/env';
 import { collectRollout, type ShowcaseSnap } from './rollout';
+import { rolloutViews, writeRollout, type RolloutViews } from './sab';
 
 interface StartMsg {
   type: 'start';
   nEnvs: number;
   seed: number;
   steps: number;
+  sab?: SharedArrayBuffer;
+  capacity?: number;
+  yieldEvery?: number;
 }
 interface WeightsMsg {
   type: 'weights';
@@ -44,6 +48,11 @@ let steps = 256;
 let stageOverride: number | null = null;
 let tick = 0;
 let waitWeights: (() => void) | null = null;
+let sabView: RolloutViews | null = null;
+let yieldEvery = 0;
+let booted = false;
+let started = false;
+let pendingWeights: WeightsMsg | null = null;
 
 async function setup(nEnvs: number, baseSeed: number): Promise<void> {
   envs = [];
@@ -87,31 +96,59 @@ async function loop(): Promise<void> {
       steps,
       baseSeed: seed + tick * 1009,
       stageOverride,
-      yieldEvery: 4,
-      onShowcase: (snap) => {
-        (self as DedicatedWorkerGlobalScope).postMessage({ type: 'showcase', showcase: snap });
-      },
+      yieldEvery,
+      onShowcase: yieldEvery
+        ? (snap) => {
+            (self as DedicatedWorkerGlobalScope).postMessage({ type: 'showcase', showcase: snap });
+          }
+        : undefined,
     });
     tick += 1;
     const arrays = outcome.buffer.toArrays();
     const snap: ShowcaseSnap | null = outcome.showcase;
     const scope = self as DedicatedWorkerGlobalScope;
-    scope.postMessage(
-      {
+    if (sabView) {
+      writeRollout(sabView, arrays);
+      scope.postMessage({
         type: 'rollout',
-        arrays,
+        shared: true,
         episodes: outcome.episodes,
         stepsPerSec: outcome.stepsPerSec,
         stage: curriculum.stage,
         showcase: snap,
         norm: norm.toJSON(),
-      },
-      { transfer: [arrays.obs.buffer, arrays.actions.buffer, arrays.logp.buffer, arrays.values.buffer, arrays.rewards.buffer, arrays.dones.buffer, arrays.truncated.buffer] },
-    );
+      });
+    } else {
+      scope.postMessage(
+        {
+          type: 'rollout',
+          arrays,
+          episodes: outcome.episodes,
+          stepsPerSec: outcome.stepsPerSec,
+          stage: curriculum.stage,
+          showcase: snap,
+          norm: norm.toJSON(),
+        },
+        { transfer: [arrays.obs.buffer, arrays.actions.buffer, arrays.logp.buffer, arrays.values.buffer, arrays.rewards.buffer, arrays.dones.buffer, arrays.truncated.buffer] },
+      );
+    }
     await new Promise<void>((resolve) => {
       waitWeights = resolve;
     });
   }
+}
+
+function applyWeights(msg: WeightsMsg): void {
+  policy.setWeights(msg.weights);
+  norm.load(msg.norm);
+  if (!started) {
+    started = true;
+    running = true;
+    void loop();
+    return;
+  }
+  waitWeights?.();
+  waitWeights = null;
 }
 
 self.onmessage = (event: MessageEvent<InMsg>) => {
@@ -119,16 +156,23 @@ self.onmessage = (event: MessageEvent<InMsg>) => {
   if (msg.type === 'start') {
     seed = msg.seed;
     steps = msg.steps;
+    yieldEvery = msg.yieldEvery ?? 0;
+    if (msg.sab && msg.capacity) sabView = rolloutViews(msg.sab, msg.capacity);
     void setup(msg.nEnvs, msg.seed).then(() => {
-      running = true;
+      booted = true;
       self.postMessage({ type: 'ready', weights: policy.getWeights(), norm: norm.toJSON() });
-      void loop();
+      if (pendingWeights) {
+        const queued = pendingWeights;
+        pendingWeights = null;
+        applyWeights(queued);
+      }
     });
   } else if (msg.type === 'weights') {
-    policy.setWeights(msg.weights);
-    norm.load(msg.norm);
-    waitWeights?.();
-    waitWeights = null;
+    if (!booted) {
+      pendingWeights = msg;
+      return;
+    }
+    applyWeights(msg);
   } else if (msg.type === 'pause') {
     running = false;
   } else if (msg.type === 'resume') {

@@ -51,6 +51,7 @@ function makeConfig(stage: number, seed: number, nRooms: number, dynamics: 'kine
     wind: [rng.range(-0.15, 0.15) * scale, rng.range(-0.15, 0.15) * scale],
     maxSteps: stage <= 1 ? 500 : 900,
     stallSteps: 200,
+    maxCollisions: stage <= 1 ? 8 : 3,
   };
 }
 
@@ -92,7 +93,9 @@ export async function collectRollout(opts: {
       returns[i] += rawReward;
       lengths[i] += 1;
       opts.obs[i] = step.obs;
-      if (i === 0 && (t % 2 === 0 || step.done)) {
+      const liveShowcase = Boolean(opts.onShowcase) && i === 0 && (t % 2 === 0 || step.done);
+      const finalShowcase = i === 0 && t === opts.steps - 1;
+      if (liveShowcase || finalShowcase) {
         const snap = envs[0]!.snapshot();
         showcase = {
           spec: opts.specs[0]!,

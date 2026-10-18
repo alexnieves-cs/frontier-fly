@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CELL, SURFACE } from '../shared/constants';
 import type { BuildingSpec } from '../shared/types';
 import { buildingAabbs } from '../gen/parts';
+import { buildProps } from './props';
 import { materialFor, type MaterialSet } from './three/materials';
 
 export interface BuiltLevel {
@@ -22,7 +23,17 @@ function addBox(
   material: THREE.Material,
   shadow: boolean,
 ): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(hx * 2, hz * 2, hy * 2), material);
+  const geo = new THREE.BoxGeometry(hx * 2, hz * 2, hy * 2);
+  const uv = geo.getAttribute('uv');
+  const tileU = Math.max(hx * 2, 0.25);
+  const tileV = Math.max(hy * 2, hz * 2, 0.25);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * tileU, uv.getY(i) * tileV);
+  try {
+    geo.computeTangents();
+  } catch {
+    /* flat lighting still works without tangents */
+  }
+  const mesh = new THREE.Mesh(geo, material);
   mesh.position.set(cx, cz, cy);
   mesh.castShadow = shadow;
   mesh.receiveShadow = true;
@@ -58,6 +69,8 @@ export function buildBuilding(spec: BuildingSpec, mats: MaterialSet, shadows: bo
         const base = f * H;
         addBox(group, cx, cy, base + H - 0.08, 0.48, 0.48, 0.06, mats.frame, shadows);
         addBox(group, cx, cy, base + 0.08, 0.48, 0.48, 0.06, mats.frame, shadows);
+        const leaf = addBox(group, cx + 0.28, cy, base + H * 0.48, 0.08, 0.42, H * 0.42, mats.door, shadows);
+        leaf.castShadow = shadows;
       }
     }
     const ceil = new THREE.Mesh(
@@ -81,6 +94,7 @@ export function buildBuilding(spec: BuildingSpec, mats: MaterialSet, shadows: bo
     floors.push(group);
     root.add(group);
   });
+  root.add(buildProps(spec, mats));
 
   const top = boxes.find((box) => box.kind === 'slab' && box.surface === SURFACE.CONCRETE && box.cz > spec.floors.length * spec.floorHeight);
   if (top) {

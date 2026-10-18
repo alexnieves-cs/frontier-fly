@@ -92,3 +92,43 @@ export function makeTextures(seed: number): SurfaceTextures {
   });
   return { wall, wallRough, floor, floorRough, concrete, metal };
 }
+
+export interface PbrMaps {
+  color: THREE.Texture;
+  rough: THREE.Texture;
+  normal: THREE.Texture;
+}
+
+function loadMap(loader: THREE.TextureLoader, url: string, srgb: boolean): Promise<THREE.Texture> {
+  return new Promise((resolve, reject) => {
+    loader.load(
+      url,
+      (tex) => {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+        tex.anisotropy = 8;
+        resolve(tex);
+      },
+      undefined,
+      () => reject(new Error(`texture failed: ${url}`)),
+    );
+  });
+}
+
+/** CC0 ambientCG maps. Callers keep the canvas textures if a file is missing. */
+export async function loadPbrSet(base: string): Promise<Record<'wall' | 'floor' | 'concrete' | 'door', PbrMaps>> {
+  const loader = new THREE.TextureLoader();
+  const trio = async (name: string): Promise<PbrMaps> => ({
+    color: await loadMap(loader, `${base}${name}_color.jpg`, true),
+    rough: await loadMap(loader, `${base}${name}_rough.jpg`, false),
+    normal: await loadMap(loader, `${base}${name}_normal.jpg`, false),
+  });
+  const [wall, floor, concrete, door] = await Promise.all([
+    trio('plaster'),
+    trio('floor'),
+    trio('concrete'),
+    trio('door'),
+  ]);
+  return { wall, floor, concrete, door };
+}

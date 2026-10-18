@@ -7,9 +7,10 @@ import { placeFpv } from './cameras/fpv';
 import { placeOverview } from './cameras/overview';
 import { buildDrone } from './droneMesh';
 import { buildBuilding, type BuiltLevel } from './meshBuilding';
+import { loadPbrSet } from './textures';
 import { makeLidarLines, updateLidarLines } from './rays';
 import { applySkyLights, makeSun } from './three/lights';
-import { makeMaterials, type MaterialSet } from './three/materials';
+import { applyPbr, makeMaterials, type MaterialSet } from './three/materials';
 import { makePost, type PostStack } from './three/post';
 import { configureShadows } from './three/shadows';
 import { applySkyBackdrop } from './three/sky';
@@ -63,6 +64,8 @@ export class ThreeView implements Renderer {
   private lidar: ArrayLike<number> | null = null;
   private collision = false;
   private readonly clock = new THREE.Clock();
+  private hdri: THREE.Texture | null = null;
+  private envMap: THREE.Texture | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -149,6 +152,23 @@ export class ThreeView implements Renderer {
     gl.toneMappingExposure = 1;
     this.gl = gl;
     this.backend = 'webgl2';
+    void this.loadSky();
+  }
+
+  private async loadSky(): Promise<void> {
+    if (!this.gl || this.hdri) return;
+    try {
+      const { RGBELoader } = await import('three/addons/loaders/RGBELoader.js');
+      const tex = await new RGBELoader().loadAsync(`${import.meta.env.BASE_URL}hdri/kloofendal_43d_clear_puresky_1k.hdr`);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(this.gl);
+      this.envMap = pmrem.fromEquirectangular(tex).texture;
+      pmrem.dispose();
+      this.hdri = tex;
+      this.scene.environment = this.envMap;
+    } catch (error) {
+      console.warn('hdri unavailable', error);
+    }
   }
 
   load(spec: BuildingSpec): void {
@@ -162,6 +182,12 @@ export class ThreeView implements Renderer {
     }
     this.mats?.wall.dispose();
     this.mats = makeMaterials(spec.seed, this.quality);
+    const mats = this.mats;
+    void loadPbrSet(`${import.meta.env.BASE_URL}textures/`)
+      .then((maps) => {
+        if (this.mats === mats) applyPbr(mats, maps);
+      })
+      .catch((error: unknown) => console.warn('pbr unavailable', error));
     this.built = buildBuilding(spec, this.mats, this.quality === 'high');
     this.scene.add(this.built.root);
     const span = Math.max(spec.floors[0]!.w, spec.floors[0]!.d) * spec.cellSize;
@@ -188,13 +214,15 @@ export class ThreeView implements Renderer {
     const yaw = s.yaw;
     this.rig.group.position.set(s.pos[0], s.pos[2], s.pos[1]);
     this.rig.group.rotation.set(s.pitch, -yaw, s.roll);
-    const spin = 0.15 + (s.motors[0] ?? 0) * 0.002;
+    const spin = 0.45 + (s.motors[0] ?? 0) * 0.004;
     for (const rotor of this.rig.rotors) rotor.rotation.y += spin;
+    this.rig.updateWash(s.t, s.motors[0] ?? 400);
     this.tmp.set(s.pos[0], s.pos[2] + 0.02, s.pos[1]);
     updateLidarLines(this.rays, this.tmp, yaw, this.lidar);
     const sky = skyFromTime(l.timeOfDay);
     applySkyLights(this.sun, this.ambient, this.hemi, sky, l.flashlightOn);
-    applySkyBackdrop(this.scene, sky);
+    applySkyBackdrop(this.scene, sky, this.hdri, this.envMap);
+    this.post?.setView(this.mode, Math.hypot(s.vel[0], s.vel[1], s.vel[2]));
     const flashOn = l.flashlightOn || sky.night > 0.55;
     this.flash.intensity = flashOn ? (l.sensorMode === 'ir' ? 28 : 18) : 0;
     this.flash.color.set(l.sensorMode === 'ir' ? '#b6ff9a' : '#fff4dd');
@@ -363,6 +391,7 @@ export class ThreeView implements Renderer {
       const renderPass = this.post.composer.passes[0] as unknown as { camera: THREE.Camera };
       renderPass.camera = cam;
       if (this.post.ssao) this.post.ssao.camera = cam;
+      if (this.post.taa) this.post.taa.camera = cam;
       this.post.composer.render();
     } else if (this.gl) {
       this.gl.render(this.scene, cam);

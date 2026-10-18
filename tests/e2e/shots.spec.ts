@@ -57,6 +57,27 @@ test('night flashlight view differs from day', async ({ page }) => {
   expect(readFileSync(`${out}/night.png`).length).toBeGreaterThan(20_000);
 });
 
+test('low preset stays on webgl and records fps', async ({ page }) => {
+  await openShot(page, '?shot=day&seed=11&quality=low');
+  await page.waitForTimeout(1200);
+  const fps = Number(await page.locator('#app').getAttribute('data-fps'));
+  const backend = await page.locator('#app').getAttribute('data-backend');
+  const previous = JSON.parse(readFileSync(`${out}/capture.json`, 'utf8')) as Record<string, unknown>;
+  writeFileSync(`${out}/capture.json`, JSON.stringify({ ...previous, lowFps: fps, lowBackend: backend }, null, 2));
+  expect(backend).toBe('webgl2');
+  expect(fps).toBeGreaterThan(0);
+});
+
+test('training dashboard is on screen', async ({ page }) => {
+  await openShot(page, '?shot=day&seed=11&quality=low');
+  await page.locator('#train-btn').click();
+  await page.waitForFunction(() => (document.querySelector('#rate-num')?.textContent ?? '0') !== '0', { timeout: 25_000 });
+  await page.waitForTimeout(400);
+  await expect(page.locator('#chart-return')).toBeVisible();
+  await page.screenshot({ path: `${out}/train.png` });
+  expect(readFileSync(`${out}/train.png`).length).toBeGreaterThan(20_000);
+});
+
 test('fpv at night shows the hud', async ({ page }) => {
   await openShot(page, '?shot=fpv&seed=11&quality=high');
   await expect(page.locator('#hud')).toBeVisible();
