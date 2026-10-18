@@ -13,6 +13,7 @@ import { makeMaterials, type MaterialSet } from './three/materials';
 import { makePost, type PostStack } from './three/post';
 import { configureShadows } from './three/shadows';
 import { applySkyBackdrop } from './three/sky';
+import { resolveQuality, type QualityChoice } from './quality';
 
 export interface ViewHooks {
   fps: number;
@@ -97,9 +98,9 @@ export class ThreeView implements Renderer {
     this.scene.add(this.sun.target);
   }
 
-  async init(quality: QualityPreset = 'high'): Promise<void> {
-    this.quality = quality;
-    const gpuOk = await this.tryWebGPU();
+  async init(quality: QualityChoice = 'auto'): Promise<void> {
+    const gpuOk = quality === 'low' ? false : await this.tryWebGPU();
+    this.quality = resolveQuality(quality, gpuOk);
     if (!gpuOk) this.makeWebGL();
     this.pip = new THREE.WebGLRenderer({ canvas: this.pipCanvas, antialias: true, alpha: true });
     this.pip.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
