@@ -56,6 +56,12 @@ The Run view plays a lawnmower preview: drone track, coverage, a detection log, 
 
 Open `/mission.html` from the dev server. The editor does not import the sim renderer.
 
+![Mission editor with a geofence, a no-fly zone, and the start pose](docs/media/mission-editor.png)
+
+![Live preview paused for an entry approval](docs/media/mission-live.png)
+
+![End-of-mission report with unmeasured fields marked](docs/media/mission-report.png)
+
 | Query | Effect |
 | --- | --- |
 | `seed` | Building and episode seed |

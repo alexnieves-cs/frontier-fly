@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const out = 'docs/media';
 
+test.use({ viewport: { width: 1440, height: 900 } });
+
 test.beforeAll(() => {
   mkdirSync(out, { recursive: true });
 });
@@ -73,6 +75,7 @@ test('editor, live approval, and report screenshots', async ({ page }) => {
   await expect(page.locator('[data-testid=mission-report]')).toBeVisible({ timeout: 30_000 });
   await expect(page.locator('[data-testid=mission-report]')).toContainText('Path efficiency');
   await expect(page.locator('[data-testid=mission-report]')).toContainText('Not measured');
+  await page.locator('[data-testid=mission-report] dt', { hasText: 'Path efficiency' }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${out}/mission-report.png` });
   expect(readFileSync(`${out}/mission-report.png`).length).toBeGreaterThan(20_000);
 });

@@ -424,15 +424,18 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     context.textAlign = 'left';
     context.textBaseline = 'alphabetic';
     context.fillText(`${meters} m`, x, y - 6);
+    const nx = width - 28;
+    const ny = 22;
     context.beginPath();
-    context.moveTo(width - 22, 30);
-    context.lineTo(width - 22, 12);
-    context.moveTo(width - 25, 16);
-    context.lineTo(width - 22, 12);
-    context.lineTo(width - 19, 16);
+    context.moveTo(nx, ny + 16);
+    context.lineTo(nx, ny);
+    context.moveTo(nx - 3, ny + 4);
+    context.lineTo(nx, ny);
+    context.lineTo(nx + 3, ny + 4);
     context.stroke();
     context.textAlign = 'center';
-    context.fillText('N', width - 22, 10);
+    context.textBaseline = 'bottom';
+    context.fillText('N', nx, ny - 2);
   }
 
   function redraw(): void {
