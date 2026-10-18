@@ -17,13 +17,57 @@ export interface FloorGrid {
   surfaces?: Uint8Array;
 }
 
+export type PropKind = 'table' | 'chair' | 'shelf' | 'plant' | 'sofa';
+
+/** One furniture piece, in renderer convention: x and z horizontal (z = sim y), y up, rot about +y. */
+export interface PropPlacement {
+  kind: PropKind;
+  x: number;
+  y: number;
+  z: number;
+  rot: number;
+  floor: number;
+}
+
+/**
+ * Solid furniture part in sim space (x, y horizontal, z up). The box is
+ * oriented by `yaw` about +z: its local x axis points along (cos yaw, sin yaw).
+ * hx/hy/hz are half extents in that local frame.
+ */
+export interface FurnitureBox {
+  floor: number;
+  /** Index into FurniturePlan.props. */
+  prop: number;
+  cx: number;
+  cy: number;
+  cz: number;
+  hx: number;
+  hy: number;
+  hz: number;
+  yaw: number;
+  /** SURFACE class reported to the lidar. */
+  surface: number;
+}
+
+/** Seeded furniture layout shared by physics, the coverage denominator, the teacher, and the renderer. */
+export interface FurniturePlan {
+  props: PropPlacement[];
+  boxes: FurnitureBox[];
+}
+
 export interface BuildingSpec {
   seed: number;
   cellSize: number;
   floorHeight: number;
   floors: FloorGrid[];
   spawn: [number, number, number];
+  /**
+   * Coverage denominator: 0.5 m voxels the drone center can reach at flight
+   * altitude (floor + 1 m). See computeFlightMap in src/gen/validate.ts.
+   */
   reachableVoxels: number;
+  /** Solid furniture. Absent on hand-written fixtures and older JSON: those buildings are empty. */
+  furniture?: FurniturePlan;
 }
 
 export interface GenParams {
