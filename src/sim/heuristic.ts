@@ -1,4 +1,4 @@
-import { LIDAR_H } from '../shared/constants';
+import { LIDAR_H, OBS } from '../shared/constants';
 
 /** Cheap lidar explorer used for shot cameras and as a light-invariant baseline. */
 export function heuristicAction(obs: Float32Array): Float32Array {
@@ -6,15 +6,15 @@ export function heuristicAction(obs: Float32Array): Float32Array {
   let left = 0;
   let right = 0;
   for (let i = 0; i < LIDAR_H; i++) {
-    const range = obs[i] ?? 0;
+    const range = obs[OBS.lidar + i] ?? 0;
     const ang = (i / LIDAR_H) * Math.PI * 2;
     const wrapped = ang > Math.PI ? ang - Math.PI * 2 : ang;
     if (Math.abs(wrapped) < 0.5) front = Math.min(front, range);
     if (wrapped > 0.2 && wrapped < 2.2) left += range;
     if (wrapped < -0.2 && wrapped > -2.2) right += range;
   }
-  const alt = obs[46] ?? 0.34;
-  const ceil = obs[47] ?? 1;
+  const alt = obs[OBS.alt] ?? 0.34;
+  const ceil = obs[OBS.ceil] ?? 1;
   let vz = Math.max(-0.6, Math.min(0.6, (0.36 - alt) * 4));
   if (ceil < 0.16) vz = Math.min(vz, -0.35);
   const side = left - right;

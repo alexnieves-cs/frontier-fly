@@ -11,22 +11,32 @@ import { runTrace, traceSpec, TRACE_CASES } from '../support/envTrace';
 /**
  * Trace hashes recorded on the code before the throughput work (frontier ring
  * search, env allocation fixes, pooled physics), by bundling
- * tests/support/printTraceHashes.ts against that checkout. They pin
- * observations, rewards, done flags and coverage bit for bit.
+ * tests/support/printTraceHashes.ts against that checkout: 306 on the original
+ * observation, 1088 on observation v2 (branch claude/indoor-policy-generalize-w4bvyl
+ * at 3462aae). They pin observations, rewards, done flags and coverage bit for bit.
  *
- * They are only valid for the observation/reward definition they were recorded
- * with (OBS_DIM 306, the original reward). After an intentional change to the
- * observation or reward, re-record: `npx vite-node tests/support/printTraceHashes.ts`
- * on the commit before your change and on yours must agree; paste the new values.
+ * Valid only for the observation/reward definition they were recorded with
+ * (keyed by OBS_DIM; the reward is not part of the key). After an intentional
+ * observation or reward change, run `npx vite-node tests/support/printTraceHashes.ts`
+ * and paste the new values, after checking a perf-only change does not move them.
  */
-const GOLDEN_OBS_DIM = 306;
-const GOLDEN: Record<string, string> = {
-  'stage0-kinematic': '8987d8b4',
-  'stage2-kinematic': '6685ea79',
-  'stage3-noise-latency': '562f291a',
-  'stage4-multifloor': 'cad600fa',
-  'stage4-quad': '8205deb1',
+const GOLDEN_BY_OBS_DIM: Record<number, Record<string, string>> = {
+  306: {
+    'stage0-kinematic': '8987d8b4',
+    'stage2-kinematic': '6685ea79',
+    'stage3-noise-latency': '562f291a',
+    'stage4-multifloor': 'cad600fa',
+    'stage4-quad': '8205deb1',
+  },
+  1088: {
+    'stage0-kinematic': 'a292aa86',
+    'stage2-kinematic': 'a7164f93',
+    'stage3-noise-latency': '3e666b17',
+    'stage4-multifloor': 'ef3d3744',
+    'stage4-quad': '6c1f28bc',
+  },
 };
+const GOLDEN = GOLDEN_BY_OBS_DIM[OBS_DIM];
 
 /** Verbatim copy of the original nearestOpen scan (before the ring search). */
 function referenceNearestOpen(spec: BuildingSpec, visited: Uint8Array, pos: [number, number, number], radius: number): number {
@@ -70,10 +80,10 @@ function referenceFrontierDistance(spec: BuildingSpec, visited: Uint8Array, pos:
 }
 
 describe('bit-identical env after the throughput work', () => {
-  it.skipIf(OBS_DIM !== GOLDEN_OBS_DIM)('matches the trace hashes recorded before the change', async () => {
+  it.skipIf(!GOLDEN)('matches the trace hashes recorded before the change', async () => {
     for (const c of TRACE_CASES) {
       const env = await createEnv();
-      expect([c.name, runTrace(env, c).hash]).toEqual([c.name, GOLDEN[c.name]]);
+      expect([c.name, runTrace(env, c).hash]).toEqual([c.name, GOLDEN![c.name]]);
       env.dispose();
     }
   });
