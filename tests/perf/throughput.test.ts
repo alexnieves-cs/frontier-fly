@@ -18,7 +18,7 @@ describe('multi-worker rollout throughput', () => {
     });
     const cores = Math.max(1, Math.min(4, availableParallelism()));
     const heuristic = await Promise.all(
-      Array.from({ length: cores }, (_, i) => spawn(outfile, { envs: 2, steps: 200, seed: 40 + i * 17, mode: 'heuristic' })),
+      Array.from({ length: cores }, (_, i) => spawn(outfile, { envs: 2, steps: 1000, seed: 40 + i * 17, mode: 'heuristic' })),
     );
     const policy = await Promise.all(
       Array.from({ length: cores }, (_, i) => spawn(outfile, { envs: 2, steps: 64, seed: 90 + i * 17, mode: 'policy' })),
@@ -28,7 +28,7 @@ describe('multi-worker rollout throughput', () => {
     console.log(
       `throughput workers=${cores} heuristic=${heuristicRate.toFixed(0)} steps/s policy=${policyRate.toFixed(0)} steps/s target=10000`,
     );
-    expect(heuristic.reduce((sum, row) => sum + row.steps, 0)).toBe(cores * 2 * 200);
+    expect(heuristic.reduce((sum, row) => sum + row.steps, 0)).toBe(cores * 2 * 1000);
     expect(heuristicRate).toBeGreaterThan(2_000 * cores);
   }, 120_000);
 });
