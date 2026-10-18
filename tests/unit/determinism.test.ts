@@ -12,8 +12,8 @@ import { runTrace, traceSpec, TRACE_CASES } from '../support/envTrace';
  * Trace hashes recorded on the code before the throughput work (frontier ring
  * search, env allocation fixes, pooled physics), by bundling
  * tests/support/printTraceHashes.ts against that checkout: 306 on the original
- * observation, 1088 on observation v2 (branch claude/indoor-policy-generalize-w4bvyl
- * at 3462aae). They pin observations, rewards, done flags and coverage bit for bit.
+ * observation, 1088 on observation v2 + solid furniture (branch
+ * claude/indoor-policy-generalize-w4bvyl at d62115d). They pin observations, rewards, done flags and coverage bit for bit.
  *
  * Valid only for the observation/reward definition they were recorded with
  * (keyed by OBS_DIM; the reward is not part of the key). After an intentional
@@ -29,11 +29,11 @@ const GOLDEN_BY_OBS_DIM: Record<number, Record<string, string>> = {
     'stage4-quad': '8205deb1',
   },
   1088: {
-    'stage0-kinematic': 'a292aa86',
-    'stage2-kinematic': 'a7164f93',
-    'stage3-noise-latency': '3e666b17',
-    'stage4-multifloor': 'ef3d3744',
-    'stage4-quad': '6c1f28bc',
+    'stage0-kinematic': 'd52a02d0',
+    'stage2-kinematic': 'da03155a',
+    'stage3-noise-latency': '2d81b682',
+    'stage4-multifloor': 'eaa10e2f',
+    'stage4-quad': '08d98fc3',
   },
 };
 const GOLDEN = GOLDEN_BY_OBS_DIM[OBS_DIM];
