@@ -127,6 +127,8 @@ interface Visit {
   pass: number;
   policyCollisions: number;
   entered: boolean;
+  /** Positions flown outside near this building, known to be clear. */
+  trail: V3[];
 }
 
 function fmt(n: number, d = 1): string {
@@ -170,11 +172,11 @@ class Runner implements MissionRunner {
   private readonly pending: MissionBuilding[] = [];
   private readonly visitedBuildings = new Set<string>();
   private visit: Visit | null = null;
-  private lastRefuge: V3 | null = null;
   private operatorAnswer: 'approve' | 'deny' | null = null;
   private pendingEntry: EntryCandidate | null = null;
   private confirmTrack: ConfirmTrack | null = null;
-  private readonly attempted = new Set<string>();
+  /** Earliest time each track may get another confirmation attempt. */
+  private readonly attempted = new Map<string, number>();
   private outdoorClearChecked = false;
   private policyClean = false;
   private frontierRan = false;
@@ -204,7 +206,7 @@ class Runner implements MissionRunner {
     this.agl = cruiseAglFor(mission);
     this.battery = createBattery();
     this.batteryStart = this.battery.remainingPct();
-    this.vehicle = new Vehicle(physics, this.battery, world.home, world.homeYaw);
+    this.vehicle = new Vehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor);
     this.monitor = createSafetyMonitor(mission, world);
     this.tracker = new ConfirmTracker(mission);
     this.coverage = planCoverage(mission, world, { agl: this.agl });
@@ -371,11 +373,42 @@ class Runner implements MissionRunner {
       this.crumbs.push([p[0], p[1], p[2]]);
       if (this.crumbs.length > 400) this.crumbs.shift();
     }
+    const v = this.visit;
+    if (v && !this.inside && v.standoff) {
+      const tl = v.trail[v.trail.length - 1];
+      if (!tl || dist(tl, p) >= 0.3) v.trail.push([p[0], p[1], p[2]]);
+    }
+  }
+
+  /** Retrace flown positions (known clear) backwards until `enough` holds. String-pulled with casts. */
+  private retrace(trail: readonly V3[], enough: (p: V3) => boolean): Waypoint[] {
+    const out: Waypoint[] = [];
+    let cur: V3 = this.vehicle.pos;
+    let i = trail.length - 1;
+    for (let guard = 0; i >= 0 && guard < 400 && !enough(cur); guard++) {
+      let j = i;
+      for (let k = Math.max(0, i - 40); k < i; k++) {
+        if (segmentClear(this.physics, cur, trail[k]!, 0.25)) {
+          j = k;
+          break;
+        }
+      }
+      cur = trail[j]!;
+      out.push({ pos: cur, tol: 0.2 });
+      i = j - 1;
+    }
+    return out;
   }
 
   // ----------------------------------------------------------- jobs
 
-  private followJob(phase: Phase, wps: Waypoint[], onDone: () => void, passTol?: number): Job {
+  private followJob(phase: Phase, route: Waypoint[], onDone: () => void, passTol?: number): Job {
+    // Close to obstacles, brake to a stop before turning onto a new path.
+    const v0 = this.vehicle.vel;
+    const wps =
+      passTol !== undefined && passTol <= 0.3 && Math.hypot(v0[0], v0[1], v0[2]) > 0.15 && route.length
+        ? [{ pos: [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]] as V3, tol: 0.12 }, ...route]
+        : route;
     let idx = 0;
     let dwell = -1;
     let spin = -1;
@@ -400,8 +433,9 @@ class Runner implements MissionRunner {
       if (la < 1e-6 || lb < 1e-6) return 0.5;
       const cos = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (la * lb);
       if (cos > 0.9) return 99;
-      if (cos > 0.5) return 1.5;
-      return 0.6;
+      if (cos > 0.7) return 1.2;
+      // Sharp corners are full stops so the drone never swings wide near obstacles.
+      return 0;
     };
     return {
       phase,
@@ -411,7 +445,7 @@ class Runner implements MissionRunner {
         while (idx < wps.length) {
           const wp = wps[idx]!;
           const d = dist(pos, wp.pos);
-          const stop = isStop(idx);
+          const stop = isStop(idx) || cornerSpeed(idx) === 0;
           const tol = stop ? 0.12 : tolFor(idx);
           const slow = len(this.vehicle.vel) < 0.3;
           if (d < tol && (!stop || slow)) {
@@ -422,7 +456,7 @@ class Runner implements MissionRunner {
               if (spin <= 0) spin = 0;
               return { vel: hold(pos, wp.pos), yawRate: rate };
             }
-            if (wp.dwell && dwell < 0) dwell = wp.dwell;
+            if (dwell === -1) dwell = wp.dwell ?? 0;
             if (dwell > 0) {
               dwell -= this.dt;
               return { vel: hold(pos, wp.pos), yaw: wp.yaw ?? null };
@@ -629,7 +663,7 @@ class Runner implements MissionRunner {
     // Start a confirmation when a mission-class contact appears.
     if (this.phase === 'coverage' || this.phase === 'indoor_explore') {
       for (const track of this.tracker.tracks) {
-        if (track.status !== 'open' || this.attempted.has(track.id)) continue;
+        if (track.status !== 'open' || (this.attempted.get(track.id) ?? 0) > this.t) continue;
         const indoor = this.phase === 'indoor_explore';
         if (indoor && v && track.buildingId !== v.b.id) continue;
         if (!indoor && track.buildingId !== null) continue;
@@ -644,7 +678,7 @@ class Runner implements MissionRunner {
   private resumeAfterConfirm: (() => void) | null = null;
 
   private startConfirm(track: ConfirmTrack): void {
-    this.attempted.add(track.id);
+    this.attempted.set(track.id, Infinity);
     const need = Math.max(1, this.tracker.minViews - track.views.length + 1);
     const pos = this.vehicle.pos;
     const v = this.visit;
@@ -657,7 +691,7 @@ class Runner implements MissionRunner {
       let cur = toLocal(grid, pos);
       let views: V3[] = [];
       for (const r of [2.2, 1.6, 3]) {
-        views = confirmViewpoints(track, cur, r, z, need, (p) => {
+        views = confirmViewpoints(track, est, cur, r, z, need, (p) => {
           const c = nearestNav(grid, p);
           if (!c || Math.hypot((c.x + 0.5) * grid.cs - p[0], (c.z + 0.5) * grid.cs - p[1]) > 0.75) return false;
           if (wallClearance(grid, f, p[0], p[1]) < PATH_CLEARANCE) return false;
@@ -677,7 +711,7 @@ class Runner implements MissionRunner {
       this.resumeAfterConfirm = () => this.exploreNext();
     } else {
       const z = cruiseZ(this.air, track.estimate[0], track.estimate[1], this.agl);
-      const views = confirmViewpoints(track, pos, 8, z, need, (p) => {
+      const views = confirmViewpoints(track, track.estimate, pos, 8, z, need, (p) => {
         if (!operable(this.air, p[0], p[1])) return false;
         const d = sub(track.estimate, p);
         const hit = this.physics.cast(p[0], p[1], p[2], d[0], d[1], d[2], len(d));
@@ -690,6 +724,14 @@ class Runner implements MissionRunner {
         cur = vp;
       }
       this.resumeAfterConfirm = () => this.startCoverage();
+    }
+    if (!wps.some((w) => w.dwell)) {
+      // Nowhere to re-view from yet. Keep the track open and try again later.
+      this.attempted.set(track.id, this.t + 6);
+      const resume = this.resumeAfterConfirm;
+      this.resumeAfterConfirm = null;
+      resume?.();
+      return;
     }
     this.confirmTrack = track;
     this.log(
@@ -749,6 +791,7 @@ class Runner implements MissionRunner {
       pass: 0,
       policyCollisions: 0,
       entered: false,
+      trail: [],
     };
     this.visit = v;
     const plan = planApproach(b, this.vehicle.pos, this.physics, this.air, this.agl);
@@ -759,7 +802,6 @@ class Runner implements MissionRunner {
       return;
     }
     v.standoff = plan.standoff;
-    this.lastRefuge = plan.standoff.pos;
     this.log('action', `Approaching ${b.label}. Standoff ${this.where(plan.standoff.pos)}, open descent column checked.`);
     const wps: Waypoint[] = [
       ...plan.cruise.map((p) => ({ pos: p, tol: 1.5 })),
@@ -861,7 +903,16 @@ class Runner implements MissionRunner {
     v.axis = passageAxis(opening);
     v.aborts = 0;
     const ft = new FlyThrough(v.axis, 'in');
-    const leg = legBetween(this.physics, this.vehicle.pos, ft.start, v.box.roofZ + 2.5);
+    const hop = v.box.roofZ + 2.5;
+    let leg = legBetween(this.physics, this.vehicle.pos, ft.start, hop);
+    const refuge = v.standoff?.pos;
+    if (!leg && refuge) {
+      // Retrace the inspection path until the alignment point is reachable.
+      const back = this.retrace(v.trail, (p) => legBetween(this.physics, p, ft.start, hop) !== null);
+      const end = back.length ? back[back.length - 1]!.pos : this.vehicle.pos;
+      const tail = legBetween(this.physics, end, ft.start, hop);
+      if (tail) leg = [...back.map((w) => w.pos), ...tail];
+    }
     if (!leg) {
       this.log('warn', `No clear path to the alignment point of opening ${opening.id}.`);
       v.candIdx += 1;
@@ -1076,13 +1127,11 @@ class Runner implements MissionRunner {
     const top = cruiseZ(this.air, pos[0], pos[1], this.agl);
     if (pos[2] >= top - 0.5) return [];
     if (columnClear(this.physics, pos[0], pos[1], pos[2], top, 0.45)) return [{ pos: [pos[0], pos[1], top] }];
-    const refuge = this.visit?.standoff?.pos ?? this.lastRefuge;
-    if (refuge) {
-      const hop = this.visit ? this.visit.box.roofZ + 2.5 : pos[2] + 2;
-      const leg = legBetween(this.physics, pos, refuge, hop) ?? (segmentClear(this.physics, pos, refuge) ? [refuge] : null);
-      if (leg) return [...leg.map((p) => ({ pos: p })), { pos: [refuge[0], refuge[1], cruiseZ(this.air, refuge[0], refuge[1], this.agl)] }];
-    }
-    return [{ pos: [pos[0], pos[1], top] }];
+    const open = (p: V3) => columnClear(this.physics, p[0], p[1], p[2], cruiseZ(this.air, p[0], p[1], this.agl), 0.45);
+    const back = this.retrace(this.visit?.trail.length ? this.visit.trail : this.crumbs, open);
+    const end = back.length ? back[back.length - 1]!.pos : pos;
+    if (back.length && !open(end)) this.log('warn', 'No open column found on the way back. Climbing anyway.');
+    return [...back, { pos: [end[0], end[1], cruiseZ(this.air, end[0], end[1], this.agl)] }];
   }
 
   private startReturn(reason: string): void {

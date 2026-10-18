@@ -1,5 +1,8 @@
-import { KINEMATIC_TAU } from '../../shared/constants';
+import { DRONE_RADIUS, KINEMATIC_TAU } from '../../shared/constants';
+import { containsPoint, inNoFly } from '../../world/outdoor/geofence';
 import type { OutdoorPhysics } from '../../world/outdoor/physics';
+import { sampleHeight } from '../../world/outdoor/terrain';
+import type { OutdoorWorld } from '../../world/outdoor/types';
 import type { BatteryModel, DronePose, V3 } from './contracts';
 
 /**
@@ -9,6 +12,11 @@ import type { BatteryModel, DronePose, V3 } from './contracts';
  * slides along solids; a collision is the start of a contact, so sliding
  * along a wall for many ticks counts once. Every tick draws battery power
  * for the current velocity and acceleration.
+ *
+ * OutdoorPhysics.move steps the Rapier world twice per call, which dominates
+ * a headless run. When a bundle of rays along the motion shows open air well
+ * past the swept sphere, the step is taken directly with the same geofence,
+ * no-fly, and terrain-floor rules; anything close falls through to move().
  */
 
 export interface VehicleLimits {
@@ -64,6 +72,9 @@ export interface VehicleStep {
 /** Contacts closer than this to the previous one belong to the same event, s. */
 export const CONTACT_GAP_SEC = 0.5;
 
+const LOOK_MARGIN = 0.6;
+const BUNDLE_RADIUS = DRONE_RADIUS + 0.12;
+
 function clampMag2(x: number, y: number, cap: number): [number, number] {
   const m = Math.hypot(x, y);
   if (m <= cap || m < 1e-12) return [x, y];
@@ -88,11 +99,16 @@ export class Vehicle {
   odometer = 0;
   private lastTouch = -Infinity;
 
+  /** Ticks resolved by OutdoorPhysics.move versus the open-air fast path. */
+  physicsMoves = 0;
+  freeMoves = 0;
+
   constructor(
     private readonly physics: OutdoorPhysics,
     readonly battery: BatteryModel,
     start: V3,
     yaw: number,
+    private readonly world: OutdoorWorld | null = null,
   ) {
     this.pos = [start[0], start[1], start[2]];
     this.yaw = wrap(yaw);
@@ -138,7 +154,8 @@ export class Vehicle {
     this.yawRate = rate;
 
     const before: V3 = [this.pos[0], this.pos[1], this.pos[2]];
-    const moved = this.physics.move(before, [vx * dt, vy * dt, vz * dt]);
+    const delta: V3 = [vx * dt, vy * dt, vz * dt];
+    const moved = this.openAir(before, delta) ?? this.physicsMove(before, delta);
     this.pos = [moved.pos[0], moved.pos[1], moved.pos[2]];
     // The velocity that actually happened after sliding.
     const real: V3 = [(this.pos[0] - before[0]) / dt, (this.pos[1] - before[1]) / dt, (this.pos[2] - before[2]) / dt];
@@ -161,5 +178,53 @@ export class Vehicle {
     const powerW = this.battery.powerFor(this.vel, this.accel);
     this.battery.draw(powerW, dt);
     return { collided, touching, powerW };
+  }
+
+  private physicsMove(pos: V3, delta: V3): { pos: V3; hit: boolean } {
+    this.physicsMoves += 1;
+    const m = this.physics.move(pos, delta);
+    return { pos: [m.pos[0], m.pos[1], m.pos[2]], hit: m.hit };
+  }
+
+  /** Direct step when rays along the motion find nothing within the swept sphere plus a margin. */
+  private openAir(pos: V3, delta: V3): { pos: V3; hit: boolean } | null {
+    const world = this.world;
+    if (!world) return null;
+    const l = Math.hypot(delta[0], delta[1], delta[2]);
+    if (l < 1e-9) {
+      this.freeMoves += 1;
+      return { pos: [pos[0], pos[1], pos[2]], hit: false };
+    }
+    const next: V3 = [pos[0] + delta[0], pos[1] + delta[1], pos[2] + delta[2]];
+    if (!containsPoint(world.geofence, next[0], next[1]) || inNoFly(world.noFly, next[0], next[1], next[2])) return null;
+    if (next[2] < sampleHeight(world.terrain, next[0], next[1]) + DRONE_RADIUS + 0.3) return null;
+    const d: V3 = [delta[0] / l, delta[1] / l, delta[2] / l];
+    let side: V3 = [-d[1], d[0], 0];
+    const sl = Math.hypot(side[0], side[1]);
+    side = sl < 1e-3 ? [1, 0, 0] : [side[0] / sl, side[1] / sl, 0];
+    const up: V3 = [side[1] * d[2] - side[2] * d[1], side[2] * d[0] - side[0] * d[2], side[0] * d[1] - side[1] * d[0]];
+    const reach = l + LOOK_MARGIN;
+    for (let k = -1; k < 8; k++) {
+      let ox = pos[0];
+      let oy = pos[1];
+      let oz = pos[2];
+      if (k >= 0) {
+        const a = (k / 8) * Math.PI * 2;
+        const cs = Math.cos(a) * BUNDLE_RADIUS;
+        const sn = Math.sin(a) * BUNDLE_RADIUS;
+        ox += side[0] * cs + up[0] * sn;
+        oy += side[1] * cs + up[1] * sn;
+        oz += side[2] * cs + up[2] * sn;
+      }
+      if (this.physics.cast(ox, oy, oz, d[0], d[1], d[2], reach)) return null;
+    }
+    // Sideways too, so a wall the drone grazes at a shallow angle is never skipped.
+    for (const s of [side, up]) {
+      for (const sign of [1, -1]) {
+        if (this.physics.cast(next[0], next[1], next[2], s[0] * sign, s[1] * sign, s[2] * sign, BUNDLE_RADIUS + 0.2)) return null;
+      }
+    }
+    this.freeMoves += 1;
+    return { pos: next, hit: false };
   }
 }

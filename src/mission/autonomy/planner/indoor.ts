@@ -253,7 +253,7 @@ export function planIndoorPath(grid: IndoorGrid, from: V3, to: V3): V3[] | null 
   const first = cellCenter(grid, a);
   const path = cellsToPath(grid, cells);
   const out: V3[] = [];
-  if (Math.hypot(first[0] - from[0], first[1] - from[1]) > 0.15 || Math.abs(first[2] - from[2]) > 0.2) out.push(first);
+  if (Math.hypot(first[0] - from[0], first[1] - from[1]) > 0.05 || Math.abs(first[2] - from[2]) > 0.2) out.push(first);
   out.push(...path);
   return out;
 }
@@ -391,7 +391,7 @@ export class FrontierExplorer {
     cells.reverse();
     const path: V3[] = [];
     const first = cellCenter(this.grid, start);
-    if (Math.hypot(first[0] - local[0], first[1] - local[1]) > 0.15 || Math.abs(first[2] - local[2]) > 0.2) path.push(first);
+    if (Math.hypot(first[0] - local[0], first[1] - local[1]) > 0.05 || Math.abs(first[2] - local[2]) > 0.2) path.push(first);
     path.push(...cellsToPath(this.grid, cells));
     if (!path.length) path.push(first);
     return { path, spin: true, gain: bestGain };

@@ -189,12 +189,13 @@ export class ConfirmTracker {
 }
 
 /**
- * Re-view poses around an estimate: bearings at least `minSepDeg` from
+ * Re-view poses around an estimate (`center`, in the caller's frame): bearings at least `minSepDeg` from
  * every existing view and from each other. `accept` filters candidates
  * (reachable, line of sight). Returns up to `count` poses, nearest first.
  */
 export function confirmViewpoints(
   track: ConfirmTrack,
+  center: V3,
   from: V3,
   radius: number,
   z: number,
@@ -209,7 +210,7 @@ export function confirmViewpoints(
   for (let k = 0; k < 24; k++) {
     const a = (k / 24) * Math.PI * 2;
     // A camera at angle a around the target looks along bearing a + pi.
-    const p: V3 = [track.estimate[0] + Math.cos(a) * radius, track.estimate[1] + Math.sin(a) * radius, z];
+    const p: V3 = [center[0] + Math.cos(a) * radius, center[1] + Math.sin(a) * radius, z];
     const bearing = Math.atan2(-Math.sin(a), -Math.cos(a));
     cands.push({ p, angle: bearing, d: Math.hypot(p[0] - from[0], p[1] - from[1]) });
   }
