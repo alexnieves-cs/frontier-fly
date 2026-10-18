@@ -104,6 +104,29 @@ flowchart LR
 
 The generator is `src/world/outdoor`. It calls `generateBuilding` for interiors and does not change `src/shared`.
 
+## Autonomous missions
+
+`demo.html` flies a full woods-to-building search on its own: outdoor coverage, approach, opening inspection, entry selection, fly-through, indoor search, confirmation, return home, and a report. Three seeded scenarios ship in `src/mission/autonomy/scenarios.ts`:
+
+| Scenario | Seed | What happens |
+| --- | --- | --- |
+| `cabin-day` | 20 | Day. Find a simulated injured hiker lying inside a cabin. Entry policy `auto`. |
+| `compound-clear` | 37 | Day. Safety sweep of two buildings with decoys and nobody inside. Entry policy `ask`, so each entry waits for Approve or Deny. |
+| `backpack-night` | 17 | 23:00, flashlight on, interior lights off. Find a backpack and ignore the look-alike bag. Entry policy `auto`. |
+
+Each seed builds on the outdoor generator's first attempt, and every building's passable opening is a ground-floor wall opening (a garage gap or an open window), so entry is a level fly-through with at least 0.42 m of margin over the airframe.
+
+The page has a live top-down map (terrain, trees, footprints, openings colored by entry safety, geofence, no-fly zones, plan, flown track, drone heading, contacts, and confirmed finds), a phase stepper, a HUD, an operator prompt, an event log, and the end-of-mission report. The sim clock holds while an entry prompt is open. An optional 3D chase picture-in-picture reuses the outdoor renderer in daylight.
+
+| Query | Effect |
+| --- | --- |
+| `scenario` | `cabin-day`, `compound-clear`, or `backpack-night` |
+| `speed` | `1`, `4`, `16`, or `max` |
+| `autorun=1` | Start when the page loads |
+| `operator=approve` | Approve entry prompts automatically |
+
+`/demo.html?scenario=compound-clear&speed=max&autorun=1` is the shareable form. `tests/e2e/demo.spec.ts` runs all three at Max speed and saves `docs/media/demo-<id>.png`. `tests/unit/autonomy.scenarios.test.ts` checks the worlds and missions and runs each scenario headless with `runMission` and `buildReport`.
+
 ## What is implemented
 
 - Seeded buildings: BSP rooms, doors, hallways from stage 3, shafts when there is more than one floor, and a reachability check that retries with `seed + 1`.
