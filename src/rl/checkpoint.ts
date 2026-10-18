@@ -1,7 +1,10 @@
 /** JSON checkpoint plus an IndexedDB helper. IndexedDB is touched only through globalThis. */
+import { OBS_DIM, OBS_VERSION } from '../shared/constants';
 
 export interface Checkpoint {
   version: number;
+  /** Observation layout version (src/sim/OBS_LAYOUT.md). Files without it are v1. */
+  obsVersion: number;
   obsDim: number;
   actDim: number;
   hidden: number[];
@@ -38,6 +41,7 @@ export function parseCheckpoint(text: string): Checkpoint {
   }
   return {
     version: num(o.version, 'version'),
+    obsVersion: o.obsVersion === undefined ? 1 : num(o.obsVersion, 'obsVersion'),
     obsDim: num(o.obsDim, 'obsDim'),
     actDim: num(o.actDim, 'actDim'),
     hidden,
@@ -48,6 +52,15 @@ export function parseCheckpoint(text: string): Checkpoint {
     rewVar: num(o.rewVar, 'rewVar'),
     stage: num(o.stage, 'stage'),
   };
+}
+
+/**
+ * Null when the checkpoint can drive the current observation, otherwise a
+ * human-readable reason (an old v1 file against a v2 build, say).
+ */
+export function checkpointMismatch(c: Pick<Checkpoint, 'obsDim' | 'obsVersion'>, obsDim = OBS_DIM, obsVersion = OBS_VERSION): string | null {
+  if (c.obsVersion === obsVersion && c.obsDim === obsDim) return null;
+  return `checkpoint is for observation v${c.obsVersion} (${c.obsDim} inputs) but this build uses v${obsVersion} (${obsDim} inputs)`;
 }
 
 function idbFactory(): IDBFactory | null {

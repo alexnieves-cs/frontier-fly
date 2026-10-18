@@ -13,7 +13,8 @@ export const SURFACE = {
   METAL: 4,
 } as const;
 
-export const OBS_DIM = 306;
+/** Observation contract version. v1 = 306 floats (shipped pretrained.json). See src/sim/OBS_LAYOUT.md. */
+export const OBS_VERSION = 2;
 export const ACT_DIM = 4;
 
 export const CELL_SIZE = 1;
@@ -36,7 +37,49 @@ export const LIDAR_H = 32;
 export const LIDAR_TILT = 8;
 export const LIDAR_MAX = 8;
 export const MAP_SIZE = 16;
-export const MAP_CELLS = MAP_SIZE * MAP_SIZE - 2;
+export const MAP_CELLS = MAP_SIZE * MAP_SIZE;
+/** Coarse egocentric map: 16x16 cells, each COARSE_VOXELS x COARSE_VOXELS fine voxels (2 m). */
+export const COARSE_VOXELS = 4;
+/** Frontier/navigation feature block length. */
+export const NAV_FEATURES = 12;
+
+/**
+ * Observation v2 offsets (see src/sim/OBS_LAYOUT.md). Indices 0–47 keep their
+ * v1 meaning so lidar-only code (sim/heuristic.ts) reads the same slots.
+ */
+export const OBS = {
+  lidar: 0,
+  tilt: 32,
+  vel: 40,
+  yawRate: 43,
+  sinYaw: 44,
+  cosYaw: 45,
+  alt: 46,
+  ceil: 47,
+  roll: 48,
+  pitch: 49,
+  floor: 50,
+  time: 51,
+  /** Navigation block: 12 floats from the sensor-only seen-free map. */
+  nav: 52,
+  wpDir: 52,
+  pathLen: 54,
+  hasFrontier: 55,
+  clusterDir: 56,
+  clusterDist: 58,
+  clusterMass: 59,
+  stall: 60,
+  bfsTruncated: 61,
+  frontierTotal: 62,
+  frontierDist: 63,
+  localVisited: 64,
+  localFrontier: 64 + MAP_CELLS,
+  coarseVisited: 64 + 2 * MAP_CELLS,
+  coarseFrontier: 64 + 3 * MAP_CELLS,
+  end: 64 + 4 * MAP_CELLS,
+} as const;
+
+export const OBS_DIM = OBS.end;
 
 export const GAMMA = 0.99;
 export const GAE_LAMBDA = 0.95;

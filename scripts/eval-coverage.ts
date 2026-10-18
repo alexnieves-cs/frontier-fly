@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { evalCoverage, formatCoverageTable } from '../src/eval/coverage';
-import { parseCheckpoint } from '../src/rl/checkpoint';
+import { checkpointMismatch, parseCheckpoint } from '../src/rl/checkpoint';
 import { InferPolicy } from '../src/rl/infer';
 import { RNG } from '../src/shared/rng';
 import { frontierAction } from '../src/sim/frontier';
@@ -25,6 +25,12 @@ async function main() {
     console.log(formatCoverageTable(report, 'privileged frontier teacher'));
   } else {
     const checkpoint = parseCheckpoint(readFileSync(path, 'utf8'));
+    const mismatch = checkpointMismatch(checkpoint);
+    if (mismatch) {
+      console.error(`${path}: ${mismatch}`);
+      process.exitCode = 1;
+      return;
+    }
     const policy = new InferPolicy(checkpoint.obsDim, checkpoint.actDim, checkpoint.hidden, 1);
     policy.setWeights(checkpoint.weights.map((row) => Float32Array.from(row).buffer));
     const rng = new RNG(1);
