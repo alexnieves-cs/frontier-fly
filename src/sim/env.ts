@@ -1,6 +1,7 @@
 import {
   COVERAGE_SUCCESS,
   MAX_HARD_COLLISIONS,
+  OBS_DIM,
   PHYSICS_DT,
   PHYSICS_SUBSTEPS,
   POLICY_DT,
@@ -19,6 +20,8 @@ import { markVisited, sense } from './sensors';
 import { initPhysics, PhysicsWorld } from './world';
 import { isWalkable } from '../gen/validate';
 import { frontierDistance } from './frontier';
+import { FrontierNav } from './frontierFeatures';
+import { EgoMaps, SeenMap } from './seenMap';
 
 export function defaultEpisodeConfig(stage = 0, nRooms = 1): EpisodeConfig {
   return {
@@ -45,7 +48,11 @@ export class ExplorerEnv implements Env {
   private prevAction = new Float32Array(4);
   private held = new Float32Array(4);
   private scaled = new Float32Array(4);
-  private obs = new Float32Array(306);
+  private obs = new Float32Array(OBS_DIM);
+  /** Sensor-only seen-free voxels, per floor, reset per episode. */
+  private seen = new SeenMap();
+  private nav = new FrontierNav();
+  private maps = new EgoMaps();
   private collisions = 0;
   private hard = 0;
   private inContact = false;
@@ -84,6 +91,7 @@ export class ExplorerEnv implements Env {
     const vd = floor0.d * 2;
     this.visited = new Uint8Array(spec.floors.length * vw * vd);
     this.visitedCount = 0;
+    this.seen.reset(spec);
     if (markVisited(spec, this.visited, this.state.pos[0], this.state.pos[1], this.state.pos[2])) {
       this.visitedCount = 1;
     }
@@ -158,7 +166,9 @@ export class ExplorerEnv implements Env {
       }
     }
 
-    const dyaw = this.state.yaw - this.prevYaw;
+    // Wrap so a yaw crossing ±π reads as a small turn, not a 2π spike.
+    let dyaw = this.state.yaw - this.prevYaw;
+    dyaw -= Math.round(dyaw / (Math.PI * 2)) * Math.PI * 2;
     this.yawRate = dyaw / POLICY_DT;
     this.prevYaw = this.state.yaw;
 
@@ -256,6 +266,11 @@ export class ExplorerEnv implements Env {
         lighting: this.cfg.lighting,
         noise: quiet,
         prevVel: [0, 0, 0],
+        seen: this.seen.data,
+        markSeen: null,
+        nav: this.nav,
+        maps: this.maps,
+        stall: this.stall,
       },
       out,
     );
@@ -264,6 +279,11 @@ export class ExplorerEnv implements Env {
 
   get visitedGrid(): Uint8Array {
     return this.visited;
+  }
+
+  /** Sensor-only seen-free voxel grid (same layout as visitedGrid). */
+  get seenGrid(): Uint8Array {
+    return this.seen.data;
   }
 
   get episodeLighting() {
@@ -307,6 +327,11 @@ export class ExplorerEnv implements Env {
         lighting: this.cfg.lighting,
         noise: this.noise,
         prevVel: this.prevVel,
+        seen: this.seen.data,
+        markSeen: this.seen,
+        nav: this.nav,
+        maps: this.maps,
+        stall: this.stall,
       },
       this.obs,
     );

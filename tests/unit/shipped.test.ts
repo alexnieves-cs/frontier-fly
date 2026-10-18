@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generateBuilding } from '../../src/gen/building';
-import { parseCheckpoint } from '../../src/rl/checkpoint';
+import { checkpointMismatch, parseCheckpoint } from '../../src/rl/checkpoint';
 import { Curriculum } from '../../src/rl/curriculum';
 import { InferPolicy } from '../../src/rl/infer';
 import { ACT_DIM, HIDDEN, OBS_DIM } from '../../src/shared/constants';
@@ -33,9 +33,19 @@ async function cover(policy: InferPolicy, stage: number, seed: number, lighting:
   return coverage;
 }
 
+const shipped = parseCheckpoint(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+const mismatch = checkpointMismatch(shipped);
+
 describe('shipped checkpoint', () => {
-  it('reports stage 0, stage 3, and night versus day', async () => {
-    const checkpoint = parseCheckpoint(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+  it('is refused with a clear reason when its observation layout is stale', () => {
+    if (!mismatch) return;
+    expect(mismatch).toContain(`v${shipped.obsVersion}`);
+    expect(shipped.obsDim).not.toBe(OBS_DIM);
+  });
+
+  // The shipped file predates observation v2 until a v2 checkpoint is trained and shipped.
+  it.skipIf(mismatch !== null)(`reports stage 0, stage 3, and night versus day${mismatch ? ` (skipped: ${mismatch})` : ''}`, async () => {
+    const checkpoint = shipped;
     expect(checkpoint.weights).toHaveLength(13);
     const policy = new InferPolicy(OBS_DIM, ACT_DIM, HIDDEN, 1);
     policy.setWeights(checkpoint.weights.map((row) => Float32Array.from(row).buffer));

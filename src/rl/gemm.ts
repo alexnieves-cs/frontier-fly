@@ -1,3 +1,5 @@
+import { HIDDEN, OBS_DIM } from '../shared/constants';
+
 /**
  * SIMD f32 gemm used by policy inference. The module is assembled from a
  * hand-written WASM text program (no third-party weights). If SIMD is missing,
@@ -10,7 +12,10 @@ const WASM_B64 =
   'AGFzbQEAAAABCwFgB39/f39/f38AAwIBAAUDAQBABxECBm1lbW9yeQIABGdlbW0AAAqIAgGFAgQGfwF7AX0BfyAFQQJ0IQwgBUF8cSEPA0BBACEIIAAgByAMbGohCgNAIAEgCCAMbGohC0MAAAAA/RMhDUEAIQkCQANAIAkgD08NASANIAogCUECdGr9AAIAIAsgCUECdGr9AAIA/eYB/eQBIQ0gCUEEaiEJDAALCyAN/R8AIA39HwGSIA39HwIgDf0fA5KSIQ4CQANAIAkgBU8NASAOIAogCUECdGoqAgAgCyAJQQJ0aioCAJSSIQ4gCUEBaiEJDAALCyAOIAIgCEECdGoqAgCSIQ4gAyAHIAZsIAhqQQJ0aiAOOAIAIAhBAWohCCAIIAZJDQALIAdBAWohByAHIARJDQALCw==';
 
 const MAX_BATCH = 64;
-const ACT_FLOATS = MAX_BATCH * 320;
+/** Row stride of the input/output scratch: the widest layer, rounded up to 4 floats. */
+const STRIDE = Math.ceil(Math.max(OBS_DIM, ...HIDDEN, 320) / 4) * 4;
+/** Input scratch at [0, ACT_FLOATS), output scratch at [ACT_FLOATS, 2 * ACT_FLOATS), weights after. */
+const ACT_FLOATS = MAX_BATCH * STRIDE;
 
 export interface GemmKernel {
   upload(data: Float32Array): number;
@@ -75,9 +80,12 @@ export function createGemm(): GemmKernel | null {
       },
       apply(x, n, inDim, weight, bias, outDim, tanhOut) {
         const y = new Float32Array(n * outDim);
+        // Wider-than-STRIDE layers still fit: shrink the batch so neither scratch overflows.
+        const rows = Math.max(1, Math.min(MAX_BATCH, Math.floor(ACT_FLOATS / Math.max(inDim, outDim, 1))));
+        if (Math.max(inDim, outDim) > ACT_FLOATS) throw new Error('gemm layer wider than scratch');
         let done = 0;
         while (done < n) {
-          const batch = Math.min(MAX_BATCH, n - done);
+          const batch = Math.min(rows, n - done);
           f32.set(x.subarray(done * inDim, (done + batch) * inDim), 0);
           gemm(0, weight * 4, bias * 4, ACT_FLOATS * 4, batch, inDim, outDim);
           const produced = f32.subarray(ACT_FLOATS, ACT_FLOATS + batch * outDim);

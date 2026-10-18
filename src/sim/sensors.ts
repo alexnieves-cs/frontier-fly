@@ -2,45 +2,25 @@ import {
   LIDAR_H,
   LIDAR_MAX,
   LIDAR_TILT,
-  MAP_CELLS,
-  MAP_SIZE,
+  MAX_SPEED_H,
+  MAX_SPEED_V,
+  MAX_YAW_RATE,
+  OBS,
   SURFACE,
   VOXEL,
 } from '../shared/constants';
 import type { BuildingSpec, DroneState, LightingState } from '../shared/types';
 import type { SensorNoise } from './dynamics/noise';
+import type { FrontierNav } from './frontierFeatures';
 import { nightFactor } from './lighting';
+import type { EgoMaps, SeenMap } from './seenMap';
 import type { PhysicsWorld } from './world';
 
-/**
- * Observation layout (OBS_DIM = 306). See sim/OBS_LAYOUT.md.
- * 0..31   horizontal lidar
- * 32..39  tilted lidar
- * 40..42  body velocity
- * 43      yaw rate
- * 44..45  sin/cos yaw
- * 46..47  altitude above floor, distance to ceiling (normalized by floor height)
- * 48..301 egocentric visited map (254 of the 16×16 crop)
- * 302     roll (0 in kinematic mode)
- * 303     pitch
- * 304     floor index normalized
- * 305     time remaining
- */
-export const OBS = {
-  lidar: 0,
-  tilt: 32,
-  vel: 40,
-  yawRate: 43,
-  sinYaw: 44,
-  cosYaw: 45,
-  alt: 46,
-  ceil: 47,
-  map: 48,
-  roll: 302,
-  pitch: 303,
-  floor: 304,
-  time: 305,
-} as const;
+/** Observation v2 offsets; re-exported from shared/constants. Layout in sim/OBS_LAYOUT.md. */
+export { OBS };
+
+/** Measured horizontal ranges (meters) of the last sense() call. */
+const ringMeters = new Float32Array(LIDAR_H);
 
 export interface SenseContext {
   world: PhysicsWorld;
@@ -54,6 +34,14 @@ export interface SenseContext {
   lighting: LightingState;
   noise: SensorNoise;
   prevVel: [number, number, number];
+  /** Seen-free voxel grid (same layout as `visited`). */
+  seen: Uint8Array;
+  /** When set, this step's horizontal ring is marked into the map before the maps are read. */
+  markSeen?: SeenMap | null;
+  nav: FrontierNav;
+  maps: EgoMaps;
+  /** Steps since the last new visited voxel. */
+  stall: number;
 }
 
 function voxelIndex(spec: BuildingSpec, x: number, y: number, z: number): number {
@@ -100,14 +88,16 @@ export function sense(ctx: SenseContext, out: Float32Array): Float32Array {
 
   for (let i = 0; i < LIDAR_H; i++) {
     const ang = yaw + (i / LIDAR_H) * Math.PI * 2;
-    out[i] = castNorm(Math.cos(ang), Math.sin(ang), 0);
+    const v = castNorm(Math.cos(ang), Math.sin(ang), 0);
+    out[OBS.lidar + i] = v;
+    ringMeters[i] = v * LIDAR_MAX;
   }
   for (let i = 0; i < LIDAR_TILT; i++) {
     const ang = yaw + (i / LIDAR_TILT) * Math.PI * 2;
     const elev = i % 2 === 0 ? 0.45 : -0.45;
     const ch = Math.cos(elev);
     const sh = Math.sin(elev);
-    out[LIDAR_H + i] = castNorm(Math.cos(ang) * ch, Math.sin(ang) * ch, sh);
+    out[OBS.tilt + i] = castNorm(Math.cos(ang) * ch, Math.sin(ang) * ch, sh);
   }
 
   const cy = Math.cos(yaw);
@@ -119,10 +109,10 @@ export function sense(ctx: SenseContext, out: Float32Array): Float32Array {
   const truthAccel: [number, number, number] = [cy * ax + sy * ay, -sy * ax + cy * ay, az];
   const accel = noise.accel(truthAccel, dt);
   const gyro = noise.gyro([0, 0, ctx.yawRate], dt);
-  out[OBS.vel] = cy * state.vel[0] + sy * state.vel[1] + (accel[0] - truthAccel[0]) * dt;
-  out[OBS.vel + 1] = -sy * state.vel[0] + cy * state.vel[1] + (accel[1] - truthAccel[1]) * dt;
-  out[OBS.vel + 2] = state.vel[2] + (accel[2] - truthAccel[2]) * dt;
-  out[OBS.yawRate] = gyro[2];
+  out[OBS.vel] = (cy * state.vel[0] + sy * state.vel[1] + (accel[0] - truthAccel[0]) * dt) / MAX_SPEED_H;
+  out[OBS.vel + 1] = (-sy * state.vel[0] + cy * state.vel[1] + (accel[1] - truthAccel[1]) * dt) / MAX_SPEED_H;
+  out[OBS.vel + 2] = (state.vel[2] + (accel[2] - truthAccel[2]) * dt) / MAX_SPEED_V;
+  out[OBS.yawRate] = gyro[2] / MAX_YAW_RATE;
   out[OBS.sinYaw] = Math.sin(yaw);
   out[OBS.cosYaw] = Math.cos(yaw);
 
@@ -136,24 +126,11 @@ export function sense(ctx: SenseContext, out: Float32Array): Float32Array {
   const vw = floor0.w * 2;
   const vd = floor0.d * 2;
   const fCount = spec.floors.length;
-  let written = 0;
-  for (let iz = 0; iz < MAP_SIZE && written < MAP_CELLS; iz++) {
-    for (let ix = 0; ix < MAP_SIZE && written < MAP_CELLS; ix++) {
-      const bx = (ix - (MAP_SIZE - 1) / 2) * VOXEL;
-      const by = (iz - (MAP_SIZE - 1) / 2) * VOXEL;
-      const wx = state.pos[0] + cy * bx - sy * by;
-      const wy = state.pos[1] + sy * bx + cy * by;
-      const vx = Math.floor(wx / VOXEL);
-      const vy = Math.floor(wy / VOXEL);
-      const f = ctx.floor;
-      let value = 0;
-      if (vx >= 0 && vy >= 0 && vx < vw && vy < vd && f >= 0 && f < fCount) {
-        value = ctx.visited[f * vw * vd + vy * vw + vx] ?? 0;
-      }
-      out[OBS.map + written] = value;
-      written += 1;
-    }
-  }
+  const x = state.pos[0];
+  const y = state.pos[1];
+  ctx.markSeen?.markRing(x, y, ctx.floor, yaw, ringMeters);
+  ctx.maps.write(out, OBS, ctx.visited, ctx.seen, vw, vd, ctx.floor, fCount, x, y, yaw);
+  ctx.nav.write(out, ctx.visited, ctx.seen, vw, vd, ctx.floor, fCount, x, y, yaw, ctx.stall);
   out[OBS.roll] = state.roll;
   out[OBS.pitch] = state.pitch;
   out[OBS.floor] = fCount <= 1 ? 0 : ctx.floor / (fCount - 1);

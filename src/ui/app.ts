@@ -1,10 +1,10 @@
 import './styles.css';
 import { generateBuilding } from '../gen/building';
-import { ACT_DIM, HIDDEN, OBS_DIM } from '../shared/constants';
+import { ACT_DIM, HIDDEN, OBS_DIM, OBS_VERSION } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { MetricsPayload } from '../shared/messages';
 import type { BuildingSpec, CameraMode, DroneState, LightingState, QualityPreset, SensorMode } from '../shared/types';
-import { parseCheckpoint, saveCheckpointIdb, loadCheckpointIdb, serializeCheckpoint, type Checkpoint } from '../rl/checkpoint';
+import { checkpointMismatch, parseCheckpoint, saveCheckpointIdb, loadCheckpointIdb, serializeCheckpoint, type Checkpoint } from '../rl/checkpoint';
 import { InferPolicy } from '../rl/infer';
 import { RunningNorm } from '../rl/normalize';
 import { makeDroneState } from '../sim/drone';
@@ -223,7 +223,8 @@ class Session {
     else if (this.pilot === 'policy' && this.policy && this.norm) {
       const normed = this.norm.apply(this.obs, 1);
       action = this.policy.actWith(normed, 1, this.actRng, true).action;
-    } else if (this.pilot === 'heuristic' || this.launch.shot) {
+    } else if (this.pilot === 'heuristic' || this.pilot === 'policy' || this.launch.shot) {
+      // 'policy' without a usable checkpoint (none yet, or refused) flies the lidar heuristic.
       action = heuristicAction(this.obs);
     }
     const step = this.env.step(action);
@@ -516,6 +517,15 @@ class Session {
   }
 
   private applyCheckpoint(checkpoint: Checkpoint, announce = true): void {
+    const mismatch = checkpointMismatch(checkpoint);
+    if (mismatch) {
+      // Refuse instead of feeding the network a different observation layout.
+      console.warn(`frontier-fly: ${mismatch}; flying the heuristic pilot instead`);
+      const link = this.q('#link');
+      link.textContent = `CKPT OBS v${checkpoint.obsVersion} REFUSED`;
+      link.title = `${mismatch}. Flying the heuristic pilot instead.`;
+      return;
+    }
     const policy = new InferPolicy(checkpoint.obsDim || OBS_DIM, checkpoint.actDim || ACT_DIM, checkpoint.hidden.length === 2 ? checkpoint.hidden : HIDDEN, 1);
     const buffers = checkpoint.weights.map((row) => {
       const arr = Float32Array.from(row);
@@ -557,6 +567,7 @@ class Session {
     const state = this.norm.toJSON();
     return {
       version: 1,
+      obsVersion: OBS_VERSION,
       obsDim: this.policy.obsDim,
       actDim: this.policy.actDim,
       hidden: this.policy.hidden,

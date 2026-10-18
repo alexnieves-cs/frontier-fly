@@ -17,6 +17,7 @@ function buffersFromNumbers(rows: number[][]): ArrayBuffer[] {
 function checkpointFrom(policy: InferPolicy, stage = 3): Checkpoint {
   return {
     version: 1,
+    obsVersion: 2,
     obsDim: policy.obsDim,
     actDim: policy.actDim,
     hidden: [...policy.hidden],
