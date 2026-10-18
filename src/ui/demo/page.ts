@@ -9,6 +9,7 @@ import type {
   TruthTarget,
 } from '../../mission/autonomy/contracts';
 import { buildReport } from '../../mission/autonomy/report';
+import { policyFromJson, type NormalizedPolicy } from '../../mission/autonomy/policy';
 import { createMissionRunner } from '../../mission/autonomy/runner';
 import {
   DEFAULT_SCENARIO,
@@ -61,10 +62,22 @@ export function startDemo(root: HTMLElement): void {
   const scenario: ScenarioId = isScenarioId(requested) ? requested : DEFAULT_SCENARIO;
   const speed = parseSpeed(params.get('speed'));
   const autoOperator = params.get('operator') === 'approve';
-  const demo = new Demo(root, scenario, speed, autoOperator);
+  // Indoors the shipped policy flies first and hands over to frontier exploration on a stall or contact.
+  const indoor = params.get('indoor') === 'frontier' ? 'frontier' : 'policy';
+  const demo = new Demo(root, scenario, speed, autoOperator, indoor);
   void demo.load().then(() => {
     if (params.get('autorun') === '1') demo.play();
   });
+}
+
+let shipped: Promise<NormalizedPolicy | null> | null = null;
+
+/** The shipped checkpoint, or null when it cannot be fetched. */
+function shippedPolicy(): Promise<NormalizedPolicy | null> {
+  shipped ??= fetch('checkpoints/pretrained.json')
+    .then(async (response) => (response.ok ? policyFromJson(await response.text()) : null))
+    .catch(() => null);
+  return shipped;
 }
 
 function parseSpeed(value: string | null): Speed {
@@ -95,6 +108,7 @@ class Demo {
     private scenario: ScenarioId,
     private speed: Speed,
     private readonly autoOperator: boolean,
+    private readonly indoor: 'policy' | 'frontier',
   ) {
     root.classList.add('demo');
     root.innerHTML = markup();
@@ -127,7 +141,14 @@ class Demo {
     try {
       const loaded = loadScenario(this.scenario);
       this.loaded = loaded;
-      const options: RunnerOptions = { ...loaded.options, operator: this.operatorFor(loaded) };
+      const policy = this.indoor === 'policy' ? await shippedPolicy() : null;
+      if (token !== this.token) return;
+      const options: RunnerOptions = {
+        ...loaded.options,
+        operator: this.operatorFor(loaded),
+        indoor: policy ? 'auto' : 'frontier',
+        policy: policy ?? undefined,
+      };
       if (this.map) this.map.setWorld(loaded.world);
       else this.map = new DemoMap(this.el('demo-map') as HTMLCanvasElement, loaded.world);
       this.paintBrief(loaded);

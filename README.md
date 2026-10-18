@@ -124,6 +124,11 @@ The page has a live top-down map (terrain, trees, footprints, openings colored b
 | `speed` | `1`, `4`, `16`, or `max` |
 | `autorun=1` | Start when the page loads |
 | `operator=approve` | Approve entry prompts automatically |
+| `indoor=frontier` | Skip the shipped policy and use frontier exploration indoors |
+
+Indoors the shipped policy (`public/checkpoints/pretrained.json`) flies first. It was trained on bare BSP interiors, and in these scenarios it often stalls or touches a wall, so on a stall or on its first contact the runner hands the visit to frontier exploration and the report says which explorer ran. `tests/unit/autonomy.policy.test.ts` checks that all three scenarios still reach their expected outcome that way, with at most one contact.
+
+![Compound sweep report](docs/media/demo-compound-clear.png)
 
 `/demo.html?scenario=compound-clear&speed=max&autorun=1` is the shareable form. `tests/e2e/demo.spec.ts` runs all three at Max speed and saves `docs/media/demo-<id>.png`. `tests/unit/autonomy.scenarios.test.ts` checks the worlds and missions and runs each scenario headless with `runMission` and `buildReport`.
 

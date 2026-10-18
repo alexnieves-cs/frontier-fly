@@ -1,6 +1,9 @@
 import { isWalkable } from '../../../gen/validate';
 import { indoorCells, type GridCell } from '../../../perception/seenEmpty';
 import type { InferPolicy } from '../../../rl/infer';
+
+/** What the explorer needs from a policy: a deterministic mean action. */
+export type ActingPolicy = Pick<InferPolicy, 'actWith'>;
 import { CELL, DRONE_RADIUS, MAX_SPEED_H, OBS_DIM } from '../../../shared/constants';
 import { RNG } from '../../../shared/rng';
 import type { BuildingSpec, LightingState } from '../../../shared/types';
@@ -427,7 +430,7 @@ export class PolicyExplorer {
 
   constructor(
     readonly grid: IndoorGrid,
-    readonly policy: InferPolicy,
+    readonly policy: ActingPolicy,
     readonly physics: PhysicsWorld,
     readonly lighting: LightingState,
     seed: number,

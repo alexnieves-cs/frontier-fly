@@ -1,4 +1,3 @@
-import type { InferPolicy } from '../../rl/infer';
 import type { LightingState } from '../../shared/types';
 import { initPhysics, PhysicsWorld } from '../../sim/world';
 import { initOutdoorPhysics, OutdoorPhysics } from '../../world/outdoor/physics';
@@ -60,6 +59,7 @@ import {
   PATH_CLEARANCE,
   planIndoorPath,
   PolicyExplorer,
+  type ActingPolicy,
   toLocal,
   toWorld,
   floorOf,
@@ -86,7 +86,8 @@ const TRACK_PERIOD = 0.5;
 const PLAN_ACCEL = 2;
 /** No new policy voxel for this long counts as a stall, s. */
 const POLICY_STALL_SEC = 8;
-const POLICY_MAX_COLLISIONS = 3;
+/** One contact hands the visit to frontier exploration before the safety ladder escalates. */
+const POLICY_MAX_COLLISIONS = 1;
 const POLICY_MAX_SEC = 150;
 const MAX_EXPLORE_SEC = 260;
 const CONFIRM_DWELL = 3.5;
@@ -147,7 +148,7 @@ class Runner implements MissionRunner {
   private readonly monitor: SafetyMonitor;
   private readonly tracker: ConfirmTracker;
   private readonly coverage: CoveragePlan;
-  private readonly policy: InferPolicy | null;
+  private readonly policy: ActingPolicy | null;
   private readonly batteryStart: number;
 
   private ticks = 0;
@@ -216,7 +217,7 @@ class Runner implements MissionRunner {
     this.monitor = createSafetyMonitor(mission, world);
     this.tracker = new ConfirmTracker(mission);
     this.coverage = planCoverage(mission, world, { agl: this.agl });
-    const p = options.policy as InferPolicy | undefined;
+    const p = options.policy as ActingPolicy | undefined;
     this.policy = p && typeof p.actWith === 'function' && options.indoor !== 'frontier' ? p : null;
     if (options.indoor === 'policy' && !this.policy) this.log('warn', 'Policy explorer requested without a policy. Using frontier exploration.');
     this.phases.push({ phase: 'preflight', tStart: 0, tEnd: 0 });
