@@ -65,7 +65,7 @@ Open `/mission.html` from the dev server. The editor does not import the sim ren
 | Query | Effect |
 | --- | --- |
 | `seed` | Building and episode seed |
-| `shot` | `day`, `dusk`, `night`, or `fpv` preset |
+| `shot` | `day`, `dusk`, `night`, `fpv`, `targets`, `targets-room`, or `targets-night` |
 | `camera` | `fpv`, `chase`, `overview` |
 | `stage` | `0`–`5` or `auto` |
 | `train=1` | Start PPO when the page loads |
@@ -107,6 +107,17 @@ flowchart LR
 - Chase, FPV, and overview cameras, a canvas HUD, day/night lighting, per-room lights, a flashlight, and IR/depth display modes.
 - Live return, coverage, and entropy charts, a top-down coverage map, a policy heatmap once training has weights, and a replay scrubber at 1×, 4×, and 16×.
 - A checkpoint in `public/checkpoints/pretrained.json`, plus download and IndexedDB save/load.
+- Simulated people and search objects (`src/targets`) and a geometric camera detector (`src/perception`). Placement is seeded for indoor rooms and outdoor areas. The detector returns class, confidence, and a bounding box, with misses from distance, occlusion, lighting, and motion blur, and false positives that sit on decoys. A seen-empty tracker supports confirm-clear from ground truth. FPV draws the boxes and lists detections. Joint velocities are stubbed for a later dodge-only response. Credits are in [CREDITS.md](CREDITS.md).
+
+## Simulated people and targets
+
+`/?shot=targets`, `/?shot=targets-room`, and `/?shot=targets-night` frame a single room with people standing, sitting, lying, walking, and hiding, plus the object library and decoys. The detection list is the simulated camera, not a trained model.
+
+![FPV boxes on the showcase lineup](docs/media/targets-fpv.png)
+
+![Room view of people, objects, and decoys](docs/media/targets-room.png)
+
+![Night lineup under the flashlight](docs/media/targets-night.png)
 
 ## Honest limits
 

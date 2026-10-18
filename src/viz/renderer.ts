@@ -66,6 +66,8 @@ export class ThreeView implements Renderer {
   private readonly clock = new THREE.Clock();
   private hdri: THREE.Texture | null = null;
   private envMap: THREE.Texture | null = null;
+  private readonly frameSpot = new THREE.SpotLight('#fff6e4', 0, 22, Math.PI / 7, 0.35, 1);
+  private framed: { eye: THREE.Vector3; look: THREE.Vector3; fov: number; beam: boolean } | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -96,7 +98,7 @@ export class ThreeView implements Renderer {
     this.flash.castShadow = true;
     this.flash.shadow.mapSize.set(1024, 1024);
     this.rig.group.add(this.beam, this.flash, this.flash.target);
-    this.scene.add(this.sun, this.ambient, this.hemi, this.rig.group, this.rays, this.trail, this.visited);
+    this.scene.add(this.sun, this.ambient, this.hemi, this.rig.group, this.rays, this.trail, this.visited, this.frameSpot, this.frameSpot.target);
     this.sun.target.position.set(0, 0, 0);
     this.scene.add(this.sun.target);
   }
@@ -278,6 +280,34 @@ export class ThreeView implements Renderer {
     this.trail.visible = points.length > 1;
   }
 
+  addSceneObject(obj: THREE.Object3D): void {
+    this.scene.add(obj);
+  }
+
+  /** Lock the main view on a sim-space pose. Used by the target debug shots. */
+  setFramedView(
+    eye: [number, number, number] | null,
+    look: [number, number, number] | null,
+    fov = 110,
+    beam = false,
+  ): void {
+    if (!eye || !look) {
+      this.framed = null;
+      this.frameSpot.intensity = 0;
+      return;
+    }
+    this.framed = {
+      eye: new THREE.Vector3(eye[0], eye[2], eye[1]),
+      look: new THREE.Vector3(look[0], look[2], look[1]),
+      fov,
+      beam,
+    };
+  }
+
+  sensingAspect(): number {
+    return this.mainCam.aspect || 1;
+  }
+
   setVisited(spec: BuildingSpec, visited: Uint8Array, floor: number): void {
     const grid = spec.floors[0]!;
     const vw = grid.w * 2;
@@ -350,6 +380,25 @@ export class ThreeView implements Renderer {
   private placeCameras(s: DroneState): void {
     const pos = this.rig.group.position;
     const dt = Math.min(0.05, this.clock.getDelta());
+    if (this.framed) {
+      const frame = this.framed;
+      this.mainCam.position.copy(frame.eye);
+      this.mainCam.up.set(0, 1, 0);
+      this.mainCam.fov = frame.fov;
+      this.mainCam.lookAt(frame.look);
+      this.mainCam.updateProjectionMatrix();
+      this.fpvCam.position.copy(this.mainCam.position);
+      this.fpvCam.quaternion.copy(this.mainCam.quaternion);
+      this.fpvCam.up.copy(this.mainCam.up);
+      this.fpvCam.fov = frame.fov;
+      this.fpvCam.aspect = this.mainCam.aspect;
+      this.fpvCam.updateProjectionMatrix();
+      this.frameSpot.position.copy(frame.eye);
+      this.frameSpot.target.position.copy(frame.look);
+      this.frameSpot.intensity = frame.beam ? 46 : 0;
+      return;
+    }
+    this.frameSpot.intensity = 0;
     placeFpv(this.fpvCam, pos, s.yaw, s.vel[2]);
     if (!this.spec) return;
     const noseX = Math.cos(s.yaw);
