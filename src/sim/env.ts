@@ -226,6 +226,13 @@ export class ExplorerEnv implements Env {
     };
   }
 
+  /** Free the Rapier world. The env can be reset again afterwards. */
+  dispose(): void {
+    this.physics?.free();
+    this.physics = null;
+    this.spec = null;
+  }
+
   snapshot(): DroneState {
     return cloneDroneState(this.state);
   }
