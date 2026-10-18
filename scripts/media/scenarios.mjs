@@ -29,14 +29,14 @@ export const SCENARIOS = [
   // Woods-to-building missions. demo.html comes from the mission pipeline work; until it is in
   // dist/ these three are skipped. Scenario ids and the finish signal follow that page.
   ...[
-    { id: 'mission-find-target', title: 'Woods to building: find the target', scenario: 'find' },
-    { id: 'mission-confirm-clear', title: 'Woods to building: confirm the area clear', scenario: 'clear' },
-    { id: 'mission-night-entry', title: 'Night entry through an opening', scenario: 'night' },
+    { id: 'mission-cabin-day', title: 'Woods to cabin: find the missing person', scenario: 'cabin-day' },
+    { id: 'mission-compound-clear', title: 'Compound search: confirm the area clear', scenario: 'compound-clear' },
+    { id: 'mission-backpack-night', title: 'Night search: find the lost backpack', scenario: 'backpack-night' },
   ].map((m, i) => ({
     id: m.id,
     title: m.title,
     page: 'demo.html',
-    query: `?scenario=${m.scenario}&quality=low`,
+    query: `?scenario=${m.scenario}&autorun=1&quality=low`,
     seconds: 55,
     gif: { start: 8, length: 10 },
     quality: /** @type {const} */ ('low'),
