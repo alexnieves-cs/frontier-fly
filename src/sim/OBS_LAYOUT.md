@@ -2,6 +2,8 @@
 
 `OBS_DIM = 306`. Every value is a float. Lidar ranges are `distance / 8m` (1 = miss).
 
+This layout is the v1 contract for `public/checkpoints/pretrained.json`, the SharedArrayBuffer rollout stride, and the SIMD gemm scratch (input stride 320, batch ≤ 64). A later search mission (outdoor geofence, opening labels, target bearing, extra agents) needs a new observation version. Do not append channels onto indices 0–305.
+
 | Index | Count | Signal |
 | --- | --- | --- |
 | 0–31 | 32 | Horizontal lidar, yaw + `i * 2π/32`, normalized range |
