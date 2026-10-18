@@ -172,9 +172,10 @@ describe('simulated detector', () => {
   });
 
   it('misses a person hidden behind a wall', () => {
-    const camera = cameraLookingAt([3, 5, 1.4], [6, 5, 1.2], [0, 0, 1], Math.PI / 2, 1.2);
+    // y=4.5 sits on a drywall cell of the east wall. y=5 is a glass strip.
+    const camera = cameraLookingAt([3, 4.5, 1.4], [8, 4.5, 1.2], [0, 0, 1], Math.PI / 2, 1.2);
     const outside = targetAt('person', 5);
-    outside.feet = [14, 5, 0];
+    outside.feet = [14, 4.5, 0];
     outside.aabb = bodyAabb(outside.feet, 0, 0.22, 0.16, 1.75);
     outside.center = centerOf(outside.aabb);
     const blocked = occlusionFraction(camera, outside.aabb, spec, []);

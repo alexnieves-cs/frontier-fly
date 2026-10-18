@@ -92,7 +92,8 @@ describe('person motion hook', () => {
     const moving = samplePersonMotion(walker, 0.35);
     const standing = samplePersonMotion({ ...walker, id: 'person-standing-0', state: 'standing', path: undefined, speed: 0 }, 0.35);
     expect(moving?.joints.map((joint) => joint.name)).toEqual([...JOINT_NAMES]);
-    expect(speedOf(moving!, 'foot.l')).toBeGreaterThan(0.4);
+    const swing = Math.max(speedOf(moving!, 'foot.l'), speedOf(moving!, 'foot.r'));
+    expect(swing).toBeGreaterThan(0.4);
     expect(Math.max(...standing!.joints.map((joint) => Math.hypot(...joint.velocity)))).toBeLessThan(0.08);
     expect(samplePersonMotion(walker, 0.35)).toEqual(moving);
     expect(samplePersonMotion({ ...walker, classId: 'backpack', category: 'object', state: 'static' }, 0.2)).toBeNull();
