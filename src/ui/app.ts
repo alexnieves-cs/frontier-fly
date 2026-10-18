@@ -8,7 +8,7 @@ import { checkpointMismatch, parseCheckpoint, saveCheckpointIdb, loadCheckpointI
 import { InferPolicy } from '../rl/infer';
 import { RunningNorm } from '../rl/normalize';
 import { makeDroneState } from '../sim/drone';
-import { createEnv, defaultEpisodeConfig, type ExplorerEnv } from '../sim/env';
+import { createEnv, defaultEpisodeConfig, policyEpisodeLimits, type ExplorerEnv } from '../sim/env';
 import { heuristicAction } from '../sim/heuristic';
 import { actionFromKeys, zeroAction } from '../sim/manual';
 import { cameraLookingAt, clearLabel, detect, drawDetections, fpvCameraFromDrone, indoorCells, roomCellKeys, SeenEmptyTracker, type Detection } from '../perception';
@@ -68,6 +68,8 @@ class Session {
   private lighting: LightingState = { timeOfDay: 12, interiorLightsOn: new Uint8Array(), flashlightOn: false, sensorMode: 'rgb' };
   private policy: InferPolicy | null = null;
   private norm: RunningNorm | null = null;
+  /** True when the checkpoint was trained on raw observations (identity stats; no ±5 clip). */
+  private rawObs = false;
   private pool: TrainPool | null = null;
   private training = false;
   private paused = false;
@@ -180,6 +182,8 @@ class Session {
     if (this.launch.lights) lights.fill(1);
     const cfg = defaultEpisodeConfig(stage, nRooms);
     cfg.dynamics = stage >= 5 ? 'quad' : 'kinematic';
+    // Same limits as training and eval, so OBS.time reads the same when the policy flies.
+    Object.assign(cfg, policyEpisodeLimits(stage));
     cfg.lighting = {
       timeOfDay: this.launch.tod,
       interiorLightsOn: lights,
@@ -221,7 +225,8 @@ class Session {
     let action = zeroAction();
     if (this.keys.size > 0) action = actionFromKeys(this.keys);
     else if (this.pilot === 'policy' && this.policy && this.norm) {
-      const normed = this.norm.apply(this.obs, 1);
+      // Checkpoints trained on raw observations (identity stats) fly on raw input, like the eval.
+      const normed = this.rawObs ? this.obs : this.norm!.apply(this.obs, 1);
       action = this.policy.actWith(normed, 1, this.actRng, true).action;
     } else if (this.pilot === 'heuristic' || this.pilot === 'policy' || this.launch.shot) {
       // 'policy' without a usable checkpoint (none yet, or refused) flies the lidar heuristic.
@@ -247,6 +252,7 @@ class Session {
       const cfg = defaultEpisodeConfig(this.stageNumber(), spec.floors.reduce((n, floor) => n + floor.rooms.length, 0));
       cfg.lighting = copyLight(this.lighting);
       cfg.dynamics = this.stageNumber() >= 5 ? 'quad' : 'kinematic';
+      Object.assign(cfg, policyEpisodeLimits(this.stageNumber()));
       this.obs = this.env.reset(spec, (this.launch.seed + this.steps) >>> 0, cfg);
       this.lighting = copyLight(this.env.episodeLighting);
     }
@@ -532,6 +538,8 @@ class Session {
       return arr.buffer;
     });
     policy.setWeights(buffers);
+    const identity =
+      checkpoint.obsMean.every((v) => v === 0) && checkpoint.obsVar.every((v) => v === 1);
     const norm = new RunningNorm(policy.obsDim);
     if (checkpoint.obsMean.length === policy.obsDim) {
       norm.load({
@@ -546,6 +554,7 @@ class Session {
     }
     this.policy = policy;
     this.norm = norm;
+    this.rawObs = identity;
     if (this.pilot !== 'keys') this.pilot = 'policy';
     if (announce) this.q('#link').textContent = `CKPT S${checkpoint.stage}`;
   }

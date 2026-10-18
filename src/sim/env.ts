@@ -34,6 +34,15 @@ export function defaultEpisodeConfig(stage = 0, nRooms = 1): EpisodeConfig {
   };
 }
 
+/**
+ * Episode limits the shipped policy is trained and evaluated with. The time
+ * feature (OBS.time) is steps-left / maxSteps, so every place that flies the
+ * policy uses these to keep its observations in distribution.
+ */
+export function policyEpisodeLimits(stage: number): { maxSteps: number; stallSteps: number; maxCollisions: number } {
+  return { maxSteps: stage <= 1 ? 1000 : 2400, stallSteps: 500, maxCollisions: 16 };
+}
+
 export class ExplorerEnv implements Env {
   private spec: BuildingSpec | null = null;
   private cfg: EpisodeConfig = defaultEpisodeConfig();

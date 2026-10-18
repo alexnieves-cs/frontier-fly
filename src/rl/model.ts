@@ -80,6 +80,16 @@ const LOG_2PIE = Math.log(2 * Math.PI * Math.E);
 const SQUASH_EPS = 1e-6;
 
 let nextTrainerId = 0;
+let preferredBackend = 'cpu';
+
+/**
+ * Backend that trainers constructed with forceCpu use. Node training scripts
+ * call this after importing an optional native backend (tfjs-node registers
+ * 'tensorflow'); everything else keeps the pure-JS 'cpu' backend.
+ */
+export function setTrainerBackend(name: string): void {
+  preferredBackend = name;
+}
 
 function squashedLogp(mean: tf.Tensor, logStd: tf.Tensor, action: tf.Tensor): tf.Tensor {
   const a = tf.clipByValue(action, -1 + SQUASH_EPS, 1 - SQUASH_EPS);
@@ -352,8 +362,8 @@ export class TfTrainer {
 
   private async init(): Promise<void> {
     if (this.forceCpu) {
-      const ok = await tf.setBackend('cpu');
-      if (!ok) throw new Error('failed to set tfjs cpu backend');
+      const ok = await tf.setBackend(preferredBackend);
+      if (!ok) throw new Error(`failed to set tfjs ${preferredBackend} backend`);
     }
     await tf.ready();
     this.shapes = weightShapes(this.policy.obsDim, this.policy.actDim, this.policy.hidden);

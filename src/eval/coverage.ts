@@ -3,7 +3,7 @@ import { Curriculum } from '../rl/curriculum';
 import { ACT_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { BuildingSpec, EpisodeConfig } from '../shared/types';
-import { createEnv, defaultEpisodeConfig, type ExplorerEnv } from '../sim/env';
+import { createEnv, defaultEpisodeConfig, policyEpisodeLimits, type ExplorerEnv } from '../sim/env';
 import { lightingPreset, type LightingPreset } from '../sim/lighting';
 
 /** Fixed eval protocol for the shipped indoor policy. Changing it changes every reported number. */
@@ -25,7 +25,7 @@ export interface CoverageReport {
 }
 
 export function evalSteps(stage: number): number {
-  return stage <= 1 ? 1000 : 2400;
+  return policyEpisodeLimits(stage).maxSteps;
 }
 
 /** Building, env seed and config of one eval episode. Shared with the parallel eval. */
@@ -38,9 +38,7 @@ export function evalEpisodeSetup(
   const spec = generateBuilding(params);
   const nRooms = spec.floors.reduce((n, floor) => n + floor.rooms.length, 0);
   const cfg = defaultEpisodeConfig(stage, nRooms);
-  cfg.maxSteps = evalSteps(stage);
-  cfg.stallSteps = 500;
-  cfg.maxCollisions = 16;
+  Object.assign(cfg, policyEpisodeLimits(stage));
   cfg.dynamics = 'kinematic';
   cfg.lighting = lightingPreset(lighting, nRooms);
   return { spec, envSeed: params.seed, cfg: cfg as EpisodeConfig & { maxSteps: number } };
