@@ -205,6 +205,18 @@ export class InferPolicy implements Policy {
     return { action, logp, value };
   }
 
+  /** Pre-tanh Gaussian means [n * actDim] and values [n]; used by KL / BC anchors. */
+  meanAndValue(obs: Float32Array, n: number): { mean: Float32Array; value: Float32Array } {
+    if (obs.length < n * this.obsDim) throw new Error('observation buffer is short');
+    if (n === 0) return { mean: new Float32Array(0), value: new Float32Array(0) };
+    return this.forward(obs, n);
+  }
+
+  /** Copy of the state-independent log std [actDim]. */
+  logStd(): Float32Array {
+    return this.weights[6]!.slice();
+  }
+
   getWeights(): ArrayBuffer[] {
     return this.weights.map((src) => {
       const copy = new Float32Array(src.length);
