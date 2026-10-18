@@ -1,4 +1,6 @@
 import { mockDetectionSource } from '../../mission/detectionMock';
+import type { DetectionSource } from '../../mission/detections';
+import { outdoorWorldProvider, perceptionDetectionSource, woodsSampleMission } from '../../mission/outdoorWorld';
 import { canonicalMission, canonicalMissionJson, decodeMissionHash, missionToHash } from '../../mission/serialize';
 import { createSession, type MissionSession, type SessionSnapshot } from '../../mission/session';
 import { blankMission, sampleMission, suggestedTargets } from '../../mission/sample';
@@ -17,7 +19,7 @@ import {
   type TargetKind,
 } from '../../mission/types';
 import { validateMission } from '../../mission/validate';
-import type { WorldSnapshot } from '../../mission/world';
+import type { WorldProvider, WorldSnapshot } from '../../mission/world';
 import { mockWorldProvider } from '../../mission/worldMock';
 import { createLivePanel } from './livePanel';
 import { createMissionMap, type MapLayers, type MapSelection, type MapTool } from './map';
@@ -83,11 +85,16 @@ function nextIdent(prefix: string, used: string[]): string {
 
 export function mountMissionEditor(root: HTMLElement): void {
   const url = new URL(location.href);
+  // `?site=mock` keeps the fixed practice site and scripted detections for tests.
+  const mockSite = url.searchParams.get('site') === 'mock';
+  const provider: WorldProvider = mockSite ? mockWorldProvider : outdoorWorldProvider;
+  const detector: DetectionSource = mockSite ? mockDetectionSource : perceptionDetectionSource;
+  const sampleFor = (seed: number): Mission => (mockSite ? sampleMission(seed) : woodsSampleMission(seed));
   let bannerText: string | null = null;
   let mission = loadInitial(url, (message) => {
     bannerText = message;
   });
-  let world: WorldSnapshot = mockWorldProvider.load(mission.seed >>> 0);
+  let world: WorldSnapshot = provider.load(mission.seed >>> 0);
   let mode: 'plan' | 'run' = 'plan';
   let tool: MapTool = 'edit';
   let snap = true;
@@ -103,6 +110,7 @@ export function mountMissionEditor(root: HTMLElement): void {
 
   root.className = 'mission';
   root.dataset.ready = '0';
+  root.dataset.site = provider.id;
 
   const saveStatus = el('p', { className: 'save-status', testid: 'save-status', text: '' });
   const saveButton = el('button', { className: 'primary', text: 'Save link', testid: 'mission-save', attrs: { type: 'button' } });
@@ -221,7 +229,12 @@ export function mountMissionEditor(root: HTMLElement): void {
     el('h2', { text: 'No-fly zones' }),
     zoneList,
     el('h2', { text: 'Site context' }),
-    el('p', { className: 'quiet', text: 'Mock site for this seed. An outdoor world provider can replace this layer.' }),
+    el('p', {
+      className: 'quiet',
+      text: mockSite
+        ? 'Mock practice site for this seed.'
+        : 'Generated woods for this seed: buildings, trails, and tree canopy. Detections come from the simulated camera.',
+    }),
     siteList,
     el('h2', { text: 'Share' }),
     linkField,
@@ -295,7 +308,7 @@ export function mountMissionEditor(root: HTMLElement): void {
 
   bindNumber(seedInput, 'seed', 'Seed', (value) => {
     mission.seed = Math.round(value);
-    world = mockWorldProvider.load(mission.seed >>> 0);
+    world = provider.load(mission.seed >>> 0);
   });
   bindNumber(altMin, 'altitude', 'Minimum altitude', (value) => {
     mission.altitude = { ...mission.altitude, minM: value };
@@ -352,8 +365,8 @@ export function mountMissionEditor(root: HTMLElement): void {
     syncPlan();
   });
   loadSample.addEventListener('click', () => {
-    mission = sampleMission(mission.seed || 11);
-    world = mockWorldProvider.load(mission.seed);
+    mission = sampleFor(mission.seed || 11);
+    world = provider.load(mission.seed);
     draft = null;
     selection = null;
     fieldIssues = [];
@@ -415,7 +428,7 @@ export function mountMissionEditor(root: HTMLElement): void {
       const stored = readStored();
       if (stored) return stored;
     }
-    return sampleMission(seedFrom(pageUrl));
+    return sampleFor(seedFrom(pageUrl));
   }
 
   function viewPoints(): Point[] {
@@ -457,7 +470,7 @@ export function mountMissionEditor(root: HTMLElement): void {
     pause();
     mode = 'run';
     mission = canonicalMission(validation.mission ?? mission);
-    session = createSession(mission, world, mockDetectionSource);
+    session = createSession(mission, world, detector);
     map.setTool('view');
     showMode();
     syncPlan();
@@ -666,7 +679,15 @@ export function mountMissionEditor(root: HTMLElement): void {
     const title = el('li');
     title.append(el('span', { text: world.siteName }), el('span', { text: `seed ${world.seed}` }));
     siteList.append(title);
+    const canopy = world.footprints.filter((footprint) => footprint.kind === 'canopy');
+    if (canopy.length > 0) {
+      const top = Math.max(...canopy.map((footprint) => footprint.heightM ?? 0));
+      const row = el('li');
+      row.append(el('span', { text: `Tree canopy, ${canopy.length} stands` }), el('span', { text: `${top} m` }));
+      siteList.append(row);
+    }
     for (const footprint of world.footprints) {
+      if (footprint.kind === 'canopy') continue;
       const row = el('li');
       const height = footprint.heightM == null ? footprint.kind : `${footprint.heightM} m`;
       row.append(el('span', { text: footprint.label }), el('span', { text: height }));
@@ -770,7 +791,7 @@ export function mountMissionEditor(root: HTMLElement): void {
 
   function restart(): void {
     pause();
-    session = createSession(mission, world, mockDetectionSource);
+    session = createSession(mission, world, detector);
     syncLive();
   }
 

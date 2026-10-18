@@ -57,8 +57,21 @@ test('draw a geofence, save the link, and reload it', async ({ page }) => {
   await expect(page.locator('[data-testid=mission-issues]')).toContainText('No errors');
 });
 
-test('editor, live approval, and report screenshots', async ({ page }) => {
+test('default page loads the generated woods and runs the camera sweep', async ({ page }) => {
   await openMission(page, '?seed=11');
+  await expect(page.locator('#app')).toHaveAttribute('data-site', 'outdoor-world');
+  await expect(page.locator('[data-testid=site-list]')).toContainText('Tree canopy');
+  await expect(page.locator('[data-testid=site-list]')).toContainText('Shed');
+  await expect(page.locator('[data-testid=mission-issues]')).toContainText('No errors');
+  await page.locator('[data-testid=mode-run]').click();
+  await page.locator('[data-testid=speed]').selectOption('16');
+  await page.locator('[data-testid=play]').click();
+  await expect(page.locator('[data-testid=mission-report]')).toBeVisible({ timeout: 120_000 });
+});
+
+test('editor, live approval, and report screenshots', async ({ page }) => {
+  // The scripted mock site guarantees an entry request for the approval flow.
+  await openMission(page, '?seed=11&site=mock');
   await expect(page.locator('[data-testid=mission-summary]')).toContainText('Geofence');
   await page.screenshot({ path: `${out}/mission-editor.png` });
   expect(readFileSync(`${out}/mission-editor.png`).length).toBeGreaterThan(20_000);

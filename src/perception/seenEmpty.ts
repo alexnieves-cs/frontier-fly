@@ -128,8 +128,10 @@ export class SeenEmptyTracker {
     private readonly spec: BuildingSpec | null = null,
   ) {}
 
-  observe(camera: CameraView, targets: ResolvedTarget[], lighting: DetectRequest['lighting'], occluders: Aabb[] = []): void {
-    const reach = this.category === 'person' ? RESOLVE_DISTANCE.person : RESOLVE_DISTANCE.object;
+  /** `rangeScale` stretches the resolve distance for a longer lens. See DetectRequest.rangeScale. */
+  observe(camera: CameraView, targets: ResolvedTarget[], lighting: DetectRequest['lighting'], occluders: Aabb[] = [], rangeScale = 1): void {
+    const base = this.category === 'person' ? RESOLVE_DISTANCE.person : RESOLVE_DISTANCE.object;
+    const reach = base * (rangeScale > 0 ? rangeScale : 1);
     for (const cell of this.cells) {
       if (!inFront(camera, cell.center)) continue;
       const distance = dist(camera.position, cell.center);
