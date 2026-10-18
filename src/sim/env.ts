@@ -35,6 +35,11 @@ export class ExplorerEnv implements Env {
   private spec: BuildingSpec | null = null;
   private cfg: EpisodeConfig = defaultEpisodeConfig();
   private physics: PhysicsWorld | null = null;
+  /** False when reset() was handed a pooled PhysicsWorld; the env then never frees it. */
+  private ownsPhysics = true;
+  private latencyTicks = 0;
+  private readonly before: [number, number, number] = [0, 0, 0];
+  private readonly delta: [number, number, number] = [0, 0, 0];
   private dyn: Dynamics = new KinematicDynamics();
   private noise = new SensorNoise(zeroNoise(), new RNG(1));
   private state = makeDroneState([0, 0, 1]);
@@ -55,13 +60,20 @@ export class ExplorerEnv implements Env {
   private stallLimit = STALL_STEPS;
   private yawRate = 0;
   private prevYaw = 0;
-  private prevVel: [number, number, number] = [0, 0, 0];
+  private readonly prevVel: [number, number, number] = [0, 0, 0];
   private frontierDist = 0;
   private done = false;
   private rng = new RNG(1);
 
-  reset(spec: BuildingSpec, seed: number, cfg?: EpisodeConfig): Float32Array {
-    if (this.physics) this.physics.free();
+  /**
+   * Start an episode. Pass `physics` (a PhysicsWorld built for this exact
+   * `spec`, e.g. from a WorldPool) to skip the Rapier rebuild; the env then
+   * borrows it and never frees it. Without it the env builds and owns one.
+   * The physics world holds no per-episode state, so reuse is bit-identical.
+   */
+  reset(spec: BuildingSpec, seed: number, cfg?: EpisodeConfig, physics?: PhysicsWorld): Float32Array {
+    if (physics && physics.spec !== spec) throw new Error('env.reset: physics world was built for a different spec');
+    if (this.physics && this.ownsPhysics && this.physics !== physics) this.physics.free();
     this.spec = spec;
     const nRooms = spec.floors.reduce((n, floor) => n + floor.rooms.length, 0);
     this.cfg = cfg ?? defaultEpisodeConfig(0, nRooms);
@@ -71,11 +83,19 @@ export class ExplorerEnv implements Env {
       if (this.cfg.lighting.interiorLightsOn.length === 0) lights.fill(1);
       this.cfg = { ...this.cfg, lighting: { ...this.cfg.lighting, interiorLightsOn: lights } };
     }
-    this.physics = new PhysicsWorld(spec);
+    if (physics) {
+      // Re-passing the world this env already holds keeps its ownership as is.
+      if (physics !== this.physics) this.ownsPhysics = false;
+      this.physics = physics;
+    } else {
+      this.physics = new PhysicsWorld(spec);
+      this.ownsPhysics = true;
+    }
     this.rng = new RNG(seed >>> 0, 'env');
     const noise = { ...this.cfg.noise };
     if (isLowLight(this.cfg.lighting)) noise.lowLightImu = Math.max(noise.lowLightImu, 1.5);
     this.noise = new SensorNoise(noise, this.rng.fork('noise'));
+    this.latencyTicks = noise.latencyTicks | 0;
     this.state = makeDroneState([spec.spawn[0], spec.spawn[1], spec.spawn[2]], 0);
     this.dyn = this.cfg.dynamics === 'quad' ? new QuadrotorDynamics() : new KinematicDynamics();
     this.dyn.reset(this.state, this.cfg.dyn);
@@ -103,7 +123,9 @@ export class ExplorerEnv implements Env {
     this.done = false;
     this.yawRate = 0;
     this.prevYaw = 0;
-    this.prevVel = [0, 0, 0];
+    this.prevVel[0] = 0;
+    this.prevVel[1] = 0;
+    this.prevVel[2] = 0;
     this.frontierDist = frontierDistance(spec, this.visited, this.state.pos);
     const base = Math.max(400, Math.min(2500, Math.round(spec.reachableVoxels * 1.5)));
     this.maxSteps = this.cfg.maxSteps ?? base;
@@ -123,8 +145,8 @@ export class ExplorerEnv implements Env {
       };
     }
     scaleAction(action, this.scaled);
-    const copy = new Float32Array(this.scaled);
-    const delayed = this.noise.latency(copy);
+    // The latency line keeps references, so it needs its own copy; without latency it returns the input.
+    const delayed = this.noise.latency(this.latencyTicks > 0 ? new Float32Array(this.scaled) : this.scaled);
     this.held[0] = delayed[0] ?? 0;
     this.held[1] = delayed[1] ?? 0;
     this.held[2] = delayed[2] ?? 0;
@@ -135,17 +157,19 @@ export class ExplorerEnv implements Env {
     const substeps = this.cfg.dynamics === 'quad' ? PHYSICS_SUBSTEPS : 1;
     const dt = this.cfg.dynamics === 'quad' ? PHYSICS_DT : POLICY_DT;
     for (let i = 0; i < substeps; i++) {
-      const before: [number, number, number] = [this.state.pos[0], this.state.pos[1], this.state.pos[2]];
+      const before = this.before;
+      before[0] = this.state.pos[0];
+      before[1] = this.state.pos[1];
+      before[2] = this.state.pos[2];
       this.dyn.step(this.held, dt);
       if (wind[0] !== 0 || wind[1] !== 0) {
         this.state.vel[0] += wind[0] * dt * 0.35;
         this.state.vel[1] += wind[1] * dt * 0.35;
       }
-      const delta: [number, number, number] = [
-        this.state.pos[0] - before[0],
-        this.state.pos[1] - before[1],
-        this.state.pos[2] - before[2],
-      ];
+      const delta = this.delta;
+      delta[0] = this.state.pos[0] - before[0];
+      delta[1] = this.state.pos[1] - before[1];
+      delta[2] = this.state.pos[2] - before[2];
       const resolved = this.physics.resolve(before, delta);
       this.state.pos[0] = resolved.pos[0];
       this.state.pos[1] = resolved.pos[1];
@@ -208,7 +232,9 @@ export class ExplorerEnv implements Env {
       coverage,
     }) + shaping;
     this.prevAction.set(action.length >= 4 ? action.subarray(0, 4) : action);
-    this.prevVel = [this.state.vel[0], this.state.vel[1], this.state.vel[2]];
+    this.prevVel[0] = this.state.vel[0];
+    this.prevVel[1] = this.state.vel[1];
+    this.prevVel[2] = this.state.vel[2];
     this.steps += 1;
 
     const success = coverage >= COVERAGE_SUCCESS;
@@ -226,10 +252,11 @@ export class ExplorerEnv implements Env {
     };
   }
 
-  /** Free the Rapier world. The env can be reset again afterwards. */
+  /** Free the Rapier world if this env owns it (a pooled world is left alone). The env can be reset again afterwards. */
   dispose(): void {
-    this.physics?.free();
+    if (this.ownsPhysics) this.physics?.free();
     this.physics = null;
+    this.ownsPhysics = true;
     this.spec = null;
   }
 
@@ -276,6 +303,11 @@ export class ExplorerEnv implements Env {
     if (partial.flashlightOn != null) this.cfg.lighting.flashlightOn = partial.flashlightOn;
     if (partial.sensorMode != null) this.cfg.lighting.sensorMode = partial.sensorMode;
     if (partial.lightsOn != null) this.cfg.lighting.interiorLightsOn.fill(partial.lightsOn ? 1 : 0);
+  }
+
+  /** The physics world in use (owned or borrowed). */
+  get physicsWorld(): PhysicsWorld | null {
+    return this.physics;
   }
 
   get building(): BuildingSpec | null {

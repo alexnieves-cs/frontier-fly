@@ -6,12 +6,120 @@ function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
 }
 
+/** min(best, distance to each unvisited voxel of walkable cell (x, z)). Out-of-grid cells are ignored. */
+function cellBest(
+  floor: BuildingSpec['floors'][number],
+  visited: Uint8Array,
+  base: number,
+  vw: number,
+  x: number,
+  z: number,
+  px: number,
+  py: number,
+  best: number,
+): number {
+  if (x < 0 || z < 0 || x >= floor.w || z >= floor.d) return best;
+  if (!isWalkable(floor.cells[z * floor.w + x]!)) return best;
+  for (let dz = 0; dz < 2; dz++) {
+    for (let dx = 0; dx < 2; dx++) {
+      const vx = x * 2 + dx;
+      const vy = z * 2 + dz;
+      if (visited[base + vy * vw + vx]) continue;
+      const dist = Math.hypot((vx + 0.5) * VOXEL - px, (vy + 0.5) * VOXEL - py);
+      if (dist < best) best = dist;
+    }
+  }
+  return best;
+}
+
 /**
  * Privileged coverage teacher. Walks to the nearest unfinished cell, using a
  * grid BFS so the heading does not point through walls. The observation the
  * policy sees still has the local visited map, which is what imitation learns.
  */
 function nearestOpen(spec: BuildingSpec, visited: Uint8Array, pos: [number, number, number], radius: number): number {
+  if (spec.cellSize !== VOXEL * 2) return nearestOpenScan(spec, visited, pos, radius);
+  const vw = spec.floors[0]!.w * 2;
+  const vd = spec.floors[0]!.d * 2;
+  const cs = spec.cellSize;
+  const px = pos[0];
+  const py = pos[1];
+  const gx = Math.floor(px / cs);
+  const gz = Math.floor(py / cs);
+  const floors = spec.floors;
+  // Every voxel centre in a cell at Chebyshev ring r >= 1 is more than (r - 0.75) * cs away
+  // (centres sit at 0.25 and 0.75 of a cell). The 1e-9 keeps the skip test conservative.
+  const ringSkips = (r: number, threshold: number) => r >= 1 && (r - 0.75) * cs - 1e-9 >= threshold;
+
+  // Phase A. The reference scan returns the first voxel, in (floor, z, x, dz, dx) order, that is
+  // closer than 0.4 m. Such voxels can only live in rings 0..1, so scanning that 3x3 block in the
+  // same order returns the same value.
+  for (let f = 0; f < floors.length; f++) {
+    const floor = floors[f]!;
+    const z0 = Math.max(0, gz - radius, gz - 1);
+    const z1 = Math.min(floor.d - 1, gz + radius, gz + 1);
+    const x0 = Math.max(0, gx - radius, gx - 1);
+    const x1 = Math.min(floor.w - 1, gx + radius, gx + 1);
+    const base = f * vw * vd;
+    for (let z = z0; z <= z1; z++) {
+      for (let x = x0; x <= x1; x++) {
+        if (!isWalkable(floor.cells[z * floor.w + x]!)) continue;
+        for (let dz = 0; dz < 2; dz++) {
+          for (let dx = 0; dx < 2; dx++) {
+            const vx = x * 2 + dx;
+            const vy = z * 2 + dz;
+            if (visited[base + vy * vw + vx]) continue;
+            const dist = Math.hypot((vx + 0.5) * VOXEL - px, (vy + 0.5) * VOXEL - py);
+            if (dist < 0.4) return dist;
+          }
+        }
+      }
+    }
+  }
+
+  // Phase B. No voxel is closer than 0.4 m, so the reference returns min(6, nearest distance).
+  // A minimum does not depend on visit order, so search outward ring by ring and stop once a
+  // ring cannot beat the best distance found so far.
+  let best = 6;
+  for (let r = 0; r <= radius; r++) {
+    if (ringSkips(r, best)) break;
+    const zLo = gz - r;
+    const zHi = gz + r;
+    const xLo = gx - r;
+    const xHi = gx + r;
+    let enclosesAll = true;
+    for (let f = 0; f < floors.length; f++) {
+      const floor = floors[f]!;
+      const fw = floor.w;
+      const fd = floor.d;
+      // Once a ring surrounds the whole floor, it and every later ring lie outside it.
+      if (xLo < 0 && zLo < 0 && xHi > fw - 1 && zHi > fd - 1) continue;
+      enclosesAll = false;
+      const base = f * vw * vd;
+      if (r === 0) {
+        best = cellBest(floor, visited, base, vw, gx, gz, px, py, best);
+        continue;
+      }
+      const xa = Math.max(0, xLo);
+      const xb = Math.min(fw - 1, xHi);
+      for (let x = xa; x <= xb; x++) {
+        best = cellBest(floor, visited, base, vw, x, zLo, px, py, best);
+        best = cellBest(floor, visited, base, vw, x, zHi, px, py, best);
+      }
+      const za = Math.max(0, zLo + 1);
+      const zb = Math.min(fd - 1, zHi - 1);
+      for (let z = za; z <= zb; z++) {
+        best = cellBest(floor, visited, base, vw, xLo, z, px, py, best);
+        best = cellBest(floor, visited, base, vw, xHi, z, px, py, best);
+      }
+    }
+    if (enclosesAll) break;
+  }
+  return best;
+}
+
+/** Reference row-major scan. Kept for non-standard cell sizes; nearestOpen must match it exactly. */
+function nearestOpenScan(spec: BuildingSpec, visited: Uint8Array, pos: [number, number, number], radius: number): number {
   const vw = spec.floors[0]!.w * 2;
   const vd = spec.floors[0]!.d * 2;
   const cs = spec.cellSize;
