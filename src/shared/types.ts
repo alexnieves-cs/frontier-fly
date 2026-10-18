@@ -108,6 +108,9 @@ export interface EpisodeConfig {
   lighting: LightingState;
   /** Horizontal wind in world x/y (m/s). Applied as a velocity bias in kinematic mode and a force in quad mode. */
   wind: [number, number];
+  /** Optional overrides used by tests and the curriculum. */
+  maxSteps?: number;
+  stallSteps?: number;
 }
 
 export interface Env {

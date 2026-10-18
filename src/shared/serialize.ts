@@ -13,7 +13,7 @@ interface BuildingJson {
   cellSize: number;
   floorHeight: number;
   floors: FloorJson[];
-  spawn: [number, number, number];
+  spawn: [number, number, number] | number[];
   reachableVoxels: number;
 }
 
@@ -22,7 +22,7 @@ export function buildingFromJson(raw: BuildingJson): BuildingSpec {
     seed: raw.seed,
     cellSize: raw.cellSize,
     floorHeight: raw.floorHeight,
-    spawn: raw.spawn,
+    spawn: [raw.spawn[0] ?? 0, raw.spawn[1] ?? 0, raw.spawn[2] ?? 0],
     reachableVoxels: raw.reachableVoxels,
     floors: raw.floors.map((floor) => ({
       w: floor.w,
