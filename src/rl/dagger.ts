@@ -15,13 +15,13 @@
  */
 import { generateBuilding } from '../gen/building';
 import { STAGE0_SEEDS, STAGE3_SEEDS } from '../eval/coverage';
-import { ACT_DIM, HIDDEN, OBS_DIM } from '../shared/constants';
+import { ACT_DIM, HIDDEN, OBS_DIM, OBS_VERSION } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { BuildingSpec, EpisodeConfig } from '../shared/types';
 import { createEnv, defaultEpisodeConfig, type ExplorerEnv } from '../sim/env';
 import { frontierAction } from '../sim/frontier';
 import { lightingPreset, type LightingPreset } from '../sim/lighting';
-import type { Checkpoint } from './checkpoint';
+import { checkpointMismatch, type Checkpoint } from './checkpoint';
 import { Curriculum } from './curriculum';
 import { InferPolicy } from './infer';
 import { TfTrainer, type BcData } from './model';
@@ -401,6 +401,7 @@ export async function validationCoverage(
 export function checkpointFromPolicy(policy: InferPolicy, stage = 3): Checkpoint {
   return {
     version: 1,
+    obsVersion: OBS_VERSION,
     obsDim: policy.obsDim,
     actDim: policy.actDim,
     hidden: [...policy.hidden],
@@ -413,7 +414,10 @@ export function checkpointFromPolicy(policy: InferPolicy, stage = 3): Checkpoint
   };
 }
 
+/** Throws when the checkpoint was trained on a different observation layout. */
 export function policyFromCheckpoint(c: Checkpoint, seed = 1): InferPolicy {
+  const mismatch = checkpointMismatch(c);
+  if (mismatch) throw new Error(mismatch);
   const policy = new InferPolicy(c.obsDim, c.actDim, c.hidden, seed);
   policy.setWeights(c.weights.map((row) => Float32Array.from(row).buffer));
   return policy;
