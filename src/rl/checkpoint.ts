@@ -21,8 +21,19 @@ const DB_NAME = 'frontier-fly';
 const STORE = 'checkpoints';
 const DB_VERSION = 1;
 
+/** Shortest decimal that reads back as the same float32 (at most 9 significant digits). */
+function shortestFloat32(v: number): number {
+  const target = Math.fround(v);
+  for (let p = 1; p < 9; p++) {
+    const s = Number(v.toPrecision(p));
+    if (Math.fround(s) === target) return s;
+  }
+  return Number(v.toPrecision(9));
+}
+
+/** Weights are float32, so printing them with float64 precision only makes the file bigger. Lossless. */
 export function serializeCheckpoint(c: Checkpoint): string {
-  return JSON.stringify(c);
+  return JSON.stringify({ ...c, weights: c.weights.map((row) => row.map(shortestFloat32)) });
 }
 
 export function parseCheckpoint(text: string): Checkpoint {
