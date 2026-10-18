@@ -9,7 +9,8 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    channel: 'chrome',
+    // Local runs use the installed Chrome. CI uses the Playwright Chromium build.
+    ...(process.env.CI ? {} : { channel: 'chrome' as const }),
     viewport: { width: 1440, height: 900 },
     launchOptions: {
       args: [
