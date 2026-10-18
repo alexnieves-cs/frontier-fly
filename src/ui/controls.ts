@@ -4,7 +4,7 @@ export interface LaunchParams {
   seed: number;
   camera: CameraMode;
   tod: number;
-  shot: 'day' | 'night' | 'fpv' | 'dusk' | null;
+  shot: 'day' | 'night' | 'fpv' | 'dusk' | 'targets' | 'targets-room' | 'targets-night' | null;
   train: boolean;
   stage: number | 'auto';
   flashlight: boolean;
@@ -17,7 +17,16 @@ export interface LaunchParams {
 export function readLaunchParams(search = window.location.search): LaunchParams {
   const q = new URLSearchParams(search);
   const shotRaw = q.get('shot');
-  const shot = shotRaw === 'day' || shotRaw === 'night' || shotRaw === 'fpv' || shotRaw === 'dusk' ? shotRaw : null;
+  const shot =
+    shotRaw === 'day' ||
+    shotRaw === 'night' ||
+    shotRaw === 'fpv' ||
+    shotRaw === 'dusk' ||
+    shotRaw === 'targets' ||
+    shotRaw === 'targets-room' ||
+    shotRaw === 'targets-night'
+      ? shotRaw
+      : null;
   const cameraRaw = q.get('camera');
   let camera: CameraMode = cameraRaw === 'fpv' || cameraRaw === 'overview' || cameraRaw === 'chase' ? cameraRaw : 'chase';
   let tod = Number(q.get('tod') ?? '13');
@@ -38,6 +47,16 @@ export function readLaunchParams(search = window.location.search): LaunchParams 
     lights = false;
   } else if (shot === 'fpv') {
     tod = 22;
+    camera = 'fpv';
+    flashlight = true;
+    lights = false;
+  } else if (shot === 'targets' || shot === 'targets-room') {
+    tod = 13;
+    camera = 'fpv';
+    flashlight = false;
+    lights = true;
+  } else if (shot === 'targets-night') {
+    tod = 22.5;
     camera = 'fpv';
     flashlight = true;
     lights = false;

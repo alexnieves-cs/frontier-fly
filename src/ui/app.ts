@@ -11,6 +11,9 @@ import { makeDroneState } from '../sim/drone';
 import { createEnv, defaultEpisodeConfig, type ExplorerEnv } from '../sim/env';
 import { heuristicAction } from '../sim/heuristic';
 import { actionFromKeys, zeroAction } from '../sim/manual';
+import { cameraLookingAt, clearLabel, detect, drawDetections, fpvCameraFromDrone, indoorCells, roomCellKeys, SeenEmptyTracker, type Detection } from '../perception';
+import { frameOnTargets, placeIndoor, resolveScene, type TargetScene } from '../targets';
+import { TargetView } from '../targets/meshes';
 import { drawHud } from '../viz/cameras/hud';
 import { ThreeView } from '../viz/renderer';
 import type { ShowcaseSnap } from '../workers/rollout';
@@ -92,6 +95,12 @@ class Session {
   private heatmap: HeatmapData | null = null;
   private heatmapArmed = false;
   private readonly actRng = new RNG(7, 'ui');
+  private readonly targetView = new TargetView();
+  private targetScene: TargetScene | null = null;
+  private detections: Detection[] = [];
+  private tracker: SeenEmptyTracker | null = null;
+  private clearText = '';
+  private framed: { eye: [number, number, number]; look: [number, number, number]; fov: number } | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -105,6 +114,7 @@ class Session {
 
   async boot(): Promise<void> {
     this.bind();
+    this.view.addSceneObject(this.targetView.group);
     this.view.setCamera(this.camera);
     this.syncButtons();
     await this.loadShipped();
@@ -157,8 +167,13 @@ class Session {
   }
 
   private rebuild(seed: number, pushUrl: boolean): void {
-    const stage = this.stageNumber();
-    const size = STAGE_SIZE[stage] ?? STAGE_SIZE[3]!;
+    let stage = this.stageNumber();
+    let size = STAGE_SIZE[stage] ?? STAGE_SIZE[3]!;
+    const showcase = this.launch.shot?.startsWith('targets') ?? false;
+    if (showcase) {
+      stage = 0;
+      size = { floors: 1, w: 14, d: 12 };
+    }
     this.spec = generateBuilding({ seed, floors: size.floors, w: size.w, d: size.d, stage });
     const nRooms = this.spec.floors.reduce((n, floor) => n + floor.rooms.length, 0);
     const lights = new Uint8Array(nRooms);
@@ -180,6 +195,18 @@ class Session {
     this.reward = 0;
     this.collisions = 0;
     this.lidar = Array.from(this.obs.slice(0, 40));
+    this.targetScene = placeIndoor(this.spec, showcase ? { seed, showcase: true } : { seed, people: 4, objects: 6, decoys: 3 });
+    this.tracker = new SeenEmptyTracker(indoorCells(this.spec), 'person', this.spec);
+    if (showcase) {
+      const distance = this.launch.shot === 'targets-room' ? 6.4 : 3.8;
+      const fov = this.launch.shot === 'targets-room' ? 64 : 110;
+      const frame = frameOnTargets(this.spec, resolveScene(this.targetScene.targets, 0), distance);
+      this.framed = { eye: frame.eye, look: frame.look, fov };
+      this.view.setFramedView(frame.eye, frame.look, fov, this.launch.shot === 'targets-night');
+    } else {
+      this.framed = null;
+      this.view.setFramedView(null, null);
+    }
     this.view.load(this.spec);
     this.q<HTMLInputElement>('#seed').value = String(seed);
     this.q<HTMLInputElement>('#tod').value = String(this.lighting.timeOfDay);
@@ -231,9 +258,11 @@ class Session {
     this.view.setCollision(this.collisions > 0 && this.env.stepCount % 8 < 2);
     if (this.visited) this.view.setVisited(this.spec, this.visited, this.floor);
     this.view.update(this.shown, this.lighting);
+    this.senseTargets();
     const hooks = this.view.hooks();
-    this.drawHudCanvas(this.q('#hud'), this.camera === 'fpv' || this.launch.shot === 'fpv');
-    this.drawHudCanvas(this.q('#pip-hud'), true);
+    const overlay = this.camera === 'fpv' || this.launch.shot === 'fpv' || this.framed !== null;
+    this.drawHudCanvas(this.q('#hud'), this.camera === 'fpv' || this.launch.shot === 'fpv', overlay);
+    this.drawHudCanvas(this.q('#pip-hud'), true, this.framed !== null);
     const text = this.q('#readout');
     const speed = Math.hypot(this.shown.vel[0], this.shown.vel[1], this.shown.vel[2]);
     text.textContent = `SIM ${this.shown.t.toFixed(1)}s\nALT ${this.shown.pos[2].toFixed(2)} m\nSPD ${speed.toFixed(2)} m/s\nX ${this.shown.pos[0].toFixed(1)}  Y ${this.shown.pos[1].toFixed(1)}`;
@@ -247,7 +276,8 @@ class Session {
     this.q('#mode-label').textContent = modeLabel(this.lighting);
     this.root.dataset.fps = hooks.fps.toFixed(1);
     this.root.dataset.backend = hooks.backend;
-    if (this.view.frameCount > 2) this.root.dataset.ready = '1';
+    const visualsReady = !this.launch.shot?.startsWith('targets') || this.targetView.loaded;
+    if (this.view.frameCount > 2 && visualsReady) this.root.dataset.ready = '1';
   }
 
   private paintMap(): void {
@@ -260,14 +290,50 @@ class Session {
     drawHeatmap(heat, this.heatmap);
   }
 
-  private drawHudCanvas(canvas: HTMLCanvasElement, enabled: boolean): void {
+  private senseTargets(): void {
+    if (!this.spec || !this.targetScene || !this.tracker) return;
+    const time = this.shown.t;
+    const resolved = resolveScene(this.targetScene.targets, time);
+    this.targetView.sync(resolved, this.targetScene.targets, time);
+    const aspect = this.view.sensingAspect();
+    const camera = this.framed
+      ? cameraLookingAt(this.framed.eye, this.framed.look, [0, 0, 1], (this.framed.fov * Math.PI) / 180, aspect)
+      : fpvCameraFromDrone(this.shown.pos, this.shown.yaw, aspect);
+    const speed = Math.hypot(this.shown.vel[0], this.shown.vel[1]);
+    this.detections = detect({
+      seed: this.launch.seed,
+      camera,
+      targets: resolved,
+      spec: this.spec,
+      lighting: this.lighting,
+      cameraSpeed: this.framed ? 0 : speed,
+    });
+    this.tracker.observe(camera, resolved, this.lighting, resolved.flatMap((target) => target.occluders));
+    const keys = roomCellKeys(this.spec, this.floor, 0);
+    const report = this.tracker.report(keys.length ? keys : indoorCells(this.spec).map((cell) => cell.key), resolved);
+    this.clearText = clearLabel(report);
+    this.root.dataset.detections = String(this.detections.length);
+    this.root.dataset.clear = report.status;
+    const list = this.root.querySelector('#detect-list');
+    if (list) {
+      const rows = this.detections.slice(0, 8).map((det) => {
+        const cls = det.kind === 'fp' ? ' class="fp"' : '';
+        return `<li${cls}><span>${det.classId}</span><span>${det.confidence.toFixed(2)} · ${det.distance.toFixed(1)}m</span></li>`;
+      });
+      list.innerHTML = rows.join('') || '<li class="muted">no detections</li>';
+    }
+    const clear = this.root.querySelector('#detect-clear');
+    if (clear) clear.textContent = this.clearText;
+    const count = this.root.querySelector('#detect-count');
+    if (count) count.textContent = String(this.detections.length);
+  }
+
+  private drawHudCanvas(canvas: HTMLCanvasElement, enabled: boolean, overlay = false): void {
     fitCanvas(canvas);
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    if (!enabled) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      return;
-    }
+    if (!enabled) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (enabled) {
     const speed = Math.hypot(this.shown.vel[0], this.shown.vel[1], this.shown.vel[2]);
     drawHud(ctx, canvas.width, canvas.height, {
       alt: this.shown.pos[2],
@@ -280,6 +346,8 @@ class Session {
       lidar: this.lidar,
       fps: this.view.hooks().fps,
     });
+    }
+    if (overlay) drawDetections(ctx, canvas.width, canvas.height, this.detections);
   }
 
   private bind(): void {
@@ -398,6 +466,8 @@ class Session {
       this.spec = snap.spec;
       this.view.load(snap.spec);
       this.trail = [];
+      this.targetScene = placeIndoor(this.spec, { seed: snap.spec.seed, people: 4, objects: 6, decoys: 3 });
+      this.tracker = new SeenEmptyTracker(indoorCells(this.spec), 'person', this.spec);
     }
     this.shown = {
       pos: [snap.pos[0], snap.pos[1], snap.pos[2]],
@@ -767,6 +837,11 @@ function shell(): string {
           <canvas id="pip-hud"></canvas>
           <span class="pip-tag">FPV FEED</span>
         </div>
+        <section class="panel detect-panel">
+          <div class="panel-head"><h2>DETECTIONS</h2><span class="live" id="detect-count">0</span></div>
+          <p class="help" id="detect-clear">seen-empty</p>
+          <ul id="detect-list" class="detect-list"></ul>
+        </section>
         <div class="stat-grid">
           <div><span>ALT</span><strong id="alt-num">0 m</strong></div>
           <div><span>SPD</span><strong id="spd-num">0 m/s</strong></div>

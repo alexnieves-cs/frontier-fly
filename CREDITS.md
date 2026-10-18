@@ -12,7 +12,19 @@ Frontier-fly ships only assets with a clear free license. Geometry written for t
 | Quadrotor mesh, furniture meshes, propeller-wash particles | Drone and room props | Original, this repository | MIT |
 | Three.js post passes (SSAO, SMAA, TAA, bloom, afterimage) | High-preset image effects and FPV trail | [three.js addons](https://github.com/mrdoob/three.js) `0.170.0` | MIT |
 | Procedural canvas textures | Fallback if a map fails to load | Original, this repository | MIT |
+| KayKit Rig_Medium mannequin and clips | Simulated people | [Kay Lousberg](https://www.kaylousberg.com), KayKit Character Animations 1.1 | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| Backpack, phone, toolbox, medkit, bottle, radio, helmet, blanket, coat, hiding crate | Search objects and decoys | Original procedural meshes, this repository | MIT |
 
-No asset in the repository has an unclear or non-commercial license. Poly Haven and ambientCG downloads used here are CC0, so attribution is not required; the links above are the record of where each file came from.
+No asset in the repository has an unclear or non-commercial license. Poly Haven and ambientCG downloads used here are CC0, so attribution is not required; the links above are the record of where each file came from. CC0 also does not require credit for KayKit; the credit is here anyway.
+
+## Simulated people
+
+The humanoid is packed into `public/assets/targets/humanoid.glb`. The license text shipped with the file is `public/assets/targets/LICENSE-KayKit.txt`.
+
+Clips included: `Idle_A` (standing), `Walking_A` (walking), `Sit_Chair_Idle` (sitting), `Sit_Floor_Idle` (hiding / low), `Lie_Idle` (lying, used for an injured or resting person). Hit, death, and other combat clips from that pack are not included.
+
+The clips and mannequin were taken from the CC0 redistribution at https://github.com/NoLimitNexus/game-models (`library/animations/Rig_Medium_*.glb` and `tools/reference/Mannequin_Medium.glb`), which credits Kay Lousberg for the skeleton, mesh, and animations. This repository does not include that project's original body kit.
+
+Joint velocities in `src/targets/skeleton.ts` are computed from an analytic pose, not by sampling the KayKit clips. The pose names match the Rig_Medium joints so a later binding can share them. The hook is reserved for a drone avoidance response: the drone dodges. It does not pursue or strike.
 
 To refresh the textures, download the same 1K JPG zips from those pages and keep only the Color, Roughness, and NormalGL images, renamed to `public/textures/{plaster,floor,concrete,door}_{color,rough,normal}.jpg`. The sky file is `public/hdri/kloofendal_43d_clear_puresky_1k.hdr`.
