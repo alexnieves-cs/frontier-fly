@@ -8,6 +8,7 @@ const LIDAR_MAX = C.LIDAR_MAX;
 const MAP_SIZE = C.MAP_SIZE;
 const VOXEL = C.VOXEL;
 import type { BuildingSpec } from '../shared/types';
+import { flightMap } from '../gen/validate';
 
 /** Rays shorter than this many meters before the return are not trusted as free. */
 const HIT_MARGIN = 0.15;
@@ -30,6 +31,12 @@ for (let i = 0; i < LIDAR_H; i++) {
  * Unlike the teacher's building cells this is knowledge a real robot has.
  * Readings with no return (misses and glass/night dropouts) mark nothing, so a
  * dropout through a glass wall can never paint the wall as free.
+ *
+ * Only voxels that count toward the coverage denominator (flightMap(spec)
+ * .reachable, the same rule as BuildingSpec.reachableVoxels) can be marked.
+ * The lidar stops at furniture, but a voxel the drone center cannot occupy at
+ * flight altitude (beside a shelf, under a chair back) could still be painted
+ * free by a ray passing it; it would then be a frontier that never clears.
  */
 export class SeenMap {
   data = new Uint8Array(0);
@@ -37,8 +44,11 @@ export class SeenMap {
   vd = 0;
   floors = 0;
   count = 0;
+  /** Voxels the drone can reach at flight altitude; markRing paints nothing else. */
+  private flyable: Uint8Array | null = null;
 
   reset(spec: BuildingSpec): void {
+    this.flyable = flightMap(spec).reachable;
     const floor0 = spec.floors[0]!;
     this.vw = floor0.w * 2;
     this.vd = floor0.d * 2;
@@ -59,6 +69,7 @@ export class SeenMap {
     const vd = this.vd;
     const base = floor * vw * vd;
     const data = this.data;
+    const flyable = this.flyable;
     const ox = x / VOXEL;
     const oy = y / VOXEL;
     const cy = Math.cos(yaw);
@@ -82,7 +93,7 @@ export class SeenMap {
       for (;;) {
         if (vx < 0 || vy < 0 || vx >= vw || vy >= vd) break;
         const k = base + vy * vw + vx;
-        if (data[k] === 0) {
+        if (data[k] === 0 && (flyable === null || flyable[k] === 1)) {
           data[k] = 1;
           added += 1;
         }

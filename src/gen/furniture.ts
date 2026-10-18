@@ -54,7 +54,7 @@ export const FURNITURE_CLEARANCE = 0.35;
 
 /** Sim-space boxes for one placement. `prop` is the placement's index. */
 export function propBoxes(spec: BuildingSpec, prop: PropPlacement, index: number): FurnitureBox[] {
-  const yaw = -prop.rot;
+  const yaw = 0 - prop.rot; // not -rot: keeps +0 so plans survive JSON round trips unchanged
   const c = Math.cos(yaw);
   const s = Math.sin(yaw);
   return PROP_PARTS[prop.kind].map((part) => ({
