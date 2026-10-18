@@ -24,7 +24,11 @@ test('outdoor chase, fpv, and map are non-blank', async ({ page }) => {
 
   await page.goto('/outdoor.html?seed=4&shot=map');
   await expect(page.locator('#app[data-ready="1"]')).toBeVisible({ timeout: 40_000 });
-  await page.waitForTimeout(400);
+  await page.waitForFunction(
+    () => Number(document.querySelector('#app')?.getAttribute('data-fps-samples') ?? '0') >= 2,
+    undefined,
+    { timeout: 20_000 },
+  );
   await page.screenshot({ path: `${out}/outdoor-map.png` });
   expect(readFileSync(`${out}/outdoor-map.png`).length).toBeGreaterThan(20_000);
 

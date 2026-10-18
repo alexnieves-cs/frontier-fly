@@ -24,21 +24,27 @@ export class OutdoorView {
   private readonly buckets: InstancedBucket[] = [];
   private buildingRoot: THREE.Group | null = null;
   private terrainMesh: THREE.Mesh | null = null;
+  private forestX = Number.NaN;
+  private forestY = Number.NaN;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    const soft = softwareWebgl();
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !soft, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(soft ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.AgXToneMapping;
     this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = !soft;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // Trees and shells do not move, so the shadow map is rendered once per world.
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = !soft;
     this.scene.background = new THREE.Color('#9ec8ea');
     this.scene.fog = new THREE.Fog('#b7d4ee', 28, 92);
     this.sun = new THREE.DirectionalLight('#fff4dd', 2.6);
     this.sun.position.set(48, 62, 18);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1024, 1024);
+    this.sun.castShadow = !soft;
+    this.sun.shadow.mapSize.set(512, 512);
     this.sun.shadow.camera.near = 10;
     this.sun.shadow.camera.far = 140;
     this.sun.shadow.camera.left = -40;
@@ -72,6 +78,9 @@ export class OutdoorView {
     this.sun.position.set(mid + 28, 64, mid + 10);
     this.sun.shadow.camera.position.copy(this.sun.position);
     this.sun.shadow.camera.lookAt(mid, 4, mid);
+    this.renderer.shadowMap.needsUpdate = true;
+    this.forestX = Number.NaN;
+    this.forestY = Number.NaN;
     this.placeForest(world, world.spawn[0], world.spawn[1]);
   }
 
@@ -138,6 +147,9 @@ export class OutdoorView {
   }
 
   private placeForest(world: OutdoorWorld, camX: number, camY: number): void {
+    if (Math.hypot(camX - this.forestX, camY - this.forestY) < 0.05) return;
+    this.forestX = camX;
+    this.forestY = camY;
     for (const bucket of this.buckets) bucket.fill(world, camX, camY);
   }
 
@@ -192,7 +204,6 @@ export class OutdoorView {
     const mat = new THREE.MeshStandardMaterial({ map: texture, vertexColors: true, roughness: 0.92, metalness: 0 });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
-    mesh.castShadow = true;
     return mesh;
   }
 
@@ -397,6 +408,16 @@ function bucket(
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     },
   };
+}
+
+function softwareWebgl(): boolean {
+  const probe = document.createElement('canvas');
+  const gl = probe.getContext('webgl2');
+  if (!gl) return true;
+  const debug = gl.getExtension('WEBGL_debug_renderer_info');
+  const name = debug ? String(gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)) : '';
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return /swiftshader|llvmpipe|softpipe|software/i.test(name);
 }
 
 function cylinder(radius: number, height: number, segments: number): THREE.CylinderGeometry {

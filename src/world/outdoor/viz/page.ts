@@ -69,6 +69,7 @@ class Session {
   private camera: OutdoorCamera;
   private last = performance.now();
   private frames = 0;
+  private fpsSamples = 0;
   private fpsStamp = performance.now();
 
   constructor(
@@ -139,9 +140,14 @@ class Session {
     this.frames += 1;
     if (now - this.fpsStamp > 500) {
       const fps = (this.frames * 1000) / (now - this.fpsStamp);
-      this.root.dataset.fps = fps.toFixed(1);
       this.frames = 0;
       this.fpsStamp = now;
+      this.fpsSamples += 1;
+      // The first window includes shader compile and the one-shot shadow pass.
+      if (this.fpsSamples >= 2) {
+        this.root.dataset.fps = fps.toFixed(1);
+        this.root.dataset.fpsSamples = String(this.fpsSamples);
+      }
     }
     requestAnimationFrame(this.loop);
   };

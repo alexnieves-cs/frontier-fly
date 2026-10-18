@@ -6,6 +6,8 @@ export interface MapDrone {
   yaw: number;
 }
 
+const mapCache = new WeakMap<OutdoorWorld, { width: number; height: number; layer: HTMLCanvasElement }>();
+
 /** Top-down overlay: terrain, geofence, no-fly zones, trees, shells, openings, drone. */
 export function drawOutdoorMap(
   ctx: CanvasRenderingContext2D,
@@ -21,16 +23,45 @@ export function drawOutdoorMap(
     ctx.canvas.width = width;
     ctx.canvas.height = height;
   }
+  const cached = mapCache.get(world);
+  const layer = cached && cached.width === width && cached.height === height ? cached.layer : paintMapLayer(world, width, height, cssWidth, cssHeight, dpr);
+  if (!cached || cached.layer !== layer) mapCache.set(world, { width, height, layer });
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+  ctx.drawImage(layer, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const { toX, toY } = mapProject(world, cssWidth, cssHeight);
+  ctx.save();
+  ctx.translate(toX(drone.x), toY(drone.y));
+  ctx.rotate(-drone.yaw);
+  ctx.fillStyle = '#f4fff8';
+  ctx.beginPath();
+  ctx.moveTo(7, 0);
+  ctx.lineTo(-5, 4);
+  ctx.lineTo(-5, -4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function paintMapLayer(
+  world: OutdoorWorld,
+  width: number,
+  height: number,
+  cssWidth: number,
+  cssHeight: number,
+  dpr: number,
+): HTMLCanvasElement {
+  const layer = document.createElement('canvas');
+  layer.width = width;
+  layer.height = height;
+  const ctx = layer.getContext('2d');
+  if (!ctx) return layer;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#102018';
   ctx.fillRect(0, 0, cssWidth, cssHeight);
-
-  const pad = 10;
-  const scale = (cssWidth - pad * 2) / world.size;
-  const toX = (x: number) => pad + x * scale;
-  const toY = (y: number) => cssHeight - pad - y * scale;
-
+  const { toX, toY, scale } = mapProject(world, cssWidth, cssHeight);
   const n = world.terrain.resolution;
   const step = 2;
   const cell = world.size / (n - 1);
@@ -101,16 +132,19 @@ export function drawOutdoorMap(
       ctx.stroke();
     }
   }
+  return layer;
+}
 
-  ctx.save();
-  ctx.translate(toX(drone.x), toY(drone.y));
-  ctx.rotate(-drone.yaw);
-  ctx.fillStyle = '#f4fff8';
-  ctx.beginPath();
-  ctx.moveTo(7, 0);
-  ctx.lineTo(-5, 4);
-  ctx.lineTo(-5, -4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
+function mapProject(world: OutdoorWorld, cssWidth: number, cssHeight: number): {
+  scale: number;
+  toX: (x: number) => number;
+  toY: (y: number) => number;
+} {
+  const pad = 10;
+  const scale = (cssWidth - pad * 2) / world.size;
+  return {
+    scale,
+    toX: (x) => pad + x * scale,
+    toY: (y) => cssHeight - pad - y * scale,
+  };
 }
