@@ -289,7 +289,13 @@ export class DaggerDataset {
     this.weights[slot] = weight;
   }
 
-  addRollout(r: { obs: Float32Array; actions: Float32Array; weights?: Float32Array; n: number }): void {
+  addRollout(r: { obs: Float32Array; actions: Float32Array; weights?: Float32Array; n: number; obsDim?: number }): void {
+    if (r.obsDim != null && r.obsDim !== this.obsDim) {
+      throw new Error(`DaggerDataset: rollout obsDim ${r.obsDim} != dataset obsDim ${this.obsDim}`);
+    }
+    if (r.obs.length < r.n * this.obsDim || r.actions.length < r.n * this.actDim) {
+      throw new Error('DaggerDataset: rollout arrays are shorter than n');
+    }
     for (let i = 0; i < r.n; i++) {
       this.add(r.obs, r.actions, r.weights ? r.weights[i]! : 1, i * this.obsDim, i * this.actDim);
     }
