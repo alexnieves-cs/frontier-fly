@@ -1,5 +1,6 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import globals from 'globals';
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -11,7 +12,13 @@ export default tseslint.config(
       'test-results/**',
       'playwright-report/**',
       'public/checkpoints/**',
+      'public/coi-serviceworker.js',
     ],
+  },
+  {
+    // Node scripts. Browser globals are allowed for code passed to page.evaluate.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
     files: [

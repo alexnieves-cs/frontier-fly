@@ -73,3 +73,5 @@ jobs:
       - if: steps.playwright.outputs.cache-hit != 'true'
         run: npx playwright install chromium
       - run: npm run test:e2e
+      # Serve dist/ with no COOP/COEP headers, as GitHub Pages does, and load every page.
+      - run: npm run check:pages
