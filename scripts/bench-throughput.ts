@@ -72,12 +72,15 @@ async function single(worlds: 'pool' | 'rebuild'): Promise<number> {
   core.collectPpo({ stepsPerEnv: Math.ceil(steps / 2), stageMix: mix, seed: 1, worlds });
   let total = 0;
   let ms = 0;
+  let episodes = 0;
   for (let k = 0; k < 3; k++) {
     const r = core.collectPpo({ stepsPerEnv: steps, stageMix: mix, seed: 2 + k, worlds });
     total += r.n;
     ms += r.ms;
+    episodes += r.episodes.length;
   }
   core.dispose();
+  console.log(`  ${worlds}: mean episode length ${(total / Math.max(1, episodes)).toFixed(0)} steps`);
   return (total * 1000) / ms;
 }
 
