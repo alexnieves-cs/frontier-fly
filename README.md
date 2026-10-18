@@ -46,6 +46,16 @@ Pushes to `main`, and a manual `workflow_dispatch`, run test, lint, and build in
 
 The left rail also sets the seed, curriculum stage, time of day, sensor mode (RGB, IR, depth), and checkpoint save/load. A shareable URL looks like `/?seed=11&camera=fpv&tod=22&shot=night`.
 
+## Mission editor
+
+`mission.html` is a planner for a civilian search or safety inspection. A mission is a geofence, no-fly zones, an altitude band, a mission type, targets, a required confidence, an entry policy (`auto`, `ask`, or `never`), battery and time budgets, and a start pose.
+
+The plan is checked against mission schema v1 (TypeScript types plus `src/mission/mission.schema.json`) and against polygon rules: a ring cannot cross itself, no-fly zones sit inside the geofence, and the start pose stays in the operating area. Save writes a canonical payload into the URL hash (`#m=`). The same mission always produces the same hash. `?seed=` loads a practice mission on a mock site.
+
+The Run view plays a lawnmower preview: drone track, coverage, a detection log, an operator prompt when entry policy is `ask`, and an end-of-mission report. Battery drain and several report fields are placeholders. The outdoor world and the real detector are behind `WorldProvider` and `DetectionSource` in `src/mission`; this page uses mocks so it does not depend on those workstreams.
+
+Open `/mission.html` from the dev server. The editor does not import the sim renderer.
+
 | Query | Effect |
 | --- | --- |
 | `seed` | Building and episode seed |

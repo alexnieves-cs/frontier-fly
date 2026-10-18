@@ -1,5 +1,9 @@
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { COOP_COEP_HEADERS } from './coopHeaders';
+
+const root = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   base: './',
@@ -23,5 +27,11 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 2500,
+    rollupOptions: {
+      input: {
+        main: resolve(root, 'index.html'),
+        mission: resolve(root, 'mission.html'),
+      },
+    },
   },
 });
