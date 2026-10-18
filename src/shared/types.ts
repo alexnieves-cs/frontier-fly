@@ -85,6 +85,8 @@ export interface StepInfo {
   newRoom: boolean;
   newFloor: boolean;
   success: boolean;
+  /** Progress penalties subtracted from this step's reward (see sim/reward.ts ProgressTracker). */
+  penalty?: { stuck: number; still: number; flip: number; total: number };
 }
 
 export interface StepResult {

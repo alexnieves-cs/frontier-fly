@@ -104,6 +104,22 @@ export const REWARD = {
   smooth: 0.01,
   effort: 0.001,
   time: 0.005,
+  /** Steps without a new voxel before the stuck penalty starts. */
+  stuckGrace: 40,
+  /** Steps past the grace window over which the stuck penalty ramps to its max. */
+  stuckRamp: 160,
+  /** Max per-step stuck penalty (reached after grace + ramp steps without progress). */
+  stuck: 0.05,
+  /** Window (steps) for the net-displacement check. */
+  stillWindow: 20,
+  /** Net displacement (m) over the window below which the drone counts as loitering. */
+  stillDist: 0.3,
+  /** Per-step penalty while loitering without covering. */
+  still: 0.02,
+  /** Commands below this magnitude never count as a sign flip. */
+  flipDeadband: 0.15,
+  /** Penalty per sign flip of the lateral (strafe) or yaw command. */
+  flip: 0.01,
 } as const;
 
 export const HIDDEN = [256, 128] as const;
