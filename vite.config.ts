@@ -31,6 +31,7 @@ export default defineConfig({
       input: {
         main: resolve(root, 'index.html'),
         mission: resolve(root, 'mission.html'),
+        outdoor: resolve(root, 'outdoor.html'),
       },
     },
   },

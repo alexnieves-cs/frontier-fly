@@ -14,7 +14,14 @@ export default tseslint.config(
     ],
   },
   {
-    files: ['src/gen/**/*.ts', 'src/sim/**/*.ts', 'src/rl/**/*.ts', 'src/workers/env.worker.ts'],
+    files: [
+      'src/gen/**/*.ts',
+      'src/sim/**/*.ts',
+      'src/rl/**/*.ts',
+      'src/workers/env.worker.ts',
+      'src/world/outdoor/**/*.ts',
+    ],
+    ignores: ['src/world/outdoor/viz/**'],
     rules: {
       'no-restricted-imports': [
         'error',

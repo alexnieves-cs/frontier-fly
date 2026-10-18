@@ -98,6 +98,12 @@ flowchart LR
 
 `src/sim`, `src/gen`, and `src/rl` do not import Three.js. Training can run headless. The renderer only consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`.
 
+## Outdoor world
+
+`outdoor.html` starts the drone in a seeded forest instead of a room. Terrain is a heightfield with hills, slopes, and flattened clearings. Trees are instanced with trunk and canopy colliders and three LOD buckets. The site places 1–3 building shells (4 if you pass a count), each from the indoor BSP generator, on its own pad. A shell keeps typed openings — open window, broken window, ajar door (with a swing angle), closed door, vent, garage gap, roof hatch — and only the ones that clear the airframe plus a margin are enterable. Smaller holes are decoys. A geofence polygon and no-fly zones are data the outdoor step will not cross. Chase is `2`, FPV is `1`, and the corner map draws the fence, zones, trees, and openings.
+
+The generator is `src/world/outdoor`. It calls `generateBuilding` for interiors and does not change `src/shared`.
+
 ## What is implemented
 
 - Seeded buildings: BSP rooms, doors, hallways from stage 3, shafts when there is more than one floor, and a reachability check that retries with `seed + 1`.
@@ -133,7 +139,7 @@ Headless Chrome on this machine, with ANGLE software WebGL2 and no discrete GPU,
 
 ## Later: outdoor search
 
-The long-term mission is outdoor plus indoor search: start outside a geofence, find buildings, use an opening, search rooms for a target or confirm the area clear, and eventually fly more than one drone in the same site. This round does not build that. A few seams already fit it, and a few indoor assumptions would have to change first.
+The long-term mission is outdoor plus indoor search: start outside a geofence, find buildings, use an opening, search rooms for a target or confirm the area clear, and eventually fly more than one drone in the same site. `outdoor.html` is the flyable site. The indoor explorer still cannot train that mission, because a few assumptions would have to change first.
 
 Already reusable: `generateBuilding` is a pure function of seed, size, and stage, so a site generator can place several buildings. Lidar is a raycast against the colliders `PhysicsWorld` was given, and glass is already its own surface class. The action stays `[vx, vy, vz, yawRate]` on one `Dynamics` implementation per drone. The renderer only subscribes to state, so terrain and exteriors can be drawn without the sim importing Three.js. The worker pool runs many independent episodes, which is the right shape for training a single-agent policy.
 
@@ -141,7 +147,7 @@ These choices block the outdoor mission if they stay as they are:
 
 - **The world is one indoor grid.** `BuildingSpec` is the only world type. Its origin is the footprint corner. Visited voxels are indexed from that corner, and every floor is assumed to share floor 0's width and depth. There is no terrain, no geofence, and no list of buildings on a site.
 - **Leaving the footprint ends the episode.** `ExplorerEnv` treats a position outside the ground-floor rectangle as out of bounds. Spawn is the center of the largest ground-floor room, so an outdoor start terminates immediately.
-- **Openings are not enterable.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Furniture does not collide.
+- **Openings are not enterable in the indoor grid.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Furniture does not collide. Outdoor shells cut real apertures next to a copy of that grid; `ExplorerEnv` does not load them.
 - **The mission is indoor coverage.** Success is 95% of reachable voxels. The reward and the privileged teacher both chase that grid. There is no target object, no "confirm clear", and no detection channel.
 - **The observation is frozen at 306 floats.** The shipped checkpoint, the SharedArrayBuffer stride, and the SIMD gemm scratch (batch ≤ 64, input stride 320) all assume `src/sim/OBS_LAYOUT.md`. The map slice is visited indoor voxels. Altitude is distance to this building's floor and ceiling. A search policy needs a new observation version. Editing indices 0–305 invalidates `public/checkpoints/pretrained.json`.
 - **One drone per world.** Each env holds one `DroneState`. Workers do not share a site. Drones are not physics bodies, so they cannot see or collide with each other. A swarm needs a shared world and a rollout layout with an agent axis.

@@ -1,0 +1,84 @@
+:root {
+  color-scheme: dark;
+  --bg: #07140f;
+  --panel: #0c1c16;
+  --line: rgba(170, 214, 190, 0.18);
+  --text: #e7f6ee;
+  --muted: #8eae9c;
+  --cyan: #5dffe0;
+  --amber: #ffb15a;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+.topbar {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+  background: #08140f;
+}
+.brand { display: flex; flex-direction: column; min-width: 180px; }
+.brand strong { letter-spacing: 0.04em; }
+.brand span, .hud span { color: var(--muted); font-size: 12px; }
+.topbar a { color: var(--cyan); text-decoration: none; }
+.controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.controls input {
+  width: 88px;
+  background: #10241c;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.controls button, .cam button {
+  background: #143024;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.controls button[data-on="1"], .cam button[data-on="1"] { border-color: var(--cyan); color: var(--cyan); }
+
+.stage { position: relative; height: calc(100% - 52px); }
+#view { width: 100%; height: 100%; display: block; }
+#map {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 240px;
+  height: 240px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #102018;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+body[data-shot="map"] #map {
+  width: min(72vh, 760px);
+  height: min(72vh, 760px);
+}
+.hud {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(8, 20, 15, 0.72);
+  border: 1px solid var(--line);
+  min-width: 220px;
+}
+.cam { position: absolute; left: 12px; top: 12px; display: flex; gap: 8px; }
+.boot {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(7, 20, 15, 0.72);
+}
