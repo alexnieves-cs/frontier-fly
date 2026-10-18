@@ -65,3 +65,27 @@ export function isLowLight(lighting: LightingState): boolean {
 export function nightFactor(lighting: LightingState): number {
   return skyFromTime(lighting.timeOfDay).night;
 }
+
+export type LightingPreset = 'day' | 'dusk' | 'night-lit' | 'night-dark' | 'ir';
+
+export const LIGHTING_PRESETS: LightingPreset[] = ['day', 'dusk', 'night-lit', 'night-dark', 'ir'];
+
+export function lightingPreset(name: LightingPreset, nRooms: number): LightingState {
+  const lights = new Uint8Array(Math.max(0, nRooms));
+  if (name === 'day') {
+    lights.fill(1);
+    return { timeOfDay: 12.5, interiorLightsOn: lights, flashlightOn: false, sensorMode: 'rgb' };
+  }
+  if (name === 'dusk') {
+    lights.fill(1);
+    return { timeOfDay: 18.4, interiorLightsOn: lights, flashlightOn: false, sensorMode: 'rgb' };
+  }
+  if (name === 'night-lit') {
+    lights.fill(1);
+    return { timeOfDay: 22, interiorLightsOn: lights, flashlightOn: false, sensorMode: 'rgb' };
+  }
+  if (name === 'ir') {
+    return { timeOfDay: 23, interiorLightsOn: lights, flashlightOn: true, sensorMode: 'ir' };
+  }
+  return { timeOfDay: 23, interiorLightsOn: lights, flashlightOn: true, sensorMode: 'rgb' };
+}
