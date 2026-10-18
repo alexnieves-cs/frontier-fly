@@ -193,7 +193,8 @@ describe('benchmark report', () => {
       schema: 1,
       measuredAt: new Date().toISOString(),
       commit: git('rev-parse HEAD'),
-      dirty: (git('status --porcelain') ?? '') !== '',
+      // Only code and the checkpoint count. Generated docs and media are expected to be uncommitted here.
+      dirty: (git('status --porcelain -- src public bench tests package.json') ?? '') !== '',
       machine: {
         node: process.version,
         cpu: cpus()[0]?.model ?? 'unknown',
