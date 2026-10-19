@@ -107,9 +107,10 @@ function encode(film, { dir, from }) {
     const hero = join(OUT, 'film-hero.mp4');
     ffmpeg(['-ss', String(film.hero.start), '-t', String(film.hero.length), '-i', master, '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', hero]);
     const gif = join(OUT, 'film-hero.gif');
+    // The GIF is the README's autoplaying preview: shorter and smaller so it stays under budget.
     ffmpeg([
-      '-ss', String(film.hero.start), '-t', String(film.hero.length), '-i', master,
-      '-vf', 'fps=12,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse=dither=sierra2_4a',
+      '-ss', String(film.hero.start), '-t', String(Math.min(7, film.hero.length)), '-i', master,
+      '-vf', 'fps=10,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle',
       gif,
     ]);
     Object.assign(out, { hero, gif, gifBytes: statSync(gif).size });
