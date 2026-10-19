@@ -180,6 +180,7 @@ These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/fron
 ## Honest limits
 
 - The shipped policy meets the coverage goals on the fixed eval, but that eval is small: 4 easy and 3 hard seeds. On 48 held-out validation episodes the current checkpoint (a weight average of DAgger rounds 3 and 4) averages 62.2% on hard buildings against 60.8% for the previous one, so expect the hard-building number to move by several points on other seeds. It reaches about 92% of the privileged teacher it imitates. [BENCHMARKS.md](docs/BENCHMARKS.md) has the per-seed numbers.
+- Inside real missions the policy is not yet better than the frontier planner it hands off to. On 90 missions over fresh seeds, both reach the expected outcome 88.9% of the time, but the policy hands 40% of the buildings it enters to the planner (mostly after touching a wall) and averages 0.4 collisions per mission against none for the planner. The planner is the safety net, and the missions table counts both. [BENCHMARKS.md](docs/BENCHMARKS.md#on-fresh-seeds) has the breakdown.
 - Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.
 - Door leaves are visual. Furniture collides, but doors are always open in the indoor grid.
 - The detector is geometric, not a trained vision model.

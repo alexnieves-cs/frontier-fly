@@ -84,11 +84,26 @@ Recorded 2026-10-19 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShad
 
 Recorded from `main@f5e22fb` by `npm run media`, which reads each run's end-of-mission report from the page. Times are simulated mission time.
 
+### On fresh seeds
+
+Each scenario's settings flown on 30 fresh world seeds (9100–9129), once with the trained policy exploring indoors first and once with the frontier planner alone, from `bench/missions.test.ts` at `fdbe94b`. The policy hands a building to the planner on its first collision or after 8 s without new coverage; "Handed to planner" counts those buildings. Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.
+
+| Scenario | Indoors | Expected outcome (95% CI) | Buildings entered | Handed to planner (95% CI) | Why | Indoor coverage | Collisions per flight | Mean mission time | False clears |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| cabin-day | Policy first | 96.7% (83–99%) | 30 | 0.0% (0–11%) | none | 90.9% | 0.00 | 2:52 | 0 |
+| cabin-day | Planner only | 96.7% (83–99%) | 30 | — | — | 90.4% | 0.00 | 2:50 | 0 |
+| compound-clear | Policy first | 90.0% (74–97%) | 60 | 65.0% (52–76%) | 28 collisions, 11 stall | 96.8% | 0.93 | 8:28 | 0 |
+| compound-clear | Planner only | 86.7% (70–95%) | 60 | — | — | 96.7% | 0.00 | 7:52 | 0 |
+| backpack-night | Policy first | 80.0% (63–90%) | 30 | 30.0% (17–48%) | 8 collisions, 1 stall | 82.7% | 0.27 | 3:13 | 0 |
+| backpack-night | Planner only | 83.3% (66–93%) | 30 | — | — | 83.5% | 0.00 | 3:07 | 0 |
+| **All** | Policy first | 88.9% (81–94%) | 120 | 40.0% (32–49%) | 36 collisions, 12 stall | 90.1% | 0.40 | 4:51 | 0 |
+| **All** | Planner only | 88.9% (81–94%) | 120 | — | — | 90.2% | 0.00 | 4:36 | 0 |
+
 ## Reproduce
 
 ```bash
 npm ci
-npm run bench   # coverage and throughput, about 30 s on 4 cores
+npm run bench   # coverage, throughput, and the fresh-seed missions, a few minutes on 4 cores
 npm run media   # headless video capture and frame rates (needs ffmpeg)
 npm run docs    # re-render this page and the README tables
 ```
