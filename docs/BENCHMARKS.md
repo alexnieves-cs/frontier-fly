@@ -79,7 +79,7 @@ Single-thread numbers are Node on the machine above. The worker rows use `node:w
 
 ## Rendering
 
-Recorded 2026-10-18 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)). Software rendering is far slower than a laptop GPU, so these are a floor, not a claim.
+Recorded 2026-10-19 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)). Software rendering is far slower than a laptop GPU, so these are a floor, not a claim.
 
 | Clip | Page | Quality | Mean fps | Backend |
 | --- | --- | --- | --- | --- |
@@ -88,7 +88,13 @@ Recorded 2026-10-18 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShad
 
 ## Missions
 
-_Not measured yet. The end-to-end mission runner writes `docs/missions.json`; this table fills in from it._
+| Scenario | Outcome | Mission time | Time to find | Outdoor coverage | Indoor coverage | Entries | False clears | False alarms | Missed | Collisions | Battery used | Landed home |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Woods to cabin: find the missing person | found | 3:13 | 2:24 | 29.4% | 100.0% | 1 | 0 | 0 | 0 | 0 | 11.7% | yes |
+| Compound search: confirm the area clear | clear | 8:25 | — | 100.0% | 100.0% | 2 | 0 | 0 | 0 | 1 | 30.3% | yes |
+| Night search: find the lost backpack | found | 4:00 | 3:17 | 27.4% | 100.0% | 1 | 0 | 0 | 0 | 1 | 14.5% | yes |
+
+Recorded from `claude/woods-to-building-missions-coyfbf@7e82138 (PR #7)` by `npm run media`, which reads each run's end-of-mission report from the page. Times are simulated mission time.
 
 ## Reproduce
 

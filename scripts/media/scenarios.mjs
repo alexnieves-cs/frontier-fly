@@ -21,7 +21,8 @@
  *   wall: play back at the speed the page ran. sim: one captured repaint per 50 ms sim step, so a
  *   page that renders slowly under software WebGL still plays at true flight speed. Anything driven
  *   by real time (training workers) then plays faster than it ran, and the README says so.
- * @property {(page: Page) => Promise<void>} [act]
+ * @property {(page: Page) => Promise<void | { mission?: Record<string, unknown> }>} [act]
+ *   A returned `mission` row is written to docs/missions.json and rendered into the benchmarks.
  */
 
 /** @type {Scenario[]} */
@@ -29,23 +30,47 @@ export const SCENARIOS = [
   // Woods-to-building missions. demo.html comes from the mission pipeline work; until it is in
   // dist/ these three are skipped. Scenario ids and the finish signal follow that page.
   ...[
-    { id: 'mission-cabin-day', title: 'Woods to cabin: find the missing person', scenario: 'cabin-day' },
-    { id: 'mission-compound-clear', title: 'Compound search: confirm the area clear', scenario: 'compound-clear' },
-    { id: 'mission-backpack-night', title: 'Night search: find the lost backpack', scenario: 'backpack-night' },
+    { id: 'mission-cabin-day', title: 'Woods to cabin: find the missing person', scenario: 'cabin-day', speed: 4 },
+    { id: 'mission-compound-clear', title: 'Compound search: confirm the area clear', scenario: 'compound-clear', speed: 16 },
+    { id: 'mission-backpack-night', title: 'Night search: find the lost backpack', scenario: 'backpack-night', speed: 4 },
   ].map((m, i) => ({
     id: m.id,
     title: m.title,
     page: 'demo.html',
-    query: `?scenario=${m.scenario}&autorun=1&quality=low`,
-    seconds: 55,
-    gif: { start: 8, length: 10 },
+    query: `?scenario=${m.scenario}&autorun=1&operator=approve&speed=${m.speed}`,
+    seconds: 10,
+    gif: { start: 6, length: 12 },
     quality: /** @type {const} */ ('low'),
     hero: i === 0,
     act: async (page) => {
-      // Stop early when the page reports the mission is over.
-      await page
-        .waitForFunction(() => document.querySelector('#app')?.getAttribute('data-done') === '1', undefined, { timeout: 55_000 })
-        .catch(() => undefined);
+      // Record until the page reports the mission is over, hold the report on screen, and return
+      // the page's own end-of-mission report so record.mjs can write docs/missions.json.
+      await page.waitForFunction(() => document.querySelector('#app')?.getAttribute('data-done') === '1', undefined, {
+        timeout: 180_000,
+      });
+      await page.waitForTimeout(4000);
+      const demo = await page.evaluate(() => window.__demo ?? null);
+      if (!demo) return undefined;
+      const r = demo.report;
+      return {
+        mission: {
+          scenario: m.scenario,
+          playbackSpeed: m.speed,
+          title: m.title,
+          outcome: r.outcome,
+          durationSec: Math.round(r.durationSec),
+          timeToFindSec: r.timeToFindSec == null ? '—' : Math.round(r.timeToFindSec),
+          outdoorCoverage: r.outdoorCoverage,
+          indoorCoverage: r.indoorCoverage,
+          entries: r.entries.length,
+          falseClears: r.falseClears,
+          falseAlarms: r.falseAlarms,
+          missed: r.missed,
+          collisions: r.collisions,
+          batteryUsedPct: Number(r.batteryUsedPct.toFixed(1)),
+          landedHome: r.landedHome ? 'yes' : 'no',
+        },
+      };
     },
   })),
   {

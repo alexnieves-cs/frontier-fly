@@ -243,11 +243,27 @@ function benchmarks() {
   }
 
   if (Array.isArray(missions) && missions.length) {
-    const keys = [...new Set(missions.flatMap((m) => Object.keys(m)))];
+    const sec = (v) => (typeof v === 'number' ? `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}` : '—');
     out.MISSION_TABLE = table(
-      keys,
-      missions.map((m) => keys.map((k) => (typeof m[k] === 'number' && m[k] <= 1 && /coverage|rate|ratio/i.test(k) ? pct(m[k]) : String(m[k] ?? '—')))),
+      ['Scenario', 'Outcome', 'Mission time', 'Time to find', 'Outdoor coverage', 'Indoor coverage', 'Entries', 'False clears', 'False alarms', 'Missed', 'Collisions', 'Battery used', 'Landed home'],
+      missions.map((m) => [
+        m.title ?? m.scenario,
+        m.outcome,
+        sec(m.durationSec),
+        sec(m.timeToFindSec),
+        pct(m.outdoorCoverage),
+        pct(m.indoorCoverage),
+        String(m.entries),
+        String(m.falseClears),
+        String(m.falseAlarms),
+        String(m.missed),
+        String(m.collisions),
+        `${m.batteryUsedPct}%`,
+        m.landedHome,
+      ]),
     );
+    const sources = [...new Set(missions.map((m) => m.source).filter(Boolean))];
+    if (sources.length) out.MISSION_TABLE += `\n\nRecorded from \`${sources.join('`, `')}\` by \`npm run media\`, which reads each run's end-of-mission report from the page. Times are simulated mission time.`;
   } else {
     out.MISSION_TABLE = '_Not measured yet. The end-to-end mission runner writes `docs/missions.json`; this table fills in from it._';
   }

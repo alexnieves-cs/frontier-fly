@@ -4,6 +4,7 @@
 //   npm run media                       build, serve dist/ with COOP/COEP, record every scenario
 //   npm run media -- training fpv-night record only these ids
 //   BASE_URL=http://host/ npm run media record against a server that is already running
+//   MEDIA_SOURCE='branch@sha'           note where the recorded build came from (shown in BENCHMARKS.md)
 //
 // Writes docs/media/<id>.mp4 (H.264, 1280x720), docs/media/<id>.gif (README excerpt), and
 // docs/media/media.json with sizes, durations, and the frame rate each page reported.
@@ -113,7 +114,7 @@ async function record(browser, base, scenario) {
   });
   await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 90, maxWidth: SIZE.width, maxHeight: SIZE.height });
   const t0 = Date.now();
-  if (scenario.act) await scenario.act(page);
+  const extra = scenario.act ? ((await scenario.act(page)) ?? {}) : {};
   if (scenario.timing === 'sim') {
     // One repaint is one 50 ms sim step whenever the page draws slower than 20 fps, which is
     // always the case under software WebGL. Keep capturing until there are enough frames.
@@ -156,7 +157,7 @@ async function record(browser, base, scenario) {
     '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '16', '-pix_fmt', 'yuv420p', raw,
   ]);
   const capturedFps = frames.length / Math.max(0.001, frames[frames.length - 1].ts - frames[0].ts);
-  return { raw, errors, url, renderer, frames: frames.length, capturedFps, wallSeconds, fps: attrs.fps ? Number(attrs.fps) : null, backend: attrs.backend ?? null };
+  return { raw, errors, url, renderer, extra, frames: frames.length, capturedFps, wallSeconds, fps: attrs.fps ? Number(attrs.fps) : null, backend: attrs.backend ?? null };
 }
 
 async function main() {
@@ -173,6 +174,10 @@ async function main() {
   });
   let renderer = previous.renderer ?? null;
   const skipped = [];
+  const missionsPath = 'docs/missions.json';
+  const missions = new Map(
+    (existsSync(missionsPath) ? JSON.parse(readFileSync(missionsPath, 'utf8')) : []).map((m) => [`mission-${m.scenario}`, m]),
+  );
   const failed = [];
   try {
     for (const scenario of scenarios) {
@@ -213,7 +218,9 @@ async function main() {
         wallSeconds: Number(shot.wallSeconds.toFixed(1)),
         backend: shot.backend,
         pageErrors: shot.errors.length,
+        source: process.env.MEDIA_SOURCE ?? null,
       });
+      if (shot.extra.mission) missions.set(scenario.id, { ...shot.extra.mission, source: process.env.MEDIA_SOURCE ?? null });
       console.log(`  ${mp4} ${(statSync(mp4).size / 1e6).toFixed(2)} MB, ${gif} ${(statSync(gif).size / 1e6).toFixed(2)} MB`);
     }
   } finally {
@@ -228,6 +235,10 @@ async function main() {
     clips: [...clips.values()].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)),
   };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  if (missions.size) {
+    const rows = order.filter((id) => missions.has(id)).map((id) => missions.get(id));
+    writeFileSync(missionsPath, `${JSON.stringify(rows, null, 2)}\n`);
+  }
   for (const s of skipped) console.log(`skipped ${s}`);
   for (const f of failed) console.log(`FAILED ${f}`);
   if (failed.length) process.exit(1);
