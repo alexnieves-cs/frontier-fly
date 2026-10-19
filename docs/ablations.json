@@ -1,0 +1,542 @@
+{
+  "schema": 1,
+  "commit": "4ef0a1c",
+  "recipe": "BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint",
+  "arms": [
+    {
+      "id": "dagger",
+      "label": "BC + DAgger, full observation",
+      "ablation": null,
+      "curve": [
+        {
+          "round": 0,
+          "beta": 1,
+          "samples": 413443,
+          "loss": 0.0088,
+          "valSmall": 0.9440000000000001,
+          "valLarge": 0.522,
+          "valScore": 0.691
+        },
+        {
+          "round": 1,
+          "beta": 0.6,
+          "samples": 137670,
+          "loss": 0.0107,
+          "valSmall": 0.948,
+          "valLarge": 0.45899999999999996,
+          "valScore": 0.655
+        },
+        {
+          "round": 2,
+          "beta": 0.42,
+          "samples": 142444,
+          "loss": 0.0126,
+          "valSmall": 0.951,
+          "valLarge": 0.335,
+          "valScore": 0.581
+        },
+        {
+          "round": 3,
+          "beta": 0.29,
+          "samples": 142216,
+          "loss": 0.0131,
+          "valSmall": 0.951,
+          "valLarge": 0.625,
+          "valScore": 0.7559999999999999
+        },
+        {
+          "round": 4,
+          "beta": 0.21,
+          "samples": 140170,
+          "loss": 0.0156,
+          "valSmall": 0.951,
+          "valLarge": 0.515,
+          "valScore": 0.69
+        },
+        {
+          "round": 5,
+          "beta": 0.14,
+          "samples": 138687,
+          "loss": 0.0163,
+          "valSmall": 0.748,
+          "valLarge": 0.23399999999999999,
+          "valScore": 0.44
+        },
+        {
+          "round": 6,
+          "beta": 0.1,
+          "samples": 132652,
+          "loss": 0.0203,
+          "valSmall": 0.951,
+          "valLarge": 0.5379999999999999,
+          "valScore": 0.703
+        }
+      ],
+      "best": "round 3",
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.6150040144668664,
+          "coverageCi": [
+            0.5806361442543632,
+            0.6499631781155144
+          ],
+          "collisionsPerEpisode": 5.733333333333333
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.6151320194613551,
+          "coverageCi": [
+            0.5783950068522098,
+            0.6525017231480815
+          ],
+          "collisionsPerEpisode": 6.133333333333334
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.6218980869301439,
+          "coverageCi": [
+            0.5864988025709112,
+            0.6569874309238805
+          ],
+          "collisionsPerEpisode": 0.03333333333333333
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.6012906399535966,
+          "coverageCi": [
+            0.5533269882119088,
+            0.6458712565709516
+          ],
+          "collisionsPerEpisode": 0.16666666666666666
+        }
+      }
+    },
+    {
+      "id": "bc",
+      "label": "BC only (DAgger round 0)",
+      "ablation": null,
+      "curve": [],
+      "best": null,
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.5050311121746358,
+          "coverageCi": [
+            0.4428277058730277,
+            0.5589253948546328
+          ],
+          "collisionsPerEpisode": 8.7
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.532565851719553,
+          "coverageCi": [
+            0.47614656946093253,
+            0.5810283207173321
+          ],
+          "collisionsPerEpisode": 9.333333333333334
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5616315625428253,
+          "coverageCi": [
+            0.5247021921962985,
+            0.5976855026260371
+          ],
+          "collisionsPerEpisode": 0.16666666666666666
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5688838138852177,
+          "coverageCi": [
+            0.529484349815651,
+            0.6081151160157962
+          ],
+          "collisionsPerEpisode": 0.16666666666666666
+        }
+      }
+    },
+    {
+      "id": "ppo",
+      "label": "BC + DAgger + anchored PPO",
+      "ablation": null,
+      "curve": [],
+      "best": null,
+      "ppo": {
+        "val": 0.7490000000000001,
+        "dagger": 0.7559999999999999
+      },
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.5883253632912149,
+          "coverageCi": [
+            0.5550684429852307,
+            0.6228663809011377
+          ],
+          "collisionsPerEpisode": 4.933333333333334
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.6068643272995311,
+          "coverageCi": [
+            0.5647289665550222,
+            0.6474128982688081
+          ],
+          "collisionsPerEpisode": 5.366666666666666
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5917701544554779,
+          "coverageCi": [
+            0.5544332149381879,
+            0.6305633401744056
+          ],
+          "collisionsPerEpisode": 0.43333333333333335
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5911342208604803,
+          "coverageCi": [
+            0.5600532426287669,
+            0.6267139398338638
+          ],
+          "collisionsPerEpisode": 0.4
+        }
+      }
+    },
+    {
+      "id": "no-nav",
+      "label": "No navigation block (obs 52–63)",
+      "ablation": "no-nav",
+      "curve": [
+        {
+          "round": 0,
+          "beta": 1,
+          "samples": 413443,
+          "loss": 0.0119,
+          "valSmall": 0.737,
+          "valLarge": 0.272,
+          "valScore": 0.45799999999999996
+        },
+        {
+          "round": 1,
+          "beta": 0.6,
+          "samples": 137703,
+          "loss": 0.0158,
+          "valSmall": 0.932,
+          "valLarge": 0.43,
+          "valScore": 0.631
+        },
+        {
+          "round": 2,
+          "beta": 0.42,
+          "samples": 139168,
+          "loss": 0.0196,
+          "valSmall": 0.903,
+          "valLarge": 0.33799999999999997,
+          "valScore": 0.564
+        },
+        {
+          "round": 3,
+          "beta": 0.29,
+          "samples": 140194,
+          "loss": 0.0213,
+          "valSmall": 0.9390000000000001,
+          "valLarge": 0.544,
+          "valScore": 0.7020000000000001
+        },
+        {
+          "round": 4,
+          "beta": 0.21,
+          "samples": 138567,
+          "loss": 0.0235,
+          "valSmall": 0.879,
+          "valLarge": 0.353,
+          "valScore": 0.563
+        },
+        {
+          "round": 5,
+          "beta": 0.14,
+          "samples": 136668,
+          "loss": 0.0304,
+          "valSmall": 0.9309999999999999,
+          "valLarge": 0.414,
+          "valScore": 0.621
+        },
+        {
+          "round": 6,
+          "beta": 0.1,
+          "samples": 139422,
+          "loss": 0.0346,
+          "valSmall": 0.951,
+          "valLarge": 0.384,
+          "valScore": 0.611
+        }
+      ],
+      "best": "round 3",
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.4718925868683017,
+          "coverageCi": [
+            0.4182998428209194,
+            0.5207043884323638
+          ],
+          "collisionsPerEpisode": 8.366666666666667
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.5038906486084962,
+          "coverageCi": [
+            0.46687907463969697,
+            0.5437361458968638
+          ],
+          "collisionsPerEpisode": 10.266666666666667
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5229696469607196,
+          "coverageCi": [
+            0.4805682707425153,
+            0.5630858733620279
+          ],
+          "collisionsPerEpisode": 0.13333333333333333
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5617534795098705,
+          "coverageCi": [
+            0.5291922613413221,
+            0.595582985403446
+          ],
+          "collisionsPerEpisode": 0.23333333333333334
+        }
+      }
+    },
+    {
+      "id": "no-local",
+      "label": "No local maps",
+      "ablation": "no-local",
+      "curve": [
+        {
+          "round": 0,
+          "beta": 1,
+          "samples": 413443,
+          "loss": 0.0158,
+          "valSmall": 0.927,
+          "valLarge": 0.47,
+          "valScore": 0.653
+        },
+        {
+          "round": 1,
+          "beta": 0.6,
+          "samples": 137571,
+          "loss": 0.0198,
+          "valSmall": 0.9259999999999999,
+          "valLarge": 0.47100000000000003,
+          "valScore": 0.653
+        },
+        {
+          "round": 2,
+          "beta": 0.42,
+          "samples": 140930,
+          "loss": 0.0249,
+          "valSmall": 0.9470000000000001,
+          "valLarge": 0.431,
+          "valScore": 0.637
+        },
+        {
+          "round": 3,
+          "beta": 0.29,
+          "samples": 142702,
+          "loss": 0.0307,
+          "valSmall": 0.924,
+          "valLarge": 0.518,
+          "valScore": 0.68
+        },
+        {
+          "round": 4,
+          "beta": 0.21,
+          "samples": 139945,
+          "loss": 0.0375,
+          "valSmall": 0.951,
+          "valLarge": 0.298,
+          "valScore": 0.5589999999999999
+        },
+        {
+          "round": 5,
+          "beta": 0.14,
+          "samples": 136775,
+          "loss": 0.0488,
+          "valSmall": 0.951,
+          "valLarge": 0.457,
+          "valScore": 0.655
+        },
+        {
+          "round": 6,
+          "beta": 0.1,
+          "samples": 139109,
+          "loss": 0.0616,
+          "valSmall": 0.9159999999999999,
+          "valLarge": 0.259,
+          "valScore": 0.522
+        }
+      ],
+      "best": "round 3",
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.5436069721886297,
+          "coverageCi": [
+            0.5032236908531127,
+            0.5829724937241191
+          ],
+          "collisionsPerEpisode": 11.2
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.49140162968674955,
+          "coverageCi": [
+            0.4456869854639889,
+            0.5339567037254063
+          ],
+          "collisionsPerEpisode": 13.366666666666667
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5297597940537563,
+          "coverageCi": [
+            0.49608687012977093,
+            0.5612026842727167
+          ],
+          "collisionsPerEpisode": 0.3333333333333333
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5309599637406126,
+          "coverageCi": [
+            0.4914139071932606,
+            0.5681934737353368
+          ],
+          "collisionsPerEpisode": 0.6333333333333333
+        }
+      }
+    },
+    {
+      "id": "no-coarse",
+      "label": "No coarse maps",
+      "ablation": "no-coarse",
+      "curve": [
+        {
+          "round": 0,
+          "beta": 1,
+          "samples": 413443,
+          "loss": 0.0099,
+          "valSmall": 0.951,
+          "valLarge": 0.5670000000000001,
+          "valScore": 0.72
+        },
+        {
+          "round": 1,
+          "beta": 0.6,
+          "samples": 134600,
+          "loss": 0.0123,
+          "valSmall": 0.951,
+          "valLarge": 0.535,
+          "valScore": 0.7020000000000001
+        },
+        {
+          "round": 2,
+          "beta": 0.42,
+          "samples": 139163,
+          "loss": 0.0147,
+          "valSmall": 0.951,
+          "valLarge": 0.457,
+          "valScore": 0.655
+        },
+        {
+          "round": 3,
+          "beta": 0.29,
+          "samples": 142315,
+          "loss": 0.0148,
+          "valSmall": 0.951,
+          "valLarge": 0.614,
+          "valScore": 0.7490000000000001
+        },
+        {
+          "round": 4,
+          "beta": 0.21,
+          "samples": 139537,
+          "loss": 0.0166,
+          "valSmall": 0.818,
+          "valLarge": 0.42,
+          "valScore": 0.579
+        },
+        {
+          "round": 5,
+          "beta": 0.14,
+          "samples": 137084,
+          "loss": 0.0186,
+          "valSmall": 0.713,
+          "valLarge": 0.46799999999999997,
+          "valScore": 0.5660000000000001
+        },
+        {
+          "round": 6,
+          "beta": 0.1,
+          "samples": 137146,
+          "loss": 0.0224,
+          "valSmall": 0.748,
+          "valLarge": 0.298,
+          "valScore": 0.478
+        }
+      ],
+      "best": "round 3",
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.58512623488253,
+          "coverageCi": [
+            0.5366588499178309,
+            0.631605290972477
+          ],
+          "collisionsPerEpisode": 6.7
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.607707872633332,
+          "coverageCi": [
+            0.5738581805812196,
+            0.6407302119422418
+          ],
+          "collisionsPerEpisode": 7.9
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.6197820455553393,
+          "coverageCi": [
+            0.5882458846444039,
+            0.6510917074793791
+          ],
+          "collisionsPerEpisode": 0.06666666666666667
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5781047204075799,
+          "coverageCi": [
+            0.5329645708077702,
+            0.6206195691937562
+          ],
+          "collisionsPerEpisode": 0.23333333333333334
+        }
+      }
+    }
+  ]
+}

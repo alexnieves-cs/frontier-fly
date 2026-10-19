@@ -85,7 +85,20 @@ async function evaluate(arm: Arm): Promise<Result[]> {
   await Promise.all(
     files.map((out, i) =>
       run(
-        ['--shard', String(i), '--of', String(shards), '--conditions', 'hard', '--pilots', 'policy,guarded', '--checkpoint', `${RUNS}/${arm.checkpoint}`, '--out', out],
+        [
+          '--shard',
+          String(i),
+          '--of',
+          String(shards),
+          '--conditions',
+          'hard',
+          '--pilots',
+          'policy,guarded',
+          '--checkpoint',
+          `${RUNS}/${arm.checkpoint}`,
+          '--out',
+          out,
+        ],
         env,
       ),
     ),
@@ -109,7 +122,12 @@ for (const arm of ARMS) {
   const cell = (pilot: string, lighting: string) => {
     const rs = rows.filter((r) => r.pilot === pilot && r.lighting === lighting);
     const cov = rs.map((r) => r.coverage);
-    return { episodes: rs.length, coverage: mean(cov), coverageCi: bootstrapCi(cov), collisionsPerEpisode: mean(rs.map((r) => r.collisions)) };
+    return {
+      episodes: rs.length,
+      coverage: mean(cov),
+      coverageCi: bootstrapCi(cov),
+      collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
+    };
   };
   const log = parseLog(`${RUNS}/${arm.log}`);
   arms.push({
@@ -126,10 +144,12 @@ for (const arm of ARMS) {
       guardedNight: cell('guarded', 'night-dark'),
     },
   });
-  console.log(`${arm.id}: policy ${(cell('policy', 'day').coverage * 100).toFixed(1)}% guarded ${(cell('guarded', 'day').coverage * 100).toFixed(1)}%`);
+  console.log(
+    `${arm.id}: policy ${(cell('policy', 'day').coverage * 100).toFixed(1)}% guarded ${(cell('guarded', 'day').coverage * 100).toFixed(1)}%`,
+  );
 }
 writeFileSync(
   OUT,
-  `${JSON.stringify({ schema: 1, commit: execSync('git rev-parse --short HEAD').toString().trim(), recipe: 'npm run train:indoor defaults (6 DAgger rounds after BC)', arms }, null, 2)}\n`,
+  `${JSON.stringify({ schema: 1, commit: execSync('git rev-parse --short HEAD').toString().trim(), recipe: 'BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint', arms }, null, 2)}\n`,
 );
 console.log(`wrote ${OUT}`);

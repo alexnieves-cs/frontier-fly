@@ -9,6 +9,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Nothing the mission flies indoors reads the floor plan any more.** Before this work, the mission's indoor planner, its viewpoint checks and its exit routes all read the building's true cell grid. They now run on a map the drone builds from its lidar, its up and down range finders, and its own estimate of where the camera has looked. The floor-plan planner is kept only as an *oracle* reference.
 - **Missions did not get worse without the floor plan.** On 90 fresh mission worlds per explorer, the sensor-only explorer meets the expected outcome in 93.3% of flights, the oracle planner in 88.9%, and the policy with the sensor-only fallback in 91.1%; the intervals overlap. 0 of the 270 flights touched anything. No flight declared a building clear while a target was inside it, and none confirmed a decoy.
 - **A classical sensor-only planner is the stronger indoor coverage pilot.** On 30 fresh hard buildings it covers 65.5% with no collisions. The learned policy covers 60.7% and averages 6.4 collisions per episode; under a lidar guard it keeps its coverage (60.8%) at 0.03 collisions per episode. The oracle teacher it imitates covers 67.3%.
+- **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps and an anchored PPO fine-tune change little. DAgger adds 11 points over behavior cloning.
 - **Two open problems are measured, not hidden.** No pilot in the coverage environment climbs to a second floor (the mission explorer does, through shafts), and every pilot collapses on quadrotor dynamics with sensor noise (43.0% for the planner, 24.6% for the policy, 23.8% for the oracle teacher).
 
 ## Setup
@@ -128,11 +129,29 @@ The night search is where the explorers differ most: the sensor-only explorer fi
 
 ### Ablations
 
-_Not measured yet. Run the ablation recipe in scripts/study/ablations.ts._
+Each arm is one `npm run train:indoor` run with the default recipe (BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint), the checkpoint kept by held-out validation, then flown on the coverage study's 30 hard buildings, from `scripts/study/ablations.ts` at `4ef0a1c`. Observation ablations zero the block in training and evaluation alike. Brackets are bootstrap 95% intervals.
 
-_Not measured yet. Run the ablation recipe in scripts/study/ablations.ts._
+| Arm | Hard, day | Hard, night | Collisions per episode | Under the lidar guard, day | Best validation |
+| --- | --- | --- | --- | --- | --- |
+| BC + DAgger, full observation | 61.5% (58.1–65.0) | 61.5% (57.8–65.3) | 5.73 | 62.2% (58.6–65.7) | 75.6% |
+| BC only (DAgger round 0) | 50.5% (44.3–55.9) | 53.3% (47.6–58.1) | 8.70 | 56.2% (52.5–59.8) | — |
+| BC + DAgger + anchored PPO | 58.8% (55.5–62.3) | 60.7% (56.5–64.7) | 4.93 | 59.2% (55.4–63.1) | 74.9% (DAgger 75.6%) |
+| No navigation block (obs 52–63) | 47.2% (41.8–52.1) | 50.4% (46.7–54.4) | 8.37 | 52.3% (48.1–56.3) | 70.2% |
+| No local maps | 54.4% (50.3–58.3) | 49.1% (44.6–53.4) | 11.20 | 53.0% (49.6–56.1) | 68.0% |
+| No coarse maps | 58.5% (53.7–63.2) | 60.8% (57.4–64.1) | 6.70 | 62.0% (58.8–65.1) | 74.9% |
 
-_Not measured yet. Run the ablation recipe in scripts/study/ablations.ts._
+What the ablations show, on day coverage without the guard:
+
+- **DAgger is worth about 11 points over behavior cloning** (61.5% vs 50.5%), and BC alone collides more. Imitating the teacher only on the teacher's own states leaves the policy lost once it drifts off them.
+- **The navigation block carries the most information.** Without the frontier waypoint and its distance (observation 52–63) the policy drops to 47.2%, the largest loss of any arm, and its validation curve starts lowest.
+- **Local maps matter for safety as much as for coverage.** Without them the policy loses 7 points by day and 12 at night, and collides about twice as often as the full policy.
+- **Coarse maps add little.** Removing them costs about 3 points by day and nothing measurable at night; the intervals overlap with the full policy's.
+- **Anchored PPO does not help.** It scores slightly below the DAgger checkpoint it starts from on validation and on the study buildings, consistent with the earlier failed PPO attempts.
+- **Validation is noisy from round to round.** Each run's best round is round 3, and later rounds can drop by 30 points (round 5 of the full run scores 44%), which is why the round is picked on validation and why the shipped checkpoint averages rounds.
+
+These runs use the default recipe without weight averaging, so the full arm is not the shipped checkpoint; it lands within a point of it on the same buildings.
+
+![Validation score per DAgger round for each arm](report/learning-curves.svg)
 
 ## Failure gallery
 
