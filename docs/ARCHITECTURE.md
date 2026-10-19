@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (120 files, 16,756 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (132 files, 21,116 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -31,17 +31,18 @@ flowchart LR
 
 1. **Generate.** `src/gen` builds a building from a seed with BSP rooms, doors, hallways, and shafts, then checks every room is reachable. The outdoor site (`src/world/outdoor`) places one to four of those buildings on terrain with trees, a geofence, and typed openings.
 2. **Simulate.** `src/sim` wraps a Rapier world. Kinematic flight steps once per action. Quadrotor mode runs a velocity-to-attitude cascade with motor lag and drag at 400 Hz.
-3. **Sense.** Each step produces a 306-float observation: 40 lidar ranges, IMU, altitude, a 16×16 egocentric visited map, floor index, and time remaining. The layout is frozen in [`src/sim/OBS_LAYOUT.md`](../src/sim/OBS_LAYOUT.md) because the checkpoint, the rollout stride, and the gemm scratch depend on it.
+3. **Sense.** Each step produces a 1088-float observation (v2): 40 lidar ranges, IMU, altitude, frontier-direction features, and four 16×16 egocentric maps (visited and unexplored-free at 8 m and 32 m). The layout is versioned in [`src/sim/OBS_LAYOUT.md`](../src/sim/OBS_LAYOUT.md) because the checkpoint, the rollout stride, and the gemm scratch depend on it.
 4. **Act.** The policy outputs `[vx, vy, vz, yawRate]` in `[-1, 1]`. Inference in the env workers is a small SIMD WASM gemm (`src/rl/gemm.ts`), not TF.js.
 5. **Learn.** Env workers write rollouts into `SharedArrayBuffer`s. The learner worker runs PPO in TF.js (WebGL backend, CPU fallback) and posts new weights back. A six-stage curriculum promotes when rolling coverage clears a gate.
 6. **Render.** The main thread interpolates the showcase env's state and draws it with Three.js (WebGL2, WebGPU when the high preset finds an adapter). The renderer consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`. It never drives the sim.
 
 ## Training
 
-The shipped checkpoint (`public/checkpoints/pretrained.json`) is produced headlessly by `npm run pretrain`:
+The shipped checkpoint (`public/checkpoints/pretrained.json`) is produced headlessly by `npm run train:indoor`:
 
 - **Behavior cloning.** A privileged frontier teacher (`src/sim/frontier.ts`) that can see the visited grid flies the curriculum, and the network learns to copy it from the observation alone.
-- **PPO fine-tuning.** Clipped surrogate, GAE, running observation and reward normalization, and the spec reward: coverage, new rooms and floors, collisions, action smoothness, and a time penalty, plus a distance-to-frontier shaping term.
+- **DAgger.** The network flies, the teacher labels every state it visits, and the aggregated data is retrained each round. The round kept scores best on held-out validation seeds, never the eval seeds.
+- **PPO.** Clipped surrogate, GAE, running observation and reward normalization, and the spec reward, with a KL anchor and BC loss to the cloned policy (`src/rl/finetune.ts`). It is what the browser **Train** button runs. No PPO fine-tune beat DAgger on validation, so the shipped checkpoint has none.
 - **Curriculum.** Stage 0 is an 8×8 m single floor. Stage 3 is 20×20 m with hallways. Stages 4 and 5 add floors, shafts, and quadrotor dynamics. Domain randomization covers dynamics, sensor noise, wind, and lighting.
 
 The same loop runs in the browser when you press **Train**, so a visitor can watch return, coverage, and entropy move in real time. [BENCHMARKS.md](BENCHMARKS.md) reports what the shipped checkpoint actually achieves.
@@ -62,9 +63,9 @@ These choices block the outdoor mission if they stay as they are:
 
 - **The world is one indoor grid.** `BuildingSpec` is the only world type. Its origin is the footprint corner. Visited voxels are indexed from that corner, and every floor is assumed to share floor 0's width and depth. There is no terrain, no geofence, and no list of buildings on a site.
 - **Leaving the footprint ends the episode.** `ExplorerEnv` treats a position outside the ground-floor rectangle as out of bounds. Spawn is the center of the largest ground-floor room, so an outdoor start terminates immediately.
-- **Openings are not enterable in the indoor grid.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Furniture does not collide. Outdoor shells cut real apertures next to a copy of that grid; `ExplorerEnv` does not load them.
+- **Openings are not enterable in the indoor grid.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Outdoor shells cut real apertures next to a copy of that grid; `ExplorerEnv` does not load them.
 - **The mission is indoor coverage.** Success is 95% of reachable voxels. The reward and the privileged teacher both chase that grid. There is no target object, no "confirm clear", and no detection channel.
-- **The observation is frozen at 306 floats.** The shipped checkpoint, the SharedArrayBuffer stride, and the SIMD gemm scratch (batch ≤ 64, input stride 320) all assume `src/sim/OBS_LAYOUT.md`. The map slice is visited indoor voxels. Altitude is distance to this building's floor and ceiling. A search policy needs a new observation version. Editing indices 0–305 invalidates `public/checkpoints/pretrained.json`.
+- **The observation is versioned (v2, 1088 floats).** The shipped checkpoint, the SharedArrayBuffer stride, and the SIMD gemm scratch all assume `src/sim/OBS_LAYOUT.md`. The maps are indoor voxels. Altitude is distance to this building's floor and ceiling. A search policy needs observation v3; the app refuses a checkpoint whose version does not match.
 - **One drone per world.** Each env holds one `DroneState`. Workers do not share a site. Drones are not physics bodies, so they cannot see or collide with each other. A swarm needs a shared world and a rollout layout with an agent axis.
 
 ## Module graph
@@ -82,6 +83,7 @@ flowchart LR
   shared["shared"]
   sim["sim"]
   targets["targets"]
+  train["train"]
   ui["ui"]
   ui_mission["ui/mission"]
   viz["viz"]
@@ -89,22 +91,33 @@ flowchart LR
   world_outdoor["world/outdoor"]
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
-  eval -->|1| gen
-  eval -->|3| shared
-  eval -->|4| sim
-  gen -->|13| shared
+  eval -->|2| gen
+  eval -->|1| rl
+  eval -->|6| shared
+  eval -->|6| sim
+  eval -->|2| train
+  gen -->|16| shared
   mission -->|1| shared
   perception -->|6| shared
   perception -->|1| sim
   perception -->|6| targets
-  rl -->|1| gen
-  rl -->|12| shared
-  rl -->|3| sim
+  rl -->|1| eval
+  rl -->|2| gen
+  rl -->|18| shared
+  rl -->|8| sim
   rl -->|1| workers
-  sim -->|4| gen
-  sim -->|26| shared
+  sim -->|1| eval
+  sim -->|8| gen
+  sim -->|1| rl
+  sim -->|31| shared
   targets -->|2| gen
   targets -->|6| shared
+  train -->|1| eval
+  train -->|1| gen
+  train -->|8| rl
+  train -->|5| shared
+  train -->|10| sim
+  train -->|2| workers
   ui_mission -->|14| mission
   ui -->|2| app
   ui -->|1| gen
@@ -115,7 +128,7 @@ flowchart LR
   ui -->|2| viz
   ui -->|2| workers
   viz -->|1| gen
-  viz -->|18| shared
+  viz -->|16| shared
   viz -->|1| sim
   workers -->|2| gen
   workers -->|14| rl
@@ -131,18 +144,19 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/eval` | 1 | 96 | `gen`, `shared`, `sim` | — | — |
-| `src/gen` | 6 | 654 | `shared` | — | — |
+| `src/eval` | 3 | 255 | `gen`, `rl`, `shared`, `sim`, `train` | — | — |
+| `src/gen` | 7 | 1,347 | `shared` | — | — |
 | `src/mission` | 14 | 1,692 | `shared` | — | — |
 | `src/perception` | 8 | 803 | `shared`, `sim`, `targets` | — | — |
-| `src/rl` | 10 | 1,716 | `gen`, `shared`, `sim`, `workers` | TF.js | — |
-| `src/shared` | 5 | 448 | — | — | — |
-| `src/sim` | 15 | 1,966 | `gen`, `shared` | Rapier | — |
+| `src/rl` | 12 | 2,791 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
+| `src/shared` | 5 | 570 | — | — | — |
+| `src/sim` | 18 | 3,260 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,269 | `gen`, `shared` | Three.js | — |
-| `src/ui` | 6 | 1,219 | `app`, `gen`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers` | uPlot | — |
+| `src/train` | 4 | 1,050 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
+| `src/ui` | 6 | 1,239 | `app`, `gen`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers` | uPlot | — |
 | `src/ui/mission` | 4 | 1,722 | `mission` | — | — |
-| `src/viz` | 17 | 1,444 | `gen`, `shared`, `sim` | Three.js | — |
-| `src/workers` | 5 | 841 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
+| `src/viz` | 17 | 1,390 | `gen`, `shared`, `sim` | Three.js | — |
+| `src/workers` | 5 | 842 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
 | `src/world/outdoor` | 14 | 1,999 | `gen`, `shared` | Rapier | — |
 | `src/world/outdoor/viz` | 4 | 880 | `shared`, `sim`, `world/outdoor` | Three.js | — |
 

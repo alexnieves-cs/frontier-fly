@@ -12,7 +12,7 @@ Every number on this page comes from a script in this repository. `npm run bench
 
 {{PROTOCOL}}
 
-The **browser pilot** is what the live demo flies when you pick **Policy**: observations go through the checkpoint's running normalization, which clips to ±5. **Raw observations** feeds the network unnormalized, the way `tests/unit/shipped.test.ts` does. The two paths do not give the same coverage, so both are listed. The **lidar heuristic** is the scripted pilot the screenshot URLs use. It is a floor for comparison, not a learned policy.
+The **browser pilot** is what the live demo flies when you pick **Policy**: observations go through the checkpoint's running normalization (clipped to ±5), or straight to the network when that normalization is the identity, as it is for the shipped checkpoint. **Raw observations** always feeds the network unnormalized, the way `npm run eval:coverage` does. Both rows are kept so a checkpoint with a real normalizer shows any gap between the two. The seeds and step budgets are the fixed protocol in `src/eval/coverage.ts`. The **lidar heuristic** is the scripted pilot the screenshot URLs use. It is a floor for comparison, not a learned policy.
 
 {{COVERAGE_TABLE}}
 
