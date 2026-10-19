@@ -1,6 +1,6 @@
 # frontier-fly
 
-**A drone that teaches itself to search buildings, from the treeline to the last room, entirely in your browser.**
+**A drone autopilot that searches buildings, from the treeline to the last room, entirely in your browser. Its policy is learned by imitation (behavior cloning + DAgger) from a privileged teacher, with PPO you can run in the tab.**
 
 [![ci](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml)
 [![pages](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml)
@@ -10,11 +10,11 @@
   <img src="docs/media/mission-cabin-day.gif" alt="Autonomous mission: the drone sweeps the woods, finds the cabin, enters through an opening, finds the hiker, and flies home" width="720">
 </p>
 
-### [▶ Try it live](https://alexnieves-cs.github.io/frontier-fly/) · [Mission editor](https://alexnieves-cs.github.io/frontier-fly/mission.html) · [Outdoor site](https://alexnieves-cs.github.io/frontier-fly/outdoor.html) · [Benchmarks](docs/BENCHMARKS.md) · [Architecture](docs/ARCHITECTURE.md)
+### [▶ Try it live](https://alexnieves-cs.github.io/frontier-fly/) · [Mission film](https://alexnieves-cs.github.io/frontier-fly/film.html) · [Mission console](https://alexnieves-cs.github.io/frontier-fly/demo.html) · [Indoor sim](https://alexnieves-cs.github.io/frontier-fly/sim.html) · [Mission editor](https://alexnieves-cs.github.io/frontier-fly/mission.html) · [Outdoor site](https://alexnieves-cs.github.io/frontier-fly/outdoor.html) · [Benchmarks](docs/BENCHMARKS.md) · [Architecture](docs/ARCHITECTURE.md)
 
-frontier-fly is a search-and-rescue drone simulator and autopilot. A quadrotor reads lidar, an IMU, and its own map of where it has been, and a small neural network trained with reinforcement learning decides where to fly next. The mission it is built for: sweep a geofenced patch of woods, find the building, pick an opening it actually fits through, search room by room for a missing person or confirm the place is clear, fly home, and file a report.
+frontier-fly is a search-and-rescue drone simulator and autopilot. A quadrotor reads lidar, an IMU, and its own map of where it has been, and a small neural network decides where to fly next. That network is trained by imitation learning: behavior cloning and DAgger from a privileged frontier-exploration teacher. PPO fine-tuning is implemented and runs in the tab, but the shipped weights come from DAgger. The mission it is built for: sweep a geofenced patch of woods, find the building, pick an opening it actually fits through, search room by room for a missing person or confirm the place is clear, fly home, and file a report.
 
-Everything runs client-side. Physics (Rapier, 400 Hz), sensors, PPO training (TensorFlow.js in a worker), and rendering (Three.js, WebGPU when available) all happen in the tab. There is no server and no GPU cluster. A seed rebuilds the same world exactly, so every result here can be reproduced.
+Everything runs client-side. Physics (Rapier, 400 Hz), sensors, optional PPO training (TensorFlow.js in a worker), and rendering (Three.js on WebGL2; WebGPU opt-in with `?renderer=webgpu`) all happen in the tab. There is no server and no GPU cluster. A seed rebuilds the same world exactly, so every result here can be reproduced.
 
 The project is civilian and defensive only: search, inspection, and confirm-clear. The drone never pursues or engages anyone.
 
@@ -43,7 +43,7 @@ Three seeded scenarios, each flown autonomously from takeoff to landing. For the
 | | |
 | --- | --- |
 | <img src="docs/media/training.gif" alt="Live training dashboard" width="420"><br>**Train it in the tab.** Press Train and up to four worker threads roll out episodes into `SharedArrayBuffer`s while a learner worker runs PPO. Return, coverage, entropy, and a policy heatmap update live. [MP4](docs/media/training.mp4) | <img src="docs/media/fpv-night.gif" alt="FPV night flight" width="420"><br>**Fly by flashlight.** The policy never sees pixels, only lidar, IMU, and an egocentric occupancy map, so it flies the same with the lights off. FPV adds the HUD and simulated detections. [MP4](docs/media/fpv-night.mp4) |
-| <img src="docs/media/mission-editor.gif" alt="Mission editor, live preview, and report" width="420"><br>**Plan a mission.** Draw a geofence and no-fly zones, set an altitude band, targets, required confidence, an entry policy (auto, ask, never), and budgets. The plan validates against a versioned JSON schema and shares as a link. [MP4](docs/media/mission-editor.mp4) | <img src="docs/media/outdoor-chase.png" alt="Seeded outdoor site with a building shell" width="420"><br>**A site, not a room.** Seeded terrain, instanced trees with colliders, and one to four building shells with typed openings: open and broken windows, ajar doors, vents, garage gaps, roof hatches. Only openings that clear the airframe are enterable. |
+| <img src="docs/media/mission-editor.gif" alt="Mission editor, live preview, and report" width="420"><br>**Plan a mission.** Draw a geofence and no-fly zones, set an altitude band, targets, required confidence, an entry policy (auto, ask, never), and budgets. The plan validates against a versioned JSON schema and shares as a link. [MP4](docs/media/mission-editor.mp4) | <img src="docs/media/outdoor-site.png" alt="Seeded outdoor site with a building shell" width="420"><br>**A site, not a room.** Seeded terrain, instanced trees with colliders, and one to four building shells with typed openings: open and broken windows, ajar doors, vents, garage gaps, roof hatches. Only openings that clear the airframe are enterable. |
 | <img src="docs/media/targets-fpv.png" alt="Simulated people and detections" width="420"><br>**Something to find.** Simulated people standing, sitting, lying, walking, and hiding, a library of search objects, and decoys. A geometric camera detector misses with distance, occlusion, darkness, and motion blur, and false-alarms on decoys. | <img src="docs/media/day.png" alt="Day chase camera inside a generated building" width="420"><br>**Procedural buildings.** BSP rooms, doors, hallways, multi-floor shafts, and a reachability check. PBR interiors with CC0 textures, an HDRI sky, SSAO, bloom, and SMAA on the high preset. |
 
 ## Benchmarks
@@ -53,26 +53,28 @@ These tables are generated by `npm run bench && npm run docs` from [`docs/benchm
 <!-- generated:benchmarks:start -->
 | Goal | Target | Measured (browser pilot) | Status |
 | --- | --- | --- | --- |
-| Coverage, easy buildings | ≥ 80.0% | 92.0% mean of 4 | ✅ meets |
-| Coverage, new hard buildings | ≥ 60.0% | 56.9% mean of 3 | ❌ misses |
-| Night coverage vs day | ≥ 90.0% | 107.3% | ✅ meets |
-| Kinematic env step | ≤ 0.3 ms | 0.143 ms | ✅ meets |
-| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 16,110 | ✅ meets |
-| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 3,861 | ❌ misses |
+| Coverage, easy buildings | ≥ 80.0% | 95.1% mean of 4 | ✅ meets |
+| Coverage, new hard buildings | ≥ 60.0% | 67.3% mean of 3 | ✅ meets |
+| Night coverage vs day | ≥ 90.0% | 100.0% | ✅ meets |
+| Kinematic env step | ≤ 0.3 ms | 0.179 ms | ✅ meets |
+| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 14,724 | ✅ meets |
+| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 3,958 | ❌ misses |
 
 | Pilot | Easy day | Easy night | Night / day | Hard day | Hard night | Night / day |
 | --- | --- | --- | --- | --- | --- | --- |
-| Shipped policy, browser pilot | 92.0% | 95.1% | 103.4% | 56.9% | 65.8% | 115.6% |
-| Shipped policy, raw observations | 92.0% | 95.1% | 103.4% | 56.9% | 65.8% | 115.6% |
+| Shipped policy, browser pilot | 95.1% | 95.1% | 100.0% | 67.3% | 67.4% | 100.1% |
+| Shipped policy, raw observations | 95.1% | 95.1% | 100.0% | 67.3% | 67.4% | 100.1% |
+| Frontier teacher (privileged, upper reference) | 95.1% | 95.1% | 100.0% | 73.3% | 73.3% | 100.0% |
+| Waypoint follower (same observation, no learning) | 53.5% | 53.5% | 100.0% | 35.5% | 35.5% | 100.0% |
 | Lidar heuristic (baseline) | 29.3% | 29.3% | 100.0% | 13.9% | 16.5% | 118.8% |
 
 | Measurement | Value |
 | --- | --- |
-| Kinematic env step (1 thread) | 0.143 ms · 6,997 steps/s |
-| Quadrotor env step, 400 Hz physics (1 thread) | 0.250 ms · 4,004 steps/s |
-| Policy inference, SIMD gemm, batch 8 | 0.072 ms per env |
-| 4 workers, physics + sensors (lidar heuristic pilot) | 16,110 env steps/s |
-| 4 workers, rollout loop with policy-sized network and building rebuild on reset | 3,861 env steps/s |
+| Kinematic env step (1 thread) | 0.179 ms · 5,587 steps/s |
+| Quadrotor env step, 400 Hz physics (1 thread) | 0.239 ms · 4,191 steps/s |
+| Policy inference, SIMD gemm, batch 8 | 0.077 ms per env |
+| 4 workers, physics + sensors (lidar heuristic pilot) | 14,724 env steps/s |
+| 4 workers, rollout loop with policy-sized network and building rebuild on reset | 3,958 env steps/s |
 <!-- generated:benchmarks:end -->
 
 **Missions.**
@@ -96,11 +98,13 @@ flowchart LR
   Sim --> Obs["1088-float observation<br/>lidar · IMU · frontier · maps"]
   Obs --> Pol["Policy MLP<br/>1088 → 512 → 256 → 4"]
   Pol -- "vx, vy, vz, yaw rate" --> Sim
-  Sim -- "rollouts (SharedArrayBuffer)" --> PPO["PPO learner<br/>TF.js worker"]
-  PPO -- "weights" --> Pol
+  Teacher["Privileged frontier teacher<br/>sees the explored map"] -- "labels" --> IL["BC + DAgger<br/>headless, npm run train:indoor"]
+  IL -- "shipped weights" --> Pol
+  Sim -. "rollouts (SharedArrayBuffer)" .-> PPO["Optional PPO in the tab<br/>TF.js worker, Train button"]
+  PPO -. "session weights" .-> Pol
   Sim --> Det["Camera detector<br/>people · objects · decoys"]
   Det --> Mission["Mission layer<br/>geofence · entry policy · report"]
-  Sim --> View["Three.js / WebGPU<br/>FPV · chase · overview"]
+  Sim --> View["Three.js WebGL2<br/>FPV · chase · overview"]
 ```
 
 **Training.** The shipped checkpoint starts from behavior cloning: a privileged frontier-seeking teacher that can see the explored map flies the curriculum, and the network learns to imitate it from its own sensors. DAgger then lets the network fly while the teacher labels every state it reaches, and the round kept is the one that scores best on held-out validation seeds. PPO with a KL anchor to the cloned policy is implemented, but no PPO fine-tune beat DAgger on validation, so the shipped file has none. In the browser, **Train** runs PPO on the spec reward (new coverage, new rooms and floors, collisions, smoothness, time). A six-stage curriculum grows the buildings from one 8×8 m room to multi-floor layouts with quadrotor dynamics, and randomizes mass, thrust, drag, motor lag, sensor noise, wind, and lighting so the policy cannot overfit one world. The full loop runs in the browser, and the same code runs headless in Node for `npm run train:indoor` and the benchmarks.
@@ -116,7 +120,7 @@ More detail, including the generated module graph and the headless boundary betw
 | Language and build | TypeScript 5.7, Vite 6 | One codebase for the browser, workers, and Node |
 | Physics | [Rapier](https://rapier.rs) 0.14 (WASM) | Deterministic colliders and fast ray casts for lidar |
 | Learning | [TensorFlow.js](https://www.tensorflow.org/js) 4.22, hand-written SIMD WASM gemm | PPO updates on WebGL or CPU, cheap batched inference in env workers |
-| Rendering | [Three.js](https://threejs.org) 0.170, WebGPU or WebGL2 | PBR, post passes, and a WebGPU path on capable browsers |
+| Rendering | [Three.js](https://threejs.org) 0.170, WebGL2 (WebGPU opt-in) | PBR, HDRI, shadows, and post passes; `?renderer=webgpu` tries the lighter WebGPU path |
 | Charts | [uPlot](https://github.com/leeoniya/uPlot) | Lightweight live training curves |
 | Concurrency | Web Workers, `SharedArrayBuffer` | Rollouts without copying |
 | Tests | Vitest, Playwright, ESLint | Unit, perf, and headless browser checks in CI |
@@ -169,13 +173,14 @@ npm run build      # typecheck and production bundle in dist/
 | `pilot` | `keys`, `heuristic`, or `policy` |
 | `tod`, `flash`, `lights` | Time of day (0–24), flashlight `1`, interior lights `0` |
 
-Example: [`?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy`](https://alexnieves-cs.github.io/frontier-fly/?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy). Pilot defaults to the keyboard. Shot URLs fly a lidar heuristic so the camera has something to follow. Choose **Policy** to fly the checkpoint.
+These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/frontier-fly/sim.html). Old links that put them on the site root are forwarded there. Example: [`sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy`](https://alexnieves-cs.github.io/frontier-fly/sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy). Pilot defaults to the keyboard. Shot URLs fly a lidar heuristic so the camera has something to follow. Choose **Policy** to fly the checkpoint.
 
 </details>
 
 ## Honest limits
 
-- The shipped policy does not yet meet the coverage goals. [BENCHMARKS.md](docs/BENCHMARKS.md) has the current numbers, and the gap on large unseen buildings is the main open problem.
+- The shipped policy meets the coverage goals on the fixed eval, but that eval is small: 4 easy and 3 hard seeds. On 48 held-out validation episodes the current checkpoint (a weight average of DAgger rounds 3 and 4) averages 62.2% on hard buildings against 60.8% for the previous one, so expect the hard-building number to move by several points on other seeds. It reaches about 92% of the privileged teacher it imitates. [BENCHMARKS.md](docs/BENCHMARKS.md) has the per-seed numbers.
+- Inside real missions the policy is not yet better than the frontier planner it hands off to. On 90 missions over fresh seeds, both reach the expected outcome 88.9% of the time, but the policy hands 40% of the buildings it enters to the planner (mostly after touching a wall) and averages 0.4 collisions per mission against none for the planner. The planner is the safety net, and the missions table counts both. [BENCHMARKS.md](docs/BENCHMARKS.md#on-fresh-seeds) has the breakdown.
 - Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.
 - Door leaves are visual. Furniture collides, but doors are always open in the indoor grid.
 - The detector is geometric, not a trained vision model.

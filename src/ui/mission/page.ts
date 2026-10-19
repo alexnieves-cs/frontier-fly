@@ -124,7 +124,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   const modes = el('div', { className: 'modes', attrs: { role: 'tablist' } });
   modes.append(planButton, runButton);
   const schema = el('p', { className: 'schema', testid: 'schema-version', text: `Schema v${MISSION_SCHEMA_VERSION}` });
-  const sim = el('a', { className: 'sim-link', text: 'Open sim', attrs: { href: './index.html' } });
+  const sim = el('a', { className: 'sim-link', text: 'Open sim', attrs: { href: './sim.html' } });
   header.append(brand, modes, schema, el('span', { className: 'spacer' }), saveStatus, saveButton, sim);
 
   const nameInput = el('input', { attrs: { type: 'text', id: 'mission-name', maxlength: '80', autocomplete: 'off' }, testid: 'mission-name' });

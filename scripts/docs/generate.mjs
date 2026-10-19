@@ -67,6 +67,8 @@ function architecture() {
       const spec = match[1] ?? match[2] ?? match[3];
       if (spec.startsWith('.')) {
         const target = resolve(dirname(file), spec);
+        // Data imported from outside src/ (the landing page reads docs/benchmarks.json) is not a module.
+        if (relative(join(ROOT, 'src'), target).startsWith('..')) continue;
         const to = moduleOf(target.endsWith('.ts') ? target : `${target}.ts`);
         if (to !== mod) {
           const key = `${mod}→${to}`;
@@ -149,6 +151,7 @@ function benchmarks() {
   const bench = readJson('docs/benchmarks.json');
   const media = readJson('docs/media/media.json');
   const missions = readJson('docs/missions.json');
+  const missionBench = readJson('docs/mission-bench.json');
   const out = {};
 
   if (!bench) {
@@ -173,6 +176,8 @@ function benchmarks() {
     const pilots = [
       ['Shipped policy, browser pilot', coverage.policy],
       ...(coverage.policyRaw ? [['Shipped policy, raw observations', coverage.policyRaw]] : []),
+      ...(coverage.teacher ? [['Frontier teacher (privileged, upper reference)', coverage.teacher]] : []),
+      ...(coverage.waypoint ? [['Waypoint follower (same observation, no learning)', coverage.waypoint]] : []),
       ['Lidar heuristic (baseline)', coverage.heuristic],
     ];
     out.COVERAGE_TABLE = table(
@@ -266,6 +271,40 @@ function benchmarks() {
     if (sources.length) out.MISSION_TABLE += `\n\nRecorded from \`${sources.join('`, `')}\` by \`npm run media\`, which reads each run's end-of-mission report from the page. Times are simulated mission time.`;
   } else {
     out.MISSION_TABLE = '_Not measured yet. The end-to-end mission runner writes `docs/missions.json`; this table fills in from it._';
+  }
+  if (missionBench) {
+    const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
+    const names = Object.fromEntries(Object.keys(missionBench.policy).filter((k) => k !== 'all').map((k) => [k, k]));
+    const rows = [];
+    for (const key of [...Object.keys(names), 'all']) {
+      for (const indoor of ['policy', 'frontier']) {
+        const s = missionBench[indoor][key];
+        rows.push([
+          key === 'all' ? '**All**' : key,
+          indoor === 'policy' ? 'Policy first' : 'Planner only',
+          `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`,
+          String(s.buildingsEntered),
+          indoor === 'policy' ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
+          indoor === 'policy' ? Object.entries(s.handoffReasons).map(([r, n]) => `${n} ${r}`).join(', ') || 'none' : '—',
+          pct(s.meanIndoorCoverage),
+          s.collisionsPerFlight.toFixed(2),
+          `${Math.floor(s.meanDurationSec / 60)}:${String(s.meanDurationSec % 60).padStart(2, '0')}`,
+          String(s.falseClears),
+        ]);
+      }
+    }
+    out.MISSION_BENCH_TABLE = table(
+      ['Scenario', 'Indoors', 'Expected outcome (95% CI)', 'Buildings entered', 'Handed to planner (95% CI)', 'Why', 'Indoor coverage', 'Collisions per flight', 'Mean mission time', 'False clears'],
+      rows,
+    );
+    out.MISSION_BENCH_NOTE = [
+      `Each scenario's settings flown on ${missionBench.seedsPerScenario} fresh world seeds (${missionBench.seedBase}–${missionBench.seedBase + missionBench.seedsPerScenario - 1}), once with the trained policy exploring indoors first and once with the frontier planner alone, from \`bench/missions.test.ts\` at \`${missionBench.commit}\`.`,
+      'The policy hands a building to the planner on its first collision or after 8 s without new coverage; "Handed to planner" counts those buildings.',
+      'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
+    ].join(' ');
+  } else {
+    out.MISSION_BENCH_TABLE = '';
+    out.MISSION_BENCH_NOTE = '_Not measured yet. `npm run bench` writes `docs/mission-bench.json`._';
   }
   out.README_MISSIONS = out.MISSION_TABLE;
   out.README_SUMMARY ??= out.TARGET_TABLE;

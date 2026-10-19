@@ -9,6 +9,7 @@
  *        [--episodes 80] [--bc-epochs 10] [--epochs 4] [--beta0 0.6] [--beta-decay 0.7]
  *        [--capacity 600000] [--workers N] [--hidden 512,256] [--lr 1e-3] [--ppo-updates 0]
  *        [--weighted]   (up-weight divergent/stalled states; it collapsed in our runs)
+ *        [--swa-start R] [--lr-decay d] [--vz-noise s] [--act-weights 1,1,4,1]
  * The defaults are the run that produced public/checkpoints/pretrained.json.
  *        npm run train:indoor -- --validate-only ckpt.json --hidden 512,256   (score a checkpoint)
  *
@@ -83,6 +84,8 @@ function pickStage(u: number): number {
   return STAGES[STAGES.length - 1]!;
 }
 
+const VZ_NOISE = num('vz-noise', 0);
+
 function episodes(count: number, beta: number, round: number): DaggerEpisode[] {
   const out: DaggerEpisode[] = [];
   for (let i = 0; i < count; i++) {
@@ -96,6 +99,7 @@ function episodes(count: number, beta: number, round: number): DaggerEpisode[] {
       steps: stage <= 1 ? 1000 : 2400,
       lighting,
       episode: { maxSteps: stage <= 1 ? 1000 : 2400, stallSteps: 500, maxCollisions: 16 },
+      vzDisturbance: VZ_NOISE,
     });
   }
   return out;
@@ -142,7 +146,14 @@ async function main() {
   await trainer.ready();
   const dataset = new DaggerDataset(OBS_DIM, ACT_DIM, num('capacity', 600_000), { policy: 'reservoir', seed: 11 });
   const valJobs = validationJobs();
-  let best: { round: number; val: Validation; weights: ArrayBuffer[] } | null = null;
+  let best: { round: number; label: string; val: Validation; weights: ArrayBuffer[] } | null = null;
+  // Stochastic weight averaging over DAgger rounds: single-round validation swings by tens of
+  // points, the running mean of the later rounds' weights is far steadier.
+  const swaStart = num('swa-start', -1);
+  let swaSum: Float64Array[] | null = null;
+  let swaCount = 0;
+  const lr0 = num('lr', 1e-3);
+  const lrDecay = num('lr-decay', 1);
 
   for (let round = 0; round <= rounds; round++) {
     const t0 = Date.now();
@@ -158,10 +169,12 @@ async function main() {
     const cov = data.extras.map((e) => Number(e.coverage ?? 0));
     const tCollect = (Date.now() - t0) / 1000;
     const view = dataset.view();
+    if (round > 0) trainer.setLearningRate(lr0 * Math.pow(lrDecay, round - 1));
     const loss = await trainer.imitate(view.obs, view.actions, view.n, {
       epochs: round === 0 ? num('bc-epochs', 10) : num('epochs', 4),
       minibatch: 512,
       weights: view.weights,
+      actionWeights: arg('act-weights')?.split(',').map(Number),
     });
     pool.setWeights(policy.getWeights());
     const val = await validate(pool, valJobs);
@@ -170,11 +183,29 @@ async function main() {
         `loss ${loss.toFixed(4)} val small ${pct(val.small)} large ${pct(val.large)} score ${pct(val.score)} ` +
         `collect ${tCollect.toFixed(0)}s total ${((Date.now() - t0) / 1000).toFixed(0)}s`,
     );
-    if (!best || val.score > best.val.score) best = { round, val, weights: policy.getWeights() };
+    if (!best || val.score > best.val.score) best = { round, label: `round ${round}`, val, weights: policy.getWeights() };
     writeFileSync(out.replace(/\.json$/, '') + `.r${round}.json`, serializeCheckpoint(checkpointFromPolicy(policy)));
+    if (swaStart >= 0 && round >= swaStart) {
+      const current = policy.getWeights().map((buf) => new Float32Array(buf));
+      swaSum ??= current.map((w) => new Float64Array(w.length));
+      current.forEach((w, i) => {
+        const sum = swaSum![i]!;
+        for (let j = 0; j < w.length; j++) sum[j]! += w[j]!;
+      });
+      swaCount += 1;
+      const swa = swaSum.map((sum) => Float32Array.from(sum, (v) => v / swaCount).buffer);
+      pool.setWeights(swa);
+      const swaVal = await validate(pool, valJobs);
+      console.log(`  swa of rounds ${swaStart}..${round} val small ${pct(swaVal.small)} large ${pct(swaVal.large)} score ${pct(swaVal.score)}`);
+      if (swaVal.score > best.val.score) best = { round, label: `swa ${swaStart}..${round}`, val: swaVal, weights: swa };
+      const live = policy.getWeights();
+      policy.setWeights(swa);
+      writeFileSync(out.replace(/\.json$/, '') + `.swa${round}.json`, serializeCheckpoint(checkpointFromPolicy(policy)));
+      policy.setWeights(live);
+    }
   }
   policy.setWeights(best!.weights);
-  console.log(`best round ${best!.round} val ${pct(best!.val.score)}`);
+  console.log(`best ${best!.label} val ${pct(best!.val.score)}`);
   writeFileSync(out, serializeCheckpoint(checkpointFromPolicy(policy)));
 
   const ppoUpdates = num('ppo-updates', 0);

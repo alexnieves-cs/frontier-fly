@@ -217,7 +217,7 @@ function markup(): string {
   return `
     <header class="topbar">
       <div class="brand"><strong>frontier-fly</strong><span>outdoor world</span></div>
-      <a href="./index.html">indoor sim</a>
+      <a href="./sim.html">indoor sim</a>
       <div class="controls">
         <label>seed <input id="seed" inputmode="numeric" /></label>
         <button id="regen" type="button">new world</button>

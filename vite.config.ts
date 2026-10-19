@@ -45,9 +45,11 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(root, 'index.html'),
+        sim: resolve(root, 'sim.html'),
         mission: resolve(root, 'mission.html'),
         outdoor: resolve(root, 'outdoor.html'),
         demo: resolve(root, 'demo.html'),
+        film: resolve(root, 'film.html'),
       },
     },
   },

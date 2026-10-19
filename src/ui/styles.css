@@ -42,7 +42,23 @@ button { cursor: pointer; }
 }
 .brand h1 { font-size: 14px; letter-spacing: 0.14em; margin: 0; font-weight: 700; }
 .brand p { margin: 0; color: var(--muted); font-size: 10px; letter-spacing: 0.08em; }
-.tabs { display: flex; gap: 4px; flex: 1; }
+.page-links { display: flex; gap: 2px; }
+.page-links a {
+  color: var(--blue);
+  text-decoration: none;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.page-links a:hover, .page-links a:focus-visible { text-decoration: underline; background: #0f2235; }
+/* Camera and panel shortcuts: a compact segmented control, not page navigation. */
+.tabs {
+  display: flex; align-items: center; gap: 2px; margin-right: auto;
+  padding: 2px 3px; border: 1px solid var(--line); border-radius: 999px; background: #0d1b2a;
+  font-size: 11px; letter-spacing: 0.06em;
+}
+.tabs-label { color: var(--muted); font-size: 10px; letter-spacing: 0.14em; padding: 0 6px 0 8px; }
 .tabs button, .icon-btn, .seg button, .text-btn {
   background: transparent;
   border: 1px solid transparent;
@@ -51,6 +67,7 @@ button { cursor: pointer; }
   color: var(--muted);
 }
 .tabs button.active { color: var(--text); background: #143049; border-color: var(--line); }
+.tabs button { padding: 4px 9px; }
 .status-pills { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .pill { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
@@ -88,8 +105,11 @@ button { cursor: pointer; }
 .stage-wrap { position: relative; min-height: 0; background: #050b12; }
 #view { width: 100%; height: 100%; display: block; }
 #hud, #pip-hud { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+/* Sits below the canvas HUD's top row (ALT / HDG / SPD drawn at y=22). */
 .readout {
-  position: absolute; left: 12px; top: 12px;
+  position: absolute; left: 12px; top: 40px;
+  white-space: pre;
+  pointer-events: none;
   font: 12px ui-monospace, "IBM Plex Mono", monospace;
   color: #d5fff1;
   text-shadow: 0 1px 2px #000;
@@ -106,6 +126,7 @@ button { cursor: pointer; }
   display: flex;
   flex-direction: column;
 }
+.panel[hidden] { display: none; }
 .panel h2 { margin: 0; font-size: 12px; letter-spacing: 0.12em; font-weight: 650; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .map-canvas, .heat-canvas { width: 100%; height: 150px; background: #071018; border-radius: 8px; }
@@ -138,6 +159,9 @@ button { cursor: pointer; }
 .detect-list li.muted { color: var(--muted); border: 0; }
 .text-btn { border-color: var(--line); border-radius: 8px; }
 .text-btn.primary { background: #123d34; color: var(--cyan); border-color: rgba(62, 224, 197, 0.35); }
+.text-btn.attention { animation: attention 1.4s ease-in-out 4; box-shadow: 0 0 0 2px var(--cyan); }
+@keyframes attention { 50% { box-shadow: 0 0 0 6px rgba(62, 224, 197, 0.25); } }
+@media (prefers-reduced-motion: reduce) { .text-btn.attention { animation: none; } }
 .replay-row { display: flex; gap: 6px; align-items: center; }
 .replay-row input { flex: 1; }
 .error {

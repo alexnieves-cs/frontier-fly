@@ -4,18 +4,18 @@
 
 Every number on this page comes from a script in this repository. `npm run bench` writes `docs/benchmarks.json`, `npm run media` writes `docs/media/media.json`, and `npm run docs` renders both into this page and the README. Nothing is typed in by hand. When a target is missed, the table says so.
 
-Measured 2026-10-19 at commit `fde4094` on 4 cores of Intel(R) Xeon(R) Processor @ 2.10GHz, Node v22.22.0. Checkpoint `public/checkpoints/pretrained.json` (sha256 `c6f52fed9164`, 512→256 hidden).
+Measured 2026-10-19 at commit `1a42f3d` on 4 cores of Intel(R) Xeon(R) Processor @ 2.10GHz, Node v22.22.0. Checkpoint `public/checkpoints/pretrained.json` (sha256 `84cc86bf7d79`, 512→256 hidden).
 
 ## Against the project goals
 
 | Goal | Target | Measured (browser pilot) | Status |
 | --- | --- | --- | --- |
-| Coverage, easy buildings | ≥ 80.0% | 92.0% mean of 4 | ✅ meets |
-| Coverage, new hard buildings | ≥ 60.0% | 56.9% mean of 3 | ❌ misses |
-| Night coverage vs day | ≥ 90.0% | 107.3% | ✅ meets |
-| Kinematic env step | ≤ 0.3 ms | 0.143 ms | ✅ meets |
-| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 16,110 | ✅ meets |
-| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 3,861 | ❌ misses |
+| Coverage, easy buildings | ≥ 80.0% | 95.1% mean of 4 | ✅ meets |
+| Coverage, new hard buildings | ≥ 60.0% | 67.3% mean of 3 | ✅ meets |
+| Night coverage vs day | ≥ 90.0% | 100.0% | ✅ meets |
+| Kinematic env step | ≤ 0.3 ms | 0.179 ms | ✅ meets |
+| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 14,724 | ✅ meets |
+| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 3,958 | ❌ misses |
 
 ## Coverage
 
@@ -25,29 +25,31 @@ The **browser pilot** is what the live demo flies when you pick **Policy**: obse
 
 | Pilot | Easy day | Easy night | Night / day | Hard day | Hard night | Night / day |
 | --- | --- | --- | --- | --- | --- | --- |
-| Shipped policy, browser pilot | 92.0% | 95.1% | 103.4% | 56.9% | 65.8% | 115.6% |
-| Shipped policy, raw observations | 92.0% | 95.1% | 103.4% | 56.9% | 65.8% | 115.6% |
+| Shipped policy, browser pilot | 95.1% | 95.1% | 100.0% | 67.3% | 67.4% | 100.1% |
+| Shipped policy, raw observations | 95.1% | 95.1% | 100.0% | 67.3% | 67.4% | 100.1% |
+| Frontier teacher (privileged, upper reference) | 95.1% | 95.1% | 100.0% | 73.3% | 73.3% | 100.0% |
+| Waypoint follower (same observation, no learning) | 53.5% | 53.5% | 100.0% | 35.5% | 35.5% | 100.0% |
 | Lidar heuristic (baseline) | 29.3% | 29.3% | 100.0% | 13.9% | 16.5% | 118.8% |
 
 <details>
 <summary>Per-seed results</summary>
 
-| Stage | Seed | Lighting | policy coverage (collisions) | policyRaw coverage (collisions) | heuristic coverage (collisions) |
-| --- | --- | --- | --- | --- | --- |
-| 0 | 101 | day | 95.1% (0) | 95.1% (0) | 29.2% (0) |
-| 0 | 101 | night-dark | 95.1% (0) | 95.1% (0) | 29.9% (0) |
-| 0 | 202 | day | 95.1% (0) | 95.1% (0) | 29.2% (0) |
-| 0 | 202 | night-dark | 95.1% (0) | 95.1% (0) | 29.9% (0) |
-| 0 | 303 | day | 82.6% (6) | 82.6% (6) | 29.2% (0) |
-| 0 | 303 | night-dark | 95.1% (1) | 95.1% (1) | 29.2% (0) |
-| 0 | 404 | day | 95.1% (1) | 95.1% (1) | 29.9% (0) |
-| 0 | 404 | night-dark | 95.1% (0) | 95.1% (0) | 28.5% (0) |
-| 3 | 4242 | day | 68.6% (1) | 68.6% (1) | 19.6% (0) |
-| 3 | 4242 | night-dark | 69.3% (0) | 69.3% (0) | 19.8% (0) |
-| 3 | 5150 | day | 61.1% (6) | 61.1% (6) | 11.9% (0) |
-| 3 | 5150 | night-dark | 61.0% (8) | 61.0% (8) | 18.6% (0) |
-| 3 | 6160 | day | 41.1% (8) | 41.1% (8) | 10.2% (0) |
-| 3 | 6160 | night-dark | 67.2% (2) | 67.2% (2) | 11.2% (0) |
+| Stage | Seed | Lighting | policy coverage (collisions) | policyRaw coverage (collisions) | heuristic coverage (collisions) | waypoint coverage (collisions) | teacher coverage (collisions) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 101 | day | 95.1% (0) | 95.1% (0) | 29.2% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 101 | night-dark | 95.1% (0) | 95.1% (0) | 29.9% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 202 | day | 95.1% (0) | 95.1% (0) | 29.2% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 202 | night-dark | 95.1% (4) | 95.1% (4) | 29.9% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 303 | day | 95.1% (0) | 95.1% (0) | 29.2% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 303 | night-dark | 95.1% (0) | 95.1% (0) | 29.2% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 404 | day | 95.1% (0) | 95.1% (0) | 29.9% (0) | 53.5% (3) | 95.1% (0) |
+| 0 | 404 | night-dark | 95.1% (3) | 95.1% (3) | 28.5% (0) | 53.5% (3) | 95.1% (0) |
+| 3 | 4242 | day | 67.6% (2) | 67.6% (2) | 19.6% (0) | 8.8% (1) | 71.8% (0) |
+| 3 | 4242 | night-dark | 66.2% (1) | 66.2% (1) | 19.8% (0) | 8.8% (1) | 71.8% (0) |
+| 3 | 5150 | day | 61.1% (17) | 61.1% (17) | 11.9% (0) | 40.9% (2) | 70.0% (0) |
+| 3 | 5150 | night-dark | 66.9% (0) | 66.9% (0) | 18.6% (0) | 40.9% (2) | 70.0% (0) |
+| 3 | 6160 | day | 73.1% (7) | 73.1% (7) | 10.2% (0) | 57.0% (4) | 78.2% (0) |
+| 3 | 6160 | night-dark | 68.9% (0) | 68.9% (0) | 11.2% (0) | 57.0% (4) | 78.2% (0) |
 
 </details>
 
@@ -57,11 +59,11 @@ Single-thread numbers are Node on the machine above. The worker rows use `node:w
 
 | Measurement | Value |
 | --- | --- |
-| Kinematic env step (1 thread) | 0.143 ms · 6,997 steps/s |
-| Quadrotor env step, 400 Hz physics (1 thread) | 0.250 ms · 4,004 steps/s |
-| Policy inference, SIMD gemm, batch 8 | 0.072 ms per env |
-| 4 workers, physics + sensors (lidar heuristic pilot) | 16,110 env steps/s |
-| 4 workers, rollout loop with policy-sized network and building rebuild on reset | 3,861 env steps/s |
+| Kinematic env step (1 thread) | 0.179 ms · 5,587 steps/s |
+| Quadrotor env step, 400 Hz physics (1 thread) | 0.239 ms · 4,191 steps/s |
+| Policy inference, SIMD gemm, batch 8 | 0.077 ms per env |
+| 4 workers, physics + sensors (lidar heuristic pilot) | 14,724 env steps/s |
+| 4 workers, rollout loop with policy-sized network and building rebuild on reset | 3,958 env steps/s |
 
 ## Rendering
 
@@ -82,11 +84,26 @@ Recorded 2026-10-19 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShad
 
 Recorded from `main@f5e22fb` by `npm run media`, which reads each run's end-of-mission report from the page. Times are simulated mission time.
 
+### On fresh seeds
+
+Each scenario's settings flown on 30 fresh world seeds (9100–9129), once with the trained policy exploring indoors first and once with the frontier planner alone, from `bench/missions.test.ts` at `fdbe94b`. The policy hands a building to the planner on its first collision or after 8 s without new coverage; "Handed to planner" counts those buildings. Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.
+
+| Scenario | Indoors | Expected outcome (95% CI) | Buildings entered | Handed to planner (95% CI) | Why | Indoor coverage | Collisions per flight | Mean mission time | False clears |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| cabin-day | Policy first | 96.7% (83–99%) | 30 | 0.0% (0–11%) | none | 90.9% | 0.00 | 2:52 | 0 |
+| cabin-day | Planner only | 96.7% (83–99%) | 30 | — | — | 90.4% | 0.00 | 2:50 | 0 |
+| compound-clear | Policy first | 90.0% (74–97%) | 60 | 65.0% (52–76%) | 28 collisions, 11 stall | 96.8% | 0.93 | 8:28 | 0 |
+| compound-clear | Planner only | 86.7% (70–95%) | 60 | — | — | 96.7% | 0.00 | 7:52 | 0 |
+| backpack-night | Policy first | 80.0% (63–90%) | 30 | 30.0% (17–48%) | 8 collisions, 1 stall | 82.7% | 0.27 | 3:13 | 0 |
+| backpack-night | Planner only | 83.3% (66–93%) | 30 | — | — | 83.5% | 0.00 | 3:07 | 0 |
+| **All** | Policy first | 88.9% (81–94%) | 120 | 40.0% (32–49%) | 36 collisions, 12 stall | 90.1% | 0.40 | 4:51 | 0 |
+| **All** | Planner only | 88.9% (81–94%) | 120 | — | — | 90.2% | 0.00 | 4:36 | 0 |
+
 ## Reproduce
 
 ```bash
 npm ci
-npm run bench   # coverage and throughput, about 30 s on 4 cores
+npm run bench   # coverage, throughput, and the fresh-seed missions, a few minutes on 4 cores
 npm run media   # headless video capture and frame rates (needs ffmpeg)
 npm run docs    # re-render this page and the README tables
 ```

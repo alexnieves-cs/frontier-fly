@@ -45,12 +45,18 @@ export async function startApp(root: HTMLElement = document.querySelector('#app'
   const view = new ThreeView(viewCanvas, pipCanvas);
   const bootNote = must<HTMLElement>(root, '#boot-note');
   try {
-    await view.init(launch.quality);
+    await view.init(launch.quality, launch.renderer);
     const env = await createEnv();
     const session = new Session(root, view, env, launch);
     await session.boot();
     bootNote.remove();
     session.loop();
+    // `?train=1` starts PPO on load (the landing page's "Train it in your tab" link) and points at the button.
+    if (launch.train) {
+      const train = must<HTMLButtonElement>(root, '#train-btn');
+      train.classList.add('attention');
+      train.click();
+    }
   } catch (error) {
     bootNote.textContent = error instanceof Error ? error.message : String(error);
     console.error(error);
@@ -292,6 +298,9 @@ class Session {
     const map = this.q<HTMLCanvasElement>('#map');
     fitCanvas(map);
     drawCoverage(map, this.spec, this.visited, this.shown, this.floor);
+    // The policy map stays hidden until training sends its first heatmap.
+    this.q('#policy-panel').hidden = !this.heatmap;
+    if (!this.heatmap) return;
     const heat = this.q<HTMLCanvasElement>('#heat');
     fitCanvas(heat);
     drawHeatmap(heat, this.heatmap);
@@ -729,15 +738,23 @@ function shell(): string {
   <div class="shell" id="shell">
     <header class="topbar">
       <div class="brand"><div class="mark"></div><div><h1>DRONE SIM</h1><p>FRONTIER-FLY</p></div></div>
-      <nav class="tabs">
+      <nav class="page-links" aria-label="Other pages">
+        <a href="./index.html">Home</a>
+        <a href="./demo.html">Mission demo</a>
+        <a href="./film.html">Mission film</a>
+        <a href="./outdoor.html">Outdoor</a>
+        <a href="./mission.html">Editor</a>
+      </nav>
+      <div class="tabs" role="toolbar" aria-label="View shortcuts">
+        <span class="tabs-label">VIEW</span>
         <button type="button" data-act="tab" data-cam="chase" class="active">SIMULATION</button>
         <button type="button" data-act="tab" data-cam="overview">ENVIRONMENT</button>
         <button type="button" data-act="tab" data-cam="fpv">DRONE</button>
         <button type="button" data-act="sensor" data-sensor="ir">SENSORS</button>
         <button type="button" data-act="train" id="train-tab">TRAINING</button>
-      </nav>
+      </div>
       <div class="status-pills">
-        <span class="pill"><i class="dot"></i><span id="link">CONNECTED</span></span>
+        <span class="pill"><i class="dot"></i><span id="link" title="Simulation, training, and inference all run in this browser tab">IN-BROWSER</span></span>
         <span class="pill" id="bat-num">100%</span>
         <span class="pill" id="clock">12:00</span>
         <span class="pill" id="fps">-- fps</span>
@@ -868,7 +885,7 @@ function shell(): string {
           <div><span>MODE</span><strong id="mode-label">DAY</strong></div>
           <div><span>KL</span><strong id="kl-num">0</strong></div>
         </div>
-        <section class="panel" style="flex:1">
+        <section class="panel" id="policy-panel" style="flex:1" hidden>
           <div class="panel-head"><h2>POLICY MAP</h2></div>
           <canvas class="heat-canvas" id="heat" width="300" height="220"></canvas>
         </section>

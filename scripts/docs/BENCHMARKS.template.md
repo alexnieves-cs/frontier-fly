@@ -39,11 +39,17 @@ Single-thread numbers are Node on the machine above. The worker rows use `node:w
 
 {{MISSION_TABLE}}
 
+### On fresh seeds
+
+{{MISSION_BENCH_NOTE}}
+
+{{MISSION_BENCH_TABLE}}
+
 ## Reproduce
 
 ```bash
 npm ci
-npm run bench   # coverage and throughput, about 30 s on 4 cores
+npm run bench   # coverage, throughput, and the fresh-seed missions, a few minutes on 4 cores
 npm run media   # headless video capture and frame rates (needs ffmpeg)
 npm run docs    # re-render this page and the README tables
 ```

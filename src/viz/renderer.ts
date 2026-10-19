@@ -14,7 +14,7 @@ import { applyPbr, makeMaterials, type MaterialSet } from './three/materials';
 import { makePost, type PostStack } from './three/post';
 import { configureShadows } from './three/shadows';
 import { applySkyBackdrop } from './three/sky';
-import { resolveQuality, type QualityChoice } from './quality';
+import { isSoftwareRendererName, resolveQuality, shouldTryWebGPU, type QualityChoice, type RendererChoice } from './quality';
 
 export interface ViewHooks {
   fps: number;
@@ -22,8 +22,9 @@ export interface ViewHooks {
 }
 
 /**
- * Three.js view. WebGPU is used when a high-quality adapter answers quickly;
- * otherwise WebGL2 with AgX, soft shadows, bloom, and SSAO.
+ * Three.js view. WebGL2 with AgX, HDRI, soft shadows, bloom, SSAO, and SMAA by
+ * default. WebGPU is opt-in (`?renderer=webgpu`) because that path skips the
+ * HDRI, shadows, and post stack.
  */
 export class ThreeView implements Renderer {
   private gl: THREE.WebGLRenderer | null = null;
@@ -103,10 +104,10 @@ export class ThreeView implements Renderer {
     this.scene.add(this.sun.target);
   }
 
-  async init(quality: QualityChoice = 'auto'): Promise<void> {
-    const gpuOk = quality === 'low' ? false : await this.tryWebGPU();
-    this.quality = resolveQuality(quality, gpuOk);
+  async init(quality: QualityChoice = 'auto', renderer: RendererChoice = 'webgl2'): Promise<void> {
+    const gpuOk = shouldTryWebGPU(renderer, quality) ? await this.tryWebGPU() : false;
     if (!gpuOk) this.makeWebGL();
+    this.quality = resolveQuality(quality, this.softwareGL());
     this.pip = new THREE.WebGLRenderer({ canvas: this.pipCanvas, antialias: true, alpha: true });
     this.pip.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.pip.outputColorSpace = THREE.SRGBColorSpace;
@@ -155,6 +156,13 @@ export class ThreeView implements Renderer {
     this.gl = gl;
     this.backend = 'webgl2';
     void this.loadSky();
+  }
+
+  private softwareGL(): boolean {
+    if (!this.gl) return false;
+    const ctx = this.gl.getContext();
+    const debug = ctx.getExtension('WEBGL_debug_renderer_info');
+    return debug ? isSoftwareRendererName(String(ctx.getParameter(debug.UNMASKED_RENDERER_WEBGL))) : false;
   }
 
   private async loadSky(): Promise<void> {

@@ -152,7 +152,7 @@ class Demo {
       if (this.map) this.map.setWorld(loaded.world);
       else this.map = new DemoMap(this.el('demo-map') as HTMLCanvasElement, loaded.world);
       this.paintBrief(loaded);
-      this.view?.setWorld(loaded.world.outdoor);
+      this.view?.setWorld(loaded.world.outdoor, { timeOfDay: loaded.world.timeOfDay });
       const runner = await createMissionRunner(loaded.mission, loaded.world, loaded.source, options);
       if (token !== this.token) return;
       this.runner = runner;
@@ -499,7 +499,7 @@ class Demo {
       pip.hidden = false;
       const canvas = this.el('pip-canvas') as HTMLCanvasElement;
       const view = new OutdoorView(canvas);
-      view.setWorld(this.loaded.world.outdoor);
+      view.setWorld(this.loaded.world.outdoor, { timeOfDay: this.loaded.world.timeOfDay });
       view.setCamera('chase');
       view.resize();
       this.view = view;
@@ -575,7 +575,8 @@ function markup(): string {
         </div>
       </div>
       <nav class="nav" aria-label="Pages">
-        <a href="./index.html">Indoor sim</a>
+        <a href="./index.html">Home</a>
+        <a href="./sim.html">Indoor sim</a>
         <a href="./outdoor.html">Outdoor world</a>
         <a href="./mission.html">Mission editor</a>
         <a href="./demo.html" aria-current="page">Autonomous missions</a>
