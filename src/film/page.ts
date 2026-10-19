@@ -73,6 +73,10 @@ export async function startFilm(root: HTMLElement): Promise<void> {
   const requested = params.get('scenario');
   const scenario: ScenarioId = isScenarioId(requested) ? requested : DEFAULT_SCENARIO;
   const recording = params.get('record') === '1';
+  // Recording: render at `scale` x 1920x1080 (the HUD scales with it) and
+  // optionally fit the flight into `length` seconds of film.
+  const renderScale = recording ? Math.min(1, Math.max(0.25, Number(params.get('scale') ?? 1) || 1)) : 1;
+  const flightSec = Number(params.get('length')) || undefined;
   const api: FilmApi = { ready: false, frames: 0, fps: FILM_FPS, scenario, render: () => undefined };
   window.__film = api;
 
@@ -90,7 +94,7 @@ export async function startFilm(root: HTMLElement): Promise<void> {
   loading.textContent = 'Flying the mission headless…';
   stage.appendChild(loading);
   const fit = () => {
-    const s = recording ? 1 : Math.min(window.innerWidth / STAGE_W, (window.innerHeight - 64) / STAGE_H);
+    const s = recording ? renderScale : Math.min(window.innerWidth / STAGE_W, (window.innerHeight - 64) / STAGE_H);
     stage.style.transform = `scale(${s})`;
     root.style.setProperty('--stage-scale', String(s));
   };
@@ -102,6 +106,7 @@ export async function startFilm(root: HTMLElement): Promise<void> {
     const log = await recordFlight(scenario, indoor);
     loading.textContent = 'Building the world…';
     const scene = new FilmScene(canvas, log);
+    scene.renderer.setPixelRatio(renderScale);
     scene.resize(STAGE_W, STAGE_H);
     await scene.load();
     const director = new Director(log, scene, scene.occluders);
@@ -109,13 +114,14 @@ export async function startFilm(root: HTMLElement): Promise<void> {
     const overlay = new FilmOverlay(stage, log);
     overlay.resize(STAGE_W, STAGE_H);
     const composer = new EffectComposer(scene.renderer);
+    composer.setPixelRatio(renderScale);
     composer.setSize(STAGE_W, STAGE_H);
     composer.addPass(new RenderPass(scene.scene, director.camera));
     composer.addPass(new UnrealBloomPass(new THREE.Vector2(STAGE_W / 2, STAGE_H / 2), scene.night ? 0.55 : 0.22, 0.5, scene.night ? 0.62 : 0.88));
     composer.addPass(new OutputPass());
     composer.addPass(new ShaderPass(GradeShader));
-    composer.addPass(new SMAAPass(STAGE_W, STAGE_H));
-    const timeline = buildTimeline(log);
+    composer.addPass(new SMAAPass(STAGE_W * renderScale, STAGE_H * renderScale));
+    const timeline = buildTimeline(log, flightSec);
     let cursor = -1;
     const show = (i: number) => {
       const target = Math.max(0, Math.min(timeline.length - 1, i));

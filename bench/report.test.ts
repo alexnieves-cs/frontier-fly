@@ -16,7 +16,9 @@ import { RunningNorm } from '../src/rl/normalize';
 import { ACT_DIM, HIDDEN, OBS_DIM } from '../src/shared/constants';
 import { RNG } from '../src/shared/rng';
 import { createEnv, defaultEpisodeConfig } from '../src/sim/env';
+import { frontierAction } from '../src/sim/frontier';
 import { heuristicAction } from '../src/sim/heuristic';
+import { waypointAction } from '../src/sim/waypointPilot';
 import type { LightingPreset } from '../src/sim/lighting';
 
 const CHECKPOINT = process.env.BENCH_CHECKPOINT ?? 'public/checkpoints/pretrained.json';
@@ -34,7 +36,8 @@ const EASY = { stage: 0, seeds: seedList('BENCH_EASY_SEEDS', STAGE0_SEEDS) };
 const HARD = { stage: 3, seeds: seedList('BENCH_HARD_SEEDS', STAGE3_SEEDS) };
 const LIGHTING: LightingPreset[] = ['day', 'night-dark'];
 
-type Pilot = (obs: Float32Array) => Float32Array;
+type Env = Awaited<ReturnType<typeof createEnv>>;
+type Pilot = (obs: Float32Array, env: Env) => Float32Array;
 
 /**
  * `browser` is the in-browser "Policy" pilot in src/ui/app.ts: raw observations when the checkpoint's
@@ -80,7 +83,7 @@ async function fly(pilot: Pilot, stage: number, seed: number, lighting: Lighting
   let collisions = 0;
   let steps = 0;
   for (let t = 0; t < cfg.maxSteps; t++) {
-    const step = env.step(pilot(obs));
+    const step = env.step(pilot(obs, env));
     obs = step.obs;
     coverage = step.info.coverage;
     collisions = step.info.collisions;
@@ -177,6 +180,13 @@ describe('benchmark report', () => {
     const policy = await sweep(loadPilot(checkpoint, 'browser'));
     const policyRaw = await sweep(loadPilot(checkpoint, 'raw'));
     const heuristic = await sweep(heuristicAction);
+    // Stronger references: a controller that only follows the navigation block's waypoint (same
+    // observation as the policy, no learning), and the privileged frontier teacher the policy imitates.
+    const waypoint = await sweep(waypointAction);
+    const teacher = await sweep((_obs, env) => {
+      const s = env.snapshot();
+      return frontierAction(env.building!, env.visitedGrid, s.pos, s.yaw);
+    });
     const throughput = {
       kinematicStepMs: await stepMs('kinematic'),
       quadStepMs: await stepMs('quad'),
@@ -211,7 +221,7 @@ describe('benchmark report', () => {
         easy: EASY,
         hard: HARD,
       },
-      coverage: { policy, policyRaw, heuristic },
+      coverage: { policy, policyRaw, heuristic, waypoint, teacher },
       throughput,
     };
     writeFileSync(OUT, `${JSON.stringify(report, null, 2)}\n`);

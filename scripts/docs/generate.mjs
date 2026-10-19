@@ -173,6 +173,8 @@ function benchmarks() {
     const pilots = [
       ['Shipped policy, browser pilot', coverage.policy],
       ...(coverage.policyRaw ? [['Shipped policy, raw observations', coverage.policyRaw]] : []),
+      ...(coverage.teacher ? [['Frontier teacher (privileged, upper reference)', coverage.teacher]] : []),
+      ...(coverage.waypoint ? [['Waypoint follower (same observation, no learning)', coverage.waypoint]] : []),
       ['Lidar heuristic (baseline)', coverage.heuristic],
     ];
     out.COVERAGE_TABLE = table(

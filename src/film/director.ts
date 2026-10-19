@@ -44,10 +44,34 @@ export interface FilmFrame {
  * moments worth watching (entry, confirmations, touchdown), with the rate
  * eased so speed changes never jump.
  */
-export function buildTimeline(log: FlightLog): FilmFrame[] {
+/**
+ * Film frames for a flight. Fast phases play at RATE times real time; first
+ * contacts and building entries drop to near real time. With `flightSec`, the
+ * fast-phase rates are scaled together so the flight part runs about that long.
+ */
+export function buildTimeline(log: FlightLog, flightSec?: number): FilmFrame[] {
+  let pace = 1;
+  if (flightSec) {
+    let lo = 0.25;
+    let hi = 40;
+    for (let k = 0; k < 24; k++) {
+      pace = Math.sqrt(lo * hi);
+      if (flightFrames(log, pace).length > flightSec * FILM_FPS) lo = pace;
+      else hi = pace;
+    }
+  }
   const frames: FilmFrame[] = [];
   const dt = 1 / FILM_FPS;
   for (let i = 0; i < INTRO_SEC * FILM_FPS; i++) frames.push({ i: frames.length, t: 0, rate: 0, part: 'intro', partSec: i * dt });
+  for (const f of flightFrames(log, pace)) frames.push({ ...f, i: frames.length });
+  const end = log.frames[log.frames.length - 1]!.t;
+  for (let i = 0; i < OUTRO_SEC * FILM_FPS; i++) frames.push({ i: frames.length, t: end, rate: 0, part: 'outro', partSec: i * dt });
+  return frames;
+}
+
+function flightFrames(log: FlightLog, pace: number): FilmFrame[] {
+  const frames: FilmFrame[] = [];
+  const dt = 1 / FILM_FPS;
   const end = log.frames[log.frames.length - 1]!.t;
   const keys = log.confirmed.map((c) => c.tSec);
   const entries = log.record.entries.map((e) => e.tSec);
@@ -55,7 +79,8 @@ export function buildTimeline(log: FlightLog): FilmFrame[] {
   let rate = 1.5;
   while (t < end) {
     const { frame } = sampleFlight(log, t);
-    let target = RATE[frame.phase] ?? 3;
+    const base = RATE[frame.phase] ?? 3;
+    let target = base >= 2 ? base * pace : base;
     for (const k of keys) if (t > k - 4 && t < k + 2.5) target = Math.min(target, 1.2);
     for (const k of entries) if (t > k - 1 && t < k + 4) target = Math.min(target, 1.4);
     if (end - t < 4) target = Math.min(target, 1.5);
@@ -63,7 +88,6 @@ export function buildTimeline(log: FlightLog): FilmFrame[] {
     frames.push({ i: frames.length, t, rate, part: 'flight', partSec: 0 });
     t += rate * dt;
   }
-  for (let i = 0; i < OUTRO_SEC * FILM_FPS; i++) frames.push({ i: frames.length, t: end, rate: 0, part: 'outro', partSec: i * dt });
   return frames;
 }
 
