@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (157 files, 28,797 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (165 files, 31,197 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -76,6 +76,7 @@ Edges are relative imports between modules. The label is the number of import st
 flowchart LR
   app["app"]
   eval["eval"]
+  film["film"]
   gen["gen"]
   mission["mission"]
   perception["perception"]
@@ -96,6 +97,14 @@ flowchart LR
   eval -->|6| shared
   eval -->|6| sim
   eval -->|2| train
+  film -->|1| gen
+  film -->|11| mission
+  film -->|3| shared
+  film -->|1| sim
+  film -->|3| targets
+  film -->|2| ui
+  film -->|4| viz
+  film -->|2| world_outdoor
   gen -->|16| shared
   mission -->|1| gen
   mission -->|8| perception
@@ -115,7 +124,7 @@ flowchart LR
   sim -->|1| eval
   sim -->|8| gen
   sim -->|1| rl
-  sim -->|31| shared
+  sim -->|32| shared
   targets -->|2| gen
   targets -->|6| shared
   train -->|1| eval
@@ -154,14 +163,15 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
 | `src/eval` | 3 | 255 | `gen`, `rl`, `shared`, `sim`, `train` | — | — |
+| `src/film` | 7 | 2,345 | `gen`, `mission`, `shared`, `sim`, `targets`, `ui`, `viz`, `world/outdoor` | Three.js | — |
 | `src/gen` | 7 | 1,347 | `shared` | — | — |
 | `src/mission` | 35 | 8,101 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
-| `src/rl` | 12 | 2,791 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
+| `src/rl` | 12 | 2,821 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 570 | — | — | — |
-| `src/sim` | 18 | 3,260 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
-| `src/targets` | 10 | 1,269 | `gen`, `shared` | Three.js | — |
-| `src/train` | 4 | 1,050 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
+| `src/sim` | 19 | 3,281 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
+| `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
+| `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 10 | 2,452 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |
 | `src/ui/mission` | 4 | 1,743 | `mission` | — | — |
 | `src/viz` | 17 | 1,418 | `gen`, `shared`, `sim` | Three.js | — |
@@ -191,6 +201,7 @@ Each page is its own Vite entry. The production build also loads `coi-servicewor
 | Page | Entry | Module |
 | --- | --- | --- |
 | `demo.html` | `src/ui/demo/main.ts` | `ui` |
+| `film.html` | `src/film/main.ts` | `film` |
 | `index.html` | `src/main.ts` | `app` |
 | `mission.html` | `src/ui/mission/main.ts` | `ui/mission` |
 | `outdoor.html` | `src/world/outdoor/viz/page.ts` | `world/outdoor/viz` |
