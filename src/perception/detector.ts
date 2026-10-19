@@ -30,6 +30,12 @@ export interface DetectRequest {
     sensorMode: SensorMode;
   };
   cameraSpeed?: number;
+  /**
+   * Optics gain over the FPV reference camera. Recall and blur use
+   * distance / rangeScale, so a narrower lens on the same sensor resolves
+   * targets farther away. Default 1.
+   */
+  rangeScale?: number;
 }
 
 function angleTo(cam: CameraView, point: Vec3): number {
@@ -63,6 +69,7 @@ function jitter(bbox: Detection['bbox'], rng: RNG): Detection['bbox'] {
 export function detect(req: DetectRequest): Detection[] {
   const rng = new RNG(req.seed >>> 0, 'detect');
   const cameraSpeed = req.cameraSpeed ?? 0;
+  const rangeScale = req.rangeScale && req.rangeScale > 0 ? req.rangeScale : 1;
   const out: Detection[] = [];
   const ordered = [...req.targets].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   for (const target of ordered) {
@@ -73,6 +80,7 @@ export function detect(req: DetectRequest): Detection[] {
     }
     const projected = projectAabb(req.camera, target.aabb);
     const distance = dist(req.camera.position, target.center);
+    const seenDistance = distance / rangeScale;
     const occlusion = projected ? occlusionFraction(req.camera, target.aabb, req.spec, blockers) : 0;
     const interiorOn = (req.lighting.interiorLightsOn[target.roomIndex] ?? 0) > 0;
     const inFlashlight = req.lighting.flashlightOn && angleTo(req.camera, target.center) <= FLASH_HALF;
@@ -87,7 +95,7 @@ export function detect(req: DetectRequest): Detection[] {
     const recall = projected
       ? recallProbability({
           classId: target.classId,
-          distance,
+          distance: seenDistance,
           occlusion,
           illumination,
           speed: target.speed,
@@ -99,7 +107,7 @@ export function detect(req: DetectRequest): Detection[] {
     const lookRecall = projected && lookalike
       ? recallProbability({
           classId: lookalike,
-          distance,
+          distance: seenDistance,
           occlusion,
           illumination,
           speed: target.speed,

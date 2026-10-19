@@ -32,6 +32,7 @@ export default defineConfig({
         main: resolve(root, 'index.html'),
         mission: resolve(root, 'mission.html'),
         outdoor: resolve(root, 'outdoor.html'),
+        demo: resolve(root, 'demo.html'),
       },
     },
   },

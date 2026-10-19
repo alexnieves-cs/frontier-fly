@@ -33,7 +33,7 @@ export function createLivePanel(actions: LiveActions): LivePanel {
   const element = document.createElement('div');
   element.innerHTML = `
     <h2>Preview</h2>
-    <p class="quiet">A lawnmower sweep over the mock site. It is not the trained policy.</p>
+    <p class="quiet">A lawnmower sweep over the site with the simulated camera. It is not the trained policy.</p>
     <div class="playback">
       <button type="button" data-testid="play">Play</button>
       <button type="button" data-testid="pause">Pause</button>
