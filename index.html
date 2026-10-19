@@ -3,19 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="In-browser search-and-rescue drone sim: lidar, physics, an imitation-learned autopilot, and optional PPO training, all running in your tab." />
-    <meta property="og:title" content="frontier-fly — drone sim" />
-    <meta property="og:description" content="In-browser search-and-rescue drone sim: lidar, physics, an imitation-learned autopilot, and optional PPO training, all running in your tab." />
+    <meta name="color-scheme" content="dark" />
+    <script>
+      // The indoor sim used to live here. Forward its old URLs (README links, shared shots) to sim.html.
+      (function () {
+        var keys = ['seed', 'shot', 'camera', 'stage', 'train', 'quality', 'pilot', 'tod', 'flash', 'lights', 'sensor', 'renderer'];
+        var q = new URLSearchParams(location.search);
+        if (keys.some(function (k) { return q.has(k); })) location.replace('sim.html' + location.search + location.hash);
+      })();
+    </script>
+    <meta name="description" content="An autonomous search-and-rescue drone that sweeps the woods, finds the building, and searches it room by room. The indoor autopilot is learned by imitation, and everything runs in your browser." />
+    <meta property="og:title" content="frontier-fly — autonomous search-and-rescue drone, in your browser" />
+    <meta property="og:description" content="An autonomous search-and-rescue drone that sweeps the woods, finds the building, and searches it room by room. The indoor autopilot is learned by imitation, and everything runs in your browser." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://raw.githubusercontent.com/alexnieves-cs/frontier-fly/main/docs/media/social-preview.png" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="frontier-fly — drone sim" />
-    <meta name="twitter:description" content="In-browser search-and-rescue drone sim: lidar, physics, an imitation-learned autopilot, and optional PPO training, all running in your tab." />
+    <meta name="twitter:title" content="frontier-fly — autonomous search-and-rescue drone, in your browser" />
+    <meta name="twitter:description" content="An autonomous search-and-rescue drone that sweeps the woods, finds the building, and searches it room by room. The indoor autopilot is learned by imitation, and everything runs in your browser." />
     <meta name="twitter:image" content="https://raw.githubusercontent.com/alexnieves-cs/frontier-fly/main/docs/media/social-preview.png" />
-    <title>frontier-fly — drone sim</title>
+    <title>frontier-fly — autonomous search-and-rescue drone</title>
   </head>
   <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app" data-ready="0"></div>
+    <script type="module" src="/src/landing/main.ts"></script>
   </body>
 </html>

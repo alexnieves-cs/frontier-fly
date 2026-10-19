@@ -67,6 +67,8 @@ function architecture() {
       const spec = match[1] ?? match[2] ?? match[3];
       if (spec.startsWith('.')) {
         const target = resolve(dirname(file), spec);
+        // Data imported from outside src/ (the landing page reads docs/benchmarks.json) is not a module.
+        if (relative(join(ROOT, 'src'), target).startsWith('..')) continue;
         const to = moduleOf(target.endsWith('.ts') ? target : `${target}.ts`);
         if (to !== mod) {
           const key = `${mod}→${to}`;

@@ -8,7 +8,7 @@ test.beforeAll(() => {
 });
 
 async function openShot(page: import('@playwright/test').Page, query: string): Promise<void> {
-  const response = await page.goto(`/${query}`);
+  const response = await page.goto(`/sim.html${query}`);
   expect(response?.ok()).toBeTruthy();
   await expect(page.locator('#app[data-ready="1"]')).toBeVisible({ timeout: 40_000 });
   await page.waitForTimeout(700);

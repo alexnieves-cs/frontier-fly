@@ -76,7 +76,7 @@ export const SCENARIOS = [
   {
     id: 'training',
     title: 'Live PPO training dashboard',
-    page: 'index.html',
+    page: 'sim.html',
     query: '?seed=11&quality=low',
     seconds: 40,
     timing: 'sim',
@@ -92,7 +92,7 @@ export const SCENARIOS = [
   {
     id: 'fpv-night',
     title: 'FPV night flight, shipped policy, easy building',
-    page: 'index.html',
+    page: 'sim.html',
     query: '?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy&quality=low',
     seconds: 30,
     timing: 'sim',

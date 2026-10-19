@@ -575,7 +575,8 @@ function markup(): string {
         </div>
       </div>
       <nav class="nav" aria-label="Pages">
-        <a href="./index.html">Indoor sim</a>
+        <a href="./index.html">Home</a>
+        <a href="./sim.html">Indoor sim</a>
         <a href="./outdoor.html">Outdoor world</a>
         <a href="./mission.html">Mission editor</a>
         <a href="./demo.html" aria-current="page">Autonomous missions</a>

@@ -68,19 +68,44 @@ async function shippedPolicy(): Promise<NormalizedPolicy | null> {
   }
 }
 
-export async function startFilm(root: HTMLElement): Promise<void> {
-  const params = new URLSearchParams(location.search);
-  const requested = params.get('scenario');
+export type FilmStatus = 'flying' | 'building' | 'ready' | 'error';
+
+export interface FilmOptions {
+  /**
+   * Embed the film in a container on another page: no controls bar, the stage
+   * fits the container instead of the window, playback starts on its own and
+   * loops, and URL parameters are ignored.
+   */
+  embed?: boolean;
+  /** Scenario to fly when embedded (the film page reads `?scenario=`). */
+  scenario?: ScenarioId;
+  /** Render scale when embedded. Defaults to 0.75, or 0.5 on narrow containers. */
+  renderScale?: number;
+  /** Progress callback, so an embedding page can show its own loading state. */
+  onStatus?: (status: FilmStatus, message: string) => void;
+}
+
+export async function startFilm(root: HTMLElement, options: FilmOptions = {}): Promise<void> {
+  const embed = options.embed === true;
+  const params = new URLSearchParams(embed ? '' : location.search);
+  const requested = embed ? (options.scenario ?? null) : params.get('scenario');
   const scenario: ScenarioId = isScenarioId(requested) ? requested : DEFAULT_SCENARIO;
-  const recording = params.get('record') === '1';
+  const recording = !embed && params.get('record') === '1';
   // Recording: render at `scale` x 1920x1080 (the HUD scales with it) and
   // optionally fit the flight into `length` seconds of film.
-  const renderScale = recording ? Math.min(1, Math.max(0.25, Number(params.get('scale') ?? 1) || 1)) : 1;
+  const renderScale = recording
+    ? Math.min(1, Math.max(0.25, Number(params.get('scale') ?? 1) || 1))
+    : embed
+      ? Math.min(1, Math.max(0.25, options.renderScale ?? (root.clientWidth < 700 ? 0.5 : 0.75)))
+      : 1;
   const flightSec = Number(params.get('length')) || undefined;
+  const status = options.onStatus ?? (() => undefined);
   const api: FilmApi = { ready: false, frames: 0, fps: FILM_FPS, scenario, render: () => undefined };
   window.__film = api;
 
-  root.className = recording ? 'film-root film-recording' : 'film-root';
+  root.classList.add('film-root');
+  if (recording) root.classList.add('film-recording');
+  if (embed) root.classList.add('film-embed');
   const stage = document.createElement('div');
   stage.className = 'film-stage';
   stage.style.width = `${STAGE_W}px`;
@@ -94,17 +119,21 @@ export async function startFilm(root: HTMLElement): Promise<void> {
   loading.textContent = 'Flying the mission headless…';
   stage.appendChild(loading);
   const fit = () => {
-    const s = recording ? renderScale : Math.min(window.innerWidth / STAGE_W, (window.innerHeight - 64) / STAGE_H);
-    stage.style.transform = `scale(${s})`;
+    const s = recording ? renderScale : embed ? embedScale(root) : Math.min(window.innerWidth / STAGE_W, (window.innerHeight - 64) / STAGE_H);
+    // An embedded stage is centred on the container (see .film-embed in film.css).
+    stage.style.transform = embed ? `translate(-50%, -50%) scale(${s})` : `scale(${s})`;
     root.style.setProperty('--stage-scale', String(s));
   };
   fit();
-  window.addEventListener('resize', fit);
+  if (embed) new ResizeObserver(fit).observe(root);
+  else window.addEventListener('resize', fit);
+  status('flying', loading.textContent);
 
   try {
     const indoor = params.get('indoor') === 'frontier' ? null : await shippedPolicy();
     const log = await recordFlight(scenario, indoor);
     loading.textContent = 'Building the world…';
+    status('building', loading.textContent);
     const scene = new FilmScene(canvas, log);
     scene.renderer.setPixelRatio(renderScale);
     scene.resize(STAGE_W, STAGE_H);
@@ -141,13 +170,66 @@ export async function startFilm(root: HTMLElement): Promise<void> {
     show(0);
     api.ready = true;
     root.dataset.ready = '1';
-    if (!recording) controls(root, timeline, show, scenario, log);
+    status('ready', '');
+    if (embed) autoplay(root, timeline, show);
+    else if (!recording) controls(root, timeline, show, scenario, log);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     api.error = message;
     loading.textContent = `Could not build the film: ${message}`;
+    status('error', message);
     console.error(error);
   }
+}
+
+/**
+ * Scale for an embedded stage: cover the container when that crops little,
+ * otherwise contain it so the HUD at the edges stays in frame.
+ */
+function embedScale(root: HTMLElement): number {
+  const w = Math.max(1, root.clientWidth);
+  const h = Math.max(1, root.clientHeight);
+  const contain = Math.min(w / STAGE_W, h / STAGE_H);
+  const cover = Math.max(w / STAGE_W, h / STAGE_H);
+  return cover / contain <= 1.08 ? cover : contain;
+}
+
+/** Embedded playback: plays on its own, holds the report card, then loops. Pauses while hidden. */
+function autoplay(root: HTMLElement, timeline: FilmFrame[], show: (i: number) => void): void {
+  const HOLD_SEC = 3;
+  let visible = true;
+  new IntersectionObserver((entries) => {
+    visible = entries.some((e) => e.isIntersecting);
+  }).observe(root);
+  let frame = 0;
+  let hold = 0;
+  let last = performance.now();
+  let acc = 0;
+  const tick = (now: number) => {
+    const dt = Math.min(0.25, (now - last) / 1000);
+    last = now;
+    if (visible && !document.hidden) {
+      if (frame >= timeline.length - 1) {
+        hold += dt;
+        if (hold >= HOLD_SEC) {
+          hold = 0;
+          acc = 0;
+          frame = 0;
+          show(frame);
+        }
+      } else {
+        acc += dt * FILM_FPS;
+        const steps = Math.floor(acc);
+        if (steps > 0) {
+          acc -= steps;
+          frame = Math.min(timeline.length - 1, frame + steps);
+          show(frame);
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 function apply(scene: FilmScene, log: FlightLog, f: FilmFrame): void {

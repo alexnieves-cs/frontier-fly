@@ -51,6 +51,12 @@ export async function startApp(root: HTMLElement = document.querySelector('#app'
     await session.boot();
     bootNote.remove();
     session.loop();
+    // `?train=1` starts PPO on load (the landing page's "Train it in your tab" link) and points at the button.
+    if (launch.train) {
+      const train = must<HTMLButtonElement>(root, '#train-btn');
+      train.classList.add('attention');
+      train.click();
+    }
   } catch (error) {
     bootNote.textContent = error instanceof Error ? error.message : String(error);
     console.error(error);
@@ -733,6 +739,7 @@ function shell(): string {
     <header class="topbar">
       <div class="brand"><div class="mark"></div><div><h1>DRONE SIM</h1><p>FRONTIER-FLY</p></div></div>
       <nav class="page-links" aria-label="Other pages">
+        <a href="./index.html">Home</a>
         <a href="./demo.html">Mission demo</a>
         <a href="./film.html">Mission film</a>
         <a href="./outdoor.html">Outdoor</a>

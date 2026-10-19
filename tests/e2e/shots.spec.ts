@@ -6,7 +6,7 @@ const out = 'docs/media';
 const frames = 'test-results/frames';
 
 async function openShot(page: import('@playwright/test').Page, query: string): Promise<void> {
-  const response = await page.goto(`/${query}`);
+  const response = await page.goto(`/sim.html${query}`);
   expect(response?.headers()['cross-origin-opener-policy']).toBe('same-origin');
   expect(response?.headers()['cross-origin-embedder-policy']).toBe('require-corp');
   await expect(page.locator('#app[data-ready="1"]')).toBeVisible({ timeout: 40_000 });
