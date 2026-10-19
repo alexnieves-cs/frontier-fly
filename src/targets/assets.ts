@@ -5,7 +5,8 @@ import type { PersonState } from './types';
  * See CREDITS.md and public/assets/targets/LICENSE-KayKit.txt.
  */
 export const HUMANOID = {
-  url: '/assets/targets/humanoid.glb',
+  // Relative to the deployed base so the file also loads under the GitHub Pages subpath.
+  url: `${import.meta.env.BASE_URL}assets/targets/humanoid.glb`,
   license: 'CC0-1.0',
   author: 'Kay Lousberg (KayKit)',
   /** Unscaled mesh height in the glTF file, meters. */

@@ -194,6 +194,12 @@ export class TfTrainer {
     await this.initPromise;
   }
 
+  /** Change the Adam step size of every optimizer this trainer owns (moment estimates are kept). */
+  setLearningRate(lr: number): void {
+    const opts = [this.optimizer, ...this.subsetOptimizers.values()];
+    for (const opt of opts) if (opt) (opt as unknown as { learningRate: number }).learningRate = lr;
+  }
+
   /** Copy TF variables into the inference policy. */
   pullWeights(): void {
     this.assertReady();
@@ -327,6 +333,8 @@ export class TfTrainer {
       onEpoch?: (epoch: number, loss: number) => void;
       /** Per-sample weights [n]. */
       weights?: Float32Array;
+      /** Per-action-dimension loss weights [actDim], e.g. to stop a small-magnitude vz label from being ignored. */
+      actionWeights?: number[];
     },
   ): Promise<number> {
     await this.ready();
@@ -336,6 +344,7 @@ export class TfTrainer {
     const weights = opts?.weights;
     if (weights && weights.length < n) throw new Error('imitate: weights shorter than n');
     const targets = atanhTargets(actions, n * this.policy.actDim);
+    this.actionWeights = opts?.actionWeights ? tf.keep(tf.tensor1d(opts.actionWeights)) : null;
     let last = 0;
     for (let epoch = 0; epoch < epochs; epoch++) {
       const order = shuffled(n, this.rng);
@@ -356,6 +365,8 @@ export class TfTrainer {
       opts?.onEpoch?.(epoch, mean);
       last = mean;
     }
+    this.actionWeights?.dispose();
+    this.actionWeights = null;
     this.pullWeights();
     return last;
   }
@@ -401,8 +412,11 @@ export class TfTrainer {
   }
 
   /** Weighted (or plain) mean squared error between mean rows and targets. */
-  private static weightedMse(mean: tf.Tensor, tgt: tf.Tensor, w: tf.Tensor | null): tf.Tensor {
-    const perRow = tf.mean(tf.square(tf.sub(mean, tgt)), 1);
+  private actionWeights: tf.Tensor1D | null = null;
+
+  private static weightedMse(mean: tf.Tensor, tgt: tf.Tensor, w: tf.Tensor | null, dims: tf.Tensor | null = null): tf.Tensor {
+    const sq = tf.square(tf.sub(mean, tgt));
+    const perRow = dims ? tf.div(tf.sum(tf.mul(sq, dims), 1), tf.sum(dims)) : tf.mean(sq, 1);
     if (!w) return tf.mean(perRow);
     return tf.div(tf.sum(tf.mul(perRow, w)), tf.add(tf.sum(w), 1e-8));
   }
@@ -415,7 +429,7 @@ export class TfTrainer {
     let before = Number.NaN;
     const cost = this.optimizerFor('policy').minimize(
       () => {
-        const loss = TfTrainer.weightedMse(this.policyMean(obsT), tgt, wT) as tf.Scalar;
+        const loss = TfTrainer.weightedMse(this.policyMean(obsT), tgt, wT, this.actionWeights) as tf.Scalar;
         before = loss.dataSync()[0] ?? Number.NaN;
         return loss;
       },

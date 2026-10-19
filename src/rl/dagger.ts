@@ -84,6 +84,13 @@ export interface DaggerCollectOpts {
   weighting?: Partial<DaggerWeighting>;
   /** Stop collecting after this many consecutive steps without a new voxel. */
   maxStall?: number;
+  /**
+   * Std of a slow random vertical command (Ornstein-Uhlenbeck, action units) added to every
+   * executed action, teacher or student. The drone wanders off its flight altitude and the
+   * teacher's corrective climb or descent gets labeled, so the student learns to hold height
+   * instead of integrating a tiny vz bias over thousands of steps. 0 = off.
+   */
+  vzDisturbance?: number;
 }
 
 export interface DaggerRollout {
@@ -150,6 +157,10 @@ export function collectDagger(opts: DaggerCollectOpts): DaggerRollout {
   let collisions = 0;
   let divSum = 0;
   const exec = new Float32Array(actDim);
+  const vzSigma = opts.vzDisturbance ?? 0;
+  // OU process with a ~2 s correlation time at 20 Hz.
+  const ouTheta = 0.025;
+  let vzOffset = 0;
   for (let t = 0; t < steps; t++) {
     const pose = env.snapshot();
     const teacher = frontierAction(spec, env.visitedGrid, pose.pos, pose.yaw);
@@ -190,6 +201,11 @@ export function collectDagger(opts: DaggerCollectOpts): DaggerRollout {
         const a = (student[j] ?? 0) + (noise > 0 ? noise * rng.gaussian() : 0);
         exec[j] = a < -1 ? -1 : a > 1 ? 1 : a;
       }
+    }
+    if (vzSigma > 0) {
+      vzOffset += -ouTheta * vzOffset + vzSigma * Math.sqrt(2 * ouTheta) * rng.gaussian();
+      const v = (exec[2] ?? 0) + vzOffset;
+      exec[2] = v < -1 ? -1 : v > 1 ? 1 : v;
     }
     const step = env.step(exec);
     obs = step.obs;

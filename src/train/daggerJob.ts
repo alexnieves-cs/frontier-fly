@@ -28,6 +28,7 @@ export interface CollectDaggerArgs {
   beta: number;
   steps: number;
   rng: RNG;
+  vzDisturbance?: number;
 }
 
 /** Returns Float32Arrays (obs, teacher actions, weights, ...) plus any scalars. */
@@ -44,6 +45,8 @@ export interface DaggerEpisode {
   lighting?: LightingPreset | 'sampled';
   dynamics?: 'kinematic' | 'quad';
   episode?: { maxSteps?: number; stallSteps?: number; maxCollisions?: number };
+  /** See DaggerCollectOpts.vzDisturbance. */
+  vzDisturbance?: number;
 }
 
 export interface DaggerPayload {
@@ -102,7 +105,7 @@ export function makeDaggerJob(collect: CollectDaggerFn): JobFn {
       env.reset = (s, seed, c, physics) => proto.call(env, s, seed, c, physics ?? (s === spec ? world.physics : undefined));
       let result: object;
       try {
-        result = await collect({ env, spec, cfg, policy: ctx.policy, beta: ep.beta, steps: ep.steps, rng: rng.fork('episode') });
+        result = await collect({ env, spec, cfg, policy: ctx.policy, beta: ep.beta, steps: ep.steps, rng: rng.fork('episode'), vzDisturbance: ep.vzDisturbance });
       } finally {
         delete (env as { reset?: unknown }).reset;
         // Detach before the world may be freed (churn / LRU), then let the pool reclaim it.

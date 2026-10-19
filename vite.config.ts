@@ -48,6 +48,7 @@ export default defineConfig({
         mission: resolve(root, 'mission.html'),
         outdoor: resolve(root, 'outdoor.html'),
         demo: resolve(root, 'demo.html'),
+        film: resolve(root, 'film.html'),
       },
     },
   },

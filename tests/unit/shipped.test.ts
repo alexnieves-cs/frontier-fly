@@ -27,8 +27,7 @@ describe('shipped checkpoint', () => {
     const day0 = mean(report.stage0Day);
     const day3 = mean(report.stage3Day);
     expect(day0).toBeGreaterThanOrEqual(TARGETS.stage0);
-    // Stage 3 is below the 60% target (README "Honest limits"); this floor only catches regressions.
-    expect(day3).toBeGreaterThanOrEqual(0.55);
+    expect(day3).toBeGreaterThanOrEqual(TARGETS.stage3);
     expect(mean(report.stage0Night) / day0).toBeGreaterThanOrEqual(TARGETS.nightToDay);
     expect(mean(report.stage3Night) / day3).toBeGreaterThanOrEqual(TARGETS.nightToDay);
   }, 300_000);
