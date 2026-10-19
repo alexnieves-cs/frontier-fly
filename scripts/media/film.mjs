@@ -17,6 +17,8 @@ import { join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const OUT = 'docs/media';
+/** Repo budget for one media file. */
+const MAX_BYTES = 4.6e6;
 const RAW = process.env.FILM_RAW ?? 'test-results/film';
 const PORT = 4175;
 const SCALE = Number(process.env.FILM_SCALE ?? 2 / 3);
@@ -87,17 +89,26 @@ async function renderFilm(browser, base, film) {
 
 function encode(film, { dir, from }) {
   const dest = join(OUT, `film-${film.scenario}.mp4`);
+  // A full-quality master next to the frames, then a copy for the repo that fits its 5 MB media
+  // budget: 960 px wide, two-pass at the bitrate that fills MAX_BYTES over the film's length.
+  const master = join(dir, '..', `film-${film.scenario}-master.mp4`);
   ffmpeg([
     '-framerate', '30', '-start_number', String(from), '-i', join(dir, '%05d.jpg'),
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '21', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', dest,
+    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', master,
   ]);
+  const frames = readdirSync(dir).filter((f) => f.endsWith('.jpg') && Number(f.slice(0, 5)) >= from).length;
+  const kbps = Math.floor((MAX_BYTES * 8) / (frames / 30) / 1000);
+  const log = join(dir, '..', `x264-${film.scenario}`);
+  const x264 = ['-vf', 'scale=960:-2:flags=lanczos', '-c:v', 'libx264', '-preset', 'slow', '-b:v', `${kbps}k`, '-passlogfile', log, '-pix_fmt', 'yuv420p', '-an'];
+  ffmpeg(['-i', master, ...x264, '-pass', '1', '-f', 'mp4', '/dev/null']);
+  ffmpeg(['-i', master, ...x264, '-pass', '2', '-movflags', '+faststart', dest]);
   const out = { file: dest, bytes: statSync(dest).size };
   if (film.hero) {
     const hero = join(OUT, 'film-hero.mp4');
-    ffmpeg(['-ss', String(film.hero.start), '-t', String(film.hero.length), '-i', dest, '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', hero]);
+    ffmpeg(['-ss', String(film.hero.start), '-t', String(film.hero.length), '-i', master, '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', hero]);
     const gif = join(OUT, 'film-hero.gif');
     ffmpeg([
-      '-ss', String(film.hero.start), '-t', String(film.hero.length), '-i', dest,
+      '-ss', String(film.hero.start), '-t', String(film.hero.length), '-i', master,
       '-vf', 'fps=12,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse=dither=sierra2_4a',
       gif,
     ]);

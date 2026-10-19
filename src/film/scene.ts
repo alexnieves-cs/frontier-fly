@@ -144,6 +144,7 @@ export class FilmScene {
       else sprite.material.opacity = (i === 2 ? strobe : blink) ? 1 : 0.08;
     });
     this.updateTrail(state.index);
+    this.updateNightFill(state.index);
     this.updatePlan(state.index);
     // Planner paths are outdoor routes; inside they only slice through walls.
     this.plan.visible = this.plan.geometry.drawRange.count > 1 && !state.inside;
@@ -322,8 +323,33 @@ export class FilmScene {
 
   // --------------------------------------------------------------- update
 
+  /** First frame of the building visit that frame `index` is part of, or -1 when outside. */
+  private visitStart(index: number): number {
+    const inside = this.log.frames[index]?.inside ?? null;
+    if (!inside) return -1;
+    let from = index;
+    while (from > 0 && this.log.frames[from - 1]!.inside === inside) from--;
+    return from;
+  }
+
+  /**
+   * At night the interior is lit only by the drone's flashlight, which reads as black from the
+   * cutaway camera. Ease up a cool moonlight fill over the first 1.5 s inside, and back down
+   * outside. Driven by flight time, so any frame renders the same on its own.
+   */
+  private updateNightFill(index: number): void {
+    if (!this.night) return;
+    const from = this.visitStart(index);
+    const f = from < 0 ? 0 : Math.min(1, (this.log.frames[index]!.t - this.log.frames[from]!.t) / 1.5);
+    const k = f * f * (3 - 2 * f);
+    this.site.hemi.intensity = 0.7 + k * 1.1;
+  }
+
   private updateTrail(index: number): void {
-    this.trail.geometry.setDrawRange(0, index + 1);
+    // Inside a building, draw only this visit's indoor path: the outdoor inspection loop would
+    // otherwise cross the cutaway view at roof height.
+    const from = Math.max(0, this.visitStart(index));
+    this.trail.geometry.setDrawRange(from, index + 1 - from);
   }
 
   private updatePlan(index: number): void {
