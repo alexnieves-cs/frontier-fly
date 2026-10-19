@@ -10,6 +10,8 @@ import type { BuildingSpec, LightingState } from '../../../shared/types';
 import { makeDroneState, scaleAction } from '../../../sim/drone';
 import { zeroNoise } from '../../../sim/dynamics/dr';
 import { SensorNoise } from '../../../sim/dynamics/noise';
+import { FrontierNav } from '../../../sim/frontierFeatures';
+import { EgoMaps, SeenMap } from '../../../sim/seenMap';
 import { markVisited, sense } from '../../../sim/sensors';
 import type { PhysicsWorld } from '../../../sim/world';
 import type { MissionBuilding, V3 } from '../contracts';
@@ -427,6 +429,11 @@ export class PolicyExplorer {
   private yawRate = 0;
   private steps = 0;
   private readonly maxSteps = 2400;
+  /** Observation v2 state, built the way ExplorerEnv builds it. */
+  private readonly seen = new SeenMap();
+  private readonly nav = new FrontierNav();
+  private readonly maps = new EgoMaps();
+  private stall = 0;
 
   constructor(
     readonly grid: IndoorGrid,
@@ -440,6 +447,7 @@ export class PolicyExplorer {
     this.visited = new Uint8Array(grid.floors * floor0.w * 2 * floor0.d * 2);
     this.rng = new RNG(seed >>> 0, 'indoor-policy');
     this.noise = new SensorNoise(zeroNoise(), this.rng.fork('noise'));
+    this.seen.reset(grid.spec);
   }
 
   /** One policy step from a local pose. */
@@ -447,6 +455,9 @@ export class PolicyExplorer {
     if (markVisited(this.grid.spec, this.visited, local[0], local[1], local[2])) {
       this.visitedCount += 1;
       this.lastNewVoxelSec = tSec;
+      this.stall = 0;
+    } else {
+      this.stall += 1;
     }
     const state = makeDroneState([local[0], local[1], local[2]], yaw);
     state.vel = [vel[0], vel[1], vel[2]];
@@ -463,6 +474,11 @@ export class PolicyExplorer {
         lighting: this.lighting,
         noise: this.noise,
         prevVel: this.prevVel,
+        seen: this.seen.data,
+        markSeen: this.seen,
+        nav: this.nav,
+        maps: this.maps,
+        stall: this.stall,
       },
       this.obs,
     );
