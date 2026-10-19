@@ -23,7 +23,8 @@ export { OBS };
 const ringMeters = new Float32Array(LIDAR_H);
 
 export interface SenseContext {
-  world: PhysicsWorld;
+  /** Anything the lidar can be cast against: the building's PhysicsWorld, or a mission's real collision world. */
+  world: Pick<PhysicsWorld, 'cast'>;
   state: DroneState;
   spec: BuildingSpec;
   visited: Uint8Array;

@@ -71,7 +71,7 @@ export function requirementsMet(mission: Mission, confirmed: readonly ConfirmedC
   });
 }
 
-function angleDiff(a: number, b: number): number {
+export function angleDiff(a: number, b: number): number {
   const d = Math.abs(a - b) % (Math.PI * 2);
   return d > Math.PI ? Math.PI * 2 - d : d;
 }
@@ -159,7 +159,10 @@ export class ConfirmTracker {
   /** Mean of the best `minViews` view confidences (all views when fewer). */
   meanConfidence(track: ConfirmTrack): number {
     if (!track.views.length) return 0;
-    const best = track.views.map((v) => v.confidence).sort((a, b) => b - a).slice(0, this.minViews);
+    const best = track.views
+      .map((v) => v.confidence)
+      .sort((a, b) => b - a)
+      .slice(0, this.minViews);
     return best.reduce((s, c) => s + c, 0) / best.length;
   }
 
@@ -229,8 +232,16 @@ export function confirmViewpoints(
     out.push(c.p);
   }
   // Too few fresh bearings: re-view old ones closer, which can raise their best confidence.
+  // The weakest views first: they hold the mean down.
   const mine = out.map((p) => Math.atan2(center[1] - p[1], center[0] - p[0]));
-  for (let i = 0; i < cands.length && out.length < count; i++) {
+  const weakness = (angle: number): number => {
+    let best = Infinity;
+    for (const v of track.views) if (angleDiff(v.angle, angle) < sep / 2 && v.confidence < best) best = v.confidence;
+    return best;
+  };
+  const order = cands.map((_, i) => i).sort((a, b) => weakness(cands[a]!.angle) - weakness(cands[b]!.angle) || a - b);
+  for (const i of order) {
+    if (out.length >= count) break;
     const c = cands[i]!;
     if (rejected.has(i) || out.includes(c.p) || mine.some((u) => angleDiff(u, c.angle) < sep)) continue;
     if (!accept(c.p)) continue;

@@ -47,7 +47,7 @@ export interface FlightLog {
   record: RunRecord;
   report: AutonomyReport;
   dt: number;
-  explorer: 'policy' | 'frontier';
+  explorer: 'policy' | 'frontier' | 'oracle';
 }
 
 function samePlan(a: V3[], b: V3[]): boolean {
