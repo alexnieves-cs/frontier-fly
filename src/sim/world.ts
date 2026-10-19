@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { CELL, DRONE_RADIUS } from '../shared/constants';
+import { furnitureIndex, type FurnitureIndex } from '../gen/furniture';
 import { buildingAabbs } from '../gen/parts';
 import { isWalkable } from '../gen/validate';
 import type { BuildingSpec } from '../shared/types';
@@ -46,11 +47,19 @@ export interface RayHit {
 /**
  * Rapier owns the raycast colliders. Contact response uses the same grid
  * AABBs analytically so a step stays deterministic and cheap.
+ *
+ * Furniture (spec.furniture, planned in src/gen/furniture.ts) is solid: each
+ * part is an oriented Rapier cuboid the lidar sees, and `penetrates` tests the
+ * drone sphere against the same boxes through a per-cell bucket index, so only
+ * boxes in the cells under the sphere are checked.
  */
 export class PhysicsWorld {
   readonly spec: BuildingSpec;
+  readonly furniture: FurnitureIndex;
   private readonly world: RAPIER.World;
   private readonly ray: RAPIER.Ray;
+  /** Collider handle -> SURFACE class for furniture parts. */
+  private readonly furnitureSurface = new Map<number, number>();
 
   constructor(spec: BuildingSpec) {
     this.spec = spec;
@@ -60,9 +69,22 @@ export class PhysicsWorld {
       const desc = RAPIER.ColliderDesc.cuboid(box.hx, box.hy, box.hz).setTranslation(box.cx, box.cy, box.cz);
       this.world.createCollider(desc, body);
     }
+    this.furniture = furnitureIndex(spec);
+    this.addFurniture(body);
     this.world.timestep = 1 / 60;
     this.world.step();
     this.ray = new RAPIER.Ray({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 });
+  }
+
+  private addFurniture(body: RAPIER.RigidBody): void {
+    for (const box of this.furniture.boxes) {
+      const half = box.yaw / 2;
+      const desc = RAPIER.ColliderDesc.cuboid(box.hx, box.hy, box.hz)
+        .setTranslation(box.cx, box.cy, box.cz)
+        .setRotation({ x: 0, y: 0, z: Math.sin(half), w: Math.cos(half) });
+      const collider = this.world.createCollider(desc, body);
+      this.furnitureSurface.set(collider.handle, box.surface);
+    }
   }
 
   free(): void {
@@ -91,6 +113,10 @@ export class PhysicsWorld {
     const hit = this.world.castRay(this.ray, maxDist, true);
     if (!hit) return null;
     const dist = hit.timeOfImpact;
+    if (this.furnitureSurface.size > 0) {
+      const surface = this.furnitureSurface.get(hit.collider.handle);
+      if (surface != null) return { dist, surface };
+    }
     return {
       dist,
       surface: this.surfaceAt(ox + this.ray.dir.x * dist, oy + this.ray.dir.y * dist, oz + this.ray.dir.z * dist),
@@ -129,7 +155,7 @@ export class PhysicsWorld {
       if (gx < 0 || gz < 0 || gx >= lower.w || gz >= lower.d) return true;
       if (lower.cells[gz * lower.w + gx] !== CELL.SHAFT) return true;
     }
-    return false;
+    return this.furniture.hits(x, y, z, radius);
   }
 
   resolve(pos: [number, number, number], delta: [number, number, number], radius = DRONE_RADIUS): MoveResult {

@@ -37,7 +37,8 @@ export interface RolloutOutcome {
   showcase: ShowcaseSnap | null;
 }
 
-function makeConfig(stage: number, seed: number, nRooms: number, dynamics: 'kinematic' | 'quad'): EpisodeConfig {
+/** Training episode config (domain randomization scaled by stage). Shared with the Node rollout pool. */
+export function makeConfig(stage: number, seed: number, nRooms: number, dynamics: 'kinematic' | 'quad'): EpisodeConfig {
   const rng = new RNG(seed, 'cfg');
   const scale = stage <= 2 ? 0 : stage === 3 ? 0.33 : stage === 4 ? 0.66 : 1;
   const lighting = stage >= 5 ? sampleLighting(seed ^ 0x9e37, nRooms, stage) : sampleLighting(seed, nRooms, stage);

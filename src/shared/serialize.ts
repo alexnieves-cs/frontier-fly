@@ -1,4 +1,4 @@
-import type { BuildingSpec, FloorGrid } from './types';
+import type { BuildingSpec, FloorGrid, FurniturePlan } from './types';
 
 interface FloorJson {
   w: number;
@@ -15,6 +15,7 @@ interface BuildingJson {
   floors: FloorJson[];
   spawn: [number, number, number] | number[];
   reachableVoxels: number;
+  furniture?: FurniturePlan;
 }
 
 export function buildingFromJson(raw: BuildingJson): BuildingSpec {
@@ -24,6 +25,14 @@ export function buildingFromJson(raw: BuildingJson): BuildingSpec {
     floorHeight: raw.floorHeight,
     spawn: [raw.spawn[0] ?? 0, raw.spawn[1] ?? 0, raw.spawn[2] ?? 0],
     reachableVoxels: raw.reachableVoxels,
+    ...(raw.furniture
+      ? {
+          furniture: {
+            props: raw.furniture.props.map((prop) => ({ ...prop })),
+            boxes: raw.furniture.boxes.map((box) => ({ ...box })),
+          },
+        }
+      : {}),
     floors: raw.floors.map((floor) => ({
       w: floor.w,
       d: floor.d,
@@ -46,6 +55,14 @@ export function buildingToJson(spec: BuildingSpec): BuildingJson {
     floorHeight: spec.floorHeight,
     spawn: spec.spawn,
     reachableVoxels: spec.reachableVoxels,
+    ...(spec.furniture
+      ? {
+          furniture: {
+            props: spec.furniture.props.map((prop) => ({ ...prop })),
+            boxes: spec.furniture.boxes.map((box) => ({ ...box })),
+          },
+        }
+      : {}),
     floors: spec.floors.map((floor) => ({
       w: floor.w,
       d: floor.d,

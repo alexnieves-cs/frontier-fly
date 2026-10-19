@@ -1,7 +1,10 @@
 /** JSON checkpoint plus an IndexedDB helper. IndexedDB is touched only through globalThis. */
+import { OBS_DIM, OBS_VERSION } from '../shared/constants';
 
 export interface Checkpoint {
   version: number;
+  /** Observation layout version (src/sim/OBS_LAYOUT.md). Files without it are v1. */
+  obsVersion: number;
   obsDim: number;
   actDim: number;
   hidden: number[];
@@ -18,8 +21,19 @@ const DB_NAME = 'frontier-fly';
 const STORE = 'checkpoints';
 const DB_VERSION = 1;
 
+/** Shortest decimal that reads back as the same float32 (at most 9 significant digits). */
+function shortestFloat32(v: number): number {
+  const target = Math.fround(v);
+  for (let p = 1; p < 9; p++) {
+    const s = Number(v.toPrecision(p));
+    if (Math.fround(s) === target) return s;
+  }
+  return Number(v.toPrecision(9));
+}
+
+/** Weights are float32, so printing them with float64 precision only makes the file bigger. Lossless. */
 export function serializeCheckpoint(c: Checkpoint): string {
-  return JSON.stringify(c);
+  return JSON.stringify({ ...c, weights: c.weights.map((row) => row.map(shortestFloat32)) });
 }
 
 export function parseCheckpoint(text: string): Checkpoint {
@@ -38,6 +52,7 @@ export function parseCheckpoint(text: string): Checkpoint {
   }
   return {
     version: num(o.version, 'version'),
+    obsVersion: o.obsVersion === undefined ? 1 : num(o.obsVersion, 'obsVersion'),
     obsDim: num(o.obsDim, 'obsDim'),
     actDim: num(o.actDim, 'actDim'),
     hidden,
@@ -48,6 +63,15 @@ export function parseCheckpoint(text: string): Checkpoint {
     rewVar: num(o.rewVar, 'rewVar'),
     stage: num(o.stage, 'stage'),
   };
+}
+
+/**
+ * Null when the checkpoint can drive the current observation, otherwise a
+ * human-readable reason (an old v1 file against a v2 build, say).
+ */
+export function checkpointMismatch(c: Pick<Checkpoint, 'obsDim' | 'obsVersion'>, obsDim = OBS_DIM, obsVersion = OBS_VERSION): string | null {
+  if (c.obsVersion === obsVersion && c.obsDim === obsDim) return null;
+  return `checkpoint is for observation v${c.obsVersion} (${c.obsDim} inputs) but this build uses v${obsVersion} (${obsDim} inputs)`;
 }
 
 function idbFactory(): IDBFactory | null {

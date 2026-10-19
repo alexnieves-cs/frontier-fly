@@ -20,7 +20,17 @@ export default defineConfig({
       ],
     },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    // The outdoor test asserts an fps floor on software WebGL, so it runs alone before the
+    // rest instead of sharing the CPU with another rendering page.
+    { name: 'outdoor', testMatch: /outdoor\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      testIgnore: /outdoor\.spec\.ts/,
+      dependencies: ['outdoor'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
   webServer: {
     command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
