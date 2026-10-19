@@ -17,7 +17,7 @@ import { join } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const OUT = 'docs/media';
-const RAW = 'test-results/film';
+const RAW = process.env.FILM_RAW ?? 'test-results/film';
 const PORT = 4175;
 const SCALE = Number(process.env.FILM_SCALE ?? 2 / 3);
 const WIDTH = Math.round(1920 * SCALE);

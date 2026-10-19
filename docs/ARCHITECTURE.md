@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (166 files, 31,233 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (166 files, 31,299 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -175,10 +175,10 @@ flowchart LR
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 10 | 2,460 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |
 | `src/ui/mission` | 4 | 1,743 | `mission` | — | — |
-| `src/viz` | 19 | 2,273 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
+| `src/viz` | 19 | 2,332 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 842 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
 | `src/world/outdoor` | 14 | 1,999 | `gen`, `shared` | Rapier | — |
-| `src/world/outdoor/viz` | 3 | 581 | `shared`, `sim`, `viz`, `world/outdoor` | Three.js | — |
+| `src/world/outdoor/viz` | 3 | 588 | `shared`, `sim`, `viz`, `world/outdoor` | Three.js | — |
 
 ## Headless boundary
 

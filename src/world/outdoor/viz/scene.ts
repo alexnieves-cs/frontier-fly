@@ -36,10 +36,12 @@ export class OutdoorView {
   private pbr: Promise<PbrSet | null> | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.soft = softwareWebgl();
+    // `?quality=high` forces the full look on software GL (for stills); `low` forces the cheap path.
+    const quality = new URLSearchParams(location.search).get('quality');
+    this.soft = quality === 'high' ? false : quality === 'low' ? true : softwareWebgl();
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !this.soft, preserveDrawingBuffer: true });
-    // Software GL is fill-bound: render three quarters of the pixels' resolution and let the browser upscale.
-    this.renderer.setPixelRatio(this.soft ? 0.75 : Math.min(window.devicePixelRatio || 1, 1.5));
+    // Software GL is fill-bound: render at half resolution and let the browser upscale.
+    this.renderer.setPixelRatio(this.soft ? 0.5 : Math.min(window.devicePixelRatio || 1, 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.9;
