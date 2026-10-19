@@ -1,4 +1,5 @@
 import type { CameraMode, QualityPreset, SensorMode } from '../shared/types';
+import { readRendererChoice, type RendererChoice } from '../viz/quality';
 
 export interface LaunchParams {
   seed: number;
@@ -10,6 +11,8 @@ export interface LaunchParams {
   flashlight: boolean;
   lights: boolean;
   quality: QualityPreset;
+  /** WebGL2 unless the URL opts in with `?renderer=webgpu`. */
+  renderer: RendererChoice;
   sensor: SensorMode;
   pilot: 'keys' | 'heuristic' | 'policy';
 }
@@ -79,6 +82,7 @@ export function readLaunchParams(search = window.location.search): LaunchParams 
     flashlight,
     lights,
     quality,
+    renderer: readRendererChoice(search),
     sensor,
     pilot,
   };
@@ -92,6 +96,7 @@ export function writeLaunchParams(params: LaunchParams): void {
   if (params.stage !== 'auto') q.set('stage', String(params.stage));
   if (params.train) q.set('train', '1');
   if (params.shot) q.set('shot', params.shot);
+  if (params.renderer === 'webgpu') q.set('renderer', 'webgpu');
   const url = `${window.location.pathname}?${q.toString()}`;
   window.history.replaceState(null, '', url);
 }

@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (157 files, 28,754 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (157 files, 28,797 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -22,7 +22,7 @@ flowchart LR
     Sens --> Pol["SIMD policy inference"]
   end
   subgraph LearnW["Learner worker"]
-    PPO["TF.js PPO + GAE"]
+    PPO["TF.js PPO + GAE<br/>(Train button, optional)"]
   end
   EnvW -- "rollouts in SharedArrayBuffer" --> LearnW
   LearnW -- "weights" --> EnvW
@@ -33,8 +33,8 @@ flowchart LR
 2. **Simulate.** `src/sim` wraps a Rapier world. Kinematic flight steps once per action. Quadrotor mode runs a velocity-to-attitude cascade with motor lag and drag at 400 Hz.
 3. **Sense.** Each step produces a 1088-float observation (v2): 40 lidar ranges, IMU, altitude, frontier-direction features, and four 16×16 egocentric maps (visited and unexplored-free at 8 m and 32 m). The layout is versioned in [`src/sim/OBS_LAYOUT.md`](../src/sim/OBS_LAYOUT.md) because the checkpoint, the rollout stride, and the gemm scratch depend on it.
 4. **Act.** The policy outputs `[vx, vy, vz, yawRate]` in `[-1, 1]`. Inference in the env workers is a small SIMD WASM gemm (`src/rl/gemm.ts`), not TF.js.
-5. **Learn.** Env workers write rollouts into `SharedArrayBuffer`s. The learner worker runs PPO in TF.js (WebGL backend, CPU fallback) and posts new weights back. A six-stage curriculum promotes when rolling coverage clears a gate.
-6. **Render.** The main thread interpolates the showcase env's state and draws it with Three.js (WebGL2, WebGPU when the high preset finds an adapter). The renderer consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`. It never drives the sim.
+5. **Learn (optional, in the tab).** The shipped weights come from offline imitation learning (see Training below). When you press **Train**, env workers write rollouts into `SharedArrayBuffer`s. The learner worker runs PPO in TF.js (WebGL backend, CPU fallback) and posts new weights back. A six-stage curriculum promotes when rolling coverage clears a gate.
+6. **Render.** The main thread interpolates the showcase env's state and draws it with Three.js (WebGL2 with the full post stack by default; WebGPU only when the URL opts in with `?renderer=webgpu`). The renderer consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`. It never drives the sim.
 
 ## Training
 
@@ -132,7 +132,7 @@ flowchart LR
   ui -->|8| shared
   ui -->|5| sim
   ui -->|1| targets
-  ui -->|2| viz
+  ui -->|3| viz
   ui -->|2| workers
   ui -->|2| world_outdoor
   ui -->|2| world_outdoor_viz
@@ -162,9 +162,9 @@ flowchart LR
 | `src/sim` | 18 | 3,260 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,269 | `gen`, `shared` | Three.js | — |
 | `src/train` | 4 | 1,050 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 10 | 2,437 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |
+| `src/ui` | 10 | 2,452 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |
 | `src/ui/mission` | 4 | 1,743 | `mission` | — | — |
-| `src/viz` | 17 | 1,390 | `gen`, `shared`, `sim` | Three.js | — |
+| `src/viz` | 17 | 1,418 | `gen`, `shared`, `sim` | Three.js | — |
 | `src/workers` | 5 | 842 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
 | `src/world/outdoor` | 14 | 1,999 | `gen`, `shared` | Rapier | — |
 | `src/world/outdoor/viz` | 4 | 880 | `shared`, `sim`, `world/outdoor` | Three.js | — |

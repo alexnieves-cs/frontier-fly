@@ -20,7 +20,7 @@ flowchart LR
     Sens --> Pol["SIMD policy inference"]
   end
   subgraph LearnW["Learner worker"]
-    PPO["TF.js PPO + GAE"]
+    PPO["TF.js PPO + GAE<br/>(Train button, optional)"]
   end
   EnvW -- "rollouts in SharedArrayBuffer" --> LearnW
   LearnW -- "weights" --> EnvW
@@ -31,8 +31,8 @@ flowchart LR
 2. **Simulate.** `src/sim` wraps a Rapier world. Kinematic flight steps once per action. Quadrotor mode runs a velocity-to-attitude cascade with motor lag and drag at 400 Hz.
 3. **Sense.** Each step produces a 1088-float observation (v2): 40 lidar ranges, IMU, altitude, frontier-direction features, and four 16×16 egocentric maps (visited and unexplored-free at 8 m and 32 m). The layout is versioned in [`src/sim/OBS_LAYOUT.md`](../src/sim/OBS_LAYOUT.md) because the checkpoint, the rollout stride, and the gemm scratch depend on it.
 4. **Act.** The policy outputs `[vx, vy, vz, yawRate]` in `[-1, 1]`. Inference in the env workers is a small SIMD WASM gemm (`src/rl/gemm.ts`), not TF.js.
-5. **Learn.** Env workers write rollouts into `SharedArrayBuffer`s. The learner worker runs PPO in TF.js (WebGL backend, CPU fallback) and posts new weights back. A six-stage curriculum promotes when rolling coverage clears a gate.
-6. **Render.** The main thread interpolates the showcase env's state and draws it with Three.js (WebGL2, WebGPU when the high preset finds an adapter). The renderer consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`. It never drives the sim.
+5. **Learn (optional, in the tab).** The shipped weights come from offline imitation learning (see Training below). When you press **Train**, env workers write rollouts into `SharedArrayBuffer`s. The learner worker runs PPO in TF.js (WebGL backend, CPU fallback) and posts new weights back. A six-stage curriculum promotes when rolling coverage clears a gate.
+6. **Render.** The main thread interpolates the showcase env's state and draws it with Three.js (WebGL2 with the full post stack by default; WebGPU only when the URL opts in with `?renderer=webgpu`). The renderer consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`. It never drives the sim.
 
 ## Training
 

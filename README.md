@@ -1,6 +1,6 @@
 # frontier-fly
 
-**A drone that teaches itself to search buildings, from the treeline to the last room, entirely in your browser.**
+**A drone autopilot that searches buildings, from the treeline to the last room, entirely in your browser. Its policy is learned by imitation (behavior cloning + DAgger) from a privileged teacher, with PPO you can run in the tab.**
 
 [![ci](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml)
 [![pages](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml)
@@ -12,9 +12,9 @@
 
 ### [▶ Try it live](https://alexnieves-cs.github.io/frontier-fly/) · [Mission editor](https://alexnieves-cs.github.io/frontier-fly/mission.html) · [Outdoor site](https://alexnieves-cs.github.io/frontier-fly/outdoor.html) · [Benchmarks](docs/BENCHMARKS.md) · [Architecture](docs/ARCHITECTURE.md)
 
-frontier-fly is a search-and-rescue drone simulator and autopilot. A quadrotor reads lidar, an IMU, and its own map of where it has been, and a small neural network trained with reinforcement learning decides where to fly next. The mission it is built for: sweep a geofenced patch of woods, find the building, pick an opening it actually fits through, search room by room for a missing person or confirm the place is clear, fly home, and file a report.
+frontier-fly is a search-and-rescue drone simulator and autopilot. A quadrotor reads lidar, an IMU, and its own map of where it has been, and a small neural network decides where to fly next. That network is trained by imitation learning: behavior cloning and DAgger from a privileged frontier-exploration teacher. PPO fine-tuning is implemented and runs in the tab, but the shipped weights come from DAgger. The mission it is built for: sweep a geofenced patch of woods, find the building, pick an opening it actually fits through, search room by room for a missing person or confirm the place is clear, fly home, and file a report.
 
-Everything runs client-side. Physics (Rapier, 400 Hz), sensors, PPO training (TensorFlow.js in a worker), and rendering (Three.js, WebGPU when available) all happen in the tab. There is no server and no GPU cluster. A seed rebuilds the same world exactly, so every result here can be reproduced.
+Everything runs client-side. Physics (Rapier, 400 Hz), sensors, optional PPO training (TensorFlow.js in a worker), and rendering (Three.js on WebGL2; WebGPU opt-in with `?renderer=webgpu`) all happen in the tab. There is no server and no GPU cluster. A seed rebuilds the same world exactly, so every result here can be reproduced.
 
 The project is civilian and defensive only: search, inspection, and confirm-clear. The drone never pursues or engages anyone.
 
@@ -96,11 +96,13 @@ flowchart LR
   Sim --> Obs["1088-float observation<br/>lidar · IMU · frontier · maps"]
   Obs --> Pol["Policy MLP<br/>1088 → 512 → 256 → 4"]
   Pol -- "vx, vy, vz, yaw rate" --> Sim
-  Sim -- "rollouts (SharedArrayBuffer)" --> PPO["PPO learner<br/>TF.js worker"]
-  PPO -- "weights" --> Pol
+  Teacher["Privileged frontier teacher<br/>sees the explored map"] -- "labels" --> IL["BC + DAgger<br/>headless, npm run train:indoor"]
+  IL -- "shipped weights" --> Pol
+  Sim -. "rollouts (SharedArrayBuffer)" .-> PPO["Optional PPO in the tab<br/>TF.js worker, Train button"]
+  PPO -. "session weights" .-> Pol
   Sim --> Det["Camera detector<br/>people · objects · decoys"]
   Det --> Mission["Mission layer<br/>geofence · entry policy · report"]
-  Sim --> View["Three.js / WebGPU<br/>FPV · chase · overview"]
+  Sim --> View["Three.js WebGL2<br/>FPV · chase · overview"]
 ```
 
 **Training.** The shipped checkpoint starts from behavior cloning: a privileged frontier-seeking teacher that can see the explored map flies the curriculum, and the network learns to imitate it from its own sensors. DAgger then lets the network fly while the teacher labels every state it reaches, and the round kept is the one that scores best on held-out validation seeds. PPO with a KL anchor to the cloned policy is implemented, but no PPO fine-tune beat DAgger on validation, so the shipped file has none. In the browser, **Train** runs PPO on the spec reward (new coverage, new rooms and floors, collisions, smoothness, time). A six-stage curriculum grows the buildings from one 8×8 m room to multi-floor layouts with quadrotor dynamics, and randomizes mass, thrust, drag, motor lag, sensor noise, wind, and lighting so the policy cannot overfit one world. The full loop runs in the browser, and the same code runs headless in Node for `npm run train:indoor` and the benchmarks.
@@ -116,7 +118,7 @@ More detail, including the generated module graph and the headless boundary betw
 | Language and build | TypeScript 5.7, Vite 6 | One codebase for the browser, workers, and Node |
 | Physics | [Rapier](https://rapier.rs) 0.14 (WASM) | Deterministic colliders and fast ray casts for lidar |
 | Learning | [TensorFlow.js](https://www.tensorflow.org/js) 4.22, hand-written SIMD WASM gemm | PPO updates on WebGL or CPU, cheap batched inference in env workers |
-| Rendering | [Three.js](https://threejs.org) 0.170, WebGPU or WebGL2 | PBR, post passes, and a WebGPU path on capable browsers |
+| Rendering | [Three.js](https://threejs.org) 0.170, WebGL2 (WebGPU opt-in) | PBR, HDRI, shadows, and post passes; `?renderer=webgpu` tries the lighter WebGPU path |
 | Charts | [uPlot](https://github.com/leeoniya/uPlot) | Lightweight live training curves |
 | Concurrency | Web Workers, `SharedArrayBuffer` | Rollouts without copying |
 | Tests | Vitest, Playwright, ESLint | Unit, perf, and headless browser checks in CI |
