@@ -20,10 +20,23 @@ The project is civilian and defensive only: search, inspection, and confirm-clea
 
 ## Missions
 
-Three seeded scenarios, each flown autonomously from takeoff to landing. For the recordings, "ask to enter" prompts were auto-approved. The drone sweeps a geofenced forest in coverage lanes, discovers the building, inspects its openings and picks one it clears with margin, searches room by room, confirms a find or declares the building clear, flies home, and writes a report. The clips play at 4× (16× for the compound) and were recorded from the mission pipeline in PR #7, which adds the `demo.html` page; results are in the [mission table](#benchmarks).
+Three seeded scenarios, each flown autonomously from takeoff to landing. For the recordings, "ask to enter" prompts were auto-approved. The drone sweeps a geofenced forest in coverage lanes, discovers the building, inspects its openings and picks one it clears with margin, searches room by room, confirms a find or declares the building clear, flies home, and writes a report. The clips play at 4× (16× for the compound) and come from [`demo.html`](https://alexnieves-cs.github.io/frontier-fly/demo.html?scenario=cabin-day&autorun=1); results are in the [mission table](#benchmarks). Indoors the shipped policy flies first, and on a stall or its first wall contact the run hands the visit to frontier exploration. The report says which explorer ran.
 
 | <img src="docs/media/mission-cabin-day.gif" alt="Injured hiker in a cabin" width="270"><br>**Find a person.** Daylight, one cabin, auto entry. [MP4](docs/media/mission-cabin-day.mp4) | <img src="docs/media/mission-compound-clear.gif" alt="Confirm a compound is clear" width="270"><br>**Confirm clear.** Two buildings, nobody inside. [MP4](docs/media/mission-compound-clear.mp4) | <img src="docs/media/mission-backpack-night.gif" alt="Lost backpack at night" width="270"><br>**Night search.** Find a backpack in the dark. [MP4](docs/media/mission-backpack-night.mp4) |
 | --- | --- | --- |
+
+<details>
+<summary>demo.html options</summary>
+
+| Query | Effect |
+| --- | --- |
+| `scenario` | `cabin-day`, `compound-clear`, or `backpack-night` (seeded in `src/mission/autonomy/scenarios.ts`) |
+| `speed` | `1`, `4`, `16`, or `max` |
+| `autorun=1` | Start when the page loads |
+| `operator=approve` | Approve entry prompts automatically |
+| `indoor=frontier` | Skip the shipped policy and use frontier exploration indoors |
+
+</details>
 
 ## Features
 
