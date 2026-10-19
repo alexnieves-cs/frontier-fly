@@ -1,36 +1,150 @@
 # frontier-fly
 
-**frontier-fly** — Watch a tiny neural network learn to fly. A drone starts out bouncing off walls in a procedurally generated building. Within minutes it is sweeping rooms, threading doorways, and climbing shafts to explore floors it has never seen. Flip to FPV, kill the lights, and watch it keep going by flashlight. Everything runs in your browser: quadrotor physics, lidar, PPO training, WebGPU rendering, and live charts. No servers and no GPU cluster, just a seed and some patience.
+**A drone that teaches itself to search buildings, from the treeline to the last room, entirely in your browser.**
 
-The sim is deterministic. A seed rebuilds the same building, and the policy reads lidar, IMU, and an egocentric occupancy crop so it does not depend on the lights.
+[![ci](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml)
+[![pages](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
 
-## Screenshots
+<p align="center">
+  <img src="docs/media/mission-cabin-day.gif" alt="Autonomous mission: the drone sweeps the woods, finds the cabin, enters through an opening, finds the hiker, and flies home" width="720">
+</p>
 
-Day chase, night with the flashlight, and the FPV feed. Captured headlessly in Chrome from `/?shot=day`, `/?shot=night`, and `/?shot=fpv`.
+### [▶ Try it live](https://alexnieves-cs.github.io/frontier-fly/) · [Mission editor](https://alexnieves-cs.github.io/frontier-fly/mission.html) · [Outdoor site](https://alexnieves-cs.github.io/frontier-fly/outdoor.html) · [Benchmarks](docs/BENCHMARKS.md) · [Architecture](docs/ARCHITECTURE.md)
 
-![Day chase camera inside a generated building](docs/media/day.png)
+frontier-fly is a search-and-rescue drone simulator and autopilot. A quadrotor reads lidar, an IMU, and its own map of where it has been, and a small neural network trained with reinforcement learning decides where to fly next. The mission it is built for: sweep a geofenced patch of woods, find the building, pick an opening it actually fits through, search room by room for a missing person or confirm the place is clear, fly home, and file a report.
 
-![Night flight with the flashlight on](docs/media/night.png)
+Everything runs client-side. Physics (Rapier, 400 Hz), sensors, PPO training (TensorFlow.js in a worker), and rendering (Three.js, WebGPU when available) all happen in the tab. There is no server and no GPU cluster. A seed rebuilds the same world exactly, so every result here can be reproduced.
 
-![FPV feed with the HUD](docs/media/fpv.png)
+The project is civilian and defensive only: search, inspection, and confirm-clear. The drone never pursues or engages anyone.
 
-![FPV flight](docs/media/fpv.gif)
+## Missions
 
-![Training dashboard during a live PPO update](docs/media/train.png)
+Three seeded scenarios, each flown autonomously from takeoff to landing. For the recordings, "ask to enter" prompts were auto-approved. The drone sweeps a geofenced forest in coverage lanes, discovers the building, inspects its openings and picks one it clears with margin, searches room by room, confirms a find or declares the building clear, flies home, and writes a report. The clips play at 4× (16× for the compound) and come from [`demo.html`](https://alexnieves-cs.github.io/frontier-fly/demo.html?scenario=cabin-day&autorun=1); results are in the [mission table](#benchmarks). Indoors the shipped policy flies first, and on a stall or its first wall contact the run hands the visit to frontier exploration. The report says which explorer ran.
 
-## Setup
+| <img src="docs/media/mission-cabin-day.gif" alt="Injured hiker in a cabin" width="270"><br>**Find a person.** Daylight, one cabin, auto entry. [MP4](docs/media/mission-cabin-day.mp4) | <img src="docs/media/mission-compound-clear.gif" alt="Confirm a compound is clear" width="270"><br>**Confirm clear.** Two buildings, nobody inside. [MP4](docs/media/mission-compound-clear.mp4) | <img src="docs/media/mission-backpack-night.gif" alt="Lost backpack at night" width="270"><br>**Night search.** Find a backpack in the dark. [MP4](docs/media/mission-backpack-night.mp4) |
+| --- | --- | --- |
 
-```bash
-npm install
-npm test
-npm run dev
+<details>
+<summary>demo.html options</summary>
+
+| Query | Effect |
+| --- | --- |
+| `scenario` | `cabin-day`, `compound-clear`, or `backpack-night` (seeded in `src/mission/autonomy/scenarios.ts`) |
+| `speed` | `1`, `4`, `16`, or `max` |
+| `autorun=1` | Start when the page loads |
+| `operator=approve` | Approve entry prompts automatically |
+| `indoor=frontier` | Skip the shipped policy and use frontier exploration indoors |
+
+</details>
+
+## Features
+
+| | |
+| --- | --- |
+| <img src="docs/media/training.gif" alt="Live training dashboard" width="420"><br>**Train it in the tab.** Press Train and up to four worker threads roll out episodes into `SharedArrayBuffer`s while a learner worker runs PPO. Return, coverage, entropy, and a policy heatmap update live. [MP4](docs/media/training.mp4) | <img src="docs/media/fpv-night.gif" alt="FPV night flight" width="420"><br>**Fly by flashlight.** The policy never sees pixels, only lidar, IMU, and an egocentric occupancy map, so it flies the same with the lights off. FPV adds the HUD and simulated detections. [MP4](docs/media/fpv-night.mp4) |
+| <img src="docs/media/mission-editor.gif" alt="Mission editor, live preview, and report" width="420"><br>**Plan a mission.** Draw a geofence and no-fly zones, set an altitude band, targets, required confidence, an entry policy (auto, ask, never), and budgets. The plan validates against a versioned JSON schema and shares as a link. [MP4](docs/media/mission-editor.mp4) | <img src="docs/media/outdoor-chase.png" alt="Seeded outdoor site with a building shell" width="420"><br>**A site, not a room.** Seeded terrain, instanced trees with colliders, and one to four building shells with typed openings: open and broken windows, ajar doors, vents, garage gaps, roof hatches. Only openings that clear the airframe are enterable. |
+| <img src="docs/media/targets-fpv.png" alt="Simulated people and detections" width="420"><br>**Something to find.** Simulated people standing, sitting, lying, walking, and hiding, a library of search objects, and decoys. A geometric camera detector misses with distance, occlusion, darkness, and motion blur, and false-alarms on decoys. | <img src="docs/media/day.png" alt="Day chase camera inside a generated building" width="420"><br>**Procedural buildings.** BSP rooms, doors, hallways, multi-floor shafts, and a reachability check. PBR interiors with CC0 textures, an HDRI sky, SSAO, bloom, and SMAA on the high preset. |
+
+## Benchmarks
+
+These tables are generated by `npm run bench && npm run docs` from [`docs/benchmarks.json`](docs/benchmarks.json). Misses are shown as misses. Method, per-seed results, and render frame rates are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+<!-- generated:benchmarks:start -->
+| Goal | Target | Measured (browser pilot) | Status |
+| --- | --- | --- | --- |
+| Coverage, easy buildings | ≥ 80.0% | 92.0% mean of 4 | ✅ meets |
+| Coverage, new hard buildings | ≥ 60.0% | 56.9% mean of 3 | ❌ misses |
+| Night coverage vs day | ≥ 90.0% | 107.3% | ✅ meets |
+| Kinematic env step | ≤ 0.3 ms | 0.143 ms | ✅ meets |
+| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 16,110 | ✅ meets |
+| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 3,861 | ❌ misses |
+
+| Pilot | Easy day | Easy night | Night / day | Hard day | Hard night | Night / day |
+| --- | --- | --- | --- | --- | --- | --- |
+| Shipped policy, browser pilot | 92.0% | 95.1% | 103.4% | 56.9% | 65.8% | 115.6% |
+| Shipped policy, raw observations | 92.0% | 95.1% | 103.4% | 56.9% | 65.8% | 115.6% |
+| Lidar heuristic (baseline) | 29.3% | 29.3% | 100.0% | 13.9% | 16.5% | 118.8% |
+
+| Measurement | Value |
+| --- | --- |
+| Kinematic env step (1 thread) | 0.143 ms · 6,997 steps/s |
+| Quadrotor env step, 400 Hz physics (1 thread) | 0.250 ms · 4,004 steps/s |
+| Policy inference, SIMD gemm, batch 8 | 0.072 ms per env |
+| 4 workers, physics + sensors (lidar heuristic pilot) | 16,110 env steps/s |
+| 4 workers, rollout loop with policy-sized network and building rebuild on reset | 3,861 env steps/s |
+<!-- generated:benchmarks:end -->
+
+**Missions.**
+
+<!-- generated:missions:start -->
+| Scenario | Outcome | Mission time | Time to find | Outdoor coverage | Indoor coverage | Entries | False clears | False alarms | Missed | Collisions | Battery used | Landed home |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Woods to cabin: find the missing person | found | 3:12 | 2:24 | 29.5% | 100.0% | 1 | 0 | 0 | 0 | 0 | 11.7% | yes |
+| Compound search: confirm the area clear | clear | 8:23 | — | 100.0% | 100.0% | 2 | 0 | 0 | 0 | 1 | 30.2% | yes |
+| Night search: find the lost backpack | found | 4:12 | 3:31 | 28.6% | 100.0% | 1 | 0 | 0 | 0 | 1 | 15.3% | yes |
+
+Recorded from `main@f5e22fb` by `npm run media`, which reads each run's end-of-mission report from the page. Times are simulated mission time.
+<!-- generated:missions:end -->
+
+## How it works
+
+```mermaid
+flowchart LR
+  Seed(["seed"]) --> Gen["Procedural site<br/>terrain · trees · buildings"]
+  Gen --> Sim["Rapier physics<br/>kinematic or 6-DoF quad"]
+  Sim --> Obs["1088-float observation<br/>lidar · IMU · frontier · maps"]
+  Obs --> Pol["Policy MLP<br/>1088 → 512 → 256 → 4"]
+  Pol -- "vx, vy, vz, yaw rate" --> Sim
+  Sim -- "rollouts (SharedArrayBuffer)" --> PPO["PPO learner<br/>TF.js worker"]
+  PPO -- "weights" --> Pol
+  Sim --> Det["Camera detector<br/>people · objects · decoys"]
+  Det --> Mission["Mission layer<br/>geofence · entry policy · report"]
+  Sim --> View["Three.js / WebGPU<br/>FPV · chase · overview"]
 ```
 
-`npm run dev` serves the app at `http://127.0.0.1:3000` with COOP/COEP headers so `SharedArrayBuffer` is available. `npm run build && npm run preview` builds the static site the GitHub Pages workflow publishes.
+**Training.** The shipped checkpoint starts from behavior cloning: a privileged frontier-seeking teacher that can see the explored map flies the curriculum, and the network learns to imitate it from its own sensors. DAgger then lets the network fly while the teacher labels every state it reaches, and the round kept is the one that scores best on held-out validation seeds. PPO with a KL anchor to the cloned policy is implemented, but no PPO fine-tune beat DAgger on validation, so the shipped file has none. In the browser, **Train** runs PPO on the spec reward (new coverage, new rooms and floors, collisions, smoothness, time). A six-stage curriculum grows the buildings from one 8×8 m room to multi-floor layouts with quadrotor dynamics, and randomizes mass, thrust, drag, motor lag, sensor noise, wind, and lighting so the policy cannot overfit one world. The full loop runs in the browser, and the same code runs headless in Node for `npm run train:indoor` and the benchmarks.
 
-Pushes to `main`, and a manual `workflow_dispatch`, run test, lint, and build in parallel. The Pages deploy job starts only after all three succeed. Pull requests and other branches run the same checks plus e2e in `.github/workflows/ci.yml`. Those runs are informational: they do not publish the site and they are not a merge gate.
+**Why it works at night.** The observation has no camera pixels. Lidar and the occupancy map do not care about light, so night coverage is measured against day coverage as a check on that design, not a separate model.
 
-## Controls
+More detail, including the generated module graph and the headless boundary between sim and renderer, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Tech stack
+
+| Layer | What | Why |
+| --- | --- | --- |
+| Language and build | TypeScript 5.7, Vite 6 | One codebase for the browser, workers, and Node |
+| Physics | [Rapier](https://rapier.rs) 0.14 (WASM) | Deterministic colliders and fast ray casts for lidar |
+| Learning | [TensorFlow.js](https://www.tensorflow.org/js) 4.22, hand-written SIMD WASM gemm | PPO updates on WebGL or CPU, cheap batched inference in env workers |
+| Rendering | [Three.js](https://threejs.org) 0.170, WebGPU or WebGL2 | PBR, post passes, and a WebGPU path on capable browsers |
+| Charts | [uPlot](https://github.com/leeoniya/uPlot) | Lightweight live training curves |
+| Concurrency | Web Workers, `SharedArrayBuffer` | Rollouts without copying |
+| Tests | Vitest, Playwright, ESLint | Unit, perf, and headless browser checks in CI |
+| Hosting | GitHub Pages + [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) | Static hosting with cross-origin isolation |
+
+## Run locally
+
+Needs Node 22.
+
+```bash
+npm ci
+npm run dev        # http://127.0.0.1:3000 with COOP/COEP headers
+npm test           # unit and perf tests
+npm run build      # typecheck and production bundle in dist/
+```
+
+| Script | What it does |
+| --- | --- |
+| `npm run test:e2e` | Headless Chrome checks and screenshots |
+| `npm run bench` | Coverage and throughput, written to `docs/benchmarks.json` |
+| `npm run media` | Record the demo clips into `docs/media/` (needs ffmpeg) |
+| `npm run docs` | Regenerate `docs/ARCHITECTURE.md`, `docs/BENCHMARKS.md`, and the README tables |
+| `npm run check:pages` | Serve `dist/` the way GitHub Pages does and check every page loads |
+| `npm run eval:coverage` | Coverage table vs targets for the shipped checkpoint |
+| `npm run train:indoor -- --out ckpt.json` | BC + DAgger on every core, kept by held-out validation |
+
+<details>
+<summary>Controls and URL parameters</summary>
 
 | Input | Action |
 | --- | --- |
@@ -44,24 +158,6 @@ Pushes to `main`, and a manual `workflow_dispatch`, run test, lint, and build in
 | T | Start or pause training |
 | Drag in overview | Orbit the cutaway camera |
 
-The left rail also sets the seed, curriculum stage, time of day, sensor mode (RGB, IR, depth), and checkpoint save/load. A shareable URL looks like `/?seed=11&camera=fpv&tod=22&shot=night`.
-
-## Mission editor
-
-`mission.html` is a planner for a civilian search or safety inspection. A mission is a geofence, no-fly zones, an altitude band, a mission type, targets, a required confidence, an entry policy (`auto`, `ask`, or `never`), battery and time budgets, and a start pose.
-
-The plan is checked against mission schema v1 (TypeScript types plus `src/mission/mission.schema.json`) and against polygon rules: a ring cannot cross itself, no-fly zones sit inside the geofence, and the start pose stays in the operating area. Save writes a canonical payload into the URL hash (`#m=`). The same mission always produces the same hash. `?seed=` loads a practice mission on a mock site.
-
-The Run view plays a lawnmower preview: drone track, coverage, a detection log, an operator prompt when entry policy is `ask`, and an end-of-mission report. Battery drain and several report fields are placeholders. The outdoor world and the real detector are behind `WorldProvider` and `DetectionSource` in `src/mission`; this page uses mocks so it does not depend on those workstreams.
-
-Open `/mission.html` from the dev server. The editor does not import the sim renderer.
-
-![Mission editor with a geofence, a no-fly zone, and the start pose](docs/media/mission-editor.png)
-
-![Live preview paused for an entry approval](docs/media/mission-live.png)
-
-![End-of-mission report with unmeasured fields marked](docs/media/mission-report.png)
-
 | Query | Effect |
 | --- | --- |
 | `seed` | Building and episode seed |
@@ -71,137 +167,30 @@ Open `/mission.html` from the dev server. The editor does not import the sim ren
 | `train=1` | Start PPO when the page loads |
 | `quality` | `low` or `high` |
 | `pilot` | `keys`, `heuristic`, or `policy` |
+| `tod`, `flash`, `lights` | Time of day (0–24), flashlight `1`, interior lights `0` |
 
-Pilot defaults to the keyboard. Shot URLs fly a lidar heuristic so the camera has something to follow before a policy has learned the building. Choose **Policy** to fly the loaded checkpoint.
+Example: [`?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy`](https://alexnieves-cs.github.io/frontier-fly/?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy). Pilot defaults to the keyboard. Shot URLs fly a lidar heuristic so the camera has something to follow. Choose **Policy** to fly the checkpoint.
 
-## Architecture
-
-```mermaid
-flowchart LR
-  subgraph Main[Main thread]
-    UI[UI / Controls] --> Viz[Three.js Renderer]
-    Viz --> Cams[FPV + HUD / Chase / Overview]
-    UI --> Charts[uPlot + coverage map]
-  end
-  subgraph EnvW[Env workers]
-    Gen[Building generator] --> Phys[Rapier world]
-    Phys --> Dyn[Quadrotor or kinematic]
-    Dyn --> Sens[Lidar, IMU, occupancy]
-  end
-  subgraph LearnW[Learner worker]
-    Pol[TF.js policy] --> PPO[PPO update]
-  end
-  EnvW -- SharedArrayBuffer rollouts --> LearnW
-  LearnW -- weights --> EnvW
-  EnvW -- showcase state --> Viz
-```
-
-`src/sim`, `src/gen`, and `src/rl` do not import Three.js. Training can run headless. The renderer only consumes a `BuildingSpec`, a `DroneState`, and a `LightingState`.
-
-## Outdoor world
-
-`outdoor.html` starts the drone in a seeded forest instead of a room. Terrain is a heightfield with hills, slopes, and flattened clearings. Trees are instanced with trunk and canopy colliders and three LOD buckets. The site places 1–3 building shells (4 if you pass a count), each from the indoor BSP generator, on its own pad. A shell keeps typed openings — open window, broken window, ajar door (with a swing angle), closed door, vent, garage gap, roof hatch — and only the ones that clear the airframe plus a margin are enterable. Smaller holes are decoys. A geofence polygon and no-fly zones are data the outdoor step will not cross. Chase is `2`, FPV is `1`, and the corner map draws the fence, zones, trees, and openings.
-
-The generator is `src/world/outdoor`. It calls `generateBuilding` for interiors and does not change `src/shared`.
-
-## Autonomous missions
-
-`demo.html` flies a full woods-to-building search on its own: outdoor coverage, approach, opening inspection, entry selection, fly-through, indoor search, confirmation, return home, and a report. Three seeded scenarios ship in `src/mission/autonomy/scenarios.ts`:
-
-| Scenario | Seed | What happens |
-| --- | --- | --- |
-| `cabin-day` | 20 | Day. Find a simulated injured hiker lying inside a cabin. Entry policy `auto`. |
-| `compound-clear` | 37 | Day. Safety sweep of two buildings with decoys and nobody inside. Entry policy `ask`, so each entry waits for Approve or Deny. |
-| `backpack-night` | 17 | 23:00, flashlight on, interior lights off. Find a backpack and ignore the look-alike bag. Entry policy `auto`. |
-
-Each seed builds on the outdoor generator's first attempt, and every building's passable opening is a ground-floor wall opening (a garage gap or an open window), so entry is a level fly-through with at least 0.42 m of margin over the airframe.
-
-The page has a live top-down map (terrain, trees, footprints, openings colored by entry safety, geofence, no-fly zones, plan, flown track, drone heading, contacts, and confirmed finds), a phase stepper, a HUD, an operator prompt, an event log, and the end-of-mission report. The sim clock holds while an entry prompt is open. An optional 3D chase picture-in-picture reuses the outdoor renderer in daylight.
-
-| Query | Effect |
-| --- | --- |
-| `scenario` | `cabin-day`, `compound-clear`, or `backpack-night` |
-| `speed` | `1`, `4`, `16`, or `max` |
-| `autorun=1` | Start when the page loads |
-| `operator=approve` | Approve entry prompts automatically |
-| `indoor=frontier` | Skip the shipped policy and use frontier exploration indoors |
-
-Indoors the shipped policy (`public/checkpoints/pretrained.json`) flies first. It was trained on bare BSP interiors, and in these scenarios it often stalls or touches a wall, so on a stall or on its first contact the runner hands the visit to frontier exploration and the report says which explorer ran. `tests/unit/autonomy.policy.test.ts` checks that all three scenarios still reach their expected outcome that way, with at most one contact.
-
-![Compound sweep report](docs/media/demo-compound-clear.png)
-
-`/demo.html?scenario=compound-clear&speed=max&autorun=1` is the shareable form. `tests/e2e/demo.spec.ts` runs all three at Max speed and saves `docs/media/demo-<id>.png`. `tests/unit/autonomy.scenarios.test.ts` checks the worlds and missions and runs each scenario headless with `runMission` and `buildReport`.
-
-## What is implemented
-
-- Seeded buildings: BSP rooms, doors, hallways from stage 3, shafts when there is more than one floor, and a reachability check that retries with `seed + 1`. Tables, chairs, sofas, and shelves are Rapier colliders: lidar sees them and the drone cannot fly through them.
-- Kinematic flight and a 6-DoF quadrotor with a velocity-to-attitude cascade, motor lag, and drag. Physics steps at 400 Hz in quad mode. Rapier builds the colliders and casts the lidar.
-- Observation v2 is 1088 floats: 40 lidar ranges, IMU, altitude, frontier-direction features from a BFS over what lidar has seen, and four 16×16 egocentric maps (visited and unexplored-free at 8 m and at 32 m). The layout is in `src/sim/OBS_LAYOUT.md`. The action is `[vx, vy, vz, yawRate]`.
-- PPO in TensorFlow.js, GAE, running observation and reward normalization, and a six-stage curriculum. Up to four env workers write rollouts into `SharedArrayBuffer`s. Inference uses a SIMD WASM gemm when the runtime has it.
-- Chase, FPV, and overview cameras, a canvas HUD, day/night lighting, per-room lights, a flashlight, and IR/depth display modes.
-- Live return, coverage, and entropy charts, a top-down coverage map, a policy heatmap once training has weights, and a replay scrubber at 1×, 4×, and 16×.
-- A checkpoint in `public/checkpoints/pretrained.json`, plus download and IndexedDB save/load.
-- Simulated people and search objects (`src/targets`) and a geometric camera detector (`src/perception`). Placement is seeded for indoor rooms and outdoor areas. The detector returns class, confidence, and a bounding box, with misses from distance, occlusion, lighting, and motion blur, and false positives that sit on decoys. A seen-empty tracker supports confirm-clear from ground truth. FPV draws the boxes and lists detections. Joint velocities are stubbed for a later dodge-only response. Credits are in [CREDITS.md](CREDITS.md).
-
-## Simulated people and targets
-
-`/?shot=targets`, `/?shot=targets-room`, and `/?shot=targets-night` frame a single room with people standing, sitting, lying, walking, and hiding, plus the object library and decoys. The detection list is the simulated camera, not a trained model.
-
-![FPV boxes on the showcase lineup](docs/media/targets-fpv.png)
-
-![Room view of people, objects, and decoys](docs/media/targets-room.png)
-
-![Night lineup under the flashlight](docs/media/targets-night.png)
+</details>
 
 ## Honest limits
 
-The shipped policy is a 1088→512→256 network. It was behavior-cloned from a privileged frontier teacher and then trained with DAgger: the network flies, the teacher labels every state it visits, and the aggregated data is retrained each round. The teacher sees the true visited grid; the network sees only lidar, its own visited map, and what its lidar has marked free. `npm run train:indoor` reproduces it in about 16 minutes on 4 cores. The round kept is the one that scores best on 30 held-out validation episodes (seeds the eval never uses), never the eval seeds. Anchored PPO (KL to the cloned policy plus a BC loss, `src/rl/finetune.ts`) and the stuck, loiter, and back-and-forth penalties are implemented, but no PPO fine-tune beat DAgger on validation, so the shipped file has none.
+- The shipped policy does not yet meet the coverage goals. [BENCHMARKS.md](docs/BENCHMARKS.md) has the current numbers, and the gap on large unseen buildings is the main open problem.
+- Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.
+- Door leaves are visual. Furniture collides, but doors are always open in the indoor grid.
+- The detector is geometric, not a trained vision model.
 
-`npm run eval:coverage` prints this table for `public/checkpoints/pretrained.json` (kinematic flight, 1000 steps on stage 0, 2400 on stage 3):
+## Roadmap
 
-| Metric | Per seed | Mean | Target | Status |
-| --- | --- | --- | --- | --- |
-| Stage 0 day (101/202/303/404) | 95.1%, 95.1%, 82.6%, 95.1% | **92.0%** | ≥ 80% | met |
-| Stage 3 day (4242/5150/6160) | 68.6%, 61.1%, 41.1% | **56.9%** | ≥ 60% | missed |
-| Stage 0 night-dark | 95.1% on all four | 95.1% | | |
-| Stage 3 night-dark | 69.3%, 61.0%, 67.2% | 65.8% | | |
-| Night / day, stage 0 | | 1.03 | ≥ 0.90 | met |
-| Night / day, stage 3 | | 1.16 | ≥ 0.90 | met |
+- **Harder missions**: more buildings, closed doors, moving people, and wind on the outdoor leg. The three scenarios above are the first end-to-end set.
+- **Generalization**: at least 80% coverage on easy buildings and 60% on unseen hard ones, with night at 90% or more of day.
+- **Swarm search**: several drones sharing one site, splitting the area, and handing off rooms. Needs a shared world and an agent axis in the rollout layout.
+- **Defensive evasion**: the drone moves out of the way of people and moving obstacles. Dodge only. It never pursues, tracks for harm, or strikes.
 
-The previous checkpoint scored 74.1% on stage 0 and 21.6% on stage 3. Stage 3 still misses 60%. Coverage on one large building swings by 20 points or more between training rounds, and on the 22 stage-3 validation episodes this checkpoint averaged 62.5%. Another candidate scored 61.9% on the three eval seeds but lower on validation, so it was not shipped. The teacher itself reaches only about 73% on stage 3 inside 2400 steps (it needs about 3000 to reach 95%), so the step budget caps what imitation can reach. There is no recurrent memory (GRU); the 32 m coarse map and the frontier features stand in for it. The seen-free map marks only voxels the generator counts as reachable at flight height, so that mask is privileged information.
+## Contributing
 
-Training reuses pre-built worlds (`src/sim/worldPool.ts`, 48 per stage, 15% replaced per reset) instead of rebuilding Rapier on every episode. A kinematic step is about 0.18–0.24 ms with observation v2. On 4 shared cores, worker threads running the 512×256 network on pooled worlds summed to about 9,000 environment steps/s, under the 10k target; the lidar heuristic on the same pool reached about 13,000. The learner uses `@tensorflow/tfjs-node` when it is installed (`npm install --no-save @tensorflow/tfjs-node@4.22.0`, roughly 27,000 samples/s at minibatch 512) and the CPU backend otherwise, which is about 50 times slower. Batched SIMD inference is a small kernel in `src/rl/gemm.ts`. The checkpoint is 17 MB of JSON because the network is wider.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and the project's civilian-use scope.
 
-Door leaves and propeller wash are visual only.
+## Credits and license
 
-Headless Chrome on this machine, with ANGLE software WebGL2 and no discrete GPU, rendered the high preset at about **7 fps** and the low preset at about **23 fps**. That does not meet 45 / 60 fps, and it was not measured on a laptop GPU. WebGPU is requested when the quality preset is high and an adapter answers within 350 ms; this capture stayed on WebGL2. High quality runs SSAO, bloom, and SMAA. Three's TAA pass accumulates only while the camera is nearly still, because that pass has no motion vectors. FPV adds an afterimage trail and a lens/vignette shader. There is no SSR and no baked global illumination. Numbers from the capture are in `docs/media/capture.json`. Asset licenses are in [CREDITS.md](CREDITS.md). Every shipped texture and the HDRI is under 5 MB, so nothing is in Git LFS.
-
-## Later: outdoor search
-
-The long-term mission is outdoor plus indoor search: start outside a geofence, find buildings, use an opening, search rooms for a target or confirm the area clear, and eventually fly more than one drone in the same site. `outdoor.html` is the flyable site. The indoor explorer still cannot train that mission, because a few assumptions would have to change first.
-
-Already reusable: `generateBuilding` is a pure function of seed, size, and stage, so a site generator can place several buildings. Lidar is a raycast against the colliders `PhysicsWorld` was given, and glass is already its own surface class. The action stays `[vx, vy, vz, yawRate]` on one `Dynamics` implementation per drone. The renderer only subscribes to state, so terrain and exteriors can be drawn without the sim importing Three.js. The worker pool runs many independent episodes, which is the right shape for training a single-agent policy.
-
-These choices block the outdoor mission if they stay as they are:
-
-- **The world is one indoor grid.** `BuildingSpec` is the only world type. Its origin is the footprint corner. Visited voxels are indexed from that corner, and every floor is assumed to share floor 0's width and depth. There is no terrain, no geofence, and no list of buildings on a site.
-- **Leaving the footprint ends the episode.** `ExplorerEnv` treats a position outside the ground-floor rectangle as out of bounds. Spawn is the center of the largest ground-floor room, so an outdoor start terminates immediately.
-- **Openings are not enterable in the indoor grid.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Outdoor shells cut real apertures next to a copy of that grid; `ExplorerEnv` does not load them.
-- **The mission is indoor coverage.** Success is 95% of reachable voxels. The reward and the privileged teacher both chase that grid. There is no target object, no "confirm clear", and no detection channel.
-- **The observation is versioned (v2, 1088 floats).** The shipped checkpoint, the SharedArrayBuffer stride, and the SIMD gemm scratch all assume `src/sim/OBS_LAYOUT.md`. The maps are indoor voxels. Altitude is distance to this building's floor and ceiling. A search policy needs observation v3; the app refuses a checkpoint whose version does not match.
-- **One drone per world.** Each env holds one `DroneState`. Workers do not share a site. Drones are not physics bodies, so they cannot see or collide with each other. A swarm needs a shared world and a rollout layout with an agent axis.
-
-## Scripts
-
-| Script | What it does |
-| --- | --- |
-| `npm test` | Unit tests and the kinematic step measurement |
-| `npm run build` | Typecheck and production bundle |
-| `npm run test:e2e` | Headless Chrome screenshots |
-| `npm run eval:coverage [-- ckpt.json]` | Coverage table vs targets for the shipped (or given) checkpoint; `--teacher` scores the frontier teacher |
-| `npm run train:indoor -- --out ckpt.json` | BC + DAgger on every core, kept by held-out validation; copy the result to `public/checkpoints/` to ship it |
-| `PRETRAIN_UPDATES=20 npm run pretrain` | The older single-thread distill + PPO path |
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+Code is [MIT](LICENSE). Every third-party asset is CC0 or MIT and listed with its source in [CREDITS.md](CREDITS.md): Poly Haven sky, ambientCG textures, the KayKit mannequin and animations, three.js post passes, and coi-serviceworker.
