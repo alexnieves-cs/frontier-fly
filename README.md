@@ -80,8 +80,8 @@ Recorded from `claude/woods-to-building-missions-coyfbf@7e82138 (PR #7)` by `npm
 flowchart LR
   Seed(["seed"]) --> Gen["Procedural site<br/>terrain · trees · buildings"]
   Gen --> Sim["Rapier physics<br/>kinematic or 6-DoF quad"]
-  Sim --> Obs["306-float observation<br/>lidar · IMU · occupancy map"]
-  Obs --> Pol["Policy MLP<br/>306 → 256 → 128 → 4"]
+  Sim --> Obs["1088-float observation<br/>lidar · IMU · frontier · maps"]
+  Obs --> Pol["Policy MLP<br/>1088 → 512 → 256 → 4"]
   Pol -- "vx, vy, vz, yaw rate" --> Sim
   Sim -- "rollouts (SharedArrayBuffer)" --> PPO["PPO learner<br/>TF.js worker"]
   PPO -- "weights" --> Pol
@@ -90,7 +90,7 @@ flowchart LR
   Sim --> View["Three.js / WebGPU<br/>FPV · chase · overview"]
 ```
 
-**Training.** The shipped checkpoint starts from behavior cloning: a privileged frontier-seeking teacher that can see the explored map flies the curriculum, and the network learns to imitate it from its own sensors. PPO then fine-tunes on the spec reward (new coverage, new rooms and floors, collisions, smoothness, time) plus a distance-to-frontier shaping term. A six-stage curriculum grows the buildings from one 8×8 m room to multi-floor layouts with quadrotor dynamics, and randomizes mass, thrust, drag, motor lag, sensor noise, wind, and lighting so the policy cannot overfit one world. The full loop runs in the browser, and the same code runs headless in Node for `npm run pretrain` and the benchmarks.
+**Training.** The shipped checkpoint starts from behavior cloning: a privileged frontier-seeking teacher that can see the explored map flies the curriculum, and the network learns to imitate it from its own sensors. DAgger then lets the network fly while the teacher labels every state it reaches, and the round kept is the one that scores best on held-out validation seeds. PPO with a KL anchor to the cloned policy is implemented, but no PPO fine-tune beat DAgger on validation, so the shipped file has none. In the browser, **Train** runs PPO on the spec reward (new coverage, new rooms and floors, collisions, smoothness, time). A six-stage curriculum grows the buildings from one 8×8 m room to multi-floor layouts with quadrotor dynamics, and randomizes mass, thrust, drag, motor lag, sensor noise, wind, and lighting so the policy cannot overfit one world. The full loop runs in the browser, and the same code runs headless in Node for `npm run train:indoor` and the benchmarks.
 
 **Why it works at night.** The observation has no camera pixels. Lidar and the occupancy map do not care about light, so night coverage is measured against day coverage as a check on that design, not a separate model.
 
@@ -127,7 +127,8 @@ npm run build      # typecheck and production bundle in dist/
 | `npm run media` | Record the demo clips into `docs/media/` (needs ffmpeg) |
 | `npm run docs` | Regenerate `docs/ARCHITECTURE.md`, `docs/BENCHMARKS.md`, and the README tables |
 | `npm run check:pages` | Serve `dist/` the way GitHub Pages does and check every page loads |
-| `PRETRAIN_UPDATES=20 npm run pretrain` | Retrain and rewrite the shipped checkpoint |
+| `npm run eval:coverage` | Coverage table vs targets for the shipped checkpoint |
+| `npm run train:indoor -- --out ckpt.json` | BC + DAgger on every core, kept by held-out validation |
 
 <details>
 <summary>Controls and URL parameters</summary>
@@ -163,7 +164,7 @@ Example: [`?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy`](ht
 
 - The shipped policy does not yet meet the coverage goals. [BENCHMARKS.md](docs/BENCHMARKS.md) has the current numbers, and the gap on large unseen buildings is the main open problem.
 - Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.
-- Furniture and door leaves are visual. Colliders are the building grid, so a chair does not stop the drone.
+- Door leaves are visual. Furniture collides, but doors are always open in the indoor grid.
 - The detector is geometric, not a trained vision model.
 
 ## Roadmap

@@ -43,7 +43,7 @@ Never edit the generated tables by hand. Edit `scripts/docs/*.template.md` for p
 
 - `src/gen`, `src/sim`, `src/rl`, `src/shared`, and `src/world/outdoor` stay headless. ESLint blocks Three.js imports and DOM globals there.
 - `src/shared` is a frozen contract. Propose changes in [CONTRACT_REQUESTS.md](CONTRACT_REQUESTS.md).
-- The 306-float observation in [`src/sim/OBS_LAYOUT.md`](src/sim/OBS_LAYOUT.md) is tied to the shipped checkpoint. Changing it needs a new observation version and a retrained checkpoint.
+- The versioned observation (v2, 1088 floats) in [`src/sim/OBS_LAYOUT.md`](src/sim/OBS_LAYOUT.md) is tied to the shipped checkpoint. Changing it needs a new observation version and a retrained checkpoint.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the module graph.
 
 ## Assets

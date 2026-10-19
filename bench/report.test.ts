@@ -8,16 +8,16 @@ import { availableParallelism, cpus } from 'node:os';
 import { Worker } from 'node:worker_threads';
 import * as esbuild from 'esbuild';
 import { describe, expect, it } from 'vitest';
+import { evalEpisodeSetup, STAGE0_SEEDS, STAGE3_SEEDS } from '../src/eval/coverage';
 import { generateBuilding } from '../src/gen/building';
 import { parseCheckpoint, type Checkpoint } from '../src/rl/checkpoint';
-import { Curriculum } from '../src/rl/curriculum';
 import { InferPolicy } from '../src/rl/infer';
 import { RunningNorm } from '../src/rl/normalize';
 import { ACT_DIM, HIDDEN, OBS_DIM } from '../src/shared/constants';
 import { RNG } from '../src/shared/rng';
 import { createEnv, defaultEpisodeConfig } from '../src/sim/env';
 import { heuristicAction } from '../src/sim/heuristic';
-import { lightingPreset, type LightingPreset } from '../src/sim/lighting';
+import type { LightingPreset } from '../src/sim/lighting';
 
 const CHECKPOINT = process.env.BENCH_CHECKPOINT ?? 'public/checkpoints/pretrained.json';
 const OUT = process.env.BENCH_OUT ?? 'docs/benchmarks.json';
@@ -28,18 +28,18 @@ function seedList(name: string, fallback: number[]): number[] {
   return raw.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n));
 }
 
-// Stage 0 is a single small floor. Stage 3 adds hallways and more rooms. None of these seeds
-// is drawn by the curriculum during training, so every building here is new to the policy.
-const EASY = { stage: 0, seeds: seedList('BENCH_EASY_SEEDS', [101, 202, 303, 404, 505, 606, 707, 808]) };
-const HARD = { stage: 3, seeds: seedList('BENCH_HARD_SEEDS', [4242, 5150, 6160, 7171, 8282, 9393]) };
+// The fixed eval protocol in src/eval/coverage.ts: stage 0 is a single small floor, stage 3 adds
+// hallways and more rooms. None of these seeds is used in training or checkpoint selection.
+const EASY = { stage: 0, seeds: seedList('BENCH_EASY_SEEDS', STAGE0_SEEDS) };
+const HARD = { stage: 3, seeds: seedList('BENCH_HARD_SEEDS', STAGE3_SEEDS) };
 const LIGHTING: LightingPreset[] = ['day', 'night-dark'];
 
 type Pilot = (obs: Float32Array) => Float32Array;
 
 /**
- * `browser` is the in-browser "Policy" pilot in src/ui/app.ts: RunningNorm.apply (which clips to ±5), then the
- * deterministic mean action. `raw` skips normalization, as tests/unit/shipped.test.ts does. Both are reported
- * because they do not fly the same.
+ * `browser` is the in-browser "Policy" pilot in src/ui/app.ts: raw observations when the checkpoint's
+ * normalizer is the identity, RunningNorm.apply (which clips to ±5) otherwise, then the deterministic mean
+ * action. `raw` always skips normalization, as `npm run eval:coverage` does.
  */
 function loadPilot(checkpoint: Checkpoint, mode: 'browser' | 'raw'): Pilot {
   const hidden = checkpoint.hidden.length === 2 ? checkpoint.hidden : HIDDEN;
@@ -58,7 +58,8 @@ function loadPilot(checkpoint: Checkpoint, mode: 'browser' | 'raw'): Pilot {
     });
   }
   const rng = new RNG(1);
-  if (mode === 'raw') return (obs) => policy.actWith(obs, 1, rng, true).action;
+  const identity = checkpoint.obsMean.every((v) => v === 0) && checkpoint.obsVar.every((v) => v === 1);
+  if (mode === 'raw' || identity) return (obs) => policy.actWith(obs, 1, rng, true).action;
   return (obs) => policy.actWith(norm.apply(obs, 1), 1, rng, true).action;
 }
 
@@ -73,16 +74,8 @@ interface Episode {
 
 async function fly(pilot: Pilot, stage: number, seed: number, lighting: LightingPreset): Promise<Episode> {
   const env = await createEnv();
-  const params = new Curriculum().genParams(stage, new RNG(seed, `eval-${stage}`));
-  const spec = generateBuilding(params);
-  const nRooms = spec.floors.reduce((n, floor) => n + floor.rooms.length, 0);
-  const cfg = defaultEpisodeConfig(stage, nRooms);
-  cfg.maxSteps = stage <= 1 ? 1000 : 2400;
-  cfg.stallSteps = 500;
-  cfg.maxCollisions = 16;
-  cfg.dynamics = 'kinematic';
-  cfg.lighting = lightingPreset(lighting, nRooms);
-  let obs = env.reset(spec, params.seed, cfg);
+  const { spec, envSeed, cfg } = evalEpisodeSetup(stage, seed, lighting);
+  let obs = env.reset(spec, envSeed, cfg);
   let coverage = 0;
   let collisions = 0;
   let steps = 0;
@@ -94,6 +87,7 @@ async function fly(pilot: Pilot, stage: number, seed: number, lighting: Lighting
     steps = t + 1;
     if (step.done) break;
   }
+  env.dispose();
   return { stage, seed, lighting, coverage, collisions, steps };
 }
 

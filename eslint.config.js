@@ -13,11 +13,12 @@ export default tseslint.config(
       'playwright-report/**',
       'public/checkpoints/**',
       'public/coi-serviceworker.js',
+      '.claude/**',
     ],
   },
   {
     // Node scripts. Browser globals are allowed for code passed to page.evaluate.
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/check-pages.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
