@@ -1,75 +1,18 @@
 import * as THREE from 'three';
-import { CELL } from '../shared/constants';
-import { RNG } from '../shared/rng';
-import type { BuildingSpec } from '../shared/types';
+import type { BuildingSpec, PropKind, PropPlacement } from '../shared/types';
 import type { MaterialSet } from './three/materials';
 
-export type PropKind = 'table' | 'chair' | 'shelf' | 'plant' | 'sofa';
+export type { PropKind, PropPlacement };
 
-export interface PropPlacement {
-  kind: PropKind;
-  /** Sim-space meters. y is up. */
-  x: number;
-  y: number;
-  z: number;
-  rot: number;
-  floor: number;
-}
-
-function cellBlocked(spec: BuildingSpec, floor: number, x: number, z: number): boolean {
-  const grid = spec.floors[floor];
-  if (!grid) return true;
-  const gx = Math.floor(x / spec.cellSize);
-  const gz = Math.floor(z / spec.cellSize);
-  if (gx < 0 || gz < 0 || gx >= grid.w || gz >= grid.d) return true;
-  const cell = grid.cells[gz * grid.w + gx] ?? CELL.WALL;
-  if (cell !== CELL.EMPTY) return true;
-  const sx = Math.floor(spec.spawn[0] / spec.cellSize);
-  const sz = Math.floor(spec.spawn[1] / spec.cellSize);
-  const sf = Math.floor(spec.spawn[2] / spec.floorHeight);
-  return floor === sf && gx === sx && gz === sz;
-}
-
-/** Seeded furniture layout. Props stay inside rooms and off doors, shafts, and the spawn cell. */
+/**
+ * Furniture placements for the renderer. The layout is planned headlessly by
+ * planFurniture (src/gen/furniture.ts) and stored on the spec by
+ * generateBuilding, so these meshes sit exactly on the physics colliders. A
+ * spec without a plan (hand-written fixtures, older JSON) has no furniture in
+ * physics either, so it renders none.
+ */
 export function planProps(spec: BuildingSpec): PropPlacement[] {
-  const rng = new RNG(spec.seed, 'props');
-  const props: PropPlacement[] = [];
-  spec.floors.forEach((floor, f) => {
-    for (const room of floor.rooms) {
-      if (room.w < 3 || room.d < 3) continue;
-      const y = f * spec.floorHeight;
-      const cx = (room.x + room.w / 2) * spec.cellSize;
-      const cz = (room.z + room.d / 2) * spec.cellSize;
-      const candidates: PropPlacement[] = [
-        { kind: 'table', x: cx, y, z: cz, rot: rng.range(-0.2, 0.2), floor: f },
-        { kind: 'chair', x: cx + 0.62, y, z: cz + 0.05, rot: Math.PI / 2, floor: f },
-        { kind: 'chair', x: cx - 0.15, y, z: cz + 0.62, rot: Math.PI, floor: f },
-        {
-          kind: 'shelf',
-          x: (room.x + 0.55) * spec.cellSize,
-          y,
-          z: (room.z + 1.1) * spec.cellSize,
-          rot: 0,
-          floor: f,
-        },
-      ];
-      if (room.w >= 4 && room.d >= 4) {
-        candidates.push({
-          kind: rng.bool(0.5) ? 'sofa' : 'plant',
-          x: (room.x + room.w - 0.8) * spec.cellSize,
-          y,
-          z: (room.z + room.d - 0.8) * spec.cellSize,
-          rot: rng.range(0, Math.PI),
-          floor: f,
-        });
-      }
-      for (const prop of candidates) {
-        if (cellBlocked(spec, f, prop.x, prop.z)) continue;
-        props.push(prop);
-      }
-    }
-  });
-  return props;
+  return spec.furniture?.props ?? [];
 }
 
 function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number): THREE.Mesh {
@@ -81,7 +24,10 @@ function add(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Mater
   return mesh;
 }
 
-/** Original furniture meshes. Surfaces reuse the room PBR materials. */
+/**
+ * Original furniture meshes. Surfaces reuse the room PBR materials. Part sizes
+ * must stay inside the collision parts in PROP_PARTS (src/gen/furniture.ts).
+ */
 export function buildProps(spec: BuildingSpec, mats: MaterialSet): THREE.Group {
   const root = new THREE.Group();
   root.name = 'props';

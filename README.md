@@ -134,9 +134,9 @@ Indoors the shipped policy (`public/checkpoints/pretrained.json`) flies first. I
 
 ## What is implemented
 
-- Seeded buildings: BSP rooms, doors, hallways from stage 3, shafts when there is more than one floor, and a reachability check that retries with `seed + 1`.
+- Seeded buildings: BSP rooms, doors, hallways from stage 3, shafts when there is more than one floor, and a reachability check that retries with `seed + 1`. Tables, chairs, sofas, and shelves are Rapier colliders: lidar sees them and the drone cannot fly through them.
 - Kinematic flight and a 6-DoF quadrotor with a velocity-to-attitude cascade, motor lag, and drag. Physics steps at 400 Hz in quad mode. Rapier builds the colliders and casts the lidar.
-- Observation is 306 floats: 40 lidar ranges, IMU, altitude, a 16×16 egocentric map, floor index, and time remaining. The action is `[vx, vy, vz, yawRate]`.
+- Observation v2 is 1088 floats: 40 lidar ranges, IMU, altitude, frontier-direction features from a BFS over what lidar has seen, and four 16×16 egocentric maps (visited and unexplored-free at 8 m and at 32 m). The layout is in `src/sim/OBS_LAYOUT.md`. The action is `[vx, vy, vz, yawRate]`.
 - PPO in TensorFlow.js, GAE, running observation and reward normalization, and a six-stage curriculum. Up to four env workers write rollouts into `SharedArrayBuffer`s. Inference uses a SIMD WASM gemm when the runtime has it.
 - Chase, FPV, and overview cameras, a canvas HUD, day/night lighting, per-room lights, a flashlight, and IR/depth display modes.
 - Live return, coverage, and entropy charts, a top-down coverage map, a policy heatmap once training has weights, and a replay scrubber at 1×, 4×, and 16×.
@@ -155,13 +155,24 @@ Indoors the shipped policy (`public/checkpoints/pretrained.json`) flies first. I
 
 ## Honest limits
 
-The shipped policy is a 306→256→128 network. It was behavior-cloned from a privileged frontier teacher (that teacher can see the visited grid; the network cannot) and then fine-tuned with PPO. The reward is the spec's coverage, room, floor, collision, smoothness, and time terms, plus a distance-to-frontier shaping term. Training episodes on early stages are allowed more than the spec's 3 hard collisions so they do not die on the first doorway.
+The shipped policy is a 1088→512→256 network. It was behavior-cloned from a privileged frontier teacher and then trained with DAgger: the network flies, the teacher labels every state it visits, and the aggregated data is retrained each round. The teacher sees the true visited grid; the network sees only lidar, its own visited map, and what its lidar has marked free. `npm run train:indoor` reproduces it in about 16 minutes on 4 cores. The round kept is the one that scores best on 30 held-out validation episodes (seeds the eval never uses), never the eval seeds. Anchored PPO (KL to the cloned policy plus a BC loss, `src/rl/finetune.ts`) and the stuck, loiter, and back-and-forth penalties are implemented, but no PPO fine-tune beat DAgger on validation, so the shipped file has none.
 
-On four stage-0 seeds the deterministic policy covered **78.5%, 75.7%, 77.1%, and 65.3%** (mean **74.1%**). The spec bar is 80%. Night-dark on those same seeds averaged **69.8%**, which is **94%** of the day mean, so the night-versus-day ratio clears 90% here. On three fresh stage-3 seeds the day coverage was **24.3%, 17.8%, and 22.7%** (mean **21.6%**). That misses the 60% bar. The same teacher, not the network, covers a stage-0 room past 95% and averaged about 66% on three stage-3 buildings. The network does not reproduce that.
+`npm run eval:coverage` prints this table for `public/checkpoints/pretrained.json` (kinematic flight, 1000 steps on stage 0, 2400 on stage 3):
 
-A kinematic step measured **0.18 ms** in Node (about 5,600 steps/s), inside the 0.3 ms budget. Four worker threads stepping that env summed to about **24,000** environment steps/s, above the 10k target. The same four workers running an untrained network, and rebuilding the building whenever an episode ends, summed to about **6,500** steps/s, which is under 10k. Batched SIMD inference is about **0.05 ms** per environment at batch 8. The learner tries the TensorFlow.js WebGL backend and falls back to CPU. Node training for this checkpoint used CPU. A separate TensorFlow.js WASM or WebGPU package is not bundled; the SIMD gemm is a small kernel in `src/rl/gemm.ts`.
+| Metric | Per seed | Mean | Target | Status |
+| --- | --- | --- | --- | --- |
+| Stage 0 day (101/202/303/404) | 95.1%, 95.1%, 82.6%, 95.1% | **92.0%** | ≥ 80% | met |
+| Stage 3 day (4242/5150/6160) | 68.6%, 61.1%, 41.1% | **56.9%** | ≥ 60% | missed |
+| Stage 0 night-dark | 95.1% on all four | 95.1% | | |
+| Stage 3 night-dark | 69.3%, 61.0%, 67.2% | 65.8% | | |
+| Night / day, stage 0 | | 1.03 | ≥ 0.90 | met |
+| Night / day, stage 3 | | 1.16 | ≥ 0.90 | met |
 
-Furniture, door leaves, and propeller wash are visual. Rapier colliders are still the building grid, so a chair does not stop the drone.
+The previous checkpoint scored 74.1% on stage 0 and 21.6% on stage 3. Stage 3 still misses 60%. Coverage on one large building swings by 20 points or more between training rounds, and on the 22 stage-3 validation episodes this checkpoint averaged 62.5%. Another candidate scored 61.9% on the three eval seeds but lower on validation, so it was not shipped. The teacher itself reaches only about 73% on stage 3 inside 2400 steps (it needs about 3000 to reach 95%), so the step budget caps what imitation can reach. There is no recurrent memory (GRU); the 32 m coarse map and the frontier features stand in for it. The seen-free map marks only voxels the generator counts as reachable at flight height, so that mask is privileged information.
+
+Training reuses pre-built worlds (`src/sim/worldPool.ts`, 48 per stage, 15% replaced per reset) instead of rebuilding Rapier on every episode. A kinematic step is about 0.18–0.24 ms with observation v2. On 4 shared cores, worker threads running the 512×256 network on pooled worlds summed to about 9,000 environment steps/s, under the 10k target; the lidar heuristic on the same pool reached about 13,000. The learner uses `@tensorflow/tfjs-node` when it is installed (`npm install --no-save @tensorflow/tfjs-node@4.22.0`, roughly 27,000 samples/s at minibatch 512) and the CPU backend otherwise, which is about 50 times slower. Batched SIMD inference is a small kernel in `src/rl/gemm.ts`. The checkpoint is 17 MB of JSON because the network is wider.
+
+Door leaves and propeller wash are visual only.
 
 Headless Chrome on this machine, with ANGLE software WebGL2 and no discrete GPU, rendered the high preset at about **7 fps** and the low preset at about **23 fps**. That does not meet 45 / 60 fps, and it was not measured on a laptop GPU. WebGPU is requested when the quality preset is high and an adapter answers within 350 ms; this capture stayed on WebGL2. High quality runs SSAO, bloom, and SMAA. Three's TAA pass accumulates only while the camera is nearly still, because that pass has no motion vectors. FPV adds an afterimage trail and a lens/vignette shader. There is no SSR and no baked global illumination. Numbers from the capture are in `docs/media/capture.json`. Asset licenses are in [CREDITS.md](CREDITS.md). Every shipped texture and the HDRI is under 5 MB, so nothing is in Git LFS.
 
@@ -175,9 +186,9 @@ These choices block the outdoor mission if they stay as they are:
 
 - **The world is one indoor grid.** `BuildingSpec` is the only world type. Its origin is the footprint corner. Visited voxels are indexed from that corner, and every floor is assumed to share floor 0's width and depth. There is no terrain, no geofence, and no list of buildings on a site.
 - **Leaving the footprint ends the episode.** `ExplorerEnv` treats a position outside the ground-floor rectangle as out of bounds. Spawn is the center of the largest ground-floor room, so an outdoor start terminates immediately.
-- **Openings are not enterable in the indoor grid.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Furniture does not collide. Outdoor shells cut real apertures next to a copy of that grid; `ExplorerEnv` does not load them.
+- **Openings are not enterable in the indoor grid.** Door cells are always walkable. There is no closed or ajar door. Glass is painted onto solid border walls, and those boxes stay colliders (`buildingAabbs` marks them `window` and still blocks). A broken window is not representable. Outdoor shells cut real apertures next to a copy of that grid; `ExplorerEnv` does not load them.
 - **The mission is indoor coverage.** Success is 95% of reachable voxels. The reward and the privileged teacher both chase that grid. There is no target object, no "confirm clear", and no detection channel.
-- **The observation is frozen at 306 floats.** The shipped checkpoint, the SharedArrayBuffer stride, and the SIMD gemm scratch (batch ≤ 64, input stride 320) all assume `src/sim/OBS_LAYOUT.md`. The map slice is visited indoor voxels. Altitude is distance to this building's floor and ceiling. A search policy needs a new observation version. Editing indices 0–305 invalidates `public/checkpoints/pretrained.json`.
+- **The observation is versioned (v2, 1088 floats).** The shipped checkpoint, the SharedArrayBuffer stride, and the SIMD gemm scratch all assume `src/sim/OBS_LAYOUT.md`. The maps are indoor voxels. Altitude is distance to this building's floor and ceiling. A search policy needs observation v3; the app refuses a checkpoint whose version does not match.
 - **One drone per world.** Each env holds one `DroneState`. Workers do not share a site. Drones are not physics bodies, so they cannot see or collide with each other. A swarm needs a shared world and a rollout layout with an agent axis.
 
 ## Scripts
@@ -187,7 +198,9 @@ These choices block the outdoor mission if they stay as they are:
 | `npm test` | Unit tests and the kinematic step measurement |
 | `npm run build` | Typecheck and production bundle |
 | `npm run test:e2e` | Headless Chrome screenshots |
-| `PRETRAIN_UPDATES=20 npm run pretrain` | Retrain and rewrite the shipped checkpoint |
+| `npm run eval:coverage [-- ckpt.json]` | Coverage table vs targets for the shipped (or given) checkpoint; `--teacher` scores the frontier teacher |
+| `npm run train:indoor -- --out ckpt.json` | BC + DAgger on every core, kept by held-out validation; copy the result to `public/checkpoints/` to ship it |
+| `PRETRAIN_UPDATES=20 npm run pretrain` | The older single-thread distill + PPO path |
 
 ## License
 

@@ -25,7 +25,7 @@ for (let i = 0; i < data.envs; i++) {
 }
 
 if (mode === 'heuristic') {
-  for (let t = 0; t < 24; t++) {
+  for (let t = 0; t < 200; t++) {
     for (let i = 0; i < envs.length; i++) {
       const step = envs[i]!.step(heuristicAction(obs[i]!));
       obs[i] = step.done ? envs[i]!.reset(specs[i]!, data.seed + t) : step.obs;

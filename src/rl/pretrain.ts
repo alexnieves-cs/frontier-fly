@@ -1,5 +1,5 @@
 import { generateBuilding } from '../gen/building';
-import { ACT_DIM, HIDDEN, OBS_DIM } from '../shared/constants';
+import { ACT_DIM, HIDDEN, OBS_DIM, OBS_VERSION } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { EpisodeConfig } from '../shared/types';
 import { Curriculum } from './curriculum';
@@ -86,6 +86,7 @@ export async function trainExplorer(opts?: {
   const state = norm.toJSON();
   const checkpoint: Checkpoint = {
     version: 1,
+    obsVersion: OBS_VERSION,
     obsDim: OBS_DIM,
     actDim: ACT_DIM,
     hidden: [...HIDDEN],
@@ -256,6 +257,7 @@ export async function distillExplorer(opts?: {
   console.info(`night/day stage0 ${stage0 > 0 ? (stage0Night / stage0).toFixed(3) : 'n/a'} stage3 ${stage3 > 0 ? (night / stage3).toFixed(3) : 'n/a'}`);
   const blank: Checkpoint = {
     version: 1,
+    obsVersion: OBS_VERSION,
     obsDim: OBS_DIM,
     actDim: ACT_DIM,
     hidden: [...HIDDEN],

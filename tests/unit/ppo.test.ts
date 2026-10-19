@@ -17,6 +17,7 @@ function buffersFromNumbers(rows: number[][]): ArrayBuffer[] {
 function checkpointFrom(policy: InferPolicy, stage = 3): Checkpoint {
   return {
     version: 1,
+    obsVersion: 2,
     obsDim: policy.obsDim,
     actDim: policy.actDim,
     hidden: [...policy.hidden],
@@ -64,6 +65,8 @@ describe('policy weights', () => {
     expect(parsed.actDim).toBe(1);
     expect(parsed.hidden).toEqual([32, 32]);
     expect(parsed.weights).toHaveLength(13);
+    const saved = checkpointFrom(loaded, 3).weights;
+    parsed.weights.forEach((row, i) => row.forEach((v, j) => expect(Math.fround(v)).toBe(Math.fround(saved[i]![j]!))));
     const fromCkpt = new InferPolicy(4, 1, [32, 32], 3);
     fromCkpt.setWeights(buffersFromNumbers(parsed.weights));
     const c = fromCkpt.actWith(obs, 2, new RNG(5), false);

@@ -4,7 +4,8 @@ import type { BuildingSpec, FloorGrid, GenParams, Room } from '../shared/types';
 import { splitRooms, type Rect } from './bsp';
 import { applyLinks, planLinks } from './connect';
 import { carveShafts, cloneFloor, sharedWalkable } from './shafts';
-import { countReachableVoxels, isFullyReachable } from './validate';
+import { planFurniture, withoutProps } from './furniture';
+import { computeFlightMap, isFullyReachable } from './validate';
 
 function carveRoom(cells: Uint8Array, w: number, room: Room): void {
   for (let z = room.z; z < room.z + room.d; z++) {
@@ -138,8 +139,20 @@ function tryGenerate(p: GenParams): BuildingSpec | null {
     spawn,
     reachableVoxels: 0,
   };
-  if (!isFullyReachable(spec)) return null;
-  spec.reachableVoxels = countReachableVoxels(spec);
+  if (!isFullyReachable(spec, computeFlightMap(spec))) return null;
+  // Furniture is solid. Its keep-out margin keeps doors and shafts clear, but if
+  // a layout still cuts a room off at flight altitude, drop props from the end
+  // (deterministically) until every room is reachable again.
+  let furniture = planFurniture(spec);
+  for (;;) {
+    spec.furniture = furniture;
+    const map = computeFlightMap(spec);
+    if (isFullyReachable(spec, map)) {
+      spec.reachableVoxels = map.count;
+      break;
+    }
+    furniture = withoutProps(spec, furniture, new Set([furniture.props.length - 1]));
+  }
   return spec;
 }
 

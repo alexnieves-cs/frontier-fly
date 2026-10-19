@@ -55,6 +55,24 @@ export class RunningNorm {
     }
   }
 
+  /**
+   * Fold in observation moments gathered elsewhere (e.g. by rollout worker
+   * threads): `count` samples with per-dim `mean` and sum of squared
+   * deviations `m2` (Chan et al. parallel update). Equivalent to update() on
+   * the same samples up to float rounding.
+   */
+  merge(count: number, mean: ArrayLike<number>, m2: ArrayLike<number>): void {
+    if (count <= 0) return;
+    if (mean.length !== this.dim || m2.length !== this.dim) throw new Error('RunningNorm.merge: dim mismatch');
+    const total = this.count + count;
+    for (let d = 0; d < this.dim; d++) {
+      const delta = mean[d]! - this.mean[d]!;
+      this.mean[d] = this.mean[d]! + (delta * count) / total;
+      this.m2[d] = this.m2[d]! + m2[d]! + (delta * delta * this.count * count) / total;
+    }
+    this.count = total;
+  }
+
   /** (x - mean) / sqrt(var + 1e-8), clipped to ±5. Does not update statistics. */
   apply(x: Float32Array, n: number): Float32Array {
     if (x.length < n * this.dim) throw new Error('RunningNorm.apply: buffer shorter than n * dim');
