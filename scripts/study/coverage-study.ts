@@ -1,11 +1,13 @@
 // Coverage study: every pilot on 30 fresh buildings per condition, with 95% confidence intervals.
 //
 //   npm run study:coverage                 # all shards in parallel, then merge into docs/study.json
-//   vite-node scripts/study/coverage-study.ts -- --shard 0 --of 4 --out /tmp/s0.jsonl
+//   vite-node scripts/study/coverage-study.ts -- --shard 0 --of 4 --out /tmp/s0.jsonl [--conditions hard] [--pilots policy,guarded]
+//   vite-node scripts/study/coverage-study.ts -- --merge /tmp/s0.jsonl ... --out docs/study.json
 //
 // Seeds 20001+, 30001+, 40001+ and 50001+ are drawn only here. Training draws curriculum seeds,
 // checkpoints are selected on 9001-9166, and the sensor planner and policy guard were tuned on
 // 9101-9108, so none of these buildings informed any choice being measured.
+import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { classicalPilot, guardedAction } from '../../src/eval/pilots';
@@ -72,7 +74,7 @@ export function jobs(): Job[] {
 
 type Act = (obs: Float32Array, env: ExplorerEnv) => Float32Array;
 
-function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
+export function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
   const ck = parseCheckpoint(readFileSync(path, 'utf8'));
   const policy = new InferPolicy(ck.obsDim, ck.actDim, ck.hidden, 1);
   policy.setWeights(ck.weights.map((row) => Float32Array.from(row).buffer));
@@ -80,7 +82,16 @@ function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
   return (obs) => policy.actWith(obs, 1, rng, true).action.slice();
 }
 
-export async function runJob(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Result> {
+export interface Episode {
+  env: ExplorerEnv;
+  spec: ReturnType<typeof evalEpisodeSetup>['spec'];
+  cfg: ReturnType<typeof evalEpisodeSetup>['cfg'];
+  obs: Float32Array;
+  act: Act;
+}
+
+/** Build the env and pilot for a job, reset and ready to step. */
+export async function startEpisode(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Episode> {
   const env = await createEnv();
   const { spec, envSeed, cfg } = evalEpisodeSetup(job.stage, job.seed, job.lighting);
   if (job.quad > 0) {
@@ -108,7 +119,13 @@ export async function runJob(job: Job, policy: (obs: Float32Array) => Float32Arr
   } else {
     act = (obs) => heuristicAction(obs);
   }
-  let obs = env.reset(spec, envSeed, cfg);
+  const obs = env.reset(spec, envSeed, cfg);
+  return { env, spec, cfg, obs, act };
+}
+
+export async function runJob(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Result> {
+  const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy);
+  let obs = first;
   let coverage = 0;
   let collisions = 0;
   let steps = 0;
@@ -131,12 +148,78 @@ function arg(name: string, fallback: string): string {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1]! : fallback;
 }
 
-if (process.argv.includes('--shard')) {
+/** Bootstrap 95% interval of the mean, deterministic. */
+export function bootstrapCi(xs: number[], resamples = 2000): [number, number] {
+  if (!xs.length) return [0, 0];
+  const rng = new RNG(7, 'bootstrap');
+  const means: number[] = [];
+  for (let b = 0; b < resamples; b++) {
+    let sum = 0;
+    for (let i = 0; i < xs.length; i++) sum += xs[Math.floor(rng.next() * xs.length)]!;
+    means.push(sum / xs.length);
+  }
+  means.sort((a, b) => a - b);
+  return [means[Math.floor(resamples * 0.025)]!, means[Math.floor(resamples * 0.975)]!];
+}
+
+export function summarizeStudy(rows: Result[]) {
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const cells = [];
+  for (const c of CONDITIONS) {
+    for (const lighting of c.lighting) {
+      for (const pilot of PILOTS) {
+        const rs = rows.filter((r) => r.condition === c.id && r.lighting === lighting && r.pilot === pilot);
+        if (!rs.length) continue;
+        const cov = rs.map((r) => r.coverage);
+        cells.push({
+          condition: c.id,
+          lighting,
+          pilot,
+          episodes: rs.length,
+          coverage: mean(cov),
+          coverageCi: bootstrapCi(cov),
+          collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
+          episodesWithCollision: rs.filter((r) => r.collisions > 0).length,
+          reachedAnotherFloor: rs.filter((r) => r.floorsReached > 1).length,
+        });
+      }
+    }
+  }
+  return cells;
+}
+
+if (process.argv.includes('--merge')) {
+  const outPath = arg('out', 'docs/study.json');
+  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== outPath);
+  const rows: Result[] = files.flatMap((f) =>
+    readFileSync(f, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as Result),
+  );
+  const report = {
+    schema: 1,
+    commit: execSync('git rev-parse --short HEAD').toString().trim(),
+    checkpoint: arg('checkpoint', 'public/checkpoints/pretrained.json'),
+    seedsPerCondition: SEEDS_PER_CONDITION,
+    conditions: CONDITIONS,
+    pilots: PILOTS,
+    cells: summarizeStudy(rows),
+    episodes: rows,
+  };
+  writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`);
+  console.log(`wrote ${outPath} from ${rows.length} episodes`);
+} else if (process.argv.includes('--shard')) {
   const shard = Number(arg('shard', '0'));
   const of = Number(arg('of', '1'));
   const out = arg('out', `study-${shard}.jsonl`);
   const policy = loadPolicy(arg('checkpoint', 'public/checkpoints/pretrained.json'));
-  const mine = jobs().filter((_, i) => i % of === shard);
+  // Optional subsets, e.g. `--conditions hard --pilots policy,guarded` for the ablation checkpoints.
+  const conditions = arg('conditions', '').split(',').filter(Boolean);
+  const pilots = arg('pilots', '').split(',').filter(Boolean);
+  const mine = jobs()
+    .filter((j) => (!conditions.length || conditions.includes(j.condition)) && (!pilots.length || pilots.includes(j.pilot)))
+    .filter((_, i) => i % of === shard);
   const lines: string[] = [];
   const t0 = Date.now();
   for (let i = 0; i < mine.length; i++) {
