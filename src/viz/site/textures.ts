@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RNG } from '../shared/rng';
+import { RNG } from '../../shared/rng';
 
 /** Procedural canvas textures for the film. Original, MIT. */
 
