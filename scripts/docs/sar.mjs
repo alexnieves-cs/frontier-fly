@@ -65,10 +65,11 @@ function findCurves(bench) {
       parts.push(`<polyline fill="none" stroke="${COLORS[m]}" stroke-width="2"${dash} points="${pts.join(' ')}"/>`);
     }
   });
+  const short = { lanes: 'Lane sweep (shipped)', 'lanes-sw': 'Lanes at sweep width', poa: 'Probability search', 'poa-flat': 'Probability search, flat prior' };
   show.forEach((m, i) => {
     const x = 12 + i * ((W - 24) / show.length);
     parts.push(`<rect x="${x}" y="${H - 14}" width="14" height="3" fill="${COLORS[m]}"/>`);
-    parts.push(`<text x="${x + 20}" y="${H - 9}" font-size="11" fill="#333" font-family="sans-serif">${LABEL[m]}</text>`);
+    parts.push(`<text x="${x + 20}" y="${H - 9}" font-size="11" fill="#333" font-family="sans-serif">${short[m]}</text>`);
   });
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${parts.join('')}</svg>\n`;
 }
@@ -156,6 +157,24 @@ export const SAR_KEYS = [
   'R_SAR_SWEEP_WIDTH',
   'R_SAR_POD_PRED',
   'R_SAR_POD_OBS',
+  'R_SAR_POS_90_PRED',
+  'R_SAR_POS_90_OBS',
+  'R_SAR_POS_300_PRED',
+  'R_SAR_POS_300_OBS',
+  'R_SAR_UNI_POS_900_PRED',
+  'R_SAR_UNI_POS_900_OBS',
+  'R_SAR_POA_BLD',
+  'R_SAR_LANES_BLD',
+  'R_SAR_SW_BLD',
+  'R_SAR_BLD_N',
+  'R_SAR_UNI_SEEDS',
+  'R_SAR_NIGHT_SEEDS',
+  'R_SAR_RING_MEAN',
+  'R_SAR_FLAT_MEAN',
+  'R_SAR_UNI_D_SW',
+  'R_SAR_UNI_POA_BLD',
+  'R_SAR_UNI_SW_BLD',
+  'R_SAR_NIGHT_D_SW',
 ];
 
 export function sarSection(bench, gallery) {
@@ -207,6 +226,10 @@ export function sarSection(bench, gallery) {
   const dl = day.vsLanes.poa.dMean;
   const ds = day.poaVsSweep.dMean;
   const cal = bench.podCalibration;
+  // The calibration sample at or just before t.
+  const signed = (x) => `${x > 0 ? '+' : ''}${Math.round(x)}`;
+  const span = ([m, lo, hi]) => `${signed(m)} s (95% CI ${signed(lo)} to ${signed(hi)} s)`;
+  const at = (cond, t) => [...cond.calibration].reverse().find((p) => p.t <= t) ?? { predicted: 0, observed: 0 };
   const values = {
     SAR_NOTE: [
       `Each condition flies the same seeded worlds (seeds ${bench.seedBase}+, ${C.day.scenes} by day, ${C.uniform.scenes} with a uniformly placed person, ${C.night.scenes} at night) with every method, from \`src/eval/sar.ts\` at \`${bench.commit}\`.`,
@@ -233,8 +256,8 @@ export function sarSection(bench, gallery) {
     R_SAR_POA_MEDIAN: sec(d('day', 'poa').medianFindSec),
     R_SAR_LANES_MEDIAN: sec(d('day', 'lanes').medianFindSec),
     R_SAR_SW_MEDIAN: sec(d('day', 'lanes-sw').medianFindSec),
-    R_SAR_D_LANES: `${Math.round(dl[0])} s (95% CI ${Math.round(dl[1])} to ${Math.round(dl[2])} s)`,
-    R_SAR_D_SW: `${Math.round(ds[0])} s (95% CI ${Math.round(ds[1])} to ${Math.round(ds[2])} s)`,
+    R_SAR_D_LANES: span(dl),
+    R_SAR_D_SW: span(ds),
     R_SAR_UNI_POA_MEAN: sec(d('uniform', 'poa').restrictedMeanSec),
     R_SAR_UNI_SW_MEAN: sec(d('uniform', 'lanes-sw').restrictedMeanSec),
     R_SAR_UNI_FLAT_MEAN: sec(d('uniform', 'poa-flat').restrictedMeanSec),
@@ -246,6 +269,24 @@ export function sarSection(bench, gallery) {
     R_SAR_SWEEP_WIDTH: `${bench.sweepWidthM.day.toFixed(1)} m`,
     R_SAR_POD_PRED: pct(cal.meanPredicted),
     R_SAR_POD_OBS: pct(cal.meanObserved),
+    R_SAR_POS_90_PRED: pct0(at(C.day, 90).predicted),
+    R_SAR_POS_90_OBS: pct0(at(C.day, 90).observed),
+    R_SAR_POS_300_PRED: pct0(at(C.day, 300).predicted),
+    R_SAR_POS_300_OBS: pct0(at(C.day, 300).observed),
+    R_SAR_UNI_POS_900_PRED: pct0(at(C.uniform, bench.budgetSec).predicted),
+    R_SAR_UNI_POS_900_OBS: pct0(at(C.uniform, bench.budgetSec).observed),
+    R_SAR_POA_BLD: pct0(d('day', 'poa').building.found),
+    R_SAR_LANES_BLD: pct0(d('day', 'lanes').building.found),
+    R_SAR_SW_BLD: pct0(d('day', 'lanes-sw').building.found),
+    R_SAR_BLD_N: String(d('day', 'poa').building.flights),
+    R_SAR_UNI_SEEDS: String(C.uniform.scenes),
+    R_SAR_NIGHT_SEEDS: String(C.night.scenes),
+    R_SAR_RING_MEAN: sec(d('day', 'poa-ring').restrictedMeanSec),
+    R_SAR_FLAT_MEAN: sec(d('day', 'poa-flat').restrictedMeanSec),
+    R_SAR_UNI_D_SW: span(C.uniform.poaVsSweep.dMean),
+    R_SAR_UNI_POA_BLD: pct0(d('uniform', 'poa').building.found),
+    R_SAR_UNI_SW_BLD: pct0(d('uniform', 'lanes-sw').building.found),
+    R_SAR_NIGHT_D_SW: span(C.night.poaVsSweep.dMean),
   };
   return {
     values,

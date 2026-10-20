@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (180 files, 33,441 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (189 files, 35,559 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -94,11 +94,12 @@ flowchart LR
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
   eval -->|2| gen
-  eval -->|6| mission
+  eval -->|26| mission
   eval -->|1| rl
-  eval -->|7| shared
+  eval -->|9| shared
   eval -->|8| sim
   eval -->|2| train
+  eval -->|2| world_outdoor
   film -->|11| mission
   film -->|3| targets
   film -->|2| ui
@@ -106,12 +107,12 @@ flowchart LR
   gen -->|16| shared
   landing -->|1| film
   mission -->|1| gen
-  mission -->|9| perception
+  mission -->|11| perception
   mission -->|4| rl
-  mission -->|16| shared
+  mission -->|18| shared
   mission -->|11| sim
-  mission -->|11| targets
-  mission -->|34| world_outdoor
+  mission -->|14| targets
+  mission -->|42| world_outdoor
   perception -->|6| shared
   perception -->|1| sim
   perception -->|6| targets
@@ -163,11 +164,11 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/eval` | 5 | 469 | `gen`, `mission`, `rl`, `shared`, `sim`, `train` | — | — |
+| `src/eval` | 8 | 1,086 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,693 | `mission`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,347 | `shared` | — | — |
 | `src/landing` | 1 | 150 | `film` | — | — |
-| `src/mission` | 40 | 9,082 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 46 | 10,583 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/rl` | 12 | 2,862 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 570 | — | — | — |

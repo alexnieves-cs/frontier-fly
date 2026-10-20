@@ -423,5 +423,7 @@ export function sarBenchReport(flights: SarFlight[], commit: string, meta: Recor
       ];
     }),
   );
-  return { schema: 1, commit, budgetSec: SAR_TIME_BUDGET_SEC, seedBase: SAR_SEED_BASE, curveGrid: CURVE_GRID, ...meta, conditions, flights };
+  // POS curves are summarized in `calibration`; per-flight they would make the file ten times larger.
+  const slim = flights.map((f) => ({ ...f, pos: undefined }));
+  return { schema: 1, commit, budgetSec: SAR_TIME_BUDGET_SEC, seedBase: SAR_SEED_BASE, curveGrid: CURVE_GRID, ...meta, conditions, flights: slim };
 }

@@ -10,6 +10,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Missions did not get worse without the floor plan.** On 90 fresh mission worlds per explorer, the sensor-only explorer meets the expected outcome in 93.3% of flights, the oracle planner in 88.9%, and the policy with the sensor-only fallback in 91.1%; the intervals overlap. 0 of the 270 flights touched anything. No flight declared a building clear while a target was inside it, and none confirmed a decoy.
 - **A classical sensor-only planner is the stronger indoor coverage pilot.** On 30 fresh hard buildings it covers 65.5% with no collisions. The learned policy covers 60.7% and averages 6.4 collisions per episode; under a lidar guard it keeps its coverage (60.8%) at 0.03 collisions per episode. The oracle teacher it imitates covers 67.3%.
 - **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps and an anchored PPO fine-tune change little. DAgger adds 11 points over behavior cloning.
+- **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 59 s restricted mean time against 264 s over 100 fresh daytime scenes, a paired difference of -205 s (95% CI -264 to -149 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -9 s (95% CI -24 to +3 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+148 s (95% CI +49 to +247 s) against the sweep-width lanes).
 - **Two open problems are measured, not hidden.** No pilot in the coverage environment climbs to a second floor (the mission explorer does, through shafts), and every pilot collapses on quadrotor dynamics with sensor noise (43.0% for the planner, 24.6% for the policy, 23.8% for the oracle teacher).
 
 ## Setup
@@ -153,6 +154,109 @@ These runs use the default recipe without weight averaging, so the full arm is n
 
 ![Validation score per DAgger round for each arm](report/learning-curves.svg)
 
+## Outdoor search for a lost person
+
+Before this work the drone searched outdoors with a boustrophedon lawnmower: parallel lanes over the whole area at a fixed spacing, then every building it had found. That is the right plan when nothing is known about where the person is. A lost-person search almost always knows something: where they were last seen, and how lost people tend to move. This section replaces the lanes with a search that flies where the person is most likely to be, and measures it against the lanes on worlds it was never tuned on.
+
+### Method
+
+**Probability of area (POA).** The search area is a 2 m grid (`src/mission/autonomy/sar`). Each cell holds the probability that the person is there. Each building holds one number for its whole interior, and a *rest of world* term holds what the drone cannot reach: ground beyond the geofence, and ground hidden under dense tree cores or inside no-fly zones.
+
+**Lost-person prior.** The prior is a mixture of five reorientation strategies of the kind catalogued in the lost-person behavior literature (Syrotuck 1977; Hill 1998; Koester 2008): staying put, following a trail, wandering, climbing for a view, and heading for shelter. Each strategy is a log-normal distance ring around the last known point, shaped by the map: the trail strategy is drawn to trail corridors, the view strategy to higher ground, the shelter strategy to the buildings (60% of its mass goes inside them). The weights and ring sizes are set by hand to be plausible for a short, local loss; they are not taken from the published tables. Every prior also gives each building the mass of its floor area, so a person can always be inside one.
+
+**Probability of detection (POD).** For each camera frame, the model predicts the chance that the detector reports a person in each cell inside the gimbal camera's footprint, from range, viewing angle, light, motion blur and the sensor (RGB by day, thermal at night). A precomputed sky-view map gives, for every cell and 32 bearings, the elevation angles at which tree crowns and roofs block the sightline, so the model does not count looks through foliage.
+
+**Belief update.** After every frame each cell's mass is multiplied by one minus its POD: Bayesian search with negative information (Stone, *Theory of Optimal Search*, 1975). The cumulative probability of success (POS) is the mass removed. A building's mass is cleared by the probability that its interior search would have found the person.
+
+**Planner.** A receding-horizon beam search over 6 m legs in 12 headings, five legs deep, scores each path by the discounted mass it would remove, with a pull toward the richest remaining block so the drone does not strand itself. It flies two legs and replans. A building is visited when its mass per second of travel and search beats what the open ground offers. The search ends when 99% of the reachable mass is gone or the budget runs out.
+
+**Confirmation outdoors.** The gimbal camera sees a person on the ground from 12–14 m, beyond the 9 m the confirmation tracker used to count, so outdoor views never counted toward confirmation. Outdoor tracks now count views to the gimbal's real range, and the drone drops to 7 m or 9.5 m above the person for its confirming looks when the air is clear. This applies to every outdoor search mode, the lanes included.
+
+### Benchmark
+
+Each scene is a seeded world, a last known point 8–20 m from the command post, and a person placed by simulating one of the five strategies as an agent that walks the map (the planner never sees which). In the *uniform* condition the person is instead placed uniformly over open ground and building floors, so the behavior prior is wrong by construction. At night the drone flies a thermal camera. Six methods fly every scene:
+
+| Method | What it is |
+| --- | --- |
+| Lane sweep (shipped) | The lawnmower the drone flew before, lanes at its default 20% footprint overlap, buildings as found |
+| Lane sweep, sweep-width spacing | The same lanes spaced at the sweep width computed from the POD model (23.2 m), buildings last: the strongest no-information baseline |
+| Probability search | The method above |
+| One-leg greedy | The same belief, flying the best single leg each time |
+| Distance ring only | The prior with no map features |
+| Flat prior | A uniform prior: the planner and belief with no lost-person knowledge |
+
+Each condition flies the same seeded worlds (seeds 7600+, 100 by day, 60 with a uniformly placed person, 60 at night) with every method, from `src/eval/sar.ts` at `3494728`. The mission is a find-person search with a 900 s and 80% battery budget, entry on auto and an operator who approves every ask. A flight counts as found when the person is confirmed from three bearings at 0.8 mean confidence. Times to find are censored at the budget: the restricted mean counts a miss as the full budget, and the median is blank when half or more were missed. Found intervals are Wilson 95%.
+
+### Results
+
+| Condition | Method | Found (95% CI) | Found within 300 s | Median time to find | Restricted mean time | Battery used | False alarms |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **Day, behavior-model person** (100 worlds) | Lane sweep (shipped) | 92% (85–96%) | 61% | 127 s | 264 s | 19.5% | 0 |
+|  | Lane sweep, sweep-width spacing, buildings last | 99% (95–100%) | 96% | 26 s | 69 s | 5.7% | 0 |
+|  | Probability search | 99% (95–100%) | 97% | 25 s | 59 s | 5.6% | 0 |
+|  | Probability search, one-leg greedy | 99% (95–100%) | 96% | 26 s | 63 s | 6.3% | 0 |
+|  | Probability search, distance ring only | 99% (95–100%) | 98% | 25 s | 56 s | 5.4% | 0 |
+|  | Probability search, flat prior | 99% (95–100%) | 97% | 26 s | 66 s | 5.6% | 0 |
+| **Day, person placed uniformly at random** (60 worlds) | Lane sweep (shipped) | 75% (63–84%) | 30% | 341 s | 474 s | 30.1% | 0 |
+|  | Lane sweep, sweep-width spacing, buildings last | 90% (80–95%) | 82% | 57 s | 177 s | 10.8% | 0 |
+|  | Probability search | 77% (65–86%) | 62% | 57 s | 324 s | 17.2% | 0 |
+|  | Probability search, one-leg greedy | 83% (72–91%) | 50% | 259 s | 358 s | 20.4% | 0 |
+|  | Probability search, distance ring only | 93% (84–97%) | 78% | 50 s | 181 s | 12.3% | 0 |
+|  | Probability search, flat prior | 92% (82–96%) | 87% | 50 s | 161 s | 10.7% | 0 |
+| **Night (thermal), behavior-model person** (60 worlds) | Lane sweep (shipped) | 93% (84–97%) | 65% | 31 s | 238 s | 17.2% | 0 |
+|  | Lane sweep, sweep-width spacing, buildings last | 98% (91–100%) | 98% | 28 s | 57 s | 4.9% | 0 |
+|  | Probability search | 100% (94–100%) | 98% | 28 s | 49 s | 5.0% | 0 |
+|  | Probability search, one-leg greedy | 100% (94–100%) | 98% | 28 s | 56 s | 5.8% | 0 |
+|  | Probability search, distance ring only | 100% (94–100%) | 98% | 28 s | 45 s | 4.7% | 0 |
+|  | Probability search, flat prior | 100% (94–100%) | 98% | 28 s | 54 s | 5.0% | 0 |
+
+![Fraction of searches that have found the person by each time, per condition and method](report/sar-find-curves.svg)
+
+Paired over the same scenes (bootstrap 95% intervals; negative times are faster than the baseline):
+
+| Condition | Comparison | Restricted mean time, difference (95% CI) | Found, difference (95% CI) |
+| --- | --- | --- | --- |
+| Day, behavior-model person | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -196 s (-254 to -139) | +7 pts (+3 to +12) |
+| Day, behavior-model person | Probability search vs lanes (shipped) | -205 s (-264 to -149) | +7 pts (+3 to +12) |
+| Day, behavior-model person | Probability search, one-leg greedy vs lanes (shipped) | -201 s (-260 to -145) | +7 pts (+3 to +12) |
+| Day, behavior-model person | Probability search, distance ring only vs lanes (shipped) | -208 s (-268 to -151) | +7 pts (+3 to +12) |
+| Day, behavior-model person | Probability search, flat prior vs lanes (shipped) | -199 s (-257 to -141) | +7 pts (+3 to +12) |
+| Day, behavior-model person | Probability search vs lane sweep, sweep-width spacing, buildings last | -9 s (-24 to +3) | 0 pts (0 to 0) |
+| Day, person placed uniformly at random | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -297 s (-384 to -214) | +15 pts (+3 to +27) |
+| Day, person placed uniformly at random | Probability search vs lanes (shipped) | -150 s (-258 to -42) | +2 pts (-13 to +17) |
+| Day, person placed uniformly at random | Probability search, one-leg greedy vs lanes (shipped) | -116 s (-217 to -16) | +8 pts (-5 to +22) |
+| Day, person placed uniformly at random | Probability search, distance ring only vs lanes (shipped) | -293 s (-387 to -203) | +18 pts (+7 to +30) |
+| Day, person placed uniformly at random | Probability search, flat prior vs lanes (shipped) | -313 s (-395 to -234) | +17 pts (+5 to +28) |
+| Day, person placed uniformly at random | Probability search vs lane sweep, sweep-width spacing, buildings last | +148 s (+49 to +247) | -13 pts (-27 to -2) |
+| Night (thermal), behavior-model person | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -181 s (-260 to -111) | +5 pts (-2 to +12) |
+| Night (thermal), behavior-model person | Probability search vs lanes (shipped) | -189 s (-264 to -124) | +7 pts (+2 to +13) |
+| Night (thermal), behavior-model person | Probability search, one-leg greedy vs lanes (shipped) | -182 s (-257 to -116) | +7 pts (+2 to +13) |
+| Night (thermal), behavior-model person | Probability search, distance ring only vs lanes (shipped) | -193 s (-272 to -125) | +7 pts (+2 to +13) |
+| Night (thermal), behavior-model person | Probability search, flat prior vs lanes (shipped) | -184 s (-263 to -114) | +7 pts (+2 to +13) |
+| Night (thermal), behavior-model person | Probability search vs lane sweep, sweep-width spacing, buildings last | -8 s (-35 to +12) | +2 pts (0 to +5) |
+
+**What the numbers say.** Against the shipped lanes the probability search is faster in every condition (by day, -205 s (95% CI -264 to -149 s)). The honest baseline is the sweep-width lanes, and against it the difference is -9 s (95% CI -24 to +3 s) by day and -8 s (95% CI -35 to +12 s) at night: within noise. Two changes explain most of the gain over the shipped lanes, and both are classical search theory rather than the prior: spacing lanes at the sweep width instead of a 20% image overlap, and leaving buildings until the open ground is done. The ablations agree. With the distance ring alone the probability search averages 56 s, and with a flat prior 66 s, against 59 s for the full prior. In these scenes most people stay within a sweep width or two of the last known point, so any search that starts there and spirals out finds them in the first minute; the map features would need larger areas or longer walks to matter, and the benchmark does not show that they do.
+
+Where the prior is wrong it hurts. With the person placed uniformly the full prior is +148 s (95% CI +49 to +247 s) slower than the sweep-width lanes, most likely because it spends its first minutes where it believes the person is, near the last known point. The one place it helps is buildings: in the uniform condition it searches every building interior that holds the person (100% found against 73% for the sweep-width lanes), because every building carries prior mass and is visited when that mass is worth the trip.
+
+By how the person moved (daytime scenes; found / median time to find):
+
+| How the person moved | Worlds | Lanes (shipped) | Lanes, sweep width | Probability search | Flat prior |
+| --- | --- | --- | --- | --- | --- |
+| shelter | 15 | 100% / 147 s | 100% / 188 s | 100% / 176 s | 100% / 214 s |
+| trail | 33 | 97% / 14 s | 100% / 14 s | 100% / 14 s | 100% / 14 s |
+| wander | 31 | 81% / 293 s | 97% / 31 s | 97% / 28 s | 97% / 29 s |
+| view | 8 | 88% / 346 s | 100% / 29 s | 100% / 27 s | 100% / 43 s |
+| stay put | 13 | 100% / 326 s | 100% / 27 s | 100% / 25 s | 100% / 24 s |
+
+![Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 755 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.](report/sar-belief.svg)
+
+Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 755 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.
+
+**Is the model calibrated?** Over 18,000 frames on development worlds the model predicts a mean per-frame POD of 14.9% against 19.2% measured (Brier score 0.127). The belief's own POS is checked against outcomes with blind flights: each scene is flown once more with nobody in it, so the POS curve runs to the end of the budget instead of stopping at a find. By day the model predicts {{R_SAR_POS_90_PRED}} success by 90 s and {{R_SAR_POS_300_PRED}} by 300 s; {{R_SAR_POS_90_OBS}} and {{R_SAR_POS_300_OBS}} of searches had confirmed the person by then. With the person placed uniformly the prior is wrong and the model says so poorly: it predicts {{R_SAR_UNI_POS_900_PRED}} success by the end of the budget against {{R_SAR_UNI_POS_900_OBS}} found.
+
+![Left: per-frame POD model against the detector. Right: the belief's probability of success against the fraction found](report/sar-calibration.svg)
+
 ## Failure gallery
 
 Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture grey, flown voxels light blue, the track blue, the start green, collisions red. The episodes are picked by rule from the coverage study (`scripts/study/gallery.ts`).
@@ -195,6 +299,8 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **Quadrotor dynamics break every pilot.** Lag, latency and overshoot make the kinematic stopping distance wrong. The planner degrades least because its filter still brakes; a model-aware filter, or training on the quad, is needed.
 - **Night confirmation is near the detector's ceiling.** Under the flashlight alone the per-frame confidence barely clears the 0.8 threshold, so confirmation needs several clean bearings. A target boxed in by furniture can leave too few.
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
+- **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
+- **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts {{R_SAR_UNI_POS_900_PRED}} success and {{R_SAR_UNI_POS_900_OBS}} of searches succeed.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -207,6 +313,8 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Tuning the mission explorer and re-views | Mission worlds 9101–9116 and the three showcase seeds |
 | Coverage study (reported) | 20001+, 30001+, 40001+, 50001+ (30 each) |
 | Mission bench (reported) | 9600–9629 |
+| Tuning the outdoor search, its prior and POD model | 7100–7139 |
+| Outdoor search bench (reported) | 7600–7699 (day), 7600–7659 (uniform person, night) |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -215,6 +323,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
 npm run study:missions   # docs/mission-bench.json: three indoor explorers, 30 fresh worlds per scenario
+npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README
