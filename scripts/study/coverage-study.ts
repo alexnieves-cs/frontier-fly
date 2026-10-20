@@ -10,13 +10,15 @@
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
-import { classicalPilot, guardedAction } from '../../src/eval/pilots';
+import { OracleGain } from '../../src/eval/gainLabels';
+import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
 import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { RNG } from '../../src/shared/rng';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
 import { frontierAction } from '../../src/sim/frontier';
+import { LearnedGain, parseGainModel, type GainModelData } from '../../src/sim/mapPredict';
 import { QUAD_BRAKING } from '../../src/sim/sensorPlanner';
 import { heuristicAction } from '../../src/sim/heuristic';
 import type { LightingPreset } from '../../src/sim/lighting';
@@ -41,10 +43,36 @@ export const CONDITIONS: Condition[] = [
   { id: 'quad', label: 'Hard, quadrotor dynamics + noise', stage: 3, seedBase: 50001, lighting: ['day', 'night-dark'], quad: 1 },
 ];
 
-export const PILOTS = ['teacher', 'classical', 'classicalBrake', 'policy', 'guarded', 'guardedBrake', 'waypoint', 'heuristic'] as const;
+export const PILOTS = [
+  'teacher',
+  'classical',
+  'classicalBrake',
+  'classicalClimb',
+  'classicalPredict',
+  'classicalOracleGain',
+  'policy',
+  'guarded',
+  'guardedBrake',
+  'waypoint',
+  'heuristic',
+] as const;
 export type PilotId = (typeof PILOTS)[number];
-/** Pilots that fly with the quadrotor's braking model, so they only run where the airframe is the quad. */
-export const QUAD_ONLY = new Set<PilotId>(['classicalBrake', 'guardedBrake']);
+/**
+ * Pilots that only run in some conditions: the braking pilots where the airframe is the quad, the
+ * climbing planner where there is more than one floor, and the map-prediction arms on the kinematic
+ * hard and multi-floor buildings.
+ */
+export const PILOT_CONDITIONS: Partial<Record<PilotId, string[]>> = {
+  classicalBrake: ['quad'],
+  guardedBrake: ['quad'],
+  classicalClimb: ['floors'],
+  classicalPredict: ['hard', 'floors'],
+  classicalOracleGain: ['hard', 'floors'],
+};
+/** Share of the step budget the climbing planner gives each floor before it takes a known shaft. */
+export const CLIMB_FLOOR_SHARE = 0.8;
+/** Path cost (voxel steps) per voxel of predicted hidden gain, for the map-prediction arms. */
+export const GAIN_WEIGHT = 0.3;
 
 export interface Job {
   condition: string;
@@ -68,7 +96,7 @@ export function jobs(): Job[] {
   for (const c of CONDITIONS) {
     for (let i = 0; i < SEEDS_PER_CONDITION; i++) {
       for (const lighting of c.lighting) {
-        for (const pilot of PILOTS) if (c.quad || !QUAD_ONLY.has(pilot)) out.push({ condition: c.id, stage: c.stage, seed: c.seedBase + i, lighting, quad: c.quad ?? 0, pilot });
+        for (const pilot of PILOTS) if (!PILOT_CONDITIONS[pilot] || PILOT_CONDITIONS[pilot].includes(c.id)) out.push({ condition: c.id, stage: c.stage, seed: c.seedBase + i, lighting, quad: c.quad ?? 0, pilot });
       }
     }
   }
@@ -83,6 +111,13 @@ export function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
   policy.setWeights(ck.weights.map((row) => Float32Array.from(row).buffer));
   const rng = new RNG(1);
   return (obs) => policy.actWith(obs, 1, rng, true).action.slice();
+}
+
+export const GAIN_MODEL_PATH = 'public/models/mappred.json';
+let gainData: GainModelData | null = null;
+function gainModel(): GainModelData {
+  gainData ??= parseGainModel(readFileSync(GAIN_MODEL_PATH, 'utf8'));
+  return gainData;
 }
 
 export interface Episode {
@@ -115,6 +150,15 @@ export async function startEpisode(job: Job, policy: (obs: Float32Array) => Floa
     act = p.act;
   } else if (job.pilot === 'classicalBrake') {
     const p = classicalPilot({ braking: QUAD_BRAKING });
+    p.reset();
+    act = p.act;
+  } else if (job.pilot === 'classicalClimb') {
+    const p = climbingPilot({}, { floorSteps: (CLIMB_FLOOR_SHARE * cfg.maxSteps) / spec.floors.length });
+    p.reset();
+    act = p.act;
+  } else if (job.pilot === 'classicalPredict' || job.pilot === 'classicalOracleGain') {
+    const gain = job.pilot === 'classicalPredict' ? new LearnedGain(gainModel()) : new OracleGain(spec);
+    const p = classicalPilot({ gain, gainWeight: GAIN_WEIGHT });
     p.reset();
     act = p.act;
   } else if (job.pilot === 'policy') {

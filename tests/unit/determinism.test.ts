@@ -21,7 +21,9 @@ import { runTrace, traceSpec, TRACE_CASES } from '../support/envTrace';
  * observation or reward change, run `npx vite-node tests/support/printTraceHashes.ts`
  * and paste the new values, after checking a perf-only change does not move them.
  * The 1088 quad hash was re-recorded when the flight controller's rate cap went from 8 to
- * 4 rad/s (the other cases do not fly the quad and are unchanged); the 306 table predates it.
+ * 4 rad/s (the other cases do not fly the quad and are unchanged), and the 1088 multifloor hash
+ * when slabs on buildings with three or more floors stopped opening over shafts that lead up
+ * from the floor above (gen/parts.ts, sim/world.ts). The 306 table predates both.
  */
 const GOLDEN_BY_OBS_DIM: Record<number, Record<string, string>> = {
   306: {
@@ -35,7 +37,7 @@ const GOLDEN_BY_OBS_DIM: Record<number, Record<string, string>> = {
     'stage0-kinematic': 'a8fcf8ba',
     'stage2-kinematic': 'efb78622',
     'stage3-noise-latency': '49221eb8',
-    'stage4-multifloor': '0e720fcd',
+    'stage4-multifloor': '7a7b7515',
     'stage4-quad': '761a5c35',
   },
 };

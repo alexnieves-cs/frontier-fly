@@ -153,7 +153,8 @@ export class PhysicsWorld {
       const gz = Math.floor(y / cs);
       const lower = floors[k - 1]!;
       if (gx < 0 || gz < 0 || gx >= lower.w || gz >= lower.d) return true;
-      if (lower.cells[gz * lower.w + gx] !== CELL.SHAFT) return true;
+      // Open only where a shaft joins floors k - 1 and k (the same rule as the slabs in gen/parts.ts).
+      if (lower.cells[gz * lower.w + gx] !== CELL.SHAFT || floors[k]!.cells[gz * lower.w + gx] !== CELL.SHAFT) return true;
     }
     return this.furniture.hits(x, y, z, radius);
   }

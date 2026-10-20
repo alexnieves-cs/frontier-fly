@@ -1,4 +1,5 @@
 import { FLOOR_HEIGHT, LIDAR_H, LIDAR_MAX, MAX_SPEED_H, OBS } from '../shared/constants';
+import { Climber, type ClimberOptions } from '../sim/climber';
 import type { ExplorerEnv } from '../sim/env';
 import {
   commandToAction,
@@ -60,6 +61,29 @@ export function classicalPilot(opts: SensorPlannerOptions = {}): { reset(): void
       occ.mark(floor, f.pos[0], f.pos[1], f.yaw, f.lidar);
       f.occupied = occ.occupied;
       return commandToAction(planner.act(f), f.yaw, out).slice();
+    },
+  };
+}
+
+/** Sensor-only planner that takes shafts between floors (sim/climber.ts) as a coverage-env pilot. */
+export function climbingPilot(opts: SensorPlannerOptions = {}, climb: ClimberOptions = {}): { reset(): void; act(obs: Float32Array, env: ExplorerEnv): Float32Array; climber: Climber } {
+  const climber = new Climber(new SensorPlanner(opts), climb);
+  const out = new Float32Array(4);
+  let occ: OccupancyMap | null = null;
+  let seen: Uint8Array | null = null;
+  return {
+    climber,
+    reset: () => climber.reset(),
+    act(obs, env) {
+      const f = sensorFrame(env, obs);
+      if (!occ || env.seenGrid !== seen || occ.occupied.length !== f.seen.length) {
+        seen = env.seenGrid;
+        occ = new OccupancyMap(f.vw, f.vd, f.floors);
+      }
+      const floor = Math.max(0, Math.min(f.floors - 1, Math.floor(f.pos[2] / f.floorHeight)));
+      occ.mark(floor, f.pos[0], f.pos[1], f.yaw, f.lidar);
+      f.occupied = occ.occupied;
+      return commandToAction(climber.act(f, obs[OBS.ceil]! * FLOOR_HEIGHT), f.yaw, out).slice();
     },
   };
 }

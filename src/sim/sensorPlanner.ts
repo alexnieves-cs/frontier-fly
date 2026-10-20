@@ -1,4 +1,5 @@
 import * as C from '../shared/constants';
+import type { GainSource } from './mapPredict';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -67,6 +68,14 @@ export interface SensorPlannerOptions {
   braking?: BrakingModel;
   /** Margin the braking filter keeps, meters (default BRAKING_MARGIN). */
   brakingMargin?: number;
+  /**
+   * Hidden-gain estimate for frontier candidates (mapPredict.ts). When set,
+   * a candidate's cost is its path cost minus gainWeight × its gain, so a
+   * frontier that likely opens into unseen space beats a nearer dead end.
+   */
+  gain?: GainSource;
+  /** Path cost, in voxel steps, traded for one voxel of predicted gain. */
+  gainWeight?: number;
 }
 
 /** Free air the safety filter keeps between the airframe edge and a lidar return, meters. */
@@ -237,6 +246,8 @@ export class SensorPlanner {
   readonly horizon: number;
   readonly braking: BrakingModel | null;
   readonly brakingMargin: number;
+  readonly gain: GainSource | null;
+  readonly gainWeight: number;
   private n = 0;
   private dist = new Float64Array(0);
   private prev = new Int32Array(0);
@@ -262,6 +273,8 @@ export class SensorPlanner {
     this.horizon = opts.horizon ?? SAFETY_HORIZON;
     this.braking = opts.braking ?? null;
     this.brakingMargin = opts.brakingMargin ?? BRAKING_MARGIN;
+    this.gain = opts.gain ?? null;
+    this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
   }
 
   reset(): void {
@@ -389,6 +402,11 @@ export class SensorPlanner {
     let bestCost = Infinity;
     let keepCost = Infinity;
     const keep = this.goalFloor === floor ? this.goal % this.plane : -1;
+    const gain = this.gain;
+    const gw = this.gainWeight;
+    // How far past the cheapest candidate a better one could still lie, once gains are counted.
+    const reach = gain ? gw * gain.max : 0;
+    if (gain) gain.prepare({ vw, vd, base, seen: f.seen, visited: f.visited, occupied: f.occupied });
     while (size > 0) {
       const k = pop();
       if (done[k]! & 128) continue;
@@ -397,14 +415,16 @@ export class SensorPlanner {
       if (k !== start && f.visited[base + k] !== 1 && this.traversable(f, base, k) && !this.banned[base + k]) {
         // Prefer frontier voxels that border flown or blocked space: sweeping edges first
         // leaves fewer isolated stragglers to come back for.
-        const score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
+        let score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
+        // The gain is only worth computing where it could still change the choice.
+        if (gain && score - reach < bestCost) score -= gw * gain.gain(k);
         if (k === keep) keepCost = score;
         if (score < bestCost) {
           bestCost = score;
           best = k;
         }
       }
-      if (d0 - 8 * this.edgeBonus > bestCost + 1.5 && (keep < 0 || keepCost < Infinity)) break;
+      if (d0 - 8 * this.edgeBonus - reach > bestCost + 1.5 && (keep < 0 || keepCost < Infinity)) break;
       const x = k % vw;
       const y = (k - x) / vw;
       for (let d = 0; d < 8; d++) {
