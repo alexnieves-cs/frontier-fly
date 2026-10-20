@@ -2,15 +2,19 @@ import type { ClearScope, V3 } from '../contracts';
 import { angleDiff, confirmViewpoints, requirementsMet, type ConfirmTrack } from '../planner/confirm';
 import { senseBuildings } from '../planner/coverage';
 import {
+  columnClear,
   cruisePath,
   cruiseZ,
   headingTo,
   len,
   operable,
+  pointFree,
+  segmentClear,
   sub,
 } from '../planner/geometry';
 import { toLocal, toWorld, floorOf, INDOOR_FLY_Z } from '../planner/indoor';
 import { observeOpenings } from '../planner/inspect';
+import { sampleHeight } from '../../../world/outdoor/terrain';
 import { type VehicleCommand } from '../vehicle';
 import {
   CONFIRM_DWELL,
@@ -23,11 +27,26 @@ import {
 } from './shared';
 import { RunnerBase } from './base';
 
+/**
+ * Outdoor re-view poses, tried in order: height above the contact's ground and horizontal radius,
+ * meters. The radius keeps the person inside the gimbal image with the nose pointed at them.
+ * The last entry is cruise height, used when the low poses are blocked by trees.
+ */
+export const OUTDOOR_CONFIRM_LOOKS: readonly { agl: number; radius: number }[] = [
+  { agl: 7, radius: 3.5 },
+  { agl: 9.5, radius: 4.5 },
+  { agl: Infinity, radius: 4.5 },
+];
+
 /** Outdoor search: the coverage sweep, periodic detection, and multi-bearing confirmation of contacts. */
 export abstract class SearchPhases extends RunnerBase {
   // ----------------------------------------------------------- coverage
 
   protected startCoverage(): void {
+    if (this.sar) {
+      this.startProbabilitySearch();
+      return;
+    }
     const wps = this.coverage.waypoints;
     if (!wps.length) {
       this.coverageDone = true;
@@ -78,6 +97,74 @@ export abstract class SearchPhases extends RunnerBase {
     this.setJob(job);
   }
 
+  /** Climb to cruise from wherever the drone is, when it is below it. */
+  private climbToCruise(): Waypoint[] {
+    const pos = this.vehicle.pos;
+    const z = cruiseZ(this.air, pos[0], pos[1], this.agl);
+    if (pos[2] >= z - 1) return [];
+    return [{ pos: [pos[0], pos[1], z], tol: 0.6 }];
+  }
+
+  /**
+   * One step of the probability search: ask the planner, then fly its first
+   * legs, visit the building it picked, or finish. The job replans a few
+   * meters before the end of its legs, so the drone never brakes between them.
+   */
+  protected startProbabilitySearch(): void {
+    const sar = this.sar!;
+    const pos = this.vehicle.pos;
+    const climb = this.climbToCruise();
+    if (climb.length && sar.replans === 0) this.log('action', `Takeoff. Climbing to ${fmt(this.agl, 0)} m AGL.`);
+    const vel = this.vehicle.vel;
+    const heading = Math.hypot(vel[0], vel[1]) > 0.5 ? Math.atan2(vel[1], vel[0]) : this.vehicle.yaw;
+    const decision = sar.plan([pos[0], pos[1]], heading);
+    if (sar.replans === 1) this.log('action', 'Starting the probability search.');
+    if (decision.kind === 'done') {
+      this.coverageDone = true;
+      this.log('info', `Probability search complete: ${decision.reason}. Modelled probability of success ${fmt(sar.belief.pos() * 100, 0)}%.`);
+      this.continueMission();
+      return;
+    }
+    if (decision.kind === 'building') {
+      const b = this.world.buildings.find((item) => item.id === decision.id)!;
+      sar.visit(b.id);
+      this.discovered.add(b.id);
+      this.log('action', `${b.label} is now the most likely place to look: searching it (probability ${fmt((sar.prior.structure.get(b.id) ?? 0) * 100, 0)}% at the start).`);
+      this.startBuilding(b);
+      return;
+    }
+    const from: V3 = climb.length ? climb[0]!.pos : pos;
+    const wps: Waypoint[] = [...climb];
+    let cur = from;
+    for (const [x, y] of decision.path) {
+      for (const p of cruisePath(this.air, cur, { x, y }, this.agl, 6)) wps.push({ pos: p });
+      cur = wps[wps.length - 1]!.pos;
+    }
+    if (!wps.length) {
+      this.coverageDone = true;
+      this.continueMission();
+      return;
+    }
+    const end = wps[wps.length - 1]!.pos;
+    const inner = this.followJob('coverage', wps, () => this.startProbabilitySearch(), 1.5);
+    const climbing = climb.length > 0;
+    let ticks = 0;
+    this.setJob({
+      phase: 'coverage',
+      plan: () => inner.plan(),
+      tick: (): VehicleCommand => {
+        const p = this.vehicle.pos;
+        ticks += 1;
+        // Replan before the last leg ends rather than braking to a stop on it.
+        if (!climbing && ticks > 2 && Math.hypot(end[0] - p[0], end[1] - p[1]) < 4 && inner.plan().length <= 1) {
+          this.startProbabilitySearch();
+          return this.job.tick();
+        }
+        return inner.tick();
+      },
+    });
+  }
+
   /** Decide what to do next once a building, confirmation, or lane set is finished. */
   protected continueMission(): void {
     if (this.finished || this.returning) return;
@@ -85,7 +172,7 @@ export abstract class SearchPhases extends RunnerBase {
       this.startReturn('all required targets confirmed');
       return;
     }
-    if (this.pending.length) {
+    if (this.pending.length && !(this.options.search?.buildingsLast && !this.coverageDone)) {
       const pos = this.vehicle.pos;
       this.pending.sort((a, b) => centerDist(a, pos) - centerDist(b, pos) || a.id.localeCompare(b.id));
       const next = this.pending.shift()!;
@@ -139,13 +226,14 @@ export abstract class SearchPhases extends RunnerBase {
   protected detect(): void {
     const pose = this.vehicle.pose();
     // Building discovery by camera footprint and line of sight.
-    if (!this.inside) {
+    // The probability search knows the buildings from the map and schedules them itself.
+    if (!this.inside && !this.sar) {
       for (const b of senseBuildings(pose.pos, this.world, this.physics, this.discovered)) {
         this.discovered.add(b.id);
         this.pending.push(b);
         this.log('info', `${b.label} discovered ${fmt(centerDist(b, pose.pos), 0)} m away.`);
       }
-      if (this.phase === 'coverage' && this.pending.length && !this.returning) {
+      if (this.phase === 'coverage' && this.pending.length && !this.returning && !this.options.search?.buildingsLast) {
         this.continueMission();
         return;
       }
@@ -166,6 +254,7 @@ export abstract class SearchPhases extends RunnerBase {
     if (v && this.inside && v.vis) v.vis.observe(toLocal(v.grid, pose.pos), pose.yaw);
 
     const obs = this.source.observe(pose, this.t);
+    if (this.sar && !this.inside) this.sar.observe(pose, obs.contacts, this.t);
     for (const c of obs.contacts) {
       this.recent.push(c);
       if (this.recent.length > 60) this.recent.shift();
@@ -246,23 +335,46 @@ export abstract class SearchPhases extends RunnerBase {
       const policy = this.policyRun;
       this.resumeAfterConfirm = () => (policy && this.policyRun === policy ? policy.resume() : this.exploreNext());
     } else {
-      const z = cruiseZ(this.air, track.estimate[0], track.estimate[1], this.agl);
-      const views = confirmViewpoints(track, track.estimate, pos, 8, z, need, (p) => {
-        if (!operable(this.air, p[0], p[1])) return false;
-        const d = sub(track.estimate, p);
+      const est = track.estimate;
+      const ground = (x: number, y: number) => sampleHeight(this.world.outdoor.terrain, x, y);
+      const sees = (p: V3) => {
+        const d = sub(est, p);
         const hit = this.physics.cast(p[0], p[1], p[2], d[0], d[1], d[2], len(d));
         return !hit || hit.dist > len(d) - 1;
-      });
+      };
+      // Lowest re-view height with enough clear bearings: closer looks give the detector more pixels,
+      // which matters most at night. A low pose needs free air around it and a clear column up to cruise.
+      let views: V3[] = [];
+      for (const look of OUTDOOR_CONFIRM_LOOKS) {
+        const low = look.agl < this.agl;
+        const z = low ? ground(est[0], est[1]) + look.agl : cruiseZ(this.air, est[0], est[1], this.agl);
+        views = confirmViewpoints(track, est, pos, look.radius, z, need, (p) => {
+          if (!operable(this.air, p[0], p[1])) return false;
+          if (low && (p[2] - ground(p[0], p[1]) < this.air.minAgl + 0.5 || !pointFree(this.physics, p, 0.9))) return false;
+          if (low && !columnClear(this.physics, p[0], p[1], p[2], cruiseZ(this.air, p[0], p[1], this.agl), 0.8)) return false;
+          return sees(p);
+        });
+        if (views.length >= need) break;
+      }
       let cur: V3 = pos;
+      const cruiseAt = (p: V3): V3 => [p[0], p[1], cruiseZ(this.air, p[0], p[1], this.agl)];
       for (const vp of views) {
-        for (const p of cruisePath(this.air, cur, { x: vp[0], y: vp[1] }, this.agl).slice(0, -1)) wps.push({ pos: p });
+        const lowHop = cur[2] < cruiseAt(cur)[2] - 1 && segmentClear(this.physics, cur, vp, 0.6);
+        if (!lowHop) {
+          if (cur[2] < cruiseAt(cur)[2] - 1) wps.push({ pos: cruiseAt(cur), tol: 0.6 });
+          const from = cur[2] < cruiseAt(cur)[2] - 1 ? cruiseAt(cur) : cur;
+          for (const p of cruisePath(this.air, from, { x: vp[0], y: vp[1] }, this.agl).slice(0, -1)) wps.push({ pos: p });
+          if (vp[2] < cruiseAt(vp)[2] - 1) wps.push({ pos: cruiseAt(vp), tol: 0.6 });
+        }
         wps.push({
           pos: vp,
-          yaw: headingTo(vp, track.estimate),
+          yaw: headingTo(vp, est),
           dwell: CONFIRM_DWELL,
         });
         cur = vp;
       }
+      // Back up to cruise before the search resumes.
+      if (views.length && cur[2] < cruiseAt(cur)[2] - 1) wps.push({ pos: cruiseAt(cur), tol: 0.6 });
       this.resumeAfterConfirm = () => this.startCoverage();
     }
     if (!wps.some((w) => w.dwell)) {

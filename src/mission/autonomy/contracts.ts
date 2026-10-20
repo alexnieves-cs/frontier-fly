@@ -18,6 +18,7 @@ import type { SensorMode } from '../../shared/types';
 import type { ObjectId, PersonState, TargetCategory, TargetClass, TargetScene } from '../../targets/types';
 import type { BuildingShell, Opening, OutdoorWorld } from '../../world/outdoor/types';
 import type { Mission, MissionType, Point } from '../types';
+import type { PlannerConfig } from './sar/planner';
 
 export type V3 = [number, number, number];
 
@@ -265,6 +266,11 @@ export interface RunRecord {
   landedHome: boolean;
   indoorExplorer: 'policy' | 'frontier' | 'oracle' | null;
   log: LogEntry[];
+  /**
+   * Probability search only: the model's cumulative probability of success every 5 s, the share of
+   * the prior within aerial reach (inside the fence, off crown-covered ground), and the replans.
+   */
+  search?: { pos: { tSec: number; pos: number }[]; reachable: number; replans: number };
 }
 
 export interface RunnerSnapshot {
@@ -301,6 +307,28 @@ export interface RunnerOptions {
   indoor?: 'auto' | 'frontier' | 'policy' | 'oracle';
   /** Optional trained policy weights (InferPolicy). */
   policy?: unknown;
+  /** Outdoor search pattern. Default: lanes. */
+  search?: OutdoorSearchOptions;
+}
+
+/**
+ * How the drone searches outdoors. 'lanes' flies the lawnmower sweep and
+ * visits each building as it is found. 'probability' (find-person missions
+ * only) plans on a probability-of-area map built from the last known point
+ * and lost-person behavior, updated by what the camera saw (src/mission/autonomy/sar).
+ */
+export interface OutdoorSearchOptions {
+  mode: 'lanes' | 'probability';
+  /** Where the missing person was last seen, world x and y. Default: home. */
+  lastKnown?: [number, number];
+  /** Probability search prior. Default 'behavior'. */
+  prior?: 'behavior' | 'ring' | 'uniform';
+  /** Probability search planner overrides. */
+  planner?: Partial<PlannerConfig>;
+  /** Lanes: spacing between lanes, meters. Default from the camera footprint. */
+  laneSpacingM?: number;
+  /** Lanes: fly every lane before visiting any building. Default false. */
+  buildingsLast?: boolean;
 }
 
 export interface MissionRunner {

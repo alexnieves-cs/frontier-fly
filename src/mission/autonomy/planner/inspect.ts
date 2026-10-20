@@ -73,8 +73,20 @@ function roofViewpoints(building: MissionBuilding, physics: OutdoorPhysics): Vie
   return out;
 }
 
-/** Ordered inspection steps from `start`, with hops over the roof line where trees block. */
-export function planInspection(building: MissionBuilding, start: V3, physics: OutdoorPhysics, air: Airspace): InspectStep[] {
+/**
+ * Ordered inspection steps from `start`, with hops over the roof line where trees block.
+ *
+ * With `backtrack`, a viewpoint with no clear leg from the current one is reached by
+ * retracing the route flown so far to an earlier viewpoint that has one. Without it such a
+ * viewpoint is skipped, so the number of faces seen depends on where the orbit started.
+ */
+export function planInspection(
+  building: MissionBuilding,
+  start: V3,
+  physics: OutdoorPhysics,
+  air: Airspace,
+  backtrack = false,
+): InspectStep[] {
   const box = buildingBox(building);
   const startAngle = Math.atan2(start[1] - box.cy, start[0] - box.cx);
   const tau = Math.PI * 2;
@@ -87,9 +99,25 @@ export function planInspection(building: MissionBuilding, start: V3, physics: Ou
   const steps: InspectStep[] = [];
   let cur = start;
   const hopZ = box.roofZ + 2.5;
+  // Positions flown so far, and the index in it of each viewpoint reached.
+  const route: V3[] = [start];
+  const anchors: number[] = [0];
   for (const view of views) {
-    const leg = legBetween(physics, cur, view.pos, hopZ);
+    let leg = legBetween(physics, cur, view.pos, hopZ);
+    if (!leg && backtrack) {
+      for (let a = anchors.length - 2; a >= 0 && !leg; a--) {
+        const from = route[anchors[a]!]!;
+        const onward = legBetween(physics, from, view.pos, hopZ);
+        if (!onward) continue;
+        const back = route.slice(anchors[a]!, route.length - 1).reverse();
+        for (const p of back) steps.push({ pos: p, yaw: null, dwell: 0 });
+        route.push(...back);
+        leg = onward;
+      }
+    }
     if (!leg) continue;
+    route.push(...leg);
+    anchors.push(route.length - 1);
     for (let i = 0; i < leg.length - 1; i++) steps.push({ pos: leg[i]!, yaw: null, dwell: 0 });
     steps.push({ pos: view.pos, yaw: view.yaw, dwell: 0.8 });
     if (view.midYaw !== null) steps.push({ pos: view.pos, yaw: view.midYaw, dwell: 0.8 });
