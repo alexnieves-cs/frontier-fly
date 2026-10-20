@@ -4,7 +4,7 @@
 
 Every number on this page comes from a script in this repository. `npm run bench` writes `docs/benchmarks.json`, `npm run study:coverage` and `npm run study:missions` write `docs/study.json` and `docs/mission-bench.json`, `npm run media` writes `docs/media/media.json`, and `npm run docs` renders them into this page, [REPORT.md](REPORT.md) and the README. Nothing is typed in by hand. When a target is missed, the table says so.
 
-Measured 2026-10-19 at commit `1a42f3d` on 4 cores of Intel(R) Xeon(R) Processor @ 2.10GHz, Node v22.22.0. Checkpoint `public/checkpoints/pretrained.json` (sha256 `84cc86bf7d79`, 512→256 hidden).
+Measured 2026-10-20 at commit `d84c157` on 4 cores of Intel(R) Xeon(R) Processor @ 2.10GHz, Node v22.22.0. Checkpoint `public/checkpoints/pretrained.json` (sha256 `84cc86bf7d79`, 512→256 hidden).
 
 ## Against the project goals
 
@@ -13,9 +13,9 @@ Measured 2026-10-19 at commit `1a42f3d` on 4 cores of Intel(R) Xeon(R) Processor
 | Coverage, easy buildings | ≥ 80.0% | 95.1% mean of 4 | ✅ meets |
 | Coverage, new hard buildings | ≥ 60.0% | 67.3% mean of 3 | ✅ meets |
 | Night coverage vs day | ≥ 90.0% | 100.0% | ✅ meets |
-| Kinematic env step | ≤ 0.3 ms | 0.179 ms | ✅ meets |
-| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 14,724 | ✅ meets |
-| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 3,958 | ❌ misses |
+| Kinematic env step | ≤ 0.3 ms | 0.133 ms | ✅ meets |
+| Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 16,305 | ✅ meets |
+| Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 13,040 | ✅ meets |
 
 ## Coverage
 
@@ -118,15 +118,15 @@ The **oracle teacher** reads the true floor plan; it is the DAgger teacher the p
 
 ## Simulator throughput
 
-Single-thread numbers are Node on the machine above. The worker rows use `node:worker_threads`, two envs per worker, the same rollout code the browser workers run.
+Single-thread numbers are Node on the machine above. The worker rows use `node:worker_threads` and the same rollout code the browser workers run: the physics row two envs per worker with the lidar heuristic, the policy row eight envs per worker, one batched forward pass per step, and episode resets onto pre-built worlds (`src/sim/worldPool.ts`), timed after a short warm-up. Until v0.8 the browser ran two envs per worker and rebuilt the building and its Rapier world on every reset, which measured 3,958 env steps/s on the same machine type.
 
 | Measurement | Value |
 | --- | --- |
-| Kinematic env step (1 thread) | 0.179 ms · 5,587 steps/s |
+| Kinematic env step (1 thread) | 0.133 ms · 7,497 steps/s |
 | Quadrotor env step, 400 Hz physics (1 thread) | 0.239 ms · 4,191 steps/s |
-| Policy inference, SIMD gemm, batch 8 | 0.077 ms per env |
-| 4 workers, physics + sensors (lidar heuristic pilot) | 14,724 env steps/s |
-| 4 workers, rollout loop with policy-sized network and building rebuild on reset | 3,958 env steps/s |
+| Policy inference, SIMD gemm, batch 8 | 0.076 ms per env |
+| 4 workers, physics + sensors (lidar heuristic pilot) | 16,305 env steps/s |
+| 4 workers × 8 envs, browser rollout loop: batched policy inference, resets on pooled worlds | 13,040 env steps/s |
 
 ## Rendering
 
