@@ -62,7 +62,11 @@ export abstract class IndoorPhases extends EntryPhases {
     );
     v.sensing.lastNewVoxelSec = this.t;
     if (this.vehicle instanceof QuadVehicle) v.sensing.braking = this.vehicle.braking;
-    v.sensing.rangeHook = this.options.lidarFault ?? null;
+    const extra = this.options.lidarFault;
+    v.sensing.rangeHook = (lidar, tSec) => {
+      extra?.(lidar, tSec);
+      this.lidarHook(lidar);
+    };
     // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
     const dark = nightFactor(lighting) > 0.5 && lighting.sensorMode === 'rgb';
     if (dark) {
@@ -260,8 +264,25 @@ export abstract class IndoorPhases extends EntryPhases {
     }
     const ft = new FlyThrough(v.axis, 'out');
     const local = toLocal(v.grid, this.vehicle.pos);
-    const path = v.nav.path(local, toLocal(v.grid, ft.start)) ?? [];
-    const wps: Waypoint[] = path.map((p) => ({ pos: toWorld(v.grid, p) }));
+    const goal = toLocal(v.grid, ft.start);
+    const route = (from: V3): Waypoint[] | null => v.nav.path(from, goal)?.map((p) => ({ pos: toWorld(v.grid, p) })) ?? null;
+    let wps = route(local);
+    if (!wps) {
+      // No route from here on the map (the drone can be somewhere the map calls blocked): retrace the
+      // breadcrumbs, which the drone has already flown, until a route opens up. Never fly straight at the opening.
+      // Point by point: the outdoor casts that let retrace() take shortcuts don't see interior floors.
+      wps = [];
+      const crumbs = this.crumbs;
+      for (let i = crumbs.length - 1; i >= 0; i--) {
+        const p = crumbs[i]!;
+        wps.push({ pos: p, tol: 0.2 });
+        const rest = (crumbs.length - 1 - i) % 5 === 4 || i === 0 ? route(toLocal(v.grid, p)) : null;
+        if (rest) {
+          wps.push(...rest);
+          break;
+        }
+      }
+    }
     this.log('action', `Leaving ${v.b.label} through opening ${v.opening?.id ?? -1}.`);
     this.setJob(this.followJob('exit', wps, () => this.crossOut(after), 0.2));
   }

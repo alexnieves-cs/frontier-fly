@@ -412,8 +412,9 @@ export function insideBox(box: BuildingBox, p: V3, margin = 0): boolean {
 }
 
 /** A local route between two points near a building: direct, or a hop over the roof line. */
-export function legBetween(physics: OutdoorPhysics, a: V3, b: V3, hopZ: number): V3[] | null {
-  if (segmentClear(physics, a, b)) return [b];
+export function legBetween(physics: OutdoorPhysics, a: V3, b: V3, hopZ: number, margin = 0): V3[] | null {
+  // A straight leg must clear walls by `margin` more than the usual sweep; otherwise hop over.
+  if (segmentClear(physics, a, b, SWEEP_RADIUS + margin)) return [b];
   for (const z of [hopZ, hopZ + 3]) {
     const aUp: V3 = [a[0], a[1], Math.max(a[2], z)];
     const bUp: V3 = [b[0], b[1], Math.max(b[2], z)];

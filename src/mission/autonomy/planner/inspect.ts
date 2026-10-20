@@ -16,6 +16,8 @@ import { type Airspace, buildingBox, dot, legBetween, operable, pointFree, sub }
 export const CAMERA_ASPECT = 4 / 3;
 /** Openings further than this are not resolved well enough to measure. */
 export const INSPECT_RANGE = 9;
+/** Extra clearance, m, a straight leg between inspection viewpoints keeps from walls and corners. */
+export const INSPECT_LEG_MARGIN = 0.25;
 
 export interface InspectStep {
   pos: V3;
@@ -88,7 +90,8 @@ export function planInspection(building: MissionBuilding, start: V3, physics: Ou
   let cur = start;
   const hopZ = box.roofZ + 2.5;
   for (const view of views) {
-    const leg = legBetween(physics, cur, view.pos, hopZ);
+    // Viewpoint to viewpoint legs pass building corners; keep a gust's worth of air off them.
+    const leg = legBetween(physics, cur, view.pos, hopZ, INSPECT_LEG_MARGIN);
     if (!leg) continue;
     for (let i = 0; i < leg.length - 1; i++) steps.push({ pos: leg[i]!, yaw: null, dwell: 0 });
     steps.push({ pos: view.pos, yaw: view.yaw, dwell: 0.8 });
