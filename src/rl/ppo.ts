@@ -43,6 +43,54 @@ export function computeGae(args: GaeArgs): { advantages: Float32Array; returns: 
   return { advantages, returns };
 }
 
+/**
+ * GAE over a rollout buffer that interleaves several envs: within each block
+ * of `block` rows, row b * block + t * envs + i belongs to env i at step t
+ * (workers/rollout.ts collects that way, and TrainPool concatenates one block
+ * per worker). Each env is its own time series; its last row bootstraps from
+ * its own last value, like computeGae does for a single env.
+ */
+export function computeGaeInterleaved(
+  args: Omit<GaeArgs, 'nextValue'>,
+  envs: number,
+  block = args.rewards.length,
+): { advantages: Float32Array; returns: Float32Array } {
+  const n = args.rewards.length;
+  const advantages = new Float32Array(n);
+  const returns = new Float32Array(n);
+  const E = Math.max(1, envs | 0);
+  const B = Math.max(E, block | 0);
+  if (B % E !== 0 || n % B !== 0) throw new Error(`computeGaeInterleaved: ${n} rows do not split into blocks of ${B} over ${E} envs`);
+  const T = B / E;
+  const pick = <A extends Float32Array | Uint8Array>(src: A, out: A, base: number, i: number): A => {
+    for (let t = 0; t < T; t++) out[t] = src[base + t * E + i]!;
+    return out;
+  };
+  const rewards = new Float32Array(T);
+  const values = new Float32Array(T);
+  const dones = new Uint8Array(T);
+  const truncated = new Uint8Array(T);
+  for (let base = 0; base < n; base += B) {
+    for (let i = 0; i < E; i++) {
+      pick(args.values, values, base, i);
+      const gae = computeGae({
+        rewards: pick(args.rewards, rewards, base, i),
+        values,
+        dones: pick(args.dones, dones, base, i),
+        truncated: pick(args.truncated, truncated, base, i),
+        nextValue: values[T - 1] ?? 0,
+        gamma: args.gamma,
+        lambda: args.lambda,
+      });
+      for (let t = 0; t < T; t++) {
+        advantages[base + t * E + i] = gae.advantages[t]!;
+        returns[base + t * E + i] = gae.returns[t]!;
+      }
+    }
+  }
+  return { advantages, returns };
+}
+
 export async function ppoUpdate(trainer: TfTrainer, batch: PpoBatch, opts?: TrainOpts): Promise<PpoMetrics> {
   return trainer.update(batch, opts);
 }

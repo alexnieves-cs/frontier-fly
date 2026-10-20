@@ -8,6 +8,7 @@ import { InferPolicy } from '../rl/infer';
 import { RunningNorm } from '../rl/normalize';
 import { defaultDynParams, zeroNoise } from '../sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../sim/env';
+import { WorldPool, type PooledWorld } from '../sim/worldPool';
 import { collectRollout, type ShowcaseSnap } from './rollout';
 import { rolloutViews, writeRollout, type RolloutViews } from './sab';
 
@@ -53,8 +54,11 @@ let yieldEvery = 0;
 let booted = false;
 let started = false;
 let pendingWeights: WeightsMsg | null = null;
+/** Episode resets reuse pre-built worlds; a few are rebuilt as training goes so the set keeps growing. */
+let worlds: { pool: WorldPool; held: (PooledWorld | null)[] } | null = null;
 
 async function setup(nEnvs: number, baseSeed: number): Promise<void> {
+  worlds = { pool: await WorldPool.create({ stages: [0], perStage: 8, churn: 0.05, seed: baseSeed }), held: [] };
   envs = [];
   specs.length = 0;
   obs.length = 0;
@@ -81,6 +85,7 @@ async function setup(nEnvs: number, baseSeed: number): Promise<void> {
     envs.push(env);
     specs.push(spec);
     obs.push(first);
+    worlds.held.push(null);
   }
 }
 
@@ -97,6 +102,7 @@ async function loop(): Promise<void> {
       baseSeed: seed + tick * 1009,
       stageOverride,
       yieldEvery,
+      worlds: worlds ?? undefined,
       onShowcase: yieldEvery
         ? (snap) => {
             (self as DedicatedWorkerGlobalScope).postMessage({ type: 'showcase', showcase: snap });

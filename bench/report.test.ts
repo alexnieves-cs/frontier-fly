@@ -143,14 +143,14 @@ async function workerRates(): Promise<{ workers: number; heuristic: number; poli
     external: ['@dimforge/rapier3d-compat'],
   });
   const workers = Math.max(1, Math.min(4, availableParallelism()));
-  const run = (mode: 'heuristic' | 'policy', steps: number) =>
+  const run = (mode: 'heuristic' | 'policy', steps: number, envs: number, extra: { pool?: boolean; warmup?: number } = {}) =>
     Promise.all(
       Array.from(
         { length: workers },
         (_, i) =>
           new Promise<{ stepsPerSec: number }>((resolve, reject) => {
             const worker = new Worker(new URL(`../${outfile}`, import.meta.url), {
-              workerData: { envs: 2, steps, seed: 40 + i * 17, mode },
+              workerData: { envs, steps, seed: 40 + i * 17, mode, ...extra },
             });
             worker.once('message', (msg: { stepsPerSec: number }) => {
               void worker.terminate();
@@ -160,8 +160,9 @@ async function workerRates(): Promise<{ workers: number; heuristic: number; poli
           }),
       ),
     );
-  const heuristic = (await run('heuristic', 400)).reduce((s, r) => s + r.stepsPerSec, 0);
-  const policy = (await run('policy', 128)).reduce((s, r) => s + r.stepsPerSec, 0);
+  const heuristic = (await run('heuristic', 400, 2)).reduce((s, r) => s + r.stepsPerSec, 0);
+  // The browser training loop: 8 envs per worker (one batched forward pass per step), resets on pooled worlds.
+  const policy = (await run('policy', 512, 8, { pool: true, warmup: 128 })).reduce((s, r) => s + r.stepsPerSec, 0);
   return { workers, heuristic, policy };
 }
 

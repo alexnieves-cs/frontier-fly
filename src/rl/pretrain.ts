@@ -6,7 +6,7 @@ import { Curriculum } from './curriculum';
 import { InferPolicy } from './infer';
 import { TfTrainer } from './model';
 import { RunningNorm } from './normalize';
-import { computeGae } from './ppo';
+import { computeGae, computeGaeInterleaved } from './ppo';
 import type { Checkpoint } from './checkpoint';
 import { createEnv, defaultEpisodeConfig } from '../sim/env';
 import { frontierAction } from '../sim/frontier';
@@ -57,14 +57,7 @@ export async function trainExplorer(opts?: {
       stageOverride: 0,
     });
     const arrays = outcome.buffer.toArrays();
-    const last = arrays.n > 0 ? arrays.values[arrays.n - 1]! : 0;
-    const gae = computeGae({
-      rewards: arrays.rewards,
-      values: arrays.values,
-      dones: arrays.dones,
-      truncated: arrays.truncated,
-      nextValue: last,
-    });
+    const gae = computeGaeInterleaved(arrays, nEnvs);
     await trainer.update(
       {
         obs: arrays.obs,

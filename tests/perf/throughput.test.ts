@@ -21,7 +21,9 @@ describe('multi-worker rollout throughput', () => {
       Array.from({ length: cores }, (_, i) => spawn(outfile, { envs: 2, steps: 1000, seed: 40 + i * 17, mode: 'heuristic' })),
     );
     const policy = await Promise.all(
-      Array.from({ length: cores }, (_, i) => spawn(outfile, { envs: 2, steps: 64, seed: 90 + i * 17, mode: 'policy' })),
+      Array.from({ length: cores }, (_, i) =>
+        spawn(outfile, { envs: 8, steps: 256, seed: 90 + i * 17, mode: 'policy', pool: true, warmup: 64 }),
+      ),
     );
     const heuristicRate = heuristic.reduce((sum, row) => sum + row.stepsPerSec, 0);
     const policyRate = policy.reduce((sum, row) => sum + row.stepsPerSec, 0);
@@ -35,7 +37,7 @@ describe('multi-worker rollout throughput', () => {
 
 function spawn(
   file: string,
-  workerData: { envs: number; steps: number; seed: number; mode: 'policy' | 'heuristic' },
+  workerData: { envs: number; steps: number; seed: number; mode: 'policy' | 'heuristic'; pool?: boolean; warmup?: number },
 ): Promise<{ steps: number; stepsPerSec: number }> {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL(`../../${file}`, import.meta.url), { workerData });

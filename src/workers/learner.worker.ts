@@ -5,12 +5,15 @@ import type { RolloutArrays } from '../rl/buffer';
 import { InferPolicy } from '../rl/infer';
 import { TfTrainer } from '../rl/model';
 import type { RunningNormState } from '../rl/normalize';
-import { computeGae } from '../rl/ppo';
+import { computeGaeInterleaved } from '../rl/ppo';
 
 interface RolloutMsg {
   type: 'rollout';
   arrays: RolloutArrays;
   norm: RunningNormState;
+  /** Rows interleave `envs` envs within blocks of `block` rows (one block per env worker). */
+  envs: number;
+  block: number;
 }
 interface BootMsg {
   type: 'boot';
@@ -53,14 +56,7 @@ self.onmessage = (event: MessageEvent<RolloutMsg | BootMsg>) => {
   if (!trainer || !policy) return;
   const { arrays } = msg;
   const n = arrays.n;
-  const last = n > 0 ? arrays.values[n - 1]! : 0;
-  const gae = computeGae({
-    rewards: arrays.rewards,
-    values: arrays.values,
-    dones: arrays.dones,
-    truncated: arrays.truncated,
-    nextValue: last,
-  });
+  const gae = computeGaeInterleaved(arrays, msg.envs, msg.block);
   void trainer
     .update({
       obs: arrays.obs,

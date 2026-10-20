@@ -10,6 +10,7 @@ import { RolloutBuffer } from '../rl/buffer';
 import { Curriculum } from '../rl/curriculum';
 import { InferPolicy } from '../rl/infer';
 import { RunningNorm } from '../rl/normalize';
+import type { PooledWorld, WorldPool } from '../sim/worldPool';
 
 export interface ShowcaseSnap {
   spec: BuildingSpec;
@@ -68,6 +69,12 @@ export async function collectRollout(opts: {
   stageOverride: number | null;
   onShowcase?: (snap: ShowcaseSnap) => void;
   yieldEvery?: number;
+  /**
+   * Reset onto pre-built worlds instead of generating a building and a Rapier
+   * world per episode. `held[i]` is the world env i is on (null before its
+   * first pooled reset); the caller keeps the array between calls.
+   */
+  worlds?: { pool: WorldPool; held: (PooledWorld | null)[] };
 }): Promise<RolloutOutcome> {
   const { envs, policy, norm, curriculum } = opts;
   const n = envs.length;
@@ -136,12 +143,29 @@ export async function collectRollout(opts: {
         });
         curriculum.record({ coverage: step.info.coverage, reachedNewFloor: reached });
         const stage = opts.stageOverride ?? curriculum.sampleStage(new RNG(opts.baseSeed + t * 17 + i, 'stage'));
-        const params = curriculum.genParams(stage, new RNG(opts.baseSeed + t * 13 + i, 'gen'));
-        const spec = generateBuilding(params);
-        const dynamics = curriculum.dynamicsFor(stage, new RNG(params.seed, 'dyn'));
+        const genRng = new RNG(opts.baseSeed + t * 13 + i, 'gen');
+        let spec: BuildingSpec;
+        let episodeSeed: number;
+        let world: PooledWorld | null = null;
+        if (opts.worlds) {
+          world = opts.worlds.pool.acquire(stage, genRng);
+          spec = world.spec;
+          episodeSeed = genRng.int(1_000_000_000);
+        } else {
+          const params = curriculum.genParams(stage, genRng);
+          spec = generateBuilding(params);
+          episodeSeed = params.seed;
+        }
+        const dynamics = curriculum.dynamicsFor(stage, new RNG(episodeSeed, 'dyn'));
         const nRooms = spec.floors.reduce((acc, floor) => acc + floor.rooms.length, 0);
+        const cfg = makeConfig(stage, episodeSeed, nRooms, dynamics);
         opts.specs[i] = spec;
-        opts.obs[i] = envs[i]!.reset(spec, params.seed, makeConfig(stage, params.seed, nRooms, dynamics));
+        opts.obs[i] = world ? envs[i]!.reset(spec, episodeSeed, cfg, world.physics) : envs[i]!.reset(spec, episodeSeed, cfg);
+        if (opts.worlds) {
+          // Release after the reset so a churned-out world is never freed while the env still uses it.
+          opts.worlds.pool.release(opts.worlds.held[i]);
+          opts.worlds.held[i] = world;
+        }
         returns[i] = 0;
         lengths[i] = 0;
       }

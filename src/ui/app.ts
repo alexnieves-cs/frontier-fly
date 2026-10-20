@@ -461,7 +461,7 @@ class Session {
           this.heatmap = { w: msg.w, d: msg.d, values: msg.values, arrows: msg.arrows };
         },
       });
-      this.pool.start(this.launch.seed, 2);
+      this.pool.start(this.launch.seed);
     } else {
       this.pool.resume();
     }
