@@ -13,6 +13,9 @@ import { SensorNoise } from '../../../sim/dynamics/noise';
 import { FrontierNav } from '../../../sim/frontierFeatures';
 import { EgoMaps, SeenMap } from '../../../sim/seenMap';
 import {
+  BRAKING_MARGIN,
+  brakingFilter,
+  type BrakingModel,
   descentClear,
   filterVelocity,
   guardAction,
@@ -512,6 +515,15 @@ export class IndoorSensing implements SensorGrid {
   readonly rng: RNG;
   private prevVel: [number, number, number] = [0, 0, 0];
   yawRate = 0;
+  /** Stopping model of the airframe flying this building; when set, filter() is the braking filter. */
+  braking: BrakingModel | null = null;
+  /**
+   * Called on the lidar ranges after every reading and before anything uses
+   * them, so a fault model can rewrite them in place. A NaN range is a
+   * missing reading; the filters treat it as blocked.
+   */
+  rangeHook: ((lidar: Float64Array, tSec: number) => void) | null = null;
+  private readonly velWorld: [number, number] = [0, 0];
   private steps = 0;
   readonly maxSteps = 2400;
   private readonly seenMap = new SeenMap();
@@ -590,6 +602,9 @@ export class IndoorSensing implements SensorGrid {
     this.prevVel = [vel[0], vel[1], vel[2]];
     this.steps += 1;
     for (let i = 0; i < LIDAR_H; i++) this.lidar[i] = this.obs[OBS.lidar + i]! * LIDAR_MAX;
+    this.rangeHook?.(this.lidar, tSec);
+    this.velWorld[0] = vel[0];
+    this.velWorld[1] = vel[1];
     const f = floorOf(this.grid, local[2]);
     this.occ.mark(f, local[0], local[1], yaw, this.lidar);
     this.look(local, yaw);
@@ -732,7 +747,19 @@ export class IndoorSensing implements SensorGrid {
       yaw,
       lidar: this.lidar,
       alt: this.obs[OBS.alt]! * FLOOR_HEIGHT,
+      vel: this.velWorld,
     };
+  }
+
+  /**
+   * The lidar velocity filter for this airframe on the latest reading: the
+   * braking filter when the airframe has a stopping model (the quad), the
+   * kinematic closing-speed rule otherwise.
+   */
+  filter(vx: number, vy: number, yaw: number, margin = SAFETY_MARGIN): [number, number] {
+    return this.braking
+      ? brakingFilter(vx, vy, yaw, this.lidar, this.velWorld, this.braking, Math.max(margin, BRAKING_MARGIN))
+      : filterVelocity(vx, vy, yaw, this.lidar, margin, INDOOR_FILTER_HORIZON);
   }
 }
 
@@ -827,7 +854,8 @@ export class PolicyExplorer {
     this.idle = this.sensing.frontierLeft ? 0 : this.idle + 1;
     const action = this.policy.actWith(obs, 1, this.sensing.rng, true).action;
     const f = floorOf(this.grid, local[2]);
-    guardAction(action, local[2] - f * this.grid.H, yaw, this.sensing.lidar, this.guarded, INDOOR_FILTER_HORIZON);
+    const brake = this.sensing.braking ? { model: this.sensing.braking, vel: [vel[0], vel[1]] as const } : undefined;
+    guardAction(action, local[2] - f * this.grid.H, yaw, this.sensing.lidar, this.guarded, INDOOR_FILTER_HORIZON, brake);
     scaleAction(this.guarded, this.scaled);
     const k = this.speedCap / MAX_SPEED_H;
     const bx = this.scaled[0]! * k;
@@ -885,6 +913,7 @@ export class SensorExplorer {
       speed: speedCap,
       flyHeight: INDOOR_FLY_Z,
       horizon: INDOOR_FILTER_HORIZON,
+      braking: sensing.braking ?? undefined,
     });
     this.phase = start;
   }
@@ -958,7 +987,7 @@ export class SensorExplorer {
       return this.route.length === 0;
     }
     const sp = Math.min(this.speedCap, 0.3 + d);
-    const [vx, vy] = filterVelocity((dx / d) * sp, (dy / d) * sp, yaw, this.sensing.lidar, SAFETY_MARGIN, INDOOR_FILTER_HORIZON);
+    const [vx, vy] = this.sensing.filter((dx / d) * sp, (dy / d) * sp, yaw);
     const yawRate = clamp(wrapAngle(Math.atan2(dy, dx) - yaw) * 2, -MAX_YAW_RATE_INDOOR, MAX_YAW_RATE_INDOOR);
     this.sensing.yawRate = yawRate;
     out.cmd = { vel: [vx, vy, this.hold(local)], yawRate };

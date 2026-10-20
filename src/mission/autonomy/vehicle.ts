@@ -61,6 +61,20 @@ export interface VehicleCommand {
   yawRate?: number;
 }
 
+/** Outside influences on one step. */
+export interface StepOptions {
+  /** Wind, a world-frame air velocity in m/s. The airframe moves relative to it. */
+  wind?: V3;
+}
+
+/** What an IMU on the airframe would read, noise-free, body frame (x forward, y left, z up). */
+export interface ImuReading {
+  /** Specific force, m/s²: acceleration minus gravity, so a hover reads [0, 0, +9.81]. */
+  accelBody: V3;
+  /** Body rates, rad/s. */
+  gyroBody: V3;
+}
+
 export interface VehicleStep {
   /** A new contact started this tick. */
   collided: boolean;
@@ -86,7 +100,15 @@ function wrap(a: number): number {
   return ((a % tau) + tau) % tau;
 }
 
+const GRAVITY = 9.81;
+
+/**
+ * The mission airframe. The base class is the kinematic multirotor described
+ * above; QuadVehicle (quadVehicle.ts) flies the same commands through rigid-body
+ * quadrotor dynamics and a flight controller.
+ */
 export class Vehicle {
+  readonly kind: 'kinematic' | 'quad' = 'kinematic';
   pos: V3;
   vel: V3 = [0, 0, 0];
   accel: V3 = [0, 0, 0];
@@ -98,27 +120,51 @@ export class Vehicle {
   /** Distance flown, m. */
   odometer = 0;
   private lastTouch = -Infinity;
+  /** Thrust authority, 0..1 overall (see setThrustAuthority). */
+  protected authority = 1;
 
   /** Ticks resolved by OutdoorPhysics.move versus the open-air fast path. */
   physicsMoves = 0;
   freeMoves = 0;
 
   constructor(
-    private readonly physics: OutdoorPhysics,
+    protected readonly physics: OutdoorPhysics,
     readonly battery: BatteryModel,
     start: V3,
     yaw: number,
-    private readonly world: OutdoorWorld | null = null,
+    protected readonly world: OutdoorWorld | null = null,
   ) {
     this.pos = [start[0], start[1], start[2]];
     this.yaw = wrap(yaw);
+  }
+
+  /**
+   * Scale the airframe's thrust authority, 0..1: one number for the whole
+   * airframe, or one per motor (front-right, rear-right, rear-left,
+   * front-left). The kinematic vehicle has no motors, so it uses the weakest
+   * motor's value to scale its acceleration and speed caps.
+   */
+  setThrustAuthority(k: number | readonly number[]): void {
+    this.authority = Math.max(0, Math.min(1, typeof k === 'number' ? k : Math.min(...k)));
+  }
+
+  /** Noise-free IMU reading for the last step. */
+  imu(): ImuReading {
+    const c = Math.cos(this.yaw);
+    const s = Math.sin(this.yaw);
+    const a = this.accel;
+    return {
+      accelBody: [c * a[0] + s * a[1], -s * a[0] + c * a[1], a[2] + GRAVITY],
+      gyroBody: [0, 0, this.yawRate],
+    };
   }
 
   pose(): DronePose {
     return { pos: [this.pos[0], this.pos[1], this.pos[2]], yaw: this.yaw, vel: [this.vel[0], this.vel[1], this.vel[2]] };
   }
 
-  step(cmd: VehicleCommand, dt: number, limits: VehicleLimits): VehicleStep {
+  step(cmd: VehicleCommand, dt: number, base: VehicleLimits, opts: StepOptions = {}): VehicleStep {
+    const limits = this.authority < 1 ? { ...base, speedH: base.speedH * this.authority, accel: base.accel * this.authority } : base;
     const [cx, cy] = clampMag2(cmd.vel[0], cmd.vel[1], limits.speedH);
     const cz = Math.max(-limits.speedV, Math.min(limits.speedV, cmd.vel[2]));
     // First-order lag gives the desired acceleration; then limit accel and jerk.
@@ -154,8 +200,15 @@ export class Vehicle {
     this.yawRate = rate;
 
     const before: V3 = [this.pos[0], this.pos[1], this.pos[2]];
+    const w = opts.wind;
+    // The commanded velocity is through the air; the wind carries the airframe with it.
+    if (w) {
+      vx += w[0];
+      vy += w[1];
+      vz += w[2];
+    }
     const delta: V3 = [vx * dt, vy * dt, vz * dt];
-    const moved = this.openAir(before, delta) ?? this.physicsMove(before, delta);
+    const moved = this.move(before, delta);
     this.pos = [moved.pos[0], moved.pos[1], moved.pos[2]];
     // The velocity that actually happened after sliding.
     const real: V3 = [(this.pos[0] - before[0]) / dt, (this.pos[1] - before[1]) / dt, (this.pos[2] - before[2]) / dt];
@@ -165,19 +218,33 @@ export class Vehicle {
       vy = real[1];
       vz = real[2];
     }
+    if (w && !blocked) {
+      // Keep the air-relative velocity as the vehicle's state.
+      vx -= w[0];
+      vy -= w[1];
+      vz -= w[2];
+    }
     this.accel = [(vx - this.vel[0]) / dt, (vy - this.vel[1]) / dt, (vz - this.vel[2]) / dt];
     if (blocked) this.accel = [ax, ay, az];
     this.vel = [vx, vy, vz];
+    return this.finishStep(before, dt, moved.hit);
+  }
+
+  /** Bookkeeping shared by every airframe: odometer, clock, contact events, battery. */
+  protected finishStep(before: V3, dt: number, touching: boolean): VehicleStep {
     this.odometer += Math.hypot(this.pos[0] - before[0], this.pos[1] - before[1], this.pos[2] - before[2]);
     this.tSec += dt;
-
-    const touching = moved.hit;
     const collided = touching && this.tSec - this.lastTouch > CONTACT_GAP_SEC;
     if (touching) this.lastTouch = this.tSec;
     if (collided) this.contacts += 1;
     const powerW = this.battery.powerFor(this.vel, this.accel);
     this.battery.draw(powerW, dt);
     return { collided, touching, powerW };
+  }
+
+  /** Move by delta, sliding along solids; the open-air fast path when nothing is near. */
+  protected move(pos: V3, delta: V3): { pos: V3; hit: boolean } {
+    return this.openAir(pos, delta) ?? this.physicsMove(pos, delta);
   }
 
   private physicsMove(pos: V3, delta: V3): { pos: V3; hit: boolean } {

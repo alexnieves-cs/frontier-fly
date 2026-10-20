@@ -15,6 +15,7 @@ import {
   toLocal,
   toWorld,
 } from '../planner/indoor';
+import { QuadVehicle } from '../quadVehicle';
 import { type VehicleCommand } from '../vehicle';
 import {
   type Job,
@@ -60,6 +61,8 @@ export abstract class IndoorPhases extends EntryPhases {
       this.world.seed,
     );
     v.sensing.lastNewVoxelSec = this.t;
+    if (this.vehicle instanceof QuadVehicle) v.sensing.braking = this.vehicle.braking;
+    v.sensing.rangeHook = this.options.lidarFault ?? null;
     // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
     const dark = nightFactor(lighting) > 0.5 && lighting.sensorMode === 'rgb';
     if (dark) {
