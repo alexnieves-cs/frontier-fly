@@ -10,7 +10,13 @@ const RATE_KP = 0.18;
 const RATE_KD = 0.01;
 const YAW_RATE_KP = 0.15;
 const MAX_TILT = 0.4;
-const MAX_RATE = 8;
+/**
+ * Body-rate setpoint cap, rad/s (about 230°/s, near PX4's 220°/s default).
+ * At 8 rad/s a hard reversal asked for more differential thrust than the
+ * motors have, the mixer clipped it out of the collective, and light-thrust
+ * airframes flipped.
+ */
+const MAX_RATE = 4;
 const MOTOR_MAX = 1100;
 const AZ_LIM = 8;
 

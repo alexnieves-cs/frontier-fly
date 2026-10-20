@@ -17,6 +17,7 @@ import { RNG } from '../../src/shared/rng';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
 import { frontierAction } from '../../src/sim/frontier';
+import { QUAD_BRAKING } from '../../src/sim/sensorPlanner';
 import { heuristicAction } from '../../src/sim/heuristic';
 import type { LightingPreset } from '../../src/sim/lighting';
 import { waypointAction } from '../../src/sim/waypointPilot';
@@ -40,8 +41,10 @@ export const CONDITIONS: Condition[] = [
   { id: 'quad', label: 'Hard, quadrotor dynamics + noise', stage: 3, seedBase: 50001, lighting: ['day', 'night-dark'], quad: 1 },
 ];
 
-export const PILOTS = ['teacher', 'classical', 'policy', 'guarded', 'waypoint', 'heuristic'] as const;
+export const PILOTS = ['teacher', 'classical', 'classicalBrake', 'policy', 'guarded', 'guardedBrake', 'waypoint', 'heuristic'] as const;
 export type PilotId = (typeof PILOTS)[number];
+/** Pilots that fly with the quadrotor's braking model, so they only run where the airframe is the quad. */
+export const QUAD_ONLY = new Set<PilotId>(['classicalBrake', 'guardedBrake']);
 
 export interface Job {
   condition: string;
@@ -65,7 +68,7 @@ export function jobs(): Job[] {
   for (const c of CONDITIONS) {
     for (let i = 0; i < SEEDS_PER_CONDITION; i++) {
       for (const lighting of c.lighting) {
-        for (const pilot of PILOTS) out.push({ condition: c.id, stage: c.stage, seed: c.seedBase + i, lighting, quad: c.quad ?? 0, pilot });
+        for (const pilot of PILOTS) if (c.quad || !QUAD_ONLY.has(pilot)) out.push({ condition: c.id, stage: c.stage, seed: c.seedBase + i, lighting, quad: c.quad ?? 0, pilot });
       }
     }
   }
@@ -110,10 +113,16 @@ export async function startEpisode(job: Job, policy: (obs: Float32Array) => Floa
     const p = classicalPilot();
     p.reset();
     act = p.act;
+  } else if (job.pilot === 'classicalBrake') {
+    const p = classicalPilot({ braking: QUAD_BRAKING });
+    p.reset();
+    act = p.act;
   } else if (job.pilot === 'policy') {
     act = (obs) => policy(obs);
   } else if (job.pilot === 'guarded') {
     act = (obs, e) => guardedAction(policy(obs), obs, e);
+  } else if (job.pilot === 'guardedBrake') {
+    act = (obs, e) => guardedAction(policy(obs), obs, e, QUAD_BRAKING);
   } else if (job.pilot === 'waypoint') {
     act = (obs) => waypointAction(obs);
   } else {
