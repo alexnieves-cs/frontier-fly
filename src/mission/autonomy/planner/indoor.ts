@@ -4,7 +4,7 @@ import type { InferPolicy } from '../../../rl/infer';
 
 /** What the explorer needs from a policy: a deterministic mean action. */
 export type ActingPolicy = Pick<InferPolicy, 'actWith'>;
-import { CELL, DRONE_RADIUS, MAX_SPEED_H, OBS_DIM } from '../../../shared/constants';
+import { CELL, DRONE_RADIUS, FLOOR_HEIGHT, LIDAR_H, LIDAR_MAX, MAX_SPEED_H, OBS, OBS_DIM, VOXEL } from '../../../shared/constants';
 import { RNG } from '../../../shared/rng';
 import type { BuildingSpec, LightingState } from '../../../shared/types';
 import { makeDroneState, scaleAction } from '../../../sim/drone';
@@ -12,9 +12,23 @@ import { zeroNoise } from '../../../sim/dynamics/dr';
 import { SensorNoise } from '../../../sim/dynamics/noise';
 import { FrontierNav } from '../../../sim/frontierFeatures';
 import { EgoMaps, SeenMap } from '../../../sim/seenMap';
+import {
+  descentClear,
+  filterVelocity,
+  guardAction,
+  OccupancyMap,
+  SAFETY_MARGIN,
+  SensorPlanner,
+  sensorClearance,
+  sensorLos,
+  sensorPath,
+  type SensorFrame,
+  type SensorGrid,
+} from '../../../sim/sensorPlanner';
 import { markVisited, sense } from '../../../sim/sensors';
 import type { PhysicsWorld } from '../../../sim/world';
 import type { MissionBuilding, V3 } from '../contracts';
+import type { OutdoorPhysics } from '../../../world/outdoor/physics';
 import { clamp, wrapAngle } from './geometry';
 
 /**
@@ -23,14 +37,18 @@ import { clamp, wrapAngle } from './geometry';
  * visibility estimate over the same cells the seen-empty maps use, picks
  * the reachable cell that would reveal the most unseen cells per meter of
  * travel, flies there on a clearance-checked grid path, and turns a full
- * circle. Shaft cells link floors. The policy explorer drives the trained
- * network from its 306-float observation instead.
+ * circle. Shaft cells link floors. That explorer plans on the true floor
+ * plan, so it is kept only as the 'oracle' reference. Missions fly the
+ * trained policy and the sensor-only explorer, which read the drone's own
+ * maps (IndoorSensing below).
  */
 
 /** Flight height above each floor, meters. */
 export const INDOOR_FLY_Z = 1.2;
 /** Range the visibility estimate trusts, meters. */
 export const SEE_RANGE = 6;
+/** Range the sensor-map look estimate trusts, meters (shorter: the map is coarser than the floor plan). */
+export const LOOK_RANGE = 5;
 /** Half of the horizontal angle the estimate trusts, radians. */
 export const SEE_HALF_FOV = (55 * Math.PI) / 180;
 /** Free air kept around the airframe on planned paths, meters. */
@@ -403,55 +421,142 @@ export class FrontierExplorer {
   }
 }
 
-// ------------------------------------------------------------- policy
+// ------------------------------------------------------------- sensing
 
-export interface PolicyCommand {
-  /** Local-frame velocity setpoint (axes match the world frame). */
-  vel: V3;
-  yawRate: number;
+/** The lidar's view of the world, in the building-local frame. */
+export type LidarWorld = Pick<PhysicsWorld, 'cast'>;
+
+/**
+ * Cast the indoor lidar against the mission's real collision world (walls,
+ * jambs, ajar doors, window holes), not the floor plan's idealized walls, so
+ * the drone senses what it can actually hit. Glass comes from the building's
+ * surface classes at the hit point.
+ */
+export function shellLidar(grid: IndoorGrid, cast: OutdoorPhysics['cast']): LidarWorld {
+  const [ox, oy, oz] = grid.origin;
+  const spec = grid.spec;
+  return {
+    cast(x, y, z, dx, dy, dz, maxDist) {
+      const hit = cast(x + ox, y + oy, z + oz, dx, dy, dz, maxDist);
+      if (!hit) return null;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      const hx = x + (dx / len) * hit.dist;
+      const hy = y + (dy / len) * hit.dist;
+      const f = clamp(Math.floor((z + (dz / len) * hit.dist) / spec.floorHeight), 0, spec.floors.length - 1);
+      const floor = spec.floors[f]!;
+      const gx = clamp(Math.floor(hx / spec.cellSize), 0, floor.w - 1);
+      const gy = clamp(Math.floor(hy / spec.cellSize), 0, floor.d - 1);
+      return {
+        dist: hit.dist,
+        surface: floor.surfaces?.[gy * floor.w + gx] ?? 0,
+      };
+    },
+  };
 }
 
 /**
- * Trained-policy explorer. Builds the 306-float observation with sense()
- * on a PhysicsWorld of the building in the local frame and takes the
- * policy's mean action. Speeds are capped for indoor flight, and commands
- * toward the outer wall ring are dropped so the policy cannot leave.
+ * The drone's own view of a building it is inside: the 1088-float
+ * observation built by sense() on a PhysicsWorld of the building in the local
+ * frame, the seen-free map its lidar paints, and the voxels it has flown.
+ * One instance lives for a whole visit, so a fallback explorer inherits the
+ * map the policy built. Nothing in here reads the floor plan for control:
+ * spec is handed to sense() only as the world the simulated lidar hits.
  */
-export class PolicyExplorer {
+/** Height above the floor the dark look estimate checks: a small object lying there. */
+const LOOK_POINT_Z = 0.25;
+
+/** Angle between the camera axis (perception/camera.ts fpvCameraFromDrone) and a point. */
+function coneAngle(local: V3, yaw: number, px: number, py: number, pz: number): number {
+  const nx = Math.cos(yaw);
+  const ny = Math.sin(yaw);
+  const ex = local[0] + nx * 0.1;
+  const ey = local[1] + ny * 0.1;
+  const ez = local[2] + 0.02;
+  const fx = nx * 2.9;
+  const fy = ny * 2.9;
+  const fz = -0.57;
+  const dx = px - ex;
+  const dy = py - ey;
+  const dz = pz - ez;
+  const c = (fx * dx + fy * dy + fz * dz) / (Math.hypot(fx, fy, fz) * Math.hypot(dx, dy, dz));
+  return Math.acos(clamp(c, -1, 1));
+}
+
+export class IndoorSensing implements SensorGrid {
   readonly visited: Uint8Array;
+  private readonly occ: OccupancyMap;
+  /** Voxels the camera has looked at, by the drone's own estimate (see look()). */
+  readonly looked: Uint8Array;
+  /** Voxels where the up (down) range finder saw past the ceiling (floor): a shaft to the next floor. */
+  readonly shaftUp: Uint8Array;
+  readonly shaftDown: Uint8Array;
+  /** Camera half-angle and range the look estimate trusts; set from the lighting the drone knows. */
+  lookHalf = SEE_HALF_FOV;
+  lookRange = LOOK_RANGE;
+  /**
+   * In the dark: half-angle of the flashlight cone around the camera axis
+   * (nose, tilted down as in perception/camera.ts). A voxel counts as looked
+   * at only when a point just above its floor falls inside the cone, so the
+   * floor right under the drone is not counted. Null in daylight.
+   */
+  lookCone: number | null = null;
+  /** Closest distance at which a viewpoint can light a voxel on the floor (see lookCone). */
+  lookMin = 0;
+  readonly vw: number;
+  readonly vd: number;
   visitedCount = 0;
   lastNewVoxelSec = 0;
-  private readonly obs = new Float32Array(OBS_DIM);
-  private readonly scaled = new Float32Array(4);
+  readonly obs = new Float32Array(OBS_DIM);
+  readonly lidar = new Float64Array(LIDAR_H);
   private readonly noise: SensorNoise;
-  private readonly rng: RNG;
+  readonly rng: RNG;
   private prevVel: [number, number, number] = [0, 0, 0];
-  private yawRate = 0;
+  yawRate = 0;
   private steps = 0;
-  private readonly maxSteps = 2400;
-  /** Observation v2 state, built the way ExplorerEnv builds it. */
-  private readonly seen = new SeenMap();
+  readonly maxSteps = 2400;
+  private readonly seenMap = new SeenMap();
   private readonly nav = new FrontierNav();
   private readonly maps = new EgoMaps();
   private stall = 0;
 
   constructor(
     readonly grid: IndoorGrid,
-    readonly policy: ActingPolicy,
-    readonly physics: PhysicsWorld,
+    readonly physics: LidarWorld,
     readonly lighting: LightingState,
     seed: number,
-    readonly speedCap = 1,
   ) {
     const floor0 = grid.spec.floors[0]!;
-    this.visited = new Uint8Array(grid.floors * floor0.w * 2 * floor0.d * 2);
+    this.vw = floor0.w * 2;
+    this.vd = floor0.d * 2;
+    this.visited = new Uint8Array(grid.floors * this.vw * this.vd);
+    this.occ = new OccupancyMap(this.vw, this.vd, grid.floors);
+    // The outer wall ring: the envelope inspection measured the building from outside and the
+    // fly-through crossed one cell of wall. Lidar through a window hole would paint it free.
+    for (let f = 0; f < grid.floors; f++) {
+      for (let y = 0; y < this.vd; y++) {
+        for (let x = 0; x < this.vw; x++) {
+          if (x < 2 || y < 2 || x >= this.vw - 2 || y >= this.vd - 2) this.occ.block(f * this.vw * this.vd + y * this.vw + x);
+        }
+      }
+    }
+    this.looked = new Uint8Array(grid.floors * this.vw * this.vd);
+    this.shaftUp = new Uint8Array(grid.floors * this.vw * this.vd);
+    this.shaftDown = new Uint8Array(grid.floors * this.vw * this.vd);
     this.rng = new RNG(seed >>> 0, 'indoor-policy');
     this.noise = new SensorNoise(zeroNoise(), this.rng.fork('noise'));
-    this.seen.reset(grid.spec);
+    this.seenMap.reset(grid.spec);
   }
 
-  /** One policy step from a local pose. */
-  act(local: V3, vel: V3, yaw: number, tSec: number): PolicyCommand {
+  get seen(): Uint8Array {
+    return this.seenMap.data;
+  }
+
+  get occupied(): Uint8Array {
+    return this.occ.occupied;
+  }
+
+  /** Sense from a local pose: marks flown and seen-free voxels and writes obs and lidar (meters). */
+  sense(local: V3, vel: V3, yaw: number, tSec: number): Float32Array {
     if (markVisited(this.grid.spec, this.visited, local[0], local[1], local[2])) {
       this.visitedCount += 1;
       this.lastNewVoxelSec = tSec;
@@ -474,8 +579,8 @@ export class PolicyExplorer {
         lighting: this.lighting,
         noise: this.noise,
         prevVel: this.prevVel,
-        seen: this.seen.data,
-        markSeen: this.seen,
+        seen: this.seenMap.data,
+        markSeen: this.seenMap,
         nav: this.nav,
         maps: this.maps,
         stall: this.stall,
@@ -484,36 +589,512 @@ export class PolicyExplorer {
     );
     this.prevVel = [vel[0], vel[1], vel[2]];
     this.steps += 1;
-    const action = this.policy.actWith(this.obs, 1, this.rng, true).action;
-    scaleAction(action, this.scaled);
+    for (let i = 0; i < LIDAR_H; i++) this.lidar[i] = this.obs[OBS.lidar + i]! * LIDAR_MAX;
+    const f = floorOf(this.grid, local[2]);
+    this.occ.mark(f, local[0], local[1], yaw, this.lidar);
+    this.look(local, yaw);
+    // Range finders: open air well past the ceiling or the floor of this storey means a shaft.
+    const zf = local[2] - f * this.grid.H;
+    const vx = Math.floor(local[0] / VOXEL);
+    const vy = Math.floor(local[1] / VOXEL);
+    if (vx >= 0 && vy >= 0 && vx < this.vw && vy < this.vd) {
+      const k = f * this.vw * this.vd + vy * this.vw + vx;
+      if (f < this.grid.floors - 1 && this.obs[OBS.ceil]! * FLOOR_HEIGHT > this.grid.H - zf + 0.8) this.shaftUp[k] = 1;
+      if (f > 0 && this.obs[OBS.alt]! * FLOOR_HEIGHT > zf + 0.8) this.shaftDown[k] = 1;
+    }
+    return this.obs;
+  }
+
+  /**
+   * Mark known-free voxels inside the camera's trusted cone and range, with a
+   * clear line of sight through the drone's own map, as looked at. This is
+   * the sensor-map version of IndoorVisibility: it never reads the floor plan.
+   */
+  look(local: V3, yaw: number): number {
+    const f = floorOf(this.grid, local[2]);
+    const { vw, vd } = this;
+    const base = f * vw * vd;
+    const r = this.lookRange;
+    const x0 = Math.max(0, Math.floor((local[0] - r) / VOXEL));
+    const x1 = Math.min(vw - 1, Math.floor((local[0] + r) / VOXEL));
+    const y0 = Math.max(0, Math.floor((local[1] - r) / VOXEL));
+    const y1 = Math.min(vd - 1, Math.floor((local[1] + r) / VOXEL));
+    let fresh = 0;
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const k = base + y * vw + x;
+        if (this.looked[k]) continue;
+        if (!(this.visited[k] || (this.seen[k] && !this.occupied[k]))) continue;
+        const cx = (x + 0.5) * VOXEL;
+        const cy = (y + 0.5) * VOXEL;
+        const d = Math.hypot(cx - local[0], cy - local[1]);
+        if (d > r) continue;
+        if (this.lookCone !== null) {
+          if (coneAngle(local, yaw, cx, cy, f * this.grid.H + LOOK_POINT_Z) > this.lookCone) continue;
+        } else if (d > 0.7 && Math.abs(wrapAngle(Math.atan2(cy - local[1], cx - local[0]) - yaw)) > this.lookHalf) continue;
+        if (!sensorLos(this, f, local[0], local[1], cx, cy)) continue;
+        this.looked[k] = 1;
+        fresh += 1;
+      }
+    }
+    return fresh;
+  }
+
+  /**
+   * Centre of the shaft voxels (found by the range finders) nearest `from` on
+   * `floor`, leading up or down, or null when none is known. The centre is
+   * the mean of the 8-connected group, so the climb stays inside the column.
+   */
+  shaftPoint(floor: number, dir: 'up' | 'down', from: V3): [number, number] | null {
+    const map = dir === 'up' ? this.shaftUp : this.shaftDown;
+    const { vw, vd } = this;
+    const base = floor * vw * vd;
+    let best = -1;
+    let bestD = Infinity;
+    for (let k = 0; k < vw * vd; k++) {
+      if (!map[base + k]) continue;
+      const d = Math.hypot(((k % vw) + 0.5) * VOXEL - from[0], (Math.floor(k / vw) + 0.5) * VOXEL - from[1]);
+      if (d < bestD) {
+        bestD = d;
+        best = k;
+      }
+    }
+    if (best < 0) return null;
+    const group = [best];
+    const seen = new Set(group);
+    let sx = 0;
+    let sy = 0;
+    for (let i = 0; i < group.length; i++) {
+      const k = group[i]!;
+      const x = k % vw;
+      const y = (k - x) / vw;
+      sx += (x + 0.5) * VOXEL;
+      sy += (y + 0.5) * VOXEL;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= vw || ny >= vd) continue;
+          const nk = ny * vw + nx;
+          if (map[base + nk] && !seen.has(nk)) {
+            seen.add(nk);
+            group.push(nk);
+          }
+        }
+      }
+    }
+    return [sx / group.length, sy / group.length];
+  }
+
+  /** Looked-at voxels over known-free voxels: the drone's own estimate of search coverage. */
+  lookedCoverage(): number {
+    let free = 0;
+    let seen = 0;
+    for (let i = 0; i < this.visited.length; i++) {
+      if (!(this.visited[i] || (this.seen[i] && !this.occupied[i]))) continue;
+      free += 1;
+      if (this.looked[i]) seen += 1;
+    }
+    return free ? seen / free : 0;
+  }
+
+  /** True when the last observation's frontier search found nothing to fly to on this floor. */
+  get frontierLeft(): boolean {
+    return this.obs[OBS.hasFrontier]! > 0.5;
+  }
+
+  /** Flown voxels over the voxels this drone has mapped as free (its own estimate of how done it is). */
+  mappedCoverage(): number {
+    let free = 0;
+    let flown = 0;
+    for (let i = 0; i < this.visited.length; i++) {
+      if (this.visited[i] || (this.seen[i] && !this.occupied[i])) free += 1;
+      if (this.visited[i]) flown += 1;
+    }
+    return free ? flown / free : 0;
+  }
+
+  /** Visited voxels over reachable voxels (ground truth; for reports only, never for control). */
+  coverage(): number {
+    return this.grid.spec.reachableVoxels > 0 ? this.visitedCount / this.grid.spec.reachableVoxels : 0;
+  }
+
+  frame(local: V3, yaw: number): SensorFrame {
+    return {
+      seen: this.seen,
+      visited: this.visited,
+      occupied: this.occupied,
+      vw: this.vw,
+      vd: this.vd,
+      floors: this.grid.floors,
+      floorHeight: this.grid.H,
+      pos: [local[0], local[1], local[2]],
+      yaw,
+      lidar: this.lidar,
+      alt: this.obs[OBS.alt]! * FLOOR_HEIGHT,
+    };
+  }
+}
+
+// ------------------------------------------------------------- navigation
+
+/** Path and viewpoint queries the runner makes inside a building. */
+export interface IndoorNav {
+  /** Local waypoints from one local point to another, or null when unreachable. */
+  path(from: V3, to: V3): V3[] | null;
+  /** A hover point is safe and sees the target point. */
+  canView(p: V3, target: V3): boolean;
+}
+
+/** Floor-plan navigation: the reference oracle. It knows every wall before the drone sees it. */
+export function oracleNav(grid: IndoorGrid): IndoorNav {
+  return {
+    path: (from, to) => planIndoorPath(grid, from, to),
+    canView: (p, target) => {
+      const f = floorOf(grid, p[2]);
+      const c = nearestNav(grid, p);
+      if (!c || Math.hypot((c.x + 0.5) * grid.cs - p[0], (c.z + 0.5) * grid.cs - p[1]) > 0.75) return false;
+      if (wallClearance(grid, f, p[0], p[1]) < PATH_CLEARANCE) return false;
+      return gridLos(grid, f, p[0], p[1], target[0], target[1]);
+    },
+  };
+}
+
+/** Navigation on the drone's own maps: only voxels it has seen free or flown. */
+export function sensorNav(grid: IndoorGrid, sensing: IndoorSensing): IndoorNav {
+  return {
+    path: (from, to) => {
+      const f = floorOf(grid, from[2]);
+      if (floorOf(grid, to[2]) !== f) return null;
+      const xy = sensorPath(sensing, f, [from[0], from[1]], [to[0], to[1]]);
+      if (!xy) return null;
+      const z = f * grid.H + INDOOR_FLY_Z;
+      return xy.map(([x, y]) => [x, y, z] as V3);
+    },
+    canView: (p, target) => {
+      const f = floorOf(grid, p[2]);
+      if (sensorClearance(sensing, f, p[0], p[1]) < 2 * VOXEL) return false;
+      // The target itself may sit in a voxel the lidar never painted free (a person on the floor).
+      return sensorLos(sensing, f, p[0], p[1], target[0], target[1], VOXEL);
+    },
+  };
+}
+
+// ------------------------------------------------------------- explorers
+
+export interface PolicyCommand {
+  /** Local-frame velocity setpoint (axes match the world frame). */
+  vel: V3;
+  yawRate: number;
+}
+
+/**
+ * Safety-filter horizon indoors, seconds. The mission vehicle brakes at
+ * 1.5 m/s² with a jerk limit (INDOOR_LIMITS), so it needs longer to stop than
+ * the coverage env's first-order lag.
+ */
+export const INDOOR_FILTER_HORIZON = 0.7;
+
+/** Steps in a row without a frontier before an explorer reports the building done. */
+const DONE_STEPS = 20;
+
+/**
+ * Trained-policy explorer. Takes the policy's mean action on the shared
+ * sensing's observation, caps speed for indoor flight, and runs it through
+ * the sensor-only guard (sim/sensorPlanner.ts guardAction): an altitude nudge
+ * and a lidar filter that cuts velocity only at imminent contact.
+ */
+export class PolicyExplorer {
+  private readonly scaled = new Float32Array(4);
+  private readonly guarded = new Float32Array(4);
+  private idle = 0;
+
+  constructor(
+    readonly grid: IndoorGrid,
+    readonly policy: ActingPolicy,
+    readonly sensing: IndoorSensing,
+    readonly speedCap = 1,
+  ) {}
+
+  /** No frontier left in the drone's own map for DONE_STEPS steps. */
+  get exhausted(): boolean {
+    return this.idle >= DONE_STEPS;
+  }
+
+  /** One policy step from a local pose. */
+  act(local: V3, vel: V3, yaw: number, tSec: number): PolicyCommand {
+    const obs = this.sensing.sense(local, vel, yaw, tSec);
+    this.idle = this.sensing.frontierLeft ? 0 : this.idle + 1;
+    const action = this.policy.actWith(obs, 1, this.sensing.rng, true).action;
+    const f = floorOf(this.grid, local[2]);
+    guardAction(action, local[2] - f * this.grid.H, yaw, this.sensing.lidar, this.guarded, INDOOR_FILTER_HORIZON);
+    scaleAction(this.guarded, this.scaled);
     const k = this.speedCap / MAX_SPEED_H;
     const bx = this.scaled[0]! * k;
     const by = this.scaled[1]! * k;
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
-    let vx = cy * bx - sy * by;
-    let vy = sy * bx + cy * by;
+    const vx = cy * bx - sy * by;
+    const vy = sy * bx + cy * by;
     const vz = clamp(this.scaled[2]!, -0.6, 0.6);
-    // Keep the policy off the outer wall ring and away from the apertures.
-    const ahead = cellAt(this.grid, [local[0] + vx * 0.6, local[1] + vy * 0.6, local[2]]);
-    if (!isNav(this.grid, ahead.f, ahead.x, ahead.z)) {
-      const ax = cellAt(this.grid, [local[0] + vx * 0.6, local[1], local[2]]);
-      const ay = cellAt(this.grid, [local[0], local[1] + vy * 0.6, local[2]]);
-      if (!isNav(this.grid, ax.f, ax.x, ax.z)) vx = 0;
-      if (!isNav(this.grid, ay.f, ay.x, ay.z)) vy = 0;
-    }
     // Hold a sane height band on the current floor.
-    const f = floorOf(this.grid, local[2]);
     const zLo = f * this.grid.H + 0.5;
     const zHi = (f + 1) * this.grid.H - 0.5;
     const vzSafe = local[2] < zLo ? Math.max(vz, 0.3) : local[2] > zHi ? Math.min(vz, -0.3) : vz;
-    this.yawRate = this.scaled[3]!;
-    return { vel: [vx, vy, vzSafe], yawRate: this.yawRate };
+    this.sensing.yawRate = this.scaled[3]!;
+    return { vel: [vx, vy, vzSafe], yawRate: this.sensing.yawRate };
   }
 
   /** Visited voxels over reachable voxels. */
   coverage(): number {
-    return this.grid.spec.reachableVoxels > 0 ? this.visitedCount / this.grid.spec.reachableVoxels : 0;
+    return this.sensing.coverage();
   }
 }
 
+/** A viewpoint is worth flying to when it would show at least this many unlooked voxels. */
+const MIN_LOOK_GAIN = 4;
+
+/**
+ * Classical sensor-only explorer (sim/sensorPlanner.ts SensorPlanner) on the
+ * shared sensing. It is the mission's indoor fallback and the baseline the
+ * policy is measured against. Per floor: sweep (fly every known-free voxel,
+ * facing the direction of travel), then look (fly to the viewpoint that would
+ * show the most voxels the camera has not looked at yet, per meter of travel,
+ * and turn a full circle there) until no viewpoint is worth it. Then it takes
+ * a shaft its up and down range finders found to a floor it has not searched,
+ * and finally returns to the floor it entered on.
+ */
+export class SensorExplorer {
+  private readonly planner: SensorPlanner;
+  private idle = 0;
+  private phase: 'sweep' | 'look' | 'shaft' | 'done';
+  private route: V3[] = [];
+  private spin = 0;
+  private entryFloor = -1;
+  private readonly floorsDone = new Set<number>();
+  /** Shaft leg: hover point (local xy) and the floor to reach. */
+  private shaft: { x: number; y: number; to: number } | null = null;
+
+  constructor(
+    readonly grid: IndoorGrid,
+    readonly sensing: IndoorSensing,
+    readonly speedCap = 1,
+    start: 'sweep' | 'look' = 'sweep',
+  ) {
+    this.planner = new SensorPlanner({
+      speed: speedCap,
+      flyHeight: INDOOR_FLY_Z,
+      horizon: INDOOR_FILTER_HORIZON,
+    });
+    this.phase = start;
+  }
+
+  get exhausted(): boolean {
+    return this.phase === 'done';
+  }
+
+  get phaseName(): 'sweep' | 'look' | 'shaft' | 'done' {
+    return this.phase;
+  }
+
+  /**
+   * Out of time: stop searching and get back to the entry floor (the way out),
+   * through the shaft if the drone is on another floor or climbing.
+   */
+  wrapUp(local: V3): void {
+    if (this.phase === 'done') return;
+    for (let f = 0; f < this.grid.floors; f++) this.floorsDone.add(f);
+    const f = floorOf(this.grid, local[2]);
+    if (this.phase === 'shaft' && this.shaft) {
+      // Already in the column: climb or descend straight to the entry floor.
+      if (!this.route.length) this.shaft.to = this.entryFloor;
+      else if (f === this.entryFloor) this.phase = 'done';
+      return;
+    }
+    if (f === this.entryFloor) {
+      this.phase = 'done';
+      return;
+    }
+    this.route = [];
+    this.spin = 0;
+    this.phase = 'look';
+    this.floorDone(local, 0);
+  }
+
+  act(local: V3, vel: V3, yaw: number, tSec: number): PolicyCommand {
+    this.sensing.sense(local, vel, yaw, tSec);
+    if (this.entryFloor < 0) this.entryFloor = floorOf(this.grid, local[2]);
+    if (this.phase === 'sweep') {
+      const cmd = this.planner.act(this.sensing.frame(local, yaw));
+      this.idle = cmd.exploring ? 0 : this.idle + 1;
+      if (this.idle >= DONE_STEPS) {
+        this.idle = 0;
+        this.phase = 'look';
+      } else {
+        this.sensing.yawRate = cmd.yawRate;
+        return { vel: [cmd.vx, cmd.vy, cmd.vz], yawRate: cmd.yawRate };
+      }
+    }
+    if (this.phase === 'look') return this.lookStep(local, yaw);
+    if (this.phase === 'shaft') return this.shaftStep(local, yaw);
+    return { vel: [0, 0, 0], yawRate: 0 };
+  }
+
+  private hold(local: V3): number {
+    const f = floorOf(this.grid, local[2]);
+    const vz = clamp((f * this.grid.H + INDOOR_FLY_Z - local[2]) * 2, -0.6, 0.6);
+    return vz < 0 && !descentClear(this.sensing.lidar) ? 0 : vz;
+  }
+
+  /** Follow this.route on the current floor; true once the last point is reached. */
+  private follow(local: V3, yaw: number, out: { cmd: PolicyCommand | null }): boolean {
+    const target = this.route[0]!;
+    const dx = target[0] - local[0];
+    const dy = target[1] - local[1];
+    const d = Math.hypot(dx, dy);
+    if (d < (this.route.length === 1 ? 0.12 : 0.2)) {
+      this.route.shift();
+      out.cmd = { vel: [0, 0, this.hold(local)], yawRate: 0 };
+      return this.route.length === 0;
+    }
+    const sp = Math.min(this.speedCap, 0.3 + d);
+    const [vx, vy] = filterVelocity((dx / d) * sp, (dy / d) * sp, yaw, this.sensing.lidar, SAFETY_MARGIN, INDOOR_FILTER_HORIZON);
+    const yawRate = clamp(wrapAngle(Math.atan2(dy, dx) - yaw) * 2, -MAX_YAW_RATE_INDOOR, MAX_YAW_RATE_INDOOR);
+    this.sensing.yawRate = yawRate;
+    out.cmd = { vel: [vx, vy, this.hold(local)], yawRate };
+    return false;
+  }
+
+  private lookStep(local: V3, yaw: number): PolicyCommand {
+    const f = floorOf(this.grid, local[2]);
+    if (this.spin > 0) {
+      this.spin -= 1;
+      this.sensing.yawRate = MAX_YAW_RATE_INDOOR;
+      return { vel: [0, 0, this.hold(local)], yawRate: MAX_YAW_RATE_INDOOR };
+    }
+    if (!this.route.length) {
+      const goal = bestViewpoint(this.sensing, f, local);
+      const path = goal ? sensorPath(this.sensing, f, [local[0], local[1]], [goal[0], goal[1]]) : null;
+      if (!path) return this.floorDone(local, yaw);
+      this.route = path.map(([x, y]) => [x, y, f * this.grid.H + INDOOR_FLY_Z] as V3);
+    }
+    const out: { cmd: PolicyCommand | null } = { cmd: null };
+    if (this.follow(local, yaw, out)) this.spin = Math.ceil((Math.PI * 2) / MAX_YAW_RATE_INDOOR / 0.05) + 2;
+    return out.cmd!;
+  }
+
+  /** This floor is searched: pick a shaft to an unsearched floor, or head back to the entry floor, or stop. */
+  private floorDone(local: V3, yaw: number): PolicyCommand {
+    const f = floorOf(this.grid, local[2]);
+    this.floorsDone.add(f);
+    const want: number[] = [];
+    for (const g of [f + 1, f - 1]) if (g >= 0 && g < this.grid.floors && !this.floorsDone.has(g)) want.push(g);
+    if (!want.length && f !== this.entryFloor) want.push(f > this.entryFloor ? f - 1 : f + 1);
+    for (const g of want) {
+      const at = this.sensing.shaftPoint(f, g > f ? 'up' : 'down', local);
+      if (!at) continue;
+      const path = sensorPath(this.sensing, f, [local[0], local[1]], at);
+      if (!path) continue;
+      this.route = path.map(([x, y]) => [x, y, f * this.grid.H + INDOOR_FLY_Z] as V3);
+      this.shaft = { x: at[0], y: at[1], to: g };
+      this.phase = 'shaft';
+      return this.shaftStep(local, yaw);
+    }
+    this.phase = 'done';
+    return { vel: [0, 0, 0], yawRate: 0 };
+  }
+
+  private shaftStep(local: V3, yaw: number): PolicyCommand {
+    const shaft = this.shaft!;
+    if (this.route.length) {
+      const out: { cmd: PolicyCommand | null } = { cmd: null };
+      this.follow(local, yaw, out);
+      return out.cmd!;
+    }
+    // In the column: hold xy on the shaft centre and climb or descend to the next floor's flight height.
+    const zTarget = shaft.to * this.grid.H + INDOOR_FLY_Z;
+    const ez = zTarget - local[2];
+    if (Math.abs(ez) < 0.08) {
+      this.shaft = null;
+      this.planner.reset();
+      this.phase = this.floorsDone.has(shaft.to) ? 'look' : 'sweep';
+      if (this.phase === 'look' && shaft.to === this.entryFloor) this.phase = 'done';
+      return { vel: [0, 0, 0], yawRate: 0 };
+    }
+    const vx = clamp((shaft.x - local[0]) * 2, -0.3, 0.3);
+    const vy = clamp((shaft.y - local[1]) * 2, -0.3, 0.3);
+    return { vel: [vx, vy, clamp(ez * 1.5, -0.5, 0.5)], yawRate: 0 };
+  }
+}
+
+/** Yaw rate for turning in place indoors, rad/s (the vehicle's indoor limit). */
+const MAX_YAW_RATE_INDOOR = Math.PI / 2;
+
+/**
+ * The reachable known-free voxel that would show the most unlooked voxels
+ * per meter of travel (gain / (1 + 0.3 * path length)), judged on the
+ * drone's own map. Null when no voxel would show MIN_LOOK_GAIN.
+ */
+export function bestViewpoint(sensing: IndoorSensing, floor: number, from: V3): [number, number] | null {
+  const { vw, vd } = sensing;
+  const base = floor * vw * vd;
+  const open = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= vw || y >= vd) return false;
+    const k = base + y * vw + x;
+    return sensing.visited[k] === 1 || (sensing.seen[k] === 1 && sensing.occupied[k] !== 1);
+  };
+  const unlooked: number[] = [];
+  for (let y = 0; y < vd; y++) for (let x = 0; x < vw; x++) if (open(x, y) && !sensing.looked[base + y * vw + x]) unlooked.push(y * vw + x);
+  if (unlooked.length < MIN_LOOK_GAIN) return null;
+  // BFS path lengths from the drone over known-free voxels.
+  const dist = new Float32Array(vw * vd).fill(Infinity);
+  const sx = clamp(Math.floor(from[0] / VOXEL), 0, vw - 1);
+  const sy = clamp(Math.floor(from[1] / VOXEL), 0, vd - 1);
+  const queue = [sy * vw + sx];
+  dist[sy * vw + sx] = 0;
+  for (let h = 0; h < queue.length; h++) {
+    const k = queue[h]!;
+    const x = k % vw;
+    const y = (k - x) / vw;
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!open(nx, ny)) continue;
+      const nk = ny * vw + nx;
+      if (dist[nk]! <= dist[k]! + 1) continue;
+      dist[nk] = dist[k]! + 1;
+      queue.push(nk);
+    }
+  }
+  const range = sensing.lookRange - 0.5;
+  let best: [number, number] | null = null;
+  let bestScore = 0;
+  for (const k of queue) {
+    const x = k % vw;
+    const y = (k - x) / vw;
+    // Viewpoints keep a voxel of known free air around them.
+    if (sensorClearance(sensing, floor, (x + 0.5) * VOXEL, (y + 0.5) * VOXEL) < 2 * VOXEL) continue;
+    const px = (x + 0.5) * VOXEL;
+    const py = (y + 0.5) * VOXEL;
+    let gain = 0;
+    for (const u of unlooked) {
+      const ux = ((u % vw) + 0.5) * VOXEL;
+      const uy = (Math.floor(u / vw) + 0.5) * VOXEL;
+      const dd = (ux - px) ** 2 + (uy - py) ** 2;
+      if (dd > range * range || dd < sensing.lookMin * sensing.lookMin) continue;
+      if (sensorLos(sensing, floor, px, py, ux, uy)) gain += 1;
+    }
+    if (gain < MIN_LOOK_GAIN) continue;
+    const score = gain / (1 + 0.3 * dist[k]! * VOXEL);
+    if (score > bestScore) {
+      bestScore = score;
+      best = [px, py];
+    }
+  }
+  return best;
+}

@@ -10,7 +10,7 @@
   <img src="docs/media/film-hero.gif" alt="Mission film: the drone crosses the roof of the cabin and lines up on the garage gap it will fly through" width="720">
 </p>
 
-### [▶ Try it live](https://alexnieves-cs.github.io/frontier-fly/) · [Mission film](https://alexnieves-cs.github.io/frontier-fly/film.html) · [Mission console](https://alexnieves-cs.github.io/frontier-fly/demo.html) · [Indoor sim](https://alexnieves-cs.github.io/frontier-fly/sim.html) · [Mission editor](https://alexnieves-cs.github.io/frontier-fly/mission.html) · [Outdoor site](https://alexnieves-cs.github.io/frontier-fly/outdoor.html) · [Benchmarks](docs/BENCHMARKS.md) · [Architecture](docs/ARCHITECTURE.md)
+### [▶ Try it live](https://alexnieves-cs.github.io/frontier-fly/) · [Mission film](https://alexnieves-cs.github.io/frontier-fly/film.html) · [Mission console](https://alexnieves-cs.github.io/frontier-fly/demo.html) · [Indoor sim](https://alexnieves-cs.github.io/frontier-fly/sim.html) · [Mission editor](https://alexnieves-cs.github.io/frontier-fly/mission.html) · [Outdoor site](https://alexnieves-cs.github.io/frontier-fly/outdoor.html) · [Benchmarks](docs/BENCHMARKS.md) · [Report](docs/REPORT.md) · [Architecture](docs/ARCHITECTURE.md)
 
 frontier-fly is a search-and-rescue drone simulator and autopilot. A quadrotor reads lidar, an IMU, and its own map of where it has been, and a small neural network decides where to fly next. That network is trained by imitation learning: behavior cloning and DAgger from a privileged frontier-exploration teacher. PPO fine-tuning is implemented and runs in the tab, but the shipped weights come from DAgger. The mission it is built for: sweep a geofenced patch of woods, find the building, pick an opening it actually fits through, search room by room for a missing person or confirm the place is clear, fly home, and file a report.
 
@@ -154,7 +154,8 @@ npm run build      # typecheck and production bundle in dist/
 | `npm run test:e2e` | Headless Chrome checks and screenshots |
 | `npm run bench` | Coverage and throughput, written to `docs/benchmarks.json` |
 | `npm run media` | Record the demo clips into `docs/media/` (needs ffmpeg) |
-| `npm run docs` | Regenerate `docs/ARCHITECTURE.md`, `docs/BENCHMARKS.md`, and the README tables |
+| `npm run study:coverage` / `npm run study:missions` | Every pilot on fresh buildings, and three indoor explorers on fresh mission worlds, with 95% intervals |
+| `npm run docs` | Regenerate `docs/ARCHITECTURE.md`, `docs/BENCHMARKS.md`, `docs/REPORT.md`, and the README tables |
 | `npm run check:pages` | Serve `dist/` the way GitHub Pages does and check every page loads |
 | `npm run eval:coverage` | Coverage table vs targets for the shipped checkpoint |
 | `npm run train:indoor -- --out ckpt.json` | BC + DAgger on every core, kept by held-out validation |
@@ -192,7 +193,7 @@ These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/fron
 ## Honest limits
 
 - The shipped policy meets the coverage goals on the fixed eval, but that eval is small: 4 easy and 3 hard seeds. On 48 held-out validation episodes the current checkpoint (a weight average of DAgger rounds 3 and 4) averages 62.2% on hard buildings against 60.8% for the previous one, so expect the hard-building number to move by several points on other seeds. It reaches about 92% of the privileged teacher it imitates. [BENCHMARKS.md](docs/BENCHMARKS.md) has the per-seed numbers.
-- Inside real missions the policy is not yet better than the frontier planner it hands off to. On 90 missions over fresh seeds, both reach the expected outcome 88.9% of the time, but the policy hands 40% of the buildings it enters to the planner (mostly after touching a wall) and averages 0.4 collisions per mission against none for the planner. The planner is the safety net, and the missions table counts both. [BENCHMARKS.md](docs/BENCHMARKS.md#on-fresh-seeds) has the breakdown.
+- Indoors, missions no longer read the floor plan: a sensor-only planner maps from the drone's own lidar and range finders, and the policy flies under a lidar guard with that planner as its fallback. On 90 fresh mission worlds per explorer the sensor-only explorer reaches the expected outcome 93.3% of the time, the policy-first explorer 91.1%, and the old floor-plan planner (kept as a reference) 88.9%, with no collisions in any of the 270 flights. The policy still hands 46% of the buildings it enters to the planner after a stall, and on fresh coverage buildings a classical sensor-only planner covers more than the policy. [REPORT.md](docs/REPORT.md) has the study, the ablations and the failure cases.
 - Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.
 - Door leaves are visual. Furniture collides, but doors are always open in the indoor grid.
 - The detector is geometric, not a trained vision model.

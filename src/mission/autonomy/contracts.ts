@@ -263,7 +263,7 @@ export interface RunRecord {
   batteryEndPct: number;
   /** True when the drone landed within 1.5 m of home. */
   landedHome: boolean;
-  indoorExplorer: 'policy' | 'frontier' | null;
+  indoorExplorer: 'policy' | 'frontier' | 'oracle' | null;
   log: LogEntry[];
 }
 
@@ -292,8 +292,13 @@ export interface RunnerOptions {
    * request open until approve() or deny(). Default: 'pending'.
    */
   operator?: (candidate: EntryCandidate) => 'approve' | 'deny' | 'pending';
-  /** Indoor exploration mode. 'auto' uses the trained policy when given, else frontier. */
-  indoor?: 'auto' | 'frontier' | 'policy';
+  /**
+   * Indoor exploration mode. 'auto' uses the trained policy when given, else
+   * the sensor-only frontier explorer. 'frontier' forces that explorer.
+   * 'oracle' plans on the true floor plan: a reference for benchmarks, not
+   * something a real drone could fly.
+   */
+  indoor?: 'auto' | 'frontier' | 'policy' | 'oracle';
   /** Optional trained policy weights (InferPolicy). */
   policy?: unknown;
 }

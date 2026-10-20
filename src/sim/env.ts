@@ -1,3 +1,4 @@
+import { applyObsAblation } from './ablation';
 import {
   COVERAGE_SUCCESS,
   MAX_HARD_COLLISIONS,
@@ -382,6 +383,7 @@ export class ExplorerEnv implements Env {
       },
       this.obs,
     );
+    applyObsAblation(this.obs);
     return this.obs.slice();
   }
 

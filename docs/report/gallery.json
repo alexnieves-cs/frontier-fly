@@ -1,0 +1,82 @@
+[
+  {
+    "id": "policy-collisions",
+    "title": "Policy alone, most collisions on a hard building",
+    "why": "The policy imitates a teacher that never collides and was never trained on the states just before a contact, so it brushes furniture and door jambs.",
+    "job": {
+      "condition": "hard",
+      "stage": 3,
+      "seed": 30023,
+      "lighting": "day",
+      "quad": 0,
+      "pilot": "policy"
+    },
+    "coverage": 0.6553030303030303,
+    "collisions": 17,
+    "floors": 1
+  },
+  {
+    "id": "policy-guarded",
+    "title": "Same building, policy under the lidar guard",
+    "why": "The guard filters the same actions through the lidar ring and holds 1.15 m above the floor, between the furniture heights.",
+    "job": {
+      "condition": "hard",
+      "stage": 3,
+      "seed": 30023,
+      "lighting": "day",
+      "quad": 0,
+      "pilot": "guarded"
+    },
+    "coverage": 0.7386363636363636,
+    "collisions": 0,
+    "floors": 1
+  },
+  {
+    "id": "planner-lowest",
+    "title": "Sensor-only planner, lowest coverage on a hard building",
+    "why": "The planner only routes through voxels its lidar has seen free. Rooms behind a doorway it never looked straight through stay unknown until the episode budget runs out.",
+    "job": {
+      "condition": "hard",
+      "stage": 3,
+      "seed": 30020,
+      "lighting": "day",
+      "quad": 0,
+      "pilot": "classical"
+    },
+    "coverage": 0.455,
+    "collisions": 0,
+    "floors": 1
+  },
+  {
+    "id": "quad-collisions",
+    "title": "Sensor-only planner on quadrotor dynamics, most collisions",
+    "why": "Motor lag, latency and overshoot make the kinematic braking distance wrong; the filter that is collision-free on the kinematic model is not on the quad.",
+    "job": {
+      "condition": "quad",
+      "stage": 3,
+      "seed": 50011,
+      "lighting": "day",
+      "quad": 1,
+      "pilot": "classical"
+    },
+    "coverage": 0.20439189189189189,
+    "collisions": 17,
+    "floors": 1
+  },
+  {
+    "id": "floors-teacher",
+    "title": "Oracle teacher on a two-floor building, ground floor only",
+    "why": "No pilot in the coverage env climbs: the teacher, the policy and the planner all chase ground-floor frontiers. Only the mission explorer uses shafts.",
+    "job": {
+      "condition": "floors",
+      "stage": 4,
+      "seed": 40012,
+      "lighting": "day",
+      "quad": 0,
+      "pilot": "teacher"
+    },
+    "coverage": 0.22945205479452055,
+    "collisions": 0,
+    "floors": 3
+  }
+]

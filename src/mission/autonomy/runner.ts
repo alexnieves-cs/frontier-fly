@@ -1,5 +1,8 @@
 import type { LightingState } from '../../shared/types';
-import { initPhysics, PhysicsWorld } from '../../sim/world';
+import { initPhysics } from '../../sim/world';
+import { nightFactor } from '../../sim/lighting';
+import { FLASH_HALF } from '../../perception/model';
+import { descentClear, filterVelocity, SAFETY_MARGIN } from '../../sim/sensorPlanner';
 import { initOutdoorPhysics, OutdoorPhysics } from '../../world/outdoor/physics';
 import { sampleHeight } from '../../world/outdoor/terrain';
 import type { Opening } from '../../world/outdoor/types';
@@ -28,7 +31,7 @@ import type {
   V3,
 } from './contracts';
 import { planApproach, type Standoff } from './planner/approach';
-import { ConfirmTracker, confirmViewpoints, requirementsMet, type ConfirmTrack } from './planner/confirm';
+import { angleDiff, ConfirmTracker, confirmViewpoints, requirementsMet, type ConfirmTrack } from './planner/confirm';
 import { cruiseAglFor, planCoverage, senseBuildings, type CoveragePlan } from './planner/coverage';
 import { passageAxis, rankCandidates, scoreOpening, type PassageAxis } from './planner/entry';
 import { FlyThrough } from './planner/flythrough';
@@ -51,19 +54,21 @@ import {
 import { landedAtHome, landingCommand, planReturn } from './planner/home';
 import {
   FrontierExplorer,
-  gridLos,
+  IndoorSensing,
   IndoorVisibility,
   indoorGrid,
   type IndoorGrid,
-  nearestNav,
-  PATH_CLEARANCE,
-  planIndoorPath,
+  type IndoorNav,
+  oracleNav,
   PolicyExplorer,
+  SensorExplorer,
+  sensorNav,
+  shellLidar,
   type ActingPolicy,
   toLocal,
   toWorld,
   floorOf,
-  wallClearance,
+  INDOOR_FILTER_HORIZON,
   INDOOR_FLY_Z,
 } from './planner/indoor';
 import { observeOpenings, planInspection } from './planner/inspect';
@@ -80,7 +85,12 @@ import { INDOOR_LIMITS, OUTDOOR_LIMITS, Vehicle, type VehicleCommand, type Vehic
  * the same RunRecord.
  */
 
-const NEAR_LIMITS: VehicleLimits = { ...OUTDOOR_LIMITS, speedH: 2.5, speedV: 1.2, accel: 2 };
+const NEAR_LIMITS: VehicleLimits = {
+  ...OUTDOOR_LIMITS,
+  speedH: 2.5,
+  speedV: 1.2,
+  accel: 2,
+};
 const DETECT_PERIOD = 0.2;
 const TRACK_PERIOD = 0.5;
 const PLAN_ACCEL = 2;
@@ -90,11 +100,23 @@ const POLICY_STALL_SEC = 8;
 const POLICY_MAX_COLLISIONS = 1;
 const POLICY_MAX_SEC = 150;
 const MAX_EXPLORE_SEC = 260;
+/** After the slot: time to get back to the entry floor before the exit starts regardless. */
+const WRAP_UP_SEC = 90;
+/** A shielded indoor move that makes no progress for this long skips its waypoint. */
+const SHIELD_STALL_SEC = 4;
 const CONFIRM_DWELL = 3.5;
+const CONFIRM_DWELL_DARK = 6;
 /** Confirmation rounds a track gets before it is rejected. */
-const CONFIRM_ROUNDS = 2;
+const CONFIRM_ROUNDS = 3;
 
-const RANK: Record<SafetyActionKind, number> = { none: 0, hold: 1, backtrack: 2, exit_building: 3, return_home: 4, land: 5 };
+const RANK: Record<SafetyActionKind, number> = {
+  none: 0,
+  hold: 1,
+  backtrack: 2,
+  exit_building: 3,
+  return_home: 4,
+  land: 5,
+};
 
 interface Waypoint {
   pos: V3;
@@ -124,8 +146,15 @@ interface Visit {
   opening: Opening | null;
   axis: PassageAxis | null;
   aborts: number;
+  /** Oracle mode only: camera-visibility estimate and planner on the true floor plan. */
   vis: IndoorVisibility | null;
   explorer: FrontierExplorer | null;
+  /** The drone's own maps of this building (every mode but oracle). */
+  sensing: IndoorSensing | null;
+  /** Path and viewpoint queries: sensor maps, or the floor plan in oracle mode. */
+  nav: IndoorNav;
+  /** The running sensor-explorer job, so a confirmation can hand control back. */
+  sensorJob: Job | null;
   exploreStart: number;
   pass: number;
   policyCollisions: number;
@@ -149,12 +178,14 @@ class Runner implements MissionRunner {
   private readonly tracker: ConfirmTracker;
   private readonly coverage: CoveragePlan;
   private readonly policy: ActingPolicy | null;
+  /** Reference mode: indoor exploration and paths read the true floor plan. */
+  private readonly oracle: boolean;
   private readonly batteryStart: number;
 
   private ticks = 0;
   private t = 0;
   private phase: Phase = 'preflight';
-    private job: Job;
+  private job: Job;
   private suspended: Job | null = null;
   private recoverRank = 0;
   private finished = false;
@@ -180,6 +211,8 @@ class Runner implements MissionRunner {
   private confirmTrack: ConfirmTrack | null = null;
   /** Earliest time each track may get another confirmation attempt. */
   private readonly attempted = new Map<string, number>();
+  /** Per track: indoor re-view bearings (camera heading, rad) that added no view. */
+  private readonly triedBearings = new Map<string, number[]>();
   private readonly confirmRounds = new Map<string, number>();
   /** Tracks already given a last look when exploration of their building ended. */
   private readonly finalLook = new Set<string>();
@@ -218,8 +251,10 @@ class Runner implements MissionRunner {
     this.tracker = new ConfirmTracker(mission);
     this.coverage = planCoverage(mission, world, { agl: this.agl });
     const p = options.policy as ActingPolicy | undefined;
-    this.policy = p && typeof p.actWith === 'function' && options.indoor !== 'frontier' ? p : null;
-    if (options.indoor === 'policy' && !this.policy) this.log('warn', 'Policy explorer requested without a policy. Using frontier exploration.');
+    this.oracle = options.indoor === 'oracle';
+    this.policy = p && typeof p.actWith === 'function' && options.indoor !== 'frontier' && !this.oracle ? p : null;
+    if (options.indoor === 'policy' && !this.policy)
+      this.log('warn', 'Policy explorer requested without a policy. Using frontier exploration.');
     this.phases.push({ phase: 'preflight', tStart: 0, tEnd: 0 });
     this.log(
       'info',
@@ -293,7 +328,7 @@ class Runner implements MissionRunner {
       batteryStartPct: this.batteryStart,
       batteryEndPct: this.battery.remainingPct(),
       landedHome: this.landedHome,
-      indoorExplorer: this.policyClean ? 'policy' : this.frontierRan ? 'frontier' : null,
+      indoorExplorer: this.policyClean ? 'policy' : this.frontierRan ? (this.oracle ? 'oracle' : 'frontier') : null,
       log: this.logs.slice(),
     };
   }
@@ -324,7 +359,11 @@ class Runner implements MissionRunner {
     this.lastCollided = step.collided;
     if (step.collided) {
       const pos = this.vehicle.pos;
-      this.collisions.push({ tSec: this.t, pos: [pos[0], pos[1], pos[2]], inside: this.inside });
+      this.collisions.push({
+        tSec: this.t,
+        pos: [pos[0], pos[1], pos[2]],
+        inside: this.inside,
+      });
       this.log('warn', `Contact at ${this.where(pos)}${this.inside ? ' inside the building' : ''} during ${this.phase.replace('_', ' ')}.`);
       if (this.visit && this.phase === 'indoor_explore') this.visit.policyCollisions += 1;
     }
@@ -370,7 +409,11 @@ class Runner implements MissionRunner {
 
   private recordTrack(): void {
     const p = this.vehicle.pos;
-    this.trackRec.push({ t: Math.round(this.t * 100) / 100, pos: [p[0], p[1], p[2]], phase: this.phase });
+    this.trackRec.push({
+      t: Math.round(this.t * 100) / 100,
+      pos: [p[0], p[1], p[2]],
+      phase: this.phase,
+    });
   }
 
   private breadcrumb(): void {
@@ -414,12 +457,22 @@ class Runner implements MissionRunner {
     const v0 = this.vehicle.vel;
     const wps =
       passTol !== undefined && passTol <= 0.3 && Math.hypot(v0[0], v0[1], v0[2]) > 0.15 && route.length
-        ? [{ pos: [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]] as V3, tol: 0.12 }, ...route]
+        ? [
+            {
+              pos: [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]] as V3,
+              tol: 0.12,
+            },
+            ...route,
+          ]
         : route;
     let idx = 0;
     let dwell = -1;
     let spin = -1;
     let called = false;
+    // Progress watch for shielded indoor moves: a waypoint the lidar shield will not let the drone
+    // reach (structure closer than the map knew) is skipped rather than flown at forever.
+    let bestD = Infinity;
+    let sinceBest = 0;
     const tolFor = (i: number): number => {
       const wp = wps[i]!;
       if (wp.tol !== undefined) return wp.tol;
@@ -471,6 +524,8 @@ class Runner implements MissionRunner {
             idx += 1;
             dwell = -1;
             spin = -1;
+            bestD = Infinity;
+            sinceBest = 0;
             continue;
           }
           // Speed from the distance to the next stop or corner.
@@ -485,8 +540,17 @@ class Runner implements MissionRunner {
             ahead += dist(wps[k]!.pos, wps[k + 1]!.pos);
           }
           const speed = Math.min(99, Math.sqrt(vEnd * vEnd + 2 * PLAN_ACCEL * ahead), stop ? 1.6 * d + 0.03 : 99);
+          if (d < bestD - 0.05) {
+            bestD = d;
+            sinceBest = 0;
+          } else if ((sinceBest += this.dt) > SHIELD_STALL_SEC && this.inside && this.visit?.sensing && phase !== 'fly_through') {
+            idx += 1;
+            bestD = Infinity;
+            sinceBest = 0;
+            continue;
+          }
           const dir = sub(wp.pos, pos);
-          const vel = scaleTo(dir, speed, this.limits());
+          const vel = this.shielded(phase, scaleTo(dir, speed, this.limits()));
           const moving = Math.hypot(vel[0], vel[1]) > 0.3;
           const yaw = wp.yaw !== undefined && wp.yaw !== null && d < 4 ? wp.yaw : moving ? Math.atan2(vel[1], vel[0]) : null;
           return { vel, yaw };
@@ -498,6 +562,20 @@ class Runner implements MissionRunner {
         return { vel: [0, 0, 0] };
       },
     };
+  }
+
+  /**
+   * Indoors on the sensor-only map, routed moves (re-views, the way out) pass through the same lidar
+   * shield as the explorers: the map is young and a route can graze structure the lidar sees now.
+   */
+  private shielded(phase: Phase, vel: V3): V3 {
+    const v = this.visit;
+    if (!this.inside || !v?.sensing || phase === 'fly_through') return vel;
+    const local = toLocal(v.grid, this.vehicle.pos);
+    v.sensing.sense(local, this.vehicle.vel, this.vehicle.yaw, this.t);
+    const [vx, vy] = filterVelocity(vel[0], vel[1], this.vehicle.yaw, v.sensing.lidar, SAFETY_MARGIN, INDOOR_FILTER_HORIZON);
+    const vz = vel[2] < 0 && !descentClear(v.sensing.lidar) ? 0 : vel[2];
+    return [vx, vy, vz];
   }
 
   private holdJob(phase: Phase, seconds: number, onDone: () => void): Job {
@@ -530,7 +608,10 @@ class Runner implements MissionRunner {
     const pos = this.vehicle.pos;
     const climb: Waypoint[] = [];
     if (this.covIndex === 0 && pos[2] < cruiseZ(this.air, pos[0], pos[1], this.agl) - 1) {
-      climb.push({ pos: [pos[0], pos[1], cruiseZ(this.air, pos[0], pos[1], this.agl)], tol: 0.6 });
+      climb.push({
+        pos: [pos[0], pos[1], cruiseZ(this.air, pos[0], pos[1], this.agl)],
+        tol: 0.6,
+      });
       this.log('action', `Takeoff. Climbing to ${fmt(this.agl, 0)} m AGL.`);
     }
     const from = climb.length ? climb[0]!.pos : pos;
@@ -603,7 +684,10 @@ class Runner implements MissionRunner {
   }
 
   private declareIfClear(scope: ClearScope): boolean {
-    const reports = this.sweptCategories().map((c) => ({ c, r: this.source.clearStatus(scope, c) }));
+    const reports = this.sweptCategories().map((c) => ({
+      c,
+      r: this.source.clearStatus(scope, c),
+    }));
     const label = scope === 'outdoor' ? 'Outdoor area' : (this.world.buildings.find((b) => b.id === scope)?.label ?? scope);
     if (reports.every(({ r }) => r.status === 'clear')) {
       this.declaredClear.push({ scope, tSec: this.t });
@@ -642,7 +726,10 @@ class Runner implements MissionRunner {
       for (const o of observeOpenings(pose.pos, pose.yaw, v.b, this.physics)) {
         if (!v.observed.has(o.id)) {
           v.observed.set(o.id, o);
-          this.log('info', `Observed opening ${o.id} (${o.kind.replace('_', ' ')}, ${fmt(o.width, 2)} x ${fmt(o.height, 2)} m) on ${v.b.label}.`);
+          this.log(
+            'info',
+            `Observed opening ${o.id} (${o.kind.replace('_', ' ')}, ${fmt(o.width, 2)} x ${fmt(o.height, 2)} m) on ${v.b.label}.`,
+          );
         }
       }
     }
@@ -690,6 +777,7 @@ class Runner implements MissionRunner {
     const pos = this.vehicle.pos;
     const v = this.visit;
     const wps: Waypoint[] = [];
+    const flown: number[] = [];
     if (this.inside && v) {
       const grid = v.grid;
       const est = toLocal(grid, track.estimate);
@@ -697,22 +785,34 @@ class Runner implements MissionRunner {
       const z = f * grid.H + INDOOR_FLY_Z;
       let cur = toLocal(grid, pos);
       let views: V3[] = [];
-      for (const r of track.classId === 'person' ? [2.2, 2.8, 1.6] : [2.4, 2.0, 2.8]) {
-        views = confirmViewpoints(track, est, cur, r, z, need, (p) => {
-          const c = nearestNav(grid, p);
-          if (!c || Math.hypot((c.x + 0.5) * grid.cs - p[0], (c.z + 0.5) * grid.cs - p[1]) > 0.75) return false;
-          if (wallClearance(grid, f, p[0], p[1]) < PATH_CLEARANCE) return false;
-          if (!gridLos(grid, f, p[0], p[1], est[0], est[1])) return false;
-          return planIndoorPath(grid, cur, p) !== null;
-        });
-        if (views.length >= need) break;
+      // One spare bearing indoors: furniture or a nearby object often hides the target from one of
+      // them. A target in a corner leaves a narrow arc, so the spacing narrows toward the tracker's own.
+      const accept = (p: V3) => v.nav.canView(p, est) && v.nav.path(cur, p) !== null;
+      // Bearings flown before that added no view (the target hidden or mislabeled there) are not retried.
+      const tried = this.triedBearings.get(track.id) ?? [];
+      const seenFrom = { ...track, views: [...track.views, ...tried.map((angle) => ({ angle, confidence: 1, tSec: 0, range: 0 }))] };
+      search: for (const sep of [40, 27]) {
+        const radii = track.classId === 'person' ? [2.2, 2.8, 1.6] : v.sensing?.lookCone != null ? [1.8, 2.2, 2.6] : [2.4, 2.0, 2.8, 1.8];
+        for (const r of radii) {
+          views = confirmViewpoints(seenFrom, est, cur, r, z, need + 1, accept, sep);
+          if (views.length >= need) break search;
+        }
       }
+      // On a map still being built, too few bearings now usually means more later: wait for the
+      // map to grow rather than spend a round. The last look before leaving takes what there is.
+      if (v.sensing && views.length < need && !this.finalLook.has(track.id)) views = [];
       for (const vp of views) {
-        const path = planIndoorPath(grid, cur, vp);
+        const path = v.nav.path(cur, vp);
         if (!path) continue;
         for (const p of path.slice(0, -1)) wps.push({ pos: toWorld(grid, p) });
         const at = toWorld(grid, vp);
-        wps.push({ pos: at, yaw: headingTo(at, track.estimate), dwell: CONFIRM_DWELL });
+        flown.push(Math.atan2(est[1] - vp[1], est[0] - vp[0]));
+        wps.push({
+          pos: at,
+          yaw: headingTo(at, track.estimate),
+          // Lit by the flashlight alone, each frame is a weaker look: hold longer for the same certainty.
+          dwell: v.sensing?.lookCone != null ? CONFIRM_DWELL_DARK : CONFIRM_DWELL,
+        });
         cur = vp;
       }
       const policy = this.policyRun;
@@ -728,7 +828,11 @@ class Runner implements MissionRunner {
       let cur: V3 = pos;
       for (const vp of views) {
         for (const p of cruisePath(this.air, cur, { x: vp[0], y: vp[1] }, this.agl).slice(0, -1)) wps.push({ pos: p });
-        wps.push({ pos: vp, yaw: headingTo(vp, track.estimate), dwell: CONFIRM_DWELL });
+        wps.push({
+          pos: vp,
+          yaw: headingTo(vp, track.estimate),
+          dwell: CONFIRM_DWELL,
+        });
         cur = vp;
       }
       this.resumeAfterConfirm = () => this.startCoverage();
@@ -752,10 +856,15 @@ class Runner implements MissionRunner {
         wps,
         () => {
           const rounds = (this.confirmRounds.get(track.id) ?? 0) + 1;
+          const empty = flown.filter((a) => !track.views.some((w) => angleDiff(w.angle, a) < this.tracker.minSeparation));
+          if (empty.length) this.triedBearings.set(track.id, [...(this.triedBearings.get(track.id) ?? []), ...empty]);
           this.confirmRounds.set(track.id, rounds);
           if (track.status === 'open' && rounds < CONFIRM_ROUNDS) {
             this.attempted.set(track.id, this.t + 4);
-            this.log('info', `${track.classId} contact still unconfirmed (${track.views.length} view(s), ${fmt(this.tracker.meanConfidence(track), 2)}). Will look again.`);
+            this.log(
+              'info',
+              `${track.classId} contact still unconfirmed (${track.views.length} view(s), ${fmt(this.tracker.meanConfidence(track), 2)}). Will look again.`,
+            );
           } else if (track.status === 'open') {
             this.tracker.reject(track);
             this.log(
@@ -786,10 +895,11 @@ class Runner implements MissionRunner {
   private startBuilding(b: MissionBuilding): void {
     this.visitedBuildings.add(b.id);
     const box = buildingBox(b);
+    const grid = indoorGrid(b);
     const v: Visit = {
       b,
       box,
-      grid: indoorGrid(b),
+      grid,
       standoff: null,
       observed: new Map(),
       ranked: [],
@@ -800,6 +910,9 @@ class Runner implements MissionRunner {
       aborts: 0,
       vis: null,
       explorer: null,
+      sensing: null,
+      nav: oracleNav(grid),
+      sensorJob: null,
       exploreStart: 0,
       pass: 0,
       policyCollisions: 0,
@@ -818,7 +931,11 @@ class Runner implements MissionRunner {
     this.log('action', `Approaching ${b.label}. Standoff ${this.where(plan.standoff.pos)}, open descent column checked.`);
     const wps: Waypoint[] = [
       ...plan.cruise.map((p) => ({ pos: p, tol: 1.5 })),
-      ...plan.descent.map((p, i) => ({ pos: p, tol: 0.3, yaw: i === plan.descent.length - 1 ? plan.standoff!.yaw : null })),
+      ...plan.descent.map((p, i) => ({
+        pos: p,
+        tol: 0.3,
+        yaw: i === plan.descent.length - 1 ? plan.standoff!.yaw : null,
+      })),
     ];
     this.setJob(this.followJob('approach', wps, () => this.startInspect(), 0.3));
   }
@@ -827,7 +944,11 @@ class Runner implements MissionRunner {
     const v = this.visit!;
     const steps = planInspection(v.b, this.vehicle.pos, this.physics, this.air);
     this.log('action', `Inspecting the ${v.b.label} envelope from ${steps.filter((s) => s.dwell > 0).length} viewpoints.`);
-    const wps: Waypoint[] = steps.map((s) => ({ pos: s.pos, yaw: s.yaw, dwell: s.dwell || undefined }));
+    const wps: Waypoint[] = steps.map((s) => ({
+      pos: s.pos,
+      yaw: s.yaw,
+      dwell: s.dwell || undefined,
+    }));
     this.setJob(this.followJob('inspect', wps, () => this.selectEntry(), 0.25));
   }
 
@@ -850,7 +971,13 @@ class Runner implements MissionRunner {
     }
     if (this.mission.entryPolicy === 'never') {
       const best = [...cands].sort((a, b) => b.safety - a.safety)[0];
-      this.entries.push({ tSec: this.t, buildingId: v.b.id, openingId: best?.openingId ?? -1, safety: best?.safety ?? 0, decision: 'never' });
+      this.entries.push({
+        tSec: this.t,
+        buildingId: v.b.id,
+        openingId: best?.openingId ?? -1,
+        safety: best?.safety ?? 0,
+        decision: 'never',
+      });
       this.log('info', `Entry policy is never. Not entering ${v.b.label}.`);
       this.leaveBuilding();
       return;
@@ -864,21 +991,39 @@ class Runner implements MissionRunner {
     if (!cand) {
       if (v.denied === 0) {
         const best = [...v.observed.values()][0];
-        this.entries.push({ tSec: this.t, buildingId: v.b.id, openingId: best?.id ?? -1, safety: 0, decision: 'none_viable' });
+        this.entries.push({
+          tSec: this.t,
+          buildingId: v.b.id,
+          openingId: best?.id ?? -1,
+          safety: 0,
+          decision: 'none_viable',
+        });
       }
       this.log('warn', `No viable entry into ${v.b.label}. Skipping the interior.`);
       this.leaveBuilding();
       return;
     }
     if (cand.decision === 'auto') {
-      this.entries.push({ tSec: this.t, buildingId: v.b.id, openingId: cand.openingId, safety: cand.safety, decision: 'auto' });
-      this.log('action', `Entering ${v.b.label} through opening ${cand.openingId} (${cand.kind.replace('_', ' ')}), safety ${fmt(cand.safety, 2)}.`);
+      this.entries.push({
+        tSec: this.t,
+        buildingId: v.b.id,
+        openingId: cand.openingId,
+        safety: cand.safety,
+        decision: 'auto',
+      });
+      this.log(
+        'action',
+        `Entering ${v.b.label} through opening ${cand.openingId} (${cand.kind.replace('_', ' ')}), safety ${fmt(cand.safety, 2)}.`,
+      );
       this.goEnter(cand);
       return;
     }
     this.pendingEntry = cand;
     this.operatorAnswer = null;
-    this.log('action', `Operator approval needed: opening ${cand.openingId} (${cand.kind.replace('_', ' ')}) on ${v.b.label}, safety ${fmt(cand.safety, 2)}.`);
+    this.log(
+      'action',
+      `Operator approval needed: opening ${cand.openingId} (${cand.kind.replace('_', ' ')}) on ${v.b.label}, safety ${fmt(cand.safety, 2)}.`,
+    );
     const at: V3 = [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]];
     this.setJob({
       phase: 'await_operator',
@@ -893,11 +1038,23 @@ class Runner implements MissionRunner {
           this.operatorAnswer = null;
           this.pendingEntry = null;
           if (answer === 'approve') {
-            this.entries.push({ tSec: this.t, buildingId: v.b.id, openingId: cand.openingId, safety: cand.safety, decision: 'approved' });
+            this.entries.push({
+              tSec: this.t,
+              buildingId: v.b.id,
+              openingId: cand.openingId,
+              safety: cand.safety,
+              decision: 'approved',
+            });
             this.log('action', `Operator approved opening ${cand.openingId}.`);
             this.goEnter(cand);
           } else {
-            this.entries.push({ tSec: this.t, buildingId: v.b.id, openingId: cand.openingId, safety: cand.safety, decision: 'denied' });
+            this.entries.push({
+              tSec: this.t,
+              buildingId: v.b.id,
+              openingId: cand.openingId,
+              safety: cand.safety,
+              decision: 'denied',
+            });
             this.log('info', `Operator denied opening ${cand.openingId}.`);
             v.denied += 1;
             v.candIdx += 1;
@@ -932,7 +1089,14 @@ class Runner implements MissionRunner {
       this.tryCandidate();
       return;
     }
-    this.setJob(this.followJob('fly_through', leg.map((p) => ({ pos: p })), () => this.crossIn(), 0.25));
+    this.setJob(
+      this.followJob(
+        'fly_through',
+        leg.map((p) => ({ pos: p })),
+        () => this.crossIn(),
+        0.25,
+      ),
+    );
   }
 
   private flyThroughJob(ft: FlyThrough, onDone: (ok: boolean) => void): Job {
@@ -983,18 +1147,46 @@ class Runner implements MissionRunner {
 
   private startExplore(): void {
     const v = this.visit!;
-    v.vis = new IndoorVisibility(v.grid);
-    v.explorer = new FrontierExplorer(v.grid, v.vis);
     v.exploreStart = this.t;
     v.pass = 0;
     v.policyCollisions = 0;
-    v.vis.observe(toLocal(v.grid, this.vehicle.pos), this.vehicle.yaw);
+    if (this.oracle) {
+      v.vis = new IndoorVisibility(v.grid);
+      v.explorer = new FrontierExplorer(v.grid, v.vis);
+      v.vis.observe(toLocal(v.grid, this.vehicle.pos), this.vehicle.yaw);
+      this.log('info', `Oracle frontier exploration of ${v.b.label} on the true floor plan: ${v.vis.cells.length} cells to see.`);
+      this.exploreNext();
+      return;
+    }
+    // The drone's own maps for this visit, from lidar cast against the real collision world.
+    // The policy and the fallback share them.
+    const lighting: LightingState = {
+      timeOfDay: this.world.timeOfDay,
+      interiorLightsOn: v.b.interiorLightsOn,
+      flashlightOn: this.world.flashlightOn,
+      sensorMode: this.world.sensorMode,
+    };
+    v.sensing = new IndoorSensing(
+      v.grid,
+      shellLidar(v.grid, (...a) => this.physics.cast(...a)),
+      lighting,
+      this.world.seed,
+    );
+    v.sensing.lastNewVoxelSec = this.t;
+    // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
+    const dark = nightFactor(lighting) > 0.5 && lighting.sensorMode === 'rgb';
+    if (dark) {
+      v.sensing.lookHalf = 0;
+      v.sensing.lookCone = lighting.flashlightOn ? FLASH_HALF * 0.9 : 0;
+      v.sensing.lookMin = 1.7;
+    }
+    v.nav = sensorNav(v.grid, v.sensing);
     if (this.policy) {
       this.startPolicy();
       return;
     }
-    this.log('info', `Frontier exploration of ${v.b.label}: ${v.vis.cells.length} cells to see.`);
-    this.exploreNext();
+    this.log('info', `Sensor-only frontier exploration of ${v.b.label}.`);
+    this.startSensorExplore();
   }
 
   /** The running policy explorer, so a confirmation can hand control back and an exit can free it. */
@@ -1002,15 +1194,8 @@ class Runner implements MissionRunner {
 
   private startPolicy(): void {
     const v = this.visit!;
-    const physicsWorld = new PhysicsWorld(v.grid.spec);
-    const lighting: LightingState = {
-      timeOfDay: this.world.timeOfDay,
-      interiorLightsOn: v.b.interiorLightsOn,
-      flashlightOn: this.world.flashlightOn,
-      sensorMode: this.world.sensorMode,
-    };
-    const pe = new PolicyExplorer(v.grid, this.policy!, physicsWorld, lighting, this.world.seed);
-    pe.lastNewVoxelSec = this.t;
+    const pe = new PolicyExplorer(v.grid, this.policy!, v.sensing!);
+    v.sensing!.lastNewVoxelSec = this.t;
     const start = this.t;
     let ended = false;
     this.log('info', `Trained policy exploring ${v.b.label}.`);
@@ -1019,30 +1204,34 @@ class Runner implements MissionRunner {
     const release = () => {
       if (ended) return;
       ended = true;
-      physicsWorld.free();
       this.policyRun = null;
     };
-    const end = (why: string, fallback: boolean) => {
+    const end = (why: string, next: 'done' | 'fallback' | 'continue') => {
       if (ended) return;
       release();
-      if (fallback) {
+      if (next === 'fallback') {
         this.policyClean = false;
         this.policyFell = true;
         this.log('warn', `Policy explorer ${why}. Falling back to frontier exploration.`);
       } else {
         this.log('info', `Policy explorer ${why}.`);
       }
-      this.exploreNext();
+      // The policy only flies coverage; looking around for targets is the planner's look phase.
+      this.startSensorExplore(next === 'done' ? 'look' : 'sweep');
     };
     const job: Job = {
       phase: 'indoor_explore',
       plan: () => [],
       tick: (): VehicleCommand => {
         const local = toLocal(v.grid, this.vehicle.pos);
-        if (this.t - pe.lastNewVoxelSec > POLICY_STALL_SEC) end(`stalled (no new coverage for ${POLICY_STALL_SEC} s)`, true);
-        else if (v.policyCollisions >= POLICY_MAX_COLLISIONS) end(`collided ${v.policyCollisions} times`, true);
-        else if (v.vis!.coverage() >= 0.97) end(`saw ${fmt(v.vis!.coverage() * 100, 0)}% of cells`, false);
-        else if (this.t - start > POLICY_MAX_SEC) end(`reached its ${POLICY_MAX_SEC} s slot`, false);
+        if (this.t - v.sensing!.lastNewVoxelSec > POLICY_STALL_SEC) end(`stalled (no new coverage for ${POLICY_STALL_SEC} s)`, 'fallback');
+        else if (v.policyCollisions >= POLICY_MAX_COLLISIONS) end(`collided ${v.policyCollisions} times`, 'fallback');
+        else if (pe.exhausted)
+          end(
+            `found no frontier left in its map (${fmt(v.sensing!.mappedCoverage() * 100, 0)}% of mapped free space flown). Planner takes the look phase`,
+            'done',
+          );
+        else if (this.t - start > POLICY_MAX_SEC) end(`reached its ${POLICY_MAX_SEC} s slot`, 'continue');
         if (ended) return { vel: [0, 0, 0] };
         const cmd = pe.act(local, this.vehicle.vel, this.vehicle.yaw, this.t);
         return { vel: cmd.vel, yawRate: cmd.yawRate };
@@ -1051,7 +1240,7 @@ class Runner implements MissionRunner {
     this.policyRun = {
       resume: () => {
         // Time spent confirming does not count as a stall.
-        pe.lastNewVoxelSec = this.t;
+        v.sensing!.lastNewVoxelSec = this.t;
         this.setJob(job);
       },
       release,
@@ -1059,9 +1248,59 @@ class Runner implements MissionRunner {
     this.setJob(job);
   }
 
+  /** Sensor-only frontier exploration on the visit's maps, until no frontier is left or the slot ends. */
+  private startSensorExplore(start: 'sweep' | 'look' = 'sweep'): void {
+    const v = this.visit!;
+    this.frontierRan = true;
+    const se = new SensorExplorer(v.grid, v.sensing!, 1, start);
+    let wrapping = false;
+    const job: Job = {
+      phase: 'indoor_explore',
+      plan: () => [],
+      tick: (): VehicleCommand => {
+        if (v.sensorJob !== job) return { vel: [0, 0, 0] };
+        const local = toLocal(v.grid, this.vehicle.pos);
+        // The slot is per floor. When it runs out, the explorer first gets back to the entry floor.
+        const used = this.t - v.exploreStart - MAX_EXPLORE_SEC * v.grid.floors;
+        if (used > 0 && !wrapping) {
+          wrapping = true;
+          this.log(
+            'warn',
+            `Exploration time slot for ${v.b.label} used up with ${fmt(v.sensing!.mappedCoverage() * 100, 0)}% of mapped free space flown.`,
+          );
+          se.wrapUp(local);
+        }
+        if (used > WRAP_UP_SEC) {
+          v.sensorJob = null;
+          this.explorationDone();
+          return { vel: [0, 0, 0] };
+        }
+        const cmd = se.act(local, this.vehicle.vel, this.vehicle.yaw, this.t);
+        if (se.exhausted) {
+          v.sensorJob = null;
+          this.explorationDone();
+          return { vel: [0, 0, 0] };
+        }
+        return { vel: cmd.vel, yawRate: cmd.yawRate };
+      },
+    };
+    v.sensorJob = job;
+    this.setJob(job);
+  }
+
   private exploreNext(): void {
     const v = this.visit;
-    if (!v || !v.vis || !v.explorer) return;
+    if (!v) return;
+    if (v.sensorJob) {
+      this.setJob(v.sensorJob);
+      return;
+    }
+    // Sensor exploration already ended (a last look at a contact interrupted it): finish up.
+    if (v.sensing) {
+      this.explorationDone();
+      return;
+    }
+    if (!v.vis || !v.explorer) return;
     this.frontierRan = true;
     if (this.t - v.exploreStart > MAX_EXPLORE_SEC) {
       this.log('warn', `Exploration time slot for ${v.b.label} used up at ${fmt(v.vis.coverage() * 100, 0)}% seen.`);
@@ -1092,17 +1331,29 @@ class Runner implements MissionRunner {
       this.startConfirm(open);
       return;
     }
-    this.log('info', `${v.b.label} explored: ${fmt(v.vis!.coverage() * 100, 0)}% of cells seen by the planner.`);
+    if (v.vis) this.log('info', `${v.b.label} explored: ${fmt(v.vis.coverage() * 100, 0)}% of cells seen by the oracle planner.`);
+    else if (v.sensing)
+      this.log(
+        'info',
+        `${v.b.label} explored: ${fmt(v.sensing.mappedCoverage() * 100, 0)}% of mapped free space flown, ${fmt(v.sensing.lookedCoverage() * 100, 0)}% looked at by the drone's own estimate.`,
+      );
     if (this.mission.missionType === 'safety_sweep') {
       const ok = this.declareIfClear(v.b.id);
       const timeLeft = this.maxSim - this.t;
       if (!ok && v.pass === 0 && timeLeft > 240) {
         v.pass = 1;
-        v.vis = new IndoorVisibility(v.grid, 3.5);
-        v.explorer = new FrontierExplorer(v.grid, v.vis, 2.5);
         v.exploreStart = this.t;
         this.log('action', `Second, closer pass through ${v.b.label}.`);
-        this.exploreNext();
+        if (v.vis) {
+          v.vis = new IndoorVisibility(v.grid, 3.5);
+          v.explorer = new FrontierExplorer(v.grid, v.vis, 2.5);
+          this.exploreNext();
+        } else {
+          // Look again from closer: forget what was looked at and trust a shorter range.
+          v.sensing!.looked.fill(0);
+          v.sensing!.lookRange = 3.5;
+          this.startSensorExplore('look');
+        }
         return;
       }
     }
@@ -1114,6 +1365,7 @@ class Runner implements MissionRunner {
   private startExit(after: 'continue' | 'rth'): void {
     this.policyRun?.release();
     const v = this.visit;
+    if (v) v.sensorJob = null;
     if (!v || !this.inside || !v.axis) {
       if (after === 'rth') this.startReturnOutside();
       else this.leaveBuilding();
@@ -1121,7 +1373,7 @@ class Runner implements MissionRunner {
     }
     const ft = new FlyThrough(v.axis, 'out');
     const local = toLocal(v.grid, this.vehicle.pos);
-    const path = planIndoorPath(v.grid, local, toLocal(v.grid, ft.start)) ?? [];
+    const path = v.nav.path(local, toLocal(v.grid, ft.start)) ?? [];
     const wps: Waypoint[] = path.map((p) => ({ pos: toWorld(v.grid, p) }));
     this.log('action', `Leaving ${v.b.label} through opening ${v.opening?.id ?? -1}.`);
     this.setJob(this.followJob('exit', wps, () => this.crossOut(after), 0.2));
@@ -1249,7 +1501,10 @@ class Runner implements MissionRunner {
     if (last) last.tEnd = this.t;
     this.recordTrack();
     this.finished = true;
-    this.log('info', `Mission ${this.outcome}. ${fmt(this.t, 0)} s, battery ${fmt(this.battery.remainingPct(), 0)}% left, ${this.collisions.length} collision(s).`);
+    this.log(
+      'info',
+      `Mission ${this.outcome}. ${fmt(this.t, 0)} s, battery ${fmt(this.battery.remainingPct(), 0)}% left, ${this.collisions.length} collision(s).`,
+    );
     this.job = this.holdJob('done', 1e9, () => undefined);
   }
 
