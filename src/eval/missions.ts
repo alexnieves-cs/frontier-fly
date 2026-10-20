@@ -1,7 +1,8 @@
 // Mission benchmark: each scenario's settings on fresh world seeds, flown with each indoor explorer.
 // bench/missions.test.ts runs it in one process; scripts/study/mission-study.ts runs it in shards.
 import { readFileSync } from 'node:fs';
-import { policyFromJson } from '../mission/autonomy/policy';
+import { policyFromFile } from '../mission/autonomy/policy';
+import { SHIPPED_CHECKPOINT_PATH } from '../rl/checkpoint';
 import { buildReport } from '../mission/autonomy/report';
 import { runMission } from '../mission/autonomy/runner';
 import { SCENARIOS } from '../mission/autonomy/scenarios';
@@ -53,14 +54,14 @@ export function missionJobs(seeds = MISSION_SEEDS_PER_SCENARIO, base = MISSION_S
   return out;
 }
 
-let shipped: ReturnType<typeof policyFromJson> | null = null;
+let shipped: ReturnType<typeof policyFromFile> | null = null;
 
 export async function flyMission(job: MissionJob): Promise<MissionFlight> {
   const scenario = SCENARIOS.find((s) => s.id === job.scenario)!;
   const world = buildMissionWorld({ ...scenario.world, seed: job.seed });
   const mission = missionForWorld(world, scenario.mission);
   const source = createPerceptionSource(world);
-  if (job.indoor === 'policy' && !shipped) shipped = policyFromJson(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+  if (job.indoor === 'policy' && !shipped) shipped = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
   // A marginal opening asks the operator even under auto entry. The bench plays an operator who
   // approves every ask, and counts the asks.
   const options = {

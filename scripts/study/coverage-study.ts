@@ -11,7 +11,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { classicalPilot, guardedAction } from '../../src/eval/pilots';
-import { parseCheckpoint } from '../../src/rl/checkpoint';
+import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { RNG } from '../../src/shared/rng';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
@@ -75,7 +75,7 @@ export function jobs(): Job[] {
 type Act = (obs: Float32Array, env: ExplorerEnv) => Float32Array;
 
 export function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
-  const ck = parseCheckpoint(readFileSync(path, 'utf8'));
+  const ck = parseCheckpoint(readFileSync(path));
   const policy = new InferPolicy(ck.obsDim, ck.actDim, ck.hidden, 1);
   policy.setWeights(ck.weights.map((row) => Float32Array.from(row).buffer));
   const rng = new RNG(1);
@@ -200,7 +200,7 @@ if (process.argv.includes('--merge')) {
   const report = {
     schema: 1,
     commit: execSync('git rev-parse --short HEAD').toString().trim(),
-    checkpoint: arg('checkpoint', 'public/checkpoints/pretrained.json'),
+    checkpoint: arg('checkpoint', SHIPPED_CHECKPOINT_PATH),
     seedsPerCondition: SEEDS_PER_CONDITION,
     conditions: CONDITIONS,
     pilots: PILOTS,
@@ -213,7 +213,7 @@ if (process.argv.includes('--merge')) {
   const shard = Number(arg('shard', '0'));
   const of = Number(arg('of', '1'));
   const out = arg('out', `study-${shard}.jsonl`);
-  const policy = loadPolicy(arg('checkpoint', 'public/checkpoints/pretrained.json'));
+  const policy = loadPolicy(arg('checkpoint', SHIPPED_CHECKPOINT_PATH));
   // Optional subsets, e.g. `--conditions hard --pilots policy,guarded` for the ablation checkpoints.
   const conditions = arg('conditions', '').split(',').filter(Boolean);
   const pilots = arg('pilots', '').split(',').filter(Boolean);

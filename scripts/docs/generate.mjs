@@ -477,10 +477,72 @@ function benchmarks() {
     out.MISSION_BENCH_TABLE = '';
     out.MISSION_BENCH_NOTE = '_Not measured yet. `npm run study:missions` writes `docs/mission-bench.json`._';
   }
-  Object.assign(out, studyTables(readJson('docs/study.json')));
-  out.README_MISSIONS = out.MISSION_TABLE;
+  const study = readJson('docs/study.json');
+  Object.assign(out, studyTables(study));
+  out.README_MISSIONS = missionBench ? readmeMissions(missionBench) : out.MISSION_TABLE;
+  // The README leads with the large study (30 fresh buildings per condition, every pilot) and keeps
+  // the small fixed protocol below it, so the headline number is the one with the tighter interval.
+  if (study && bench) {
+    out.README_SUMMARY = [
+      `**Coverage on ${study.seedsPerCondition} fresh buildings per condition**, every pilot on the same seeds, bootstrap 95% intervals ([REPORT.md](docs/REPORT.md)):`,
+      '',
+      out.STUDY_HEADLINE,
+      '',
+      `**Targets.** Fixed protocol (${bench.protocol.easy.seeds.length} easy and ${bench.protocol.hard.seeds.length} hard seeds) unless the row says otherwise:`,
+      '',
+      readmeTargets(out, study),
+      '',
+      out.THROUGHPUT_TABLE,
+    ].join('\n');
+  }
   out.README_SUMMARY ??= out.TARGET_TABLE;
   return out;
+}
+
+
+/** The fixed-protocol target table plus the same hard-building goal measured on the 30-seed study. */
+function readmeTargets(out, study) {
+  const lines = out.TARGET_TABLE.split('\n');
+  const extra = [];
+  for (const [pilot, label] of [
+    ['policy', 'Coverage, new hard buildings, 30 fresh seeds (policy)'],
+    ['guarded', 'Coverage, new hard buildings, 30 fresh seeds (policy + lidar guard)'],
+  ]) {
+    const c = study.cells.find((x) => x.condition === 'hard' && x.lighting === 'day' && x.pilot === pilot);
+    if (!c) continue;
+    const [lo, hi] = c.coverageCi;
+    const status = lo >= TARGETS.hard ? '✅ meets' : c.coverage >= TARGETS.hard ? '⚠️ meets on the mean; interval spans the target' : '❌ misses';
+    extra.push(`| ${label} | ≥ ${pct(TARGETS.hard)} | ${pct(c.coverage)} (${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}) | ${status} |`);
+  }
+  const at = lines.findIndex((l) => l.startsWith('| Coverage, new hard buildings'));
+  lines.splice(at + 1, 0, ...extra);
+  return lines.join('\n');
+}
+
+/** Mission outcome per scenario and indoor explorer, from the 30-world mission bench. */
+function readmeMissions(mb) {
+  const titles = { 'cabin-day': 'Woods to cabin: find the missing person', 'compound-clear': 'Compound search: confirm two buildings clear', 'backpack-night': 'Night search: find the lost backpack' };
+  const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
+  const cell = (s) => `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`;
+  const scenarios = Object.keys(mb.modes.sensor).filter((k) => k !== 'all');
+  const rows = [...scenarios, 'all'].map((k) => [
+    k === 'all' ? '**All**' : (titles[k] ?? k),
+    cell(mb.modes.policy[k]),
+    cell(mb.modes.sensor[k]),
+    cell(mb.modes.oracle[k]),
+  ]);
+  const modes = ['policy', 'sensor', 'oracle'];
+  const flights = modes.reduce((a, m) => a + mb.modes[m].all.flights, 0);
+  const touched = modes.reduce((a, m) => a + mb.modes[m].all.flightsWithCollision, 0);
+  const falseClears = modes.reduce((a, m) => a + mb.modes[m].all.falseClears, 0);
+  const falseAlarms = modes.reduce((a, m) => a + mb.modes[m].all.falseAlarms, 0);
+  return [
+    table(['Scenario', 'Policy, planner fallback', 'Sensor-only planner', 'Oracle planner (floor plan, reference)'], rows),
+    '',
+    `Share of ${mb.seedsPerScenario} fresh mission worlds per scenario (seeds ${mb.seedBase}–${mb.seedBase + mb.seedsPerScenario - 1}) where the mission ends with the expected outcome: found, or correctly cleared. Brackets are Wilson 95% intervals.`,
+    `Across all ${flights} flights: ${touched} with a collision, ${falseClears} false clears, ${falseAlarms} false alarms. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
+    `From \`npm run study:missions\` at \`${mb.commit}\`; per-scenario detail is in [BENCHMARKS.md](docs/BENCHMARKS.md).`,
+  ].join('\n');
 }
 
 // ---------------------------------------------------------------------------------------------

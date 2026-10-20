@@ -9,7 +9,8 @@ import type {
   TruthTarget,
 } from '../../mission/autonomy/contracts';
 import { buildReport } from '../../mission/autonomy/report';
-import { policyFromJson, type NormalizedPolicy } from '../../mission/autonomy/policy';
+import { policyFromFile, type NormalizedPolicy } from '../../mission/autonomy/policy';
+import { SHIPPED_CHECKPOINT_URL } from '../../rl/checkpoint';
 import { createMissionRunner } from '../../mission/autonomy/runner';
 import {
   DEFAULT_SCENARIO,
@@ -74,8 +75,8 @@ let shipped: Promise<NormalizedPolicy | null> | null = null;
 
 /** The shipped checkpoint, or null when it cannot be fetched. */
 function shippedPolicy(): Promise<NormalizedPolicy | null> {
-  shipped ??= fetch('checkpoints/pretrained.json')
-    .then(async (response) => (response.ok ? policyFromJson(await response.text()) : null))
+  shipped ??= fetch(SHIPPED_CHECKPOINT_URL)
+    .then(async (response) => (response.ok ? policyFromFile(await response.arrayBuffer()) : null))
     .catch(() => null);
   return shipped;
 }

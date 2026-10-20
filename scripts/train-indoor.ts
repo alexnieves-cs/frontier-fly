@@ -10,7 +10,7 @@
  *        [--capacity 600000] [--workers N] [--hidden 512,256] [--lr 1e-3] [--ppo-updates 0]
  *        [--weighted]   (up-weight divergent/stalled states; it collapsed in our runs)
  *        [--swa-start R] [--lr-decay d] [--vz-noise s] [--act-weights 1,1,4,1]
- * The defaults are the run that produced public/checkpoints/pretrained.json.
+ * The defaults are the run that produced public/checkpoints/pretrained.bin (pass --out ckpt.bin, or pack a JSON output with npm run pack:checkpoint).
  *        npm run train:indoor -- --validate-only ckpt.json --hidden 512,256   (score a checkpoint)
  *
  * Install the optional native backend first for ~50x faster learning:
@@ -20,7 +20,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { parseCheckpoint, serializeCheckpoint } from '../src/rl/checkpoint';
+import { parseCheckpoint, serializeCheckpoint, serializeCheckpointFor } from '../src/rl/checkpoint';
 import { checkpointFromPolicy, DaggerDataset, policyFromCheckpoint } from '../src/rl/dagger';
 import { ppoFinetune } from '../src/rl/finetune';
 import { InferPolicy } from '../src/rl/infer';
@@ -134,7 +134,7 @@ async function main() {
 
   const scoreOnly = arg('validate-only');
   if (scoreOnly) {
-    pool.setWeights(policyFromCheckpoint(parseCheckpoint(readFileSync(scoreOnly, 'utf8'))).getWeights());
+    pool.setWeights(policyFromCheckpoint(parseCheckpoint(readFileSync(scoreOnly))).getWeights());
     const val = await validate(pool, validationJobs());
     console.log(`val small ${pct(val.small)} large ${pct(val.large)} score ${pct(val.score)}`);
     await pool.close();
@@ -206,7 +206,7 @@ async function main() {
   }
   policy.setWeights(best!.weights);
   console.log(`best ${best!.label} val ${pct(best!.val.score)}`);
-  writeFileSync(out, serializeCheckpoint(checkpointFromPolicy(policy)));
+  writeFileSync(out, serializeCheckpointFor(out, checkpointFromPolicy(policy)));
 
   const ppoUpdates = num('ppo-updates', 0);
   if (ppoUpdates > 0) {
@@ -226,9 +226,9 @@ async function main() {
     const val = await validate(pool, valJobs);
     console.log(`ppo val ${pct(val.score)} vs dagger ${pct(best!.val.score)}`);
     const ppoOut = out.replace(/\.json$/, '') + '.ppo.json';
-    writeFileSync(ppoOut, serializeCheckpoint(tuned.checkpoint));
+    writeFileSync(ppoOut, serializeCheckpointFor(ppoOut, tuned.checkpoint));
     if (val.score > best!.val.score) {
-      writeFileSync(out, serializeCheckpoint(tuned.checkpoint));
+      writeFileSync(out, serializeCheckpointFor(out, tuned.checkpoint));
       console.log(`kept the PPO fine-tune in ${out}`);
     }
   }
