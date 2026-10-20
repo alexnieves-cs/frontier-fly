@@ -7,6 +7,7 @@ export function shell(): string {
       <div class="brand"><div class="mark"></div><div><h1>DRONE SIM</h1><p>FRONTIER-FLY</p></div></div>
       <nav class="page-links" aria-label="Other pages">
         <a href="./index.html">Home</a>
+        <a href="./race.html">Pilot race</a>
         <a href="./demo.html">Mission demo</a>
         <a href="./film.html">Mission film</a>
         <a href="./outdoor.html">Outdoor</a>
