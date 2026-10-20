@@ -21,6 +21,7 @@ import {
 import { validateMission } from '../../mission/validate';
 import type { WorldProvider, WorldSnapshot } from '../../mission/world';
 import { mockWorldProvider } from '../../mission/worldMock';
+import { createExportPanel } from './exportPanel';
 import { createLivePanel } from './livePanel';
 import { createMissionMap, type MapLayers, type MapSelection, type MapTool } from './map';
 
@@ -239,6 +240,19 @@ export function mountMissionEditor(root: HTMLElement): void {
     el('h2', { text: 'Share' }),
     linkField,
   );
+  const exporter = createExportPanel({
+    mockSite,
+    mission: () => mission,
+    onImport: (next) => {
+      mission = next;
+      draft = null;
+      selection = null;
+      syncPlan();
+      map.fit(viewPoints());
+    },
+    onPreview: () => map.setLayers(layers()),
+  });
+  planSide.append(exporter.element);
   const side = el('aside', { className: 'side' });
 
   const workspace = el('div', { className: 'workspace' });
@@ -567,6 +581,7 @@ export function mountMissionEditor(root: HTMLElement): void {
     renderTargets();
     renderZones();
     renderSite();
+    exporter.refresh();
     map.setLayers(layers());
     if (mode === 'plan') persist();
   }
@@ -584,7 +599,7 @@ export function mountMissionEditor(root: HTMLElement): void {
       draft,
       draftKind: tool === 'nofly' ? 'nofly' : 'geofence',
       start: { x: mission.startPose.x, y: mission.startPose.y, yawRad: mission.startPose.yawRad },
-      plan: liveSnap?.plan ?? [],
+      plan: liveSnap?.plan ?? (mode === 'plan' ? (exporter.preview() ?? []) : []),
       track: liveSnap?.track ?? [],
       drone: liveSnap ? liveSnap.pose : null,
       coverage: liveSnap?.coverage ?? null,
