@@ -370,7 +370,7 @@ function benchmarks() {
         ['Quadrotor env step, 400 Hz physics (1 thread)', `${throughput.quadStepMs.toFixed(3)} ms · ${fmt(1000 / throughput.quadStepMs)} steps/s`],
         ['Policy inference, SIMD gemm, batch 8', `${throughput.inferMsPerEnvBatch8.toFixed(3)} ms per env`],
         [`${throughput.workers} workers, physics + sensors (lidar heuristic pilot)`, `${fmt(throughput.heuristic)} env steps/s`],
-        [`${throughput.workers} workers, rollout loop with policy-sized network and building rebuild on reset`, `${fmt(throughput.policy)} env steps/s`],
+        [`${throughput.workers} workers × 8 envs, browser rollout loop: batched policy inference, resets on pooled worlds`, `${fmt(throughput.policy)} env steps/s`],
       ],
     );
 

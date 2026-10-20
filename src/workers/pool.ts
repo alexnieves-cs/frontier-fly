@@ -38,16 +38,21 @@ export class TrainPool {
   private update = 0;
   readonly stepsPerSec = { value: 0 };
   readonly workers = { value: 0 };
+  /** Envs per worker and rows per worker block, for per-env GAE in the learner. */
+  private layout = { envs: 1, block: 1 };
 
   constructor(private readonly handlers: PoolHandlers) {}
 
-  start(seed: number, envsPerWorker = 2): void {
+  /** Eight envs per worker so each policy forward pass is a batch of eight. */
+  start(seed: number, envsPerWorker = 8): void {
     this.stop();
     const cores = typeof navigator === 'undefined' ? 4 : navigator.hardwareConcurrency || 4;
     const nWorkers = Math.max(1, Math.min(4, cores));
-    const steps = 128;
+    // 8 envs x 32 steps keeps the learner's batch at 256 rows per worker, as with the old 2 x 128.
+    const steps = 32;
     const capacity = Math.max(1, envsPerWorker) * steps;
     this.workers.value = nWorkers;
+    this.layout = { envs: Math.max(1, envsPerWorker), block: capacity };
     this.learner = new Worker(new URL('./learner.worker.ts', import.meta.url), { type: 'module' });
     this.learner.onmessage = (event: MessageEvent) => this.onLearner(event);
     for (let i = 0; i < nWorkers; i++) {
@@ -248,6 +253,6 @@ export class TrainPool {
       arrays.dones.buffer,
       arrays.truncated.buffer,
     ];
-    this.learner.postMessage({ type: 'rollout', arrays, norm: this.pending.norm }, transfer);
+    this.learner.postMessage({ type: 'rollout', arrays, norm: this.pending.norm, ...this.layout }, transfer);
   }
 }

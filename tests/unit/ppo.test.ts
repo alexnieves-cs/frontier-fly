@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseCheckpoint, serializeCheckpoint, loadCheckpointIdb, saveCheckpointIdb } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { TfTrainer } from '../../src/rl/model';
-import { computeGae } from '../../src/rl/ppo';
+import { computeGae, computeGaeInterleaved } from '../../src/rl/ppo';
 import { trainToy } from '../../src/rl/toy';
 import { RNG } from '../../src/shared/rng';
 import type { Checkpoint } from '../../src/rl/checkpoint';
@@ -152,6 +152,48 @@ describe('computeGae', () => {
     expect(trunc.advantages[0]).toBeCloseTo(5.308935, 5);
     expect(trunc.returns[0]).toBeCloseTo(5.708935, 5);
     expect(trunc.returns[1]).toBeCloseTo(4.97, 5);
+  });
+});
+
+describe('computeGaeInterleaved', () => {
+  it('runs computeGae on each env of each worker block separately', () => {
+    // 2 worker blocks x 3 steps x 2 envs; row = block * 6 + t * 2 + env.
+    const E = 2;
+    const T = 3;
+    const B = E * T;
+    const n = 2 * B;
+    const rng = new RNG(5, 'gae');
+    const rewards = Float32Array.from({ length: n }, () => rng.range(-1, 1));
+    const values = Float32Array.from({ length: n }, () => rng.range(-1, 1));
+    const dones = new Uint8Array(n);
+    const truncated = new Uint8Array(n);
+    dones[1 * E + 1] = 1; // env 1 of block 0 ends at t = 1
+    truncated[B + 0 * E + 0] = 1; // env 0 of block 1 is cut off at t = 0
+    dones[B + 0 * E + 0] = 1;
+    const got = computeGaeInterleaved({ rewards, values, dones, truncated }, E, B);
+    for (let b = 0; b < 2; b++) {
+      for (let i = 0; i < E; i++) {
+        const rows = Array.from({ length: T }, (_, t) => b * B + t * E + i);
+        const pick = <A extends Float32Array | Uint8Array>(a: A, make: (xs: number[]) => A) => make(rows.map((r) => a[r]!));
+        const vals = pick(values, (xs) => Float32Array.from(xs));
+        const want = computeGae({
+          rewards: pick(rewards, (xs) => Float32Array.from(xs)),
+          values: vals,
+          dones: pick(dones, (xs) => Uint8Array.from(xs)),
+          truncated: pick(truncated, (xs) => Uint8Array.from(xs)),
+          nextValue: vals[T - 1]!,
+        });
+        rows.forEach((r, t) => {
+          expect(got.advantages[r]).toBeCloseTo(want.advantages[t]!, 6);
+          expect(got.returns[r]).toBeCloseTo(want.returns[t]!, 6);
+        });
+      }
+    }
+  });
+
+  it('rejects a layout that does not divide the rows', () => {
+    const z = new Float32Array(10);
+    expect(() => computeGaeInterleaved({ rewards: z, values: z, dones: new Uint8Array(10), truncated: new Uint8Array(10) }, 4)).toThrow();
   });
 });
 
