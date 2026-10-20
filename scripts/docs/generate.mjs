@@ -151,6 +151,9 @@ const PILOT_LABELS = {
   teacher: 'Oracle teacher (floor plan)',
   classical: 'Sensor-only planner',
   classicalBrake: 'Sensor-only planner, braking filter',
+  classicalClimb: 'Sensor-only planner, takes shafts',
+  classicalPredict: 'Sensor-only planner + learned map prediction',
+  classicalOracleGain: 'Sensor-only planner + true hidden gain (reference)',
   policy: 'Policy',
   guarded: 'Policy + lidar guard',
   guardedBrake: 'Policy + braking guard',
@@ -268,8 +271,20 @@ function reportInline(study, bench) {
   const keys = ['R_TEACHER_HARD', 'R_PLANNER_HARD', 'R_POLICY_HARD', 'R_GUARD_HARD', 'R_POLICY_COLL', 'R_GUARD_COLL', 'R_PLANNER_QUAD', 'R_POLICY_QUAD', 'R_TEACHER_QUAD'];
   const keys3 = ['R_Q_PLANNER', 'R_Q_PLANNER_COLL', 'R_Q_PLANNER_BRAKE', 'R_Q_PLANNER_BRAKE_COLL', 'R_Q_GUARD', 'R_Q_GUARD_COLL', 'R_Q_GUARD_BRAKE', 'R_Q_GUARD_BRAKE_COLL'];
   const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
+  const keys5 = ['R_CLIMB_FLOORS', 'R_CLIMB_FLOORS_CI', 'R_PLANNER_FLOORS', 'R_PLANNER_FLOORS_CI', 'R_CLIMB_REACHED', 'R_CLIMB_COLL', 'R_PRED_HARD', 'R_PRED_HARD_CI', 'R_ORACLEGAIN_HARD', 'R_PRED_FLOORS', 'R_ORACLEGAIN_FLOORS', 'R_PLANNER_FLOORS_N'];
+  const keys6 = ['R_MP_R2', 'R_MP_BASE_R2', 'R_MP_MAE', 'R_MP_BASE_MAE', 'R_MP_TRAIN', 'R_MP_VAL'];
   const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL'];
-  for (const k of [...keys, ...keys2, ...keys3, ...keys4]) out[k] = 'n/a';
+  for (const k of [...keys, ...keys2, ...keys3, ...keys4, ...keys5, ...keys6]) out[k] = 'n/a';
+  const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
+  const mp = readJson('public/models/mappred.json');
+  if (mp?.meta) {
+    out.R_MP_R2 = mp.meta.valR2.toFixed(2);
+    out.R_MP_BASE_R2 = mp.meta.baselineR2.toFixed(2);
+    out.R_MP_MAE = mp.meta.valMae.toFixed(1);
+    out.R_MP_BASE_MAE = mp.meta.baselineMae.toFixed(1);
+    out.R_MP_TRAIN = mp.meta.trainSamples.toLocaleString('en-US');
+    out.R_MP_VAL = mp.meta.valSamples.toLocaleString('en-US');
+  }
   if (study) {
     const c = (cond, pilot) => study.cells.find((x) => x.condition === cond && x.lighting === 'day' && x.pilot === pilot);
     out.R_TEACHER_HARD = pct(c('hard', 'teacher').coverage);
@@ -281,6 +296,23 @@ function reportInline(study, bench) {
     out.R_PLANNER_QUAD = pct(c('quad', 'classical').coverage);
     out.R_POLICY_QUAD = pct(c('quad', 'policy').coverage);
     out.R_TEACHER_QUAD = pct(c('quad', 'teacher').coverage);
+    const climb = c('floors', 'classicalClimb');
+    const pred = c('hard', 'classicalPredict');
+    if (climb && pred) {
+      const planFloors = c('floors', 'classical');
+      out.R_CLIMB_FLOORS = pct(climb.coverage);
+      out.R_CLIMB_FLOORS_CI = ci(climb.coverageCi);
+      out.R_PLANNER_FLOORS = pct(planFloors.coverage);
+      out.R_PLANNER_FLOORS_CI = ci(planFloors.coverageCi);
+      out.R_PLANNER_FLOORS_N = String(climb.episodes);
+      out.R_CLIMB_REACHED = `${climb.reachedAnotherFloor} of ${climb.episodes}`;
+      out.R_CLIMB_COLL = climb.collisionsPerEpisode.toFixed(2);
+      out.R_PRED_HARD = pct(pred.coverage);
+      out.R_PRED_HARD_CI = ci(pred.coverageCi);
+      out.R_ORACLEGAIN_HARD = pct(c('hard', 'classicalOracleGain').coverage);
+      out.R_PRED_FLOORS = pct(c('floors', 'classicalPredict').coverage);
+      out.R_ORACLEGAIN_FLOORS = pct(c('floors', 'classicalOracleGain').coverage);
+    }
     const brake = c('quad', 'classicalBrake');
     const guardBrake = c('quad', 'guardedBrake');
     if (brake && guardBrake) {
