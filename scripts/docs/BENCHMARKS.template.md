@@ -40,7 +40,7 @@ The **oracle teacher** reads the true floor plan; it is the DAgger teacher the p
 
 ## Simulator throughput
 
-Single-thread numbers are Node on the machine above. The worker rows use `node:worker_threads`, two envs per worker, the same rollout code the browser workers run.
+Single-thread numbers are Node on the machine above. The worker rows use `node:worker_threads` and the same rollout code the browser workers run: the physics row two envs per worker with the lidar heuristic, the policy row eight envs per worker, one batched forward pass per step, and episode resets onto pre-built worlds (`src/sim/worldPool.ts`), timed after a short warm-up. Until v0.8 the browser ran two envs per worker and rebuilt the building and its Rapier world on every reset, which measured 3,958 env steps/s on the same machine type.
 
 {{THROUGHPUT_TABLE}}
 

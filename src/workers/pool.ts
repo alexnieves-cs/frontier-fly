@@ -48,7 +48,8 @@ export class TrainPool {
     this.stop();
     const cores = typeof navigator === 'undefined' ? 4 : navigator.hardwareConcurrency || 4;
     const nWorkers = Math.max(1, Math.min(4, cores));
-    const steps = 128;
+    // 8 envs x 32 steps keeps the learner's batch at 256 rows per worker, as with the old 2 x 128.
+    const steps = 32;
     const capacity = Math.max(1, envsPerWorker) * steps;
     this.workers.value = nWorkers;
     this.layout = { envs: Math.max(1, envsPerWorker), block: capacity };
