@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (180 files, 33,521 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (181 files, 33,949 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -94,7 +94,7 @@ flowchart LR
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
   eval -->|2| gen
-  eval -->|6| mission
+  eval -->|7| mission
   eval -->|2| rl
   eval -->|7| shared
   eval -->|8| sim
@@ -109,10 +109,10 @@ flowchart LR
   mission -->|1| gen
   mission -->|9| perception
   mission -->|4| rl
-  mission -->|16| shared
-  mission -->|11| sim
+  mission -->|17| shared
+  mission -->|15| sim
   mission -->|11| targets
-  mission -->|34| world_outdoor
+  mission -->|36| world_outdoor
   perception -->|6| shared
   perception -->|1| sim
   perception -->|6| targets
@@ -164,15 +164,15 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/eval` | 5 | 470 | `gen`, `mission`, `rl`, `shared`, `sim`, `train` | — | — |
+| `src/eval` | 5 | 494 | `gen`, `mission`, `rl`, `shared`, `sim`, `train` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,347 | `shared` | — | — |
 | `src/landing` | 1 | 150 | `film` | — | — |
-| `src/mission` | 40 | 9,083 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 41 | 9,332 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 570 | — | — | — |
-| `src/sim` | 21 | 4,074 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
+| `src/sim` | 21 | 4,229 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 15 | 2,517 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |

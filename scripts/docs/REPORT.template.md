@@ -8,7 +8,8 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Missions did not get worse without the floor plan.** On {{R_M_FLIGHTS}} fresh mission worlds per explorer, the sensor-only explorer meets the expected outcome in {{R_M_SENSOR}} of flights, the oracle planner in {{R_M_ORACLE}}, and the policy with the sensor-only fallback in {{R_M_POLICY}}; the intervals overlap. {{R_M_COLL}} of the {{R_M_ALL}} flights touched anything. No flight declared a building clear while a target was inside it, and none confirmed a decoy.
 - **A classical sensor-only planner is the stronger indoor coverage pilot.** On 30 fresh hard buildings it covers {{R_PLANNER_HARD}} with no collisions. The learned policy covers {{R_POLICY_HARD}} and averages {{R_POLICY_COLL}} collisions per episode; under a lidar guard it keeps its coverage ({{R_GUARD_HARD}}) at {{R_GUARD_COLL}} collisions per episode. The oracle teacher it imitates covers {{R_TEACHER_HARD}}.
 - **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps and an anchored PPO fine-tune change little. DAgger adds 11 points over behavior cloning.
-- **Two open problems are measured, not hidden.** No pilot in the coverage environment climbs to a second floor (the mission explorer does, through shafts), and every pilot collapses on quadrotor dynamics with sensor noise ({{R_PLANNER_QUAD}} for the planner, {{R_POLICY_QUAD}} for the policy, {{R_TEACHER_QUAD}} for the oracle teacher).
+- **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage ({{R_PLANNER_QUAD}} for the planner, {{R_POLICY_QUAD}} for the policy, {{R_TEACHER_QUAD}} for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from {{R_Q_PLANNER_COLL}} to {{R_Q_PLANNER_BRAKE_COLL}} per episode and the guarded policy's from {{R_Q_GUARD_COLL}} to {{R_Q_GUARD_BRAKE_COLL}}. Whole missions flown on the quadrotor meet the expected outcome in {{R_MQ_SENSOR}} (planner) and {{R_MQ_POLICY}} (policy) of flights.
+- **One open problem is measured, not hidden.** No pilot in the coverage environment climbs to a second floor (the mission explorer does, through shafts).
 
 ## Setup
 
@@ -34,6 +35,8 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 **Sensor-only planner.** Dijkstra over voxels the drone has flown or seen free and not occupied, with a cost for passing near unknown or occupied space. The goal is the frontier voxel with the best distance minus a bonus for unknown neighbours, kept with hysteresis and banned after 60 steps without progress. It flies a pure-pursuit point on the path at constant speed and 1.2 m above the floor, between the 0.9 m and 1.4 m furniture heights so the lidar ring sees the taller pieces. Every command passes a lidar velocity filter: along each ray with a return, the approach speed is capped so the drone can stop before the surface.
 
 **Lidar occupancy.** Lidar that passes through a small window hole paints the wall behind it free. Each voxel counts returns and pass-throughs, and is occupied when its returns exceed half its pass-throughs. That closes window holes and keeps doorways, whose jambs only graze a few rays, open.
+
+**Braking filter for the quadrotor.** The kinematic filter assumes the drone stops within a fixed horizon. A quadrotor stops by tilting back, which takes a reaction time (control latency plus the attitude loop) and then a bounded deceleration. The filter models the stopping distance as S(v) = v·t<sub>r</sub> + v²/(2a) and caps the approach speed along each lidar ray at the speed whose stopping distance fits the free range less a margin. It uses the measured velocity, so a drone that is already too fast for the gap is told to slow by the excess. t<sub>r</sub> = 0.21 s and a = 5 m/s² are the 97th percentile of stopping distances over randomized quadrotor airframes at the worst latency, measured on the tuning buildings; a unit test checks that the 1.2 kg mission airframe stops inside the same curve. A missing lidar reading counts as a return at the margin. The flight controller's body-rate limit was also lowered from 8 to 4 rad/s, close to PX4's default of 220°/s: at 8 rad/s, light randomized airframes flipped during hard stops.
 
 **Lidar guard for the policy.** The policy's action goes through the same velocity filter with a tighter margin, and its altitude is pulled to 1.15 m above the floor. The guard does not descend while a wall is within 0.6 m, because a sill under the lidar ring is invisible to it.
 
@@ -63,6 +66,16 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 {{MISSION_BENCH_TABLE}}
 
 The night search is where the explorers differ most: the sensor-only explorer finds the backpack in {{R_M_NIGHT_SENSOR}} of worlds and the oracle planner in {{R_M_NIGHT_ORACLE}}. The oracle knows the floor plan, but the night changes (the flashlight-cone look estimate, closer re-views and a longer dwell) key off the drone's own sensing and do not apply to it. The compound sweep succeeds in {{R_M_COMPOUND}} of worlds for every explorer; the misses are worlds where no opening into one building is safe enough to enter, so the drone correctly reports the sweep incomplete. The policy hands {{R_M_HANDOFF}} of buildings to the planner, all after a stall and most of them in the compound sweep.
+
+### Quadrotor dynamics and the braking filter
+
+The quadrotor condition flies the same pilots on rigid-body dynamics with randomized mass, thrust, drag and motor lag, sensor noise and 0–2 ticks of control latency. The braking pilots are the planner and the guarded policy with the braking filter in place of the kinematic one; they run only on the quadrotor, where the model applies.
+
+- **The planner** with the kinematic filter covers {{R_Q_PLANNER}} at {{R_Q_PLANNER_COLL}} collisions per episode. With the braking filter it covers {{R_Q_PLANNER_BRAKE}} at {{R_Q_PLANNER_BRAKE_COLL}}.
+- **The guarded policy** covers {{R_Q_GUARD}} at {{R_Q_GUARD_COLL}} collisions per episode with the kinematic guard, and {{R_Q_GUARD_BRAKE}} at {{R_Q_GUARD_BRAKE_COLL}} with the braking guard. Fewer crashes leave it more of the episode to explore.
+- **The coverage gap to the kinematic airframe is physical.** On the tuning buildings the quadrotor flies about 13% less distance in the same episode, because it accelerates at about 4 m/s² rather than instantly within the lag. The remainder comes from latency and noise, which slow every approach.
+
+On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the policy and the planner on the 1.2 kg quadrotor with the braking filter as the indoor shield: {{R_MQ_COLL}} of {{R_MQ_ALL}} quadrotor flights touched anything.
 
 ### Ablations
 
@@ -94,7 +107,8 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **Imitation is bounded by its teacher and adds little over a classical planner here.** The policy imitates an oracle that sees the floor plan, yet on fresh hard buildings it does not beat a planner that sees only lidar. The teacher's advantage is information, not skill, and the policy cannot inherit it.
 - **The policy collides; the guard is what makes it safe.** A teacher that never collides gives no examples of recovering from near-contacts. The guard removes most collisions without retraining.
 - **No climbing in the coverage environment.** The teacher, the policy and the planner all chase ground-floor frontiers on two-floor buildings. Shaft climbing exists only in the mission explorer.
-- **Quadrotor dynamics break every pilot.** Lag, latency and overshoot make the kinematic stopping distance wrong. The planner degrades least because its filter still brakes; a model-aware filter, or training on the quad, is needed.
+- **The policy was never trained on the quadrotor.** The braking guard makes the policy safe on it, but its coverage there is well below the planner's. Training on the quadrotor, or a policy that outputs attitude rather than velocity, is not attempted.
+- **The braking model is fitted, not derived.** Its two constants come from simulated stopping tests on the randomized airframes. A heavier airframe, a stronger wind or a slower controller needs them measured again.
 - **Night confirmation is near the detector's ceiling.** Under the flashlight alone the per-frame confidence barely clears the 0.8 threshold, so confirmation needs several clean bearings. A target boxed in by furniture can leave too few.
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
@@ -116,7 +130,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 ```bash
 npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
-npm run study:missions   # docs/mission-bench.json: three indoor explorers, 30 fresh worlds per scenario
+npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README

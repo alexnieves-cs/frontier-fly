@@ -150,8 +150,10 @@ function coverageSummary(rows, stage) {
 const PILOT_LABELS = {
   teacher: 'Oracle teacher (floor plan)',
   classical: 'Sensor-only planner',
+  classicalBrake: 'Sensor-only planner, braking filter',
   policy: 'Policy',
   guarded: 'Policy + lidar guard',
+  guardedBrake: 'Policy + braking guard',
   waypoint: 'Waypoint follower',
   heuristic: 'Lidar heuristic',
 };
@@ -264,8 +266,10 @@ function ablationTables(ab) {
 function reportInline(study, bench) {
   const out = {};
   const keys = ['R_TEACHER_HARD', 'R_PLANNER_HARD', 'R_POLICY_HARD', 'R_GUARD_HARD', 'R_POLICY_COLL', 'R_GUARD_COLL', 'R_PLANNER_QUAD', 'R_POLICY_QUAD', 'R_TEACHER_QUAD'];
+  const keys3 = ['R_Q_PLANNER', 'R_Q_PLANNER_COLL', 'R_Q_PLANNER_BRAKE', 'R_Q_PLANNER_BRAKE_COLL', 'R_Q_GUARD', 'R_Q_GUARD_COLL', 'R_Q_GUARD_BRAKE', 'R_Q_GUARD_BRAKE_COLL'];
+  const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
   const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL'];
-  for (const k of [...keys, ...keys2]) out[k] = 'n/a';
+  for (const k of [...keys, ...keys2, ...keys3, ...keys4]) out[k] = 'n/a';
   if (study) {
     const c = (cond, pilot) => study.cells.find((x) => x.condition === cond && x.lighting === 'day' && x.pilot === pilot);
     out.R_TEACHER_HARD = pct(c('hard', 'teacher').coverage);
@@ -277,6 +281,18 @@ function reportInline(study, bench) {
     out.R_PLANNER_QUAD = pct(c('quad', 'classical').coverage);
     out.R_POLICY_QUAD = pct(c('quad', 'policy').coverage);
     out.R_TEACHER_QUAD = pct(c('quad', 'teacher').coverage);
+    const brake = c('quad', 'classicalBrake');
+    const guardBrake = c('quad', 'guardedBrake');
+    if (brake && guardBrake) {
+      out.R_Q_PLANNER = out.R_PLANNER_QUAD;
+      out.R_Q_PLANNER_COLL = c('quad', 'classical').collisionsPerEpisode.toFixed(1);
+      out.R_Q_PLANNER_BRAKE = pct(brake.coverage);
+      out.R_Q_PLANNER_BRAKE_COLL = brake.collisionsPerEpisode.toFixed(1);
+      out.R_Q_GUARD = pct(c('quad', 'guarded').coverage);
+      out.R_Q_GUARD_COLL = c('quad', 'guarded').collisionsPerEpisode.toFixed(1);
+      out.R_Q_GUARD_BRAKE = pct(guardBrake.coverage);
+      out.R_Q_GUARD_BRAKE_COLL = guardBrake.collisionsPerEpisode.toFixed(1);
+    }
   }
   if (bench) {
     const m = bench.modes;
@@ -290,6 +306,12 @@ function reportInline(study, bench) {
     out.R_M_NIGHT_SENSOR = pct(m.sensor['backpack-night'].expectedOutcome);
     out.R_M_NIGHT_ORACLE = pct(m.oracle['backpack-night'].expectedOutcome);
     out.R_M_COMPOUND = pct(m.sensor['compound-clear'].expectedOutcome);
+    if (m.sensorQuad && m.policyQuad) {
+      out.R_MQ_SENSOR = pct(m.sensorQuad.all.expectedOutcome);
+      out.R_MQ_POLICY = pct(m.policyQuad.all.expectedOutcome);
+      out.R_MQ_ALL = String(m.sensorQuad.all.flights + m.policyQuad.all.flights);
+      out.R_MQ_COLL = String(m.sensorQuad.all.flightsWithCollision + m.policyQuad.all.flightsWithCollision);
+    }
   }
   return out;
 }
@@ -432,18 +454,25 @@ function benchmarks() {
   }
   if (missionBench) {
     const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
-    const labels = { policy: 'Policy, sensor planner fallback', sensor: 'Sensor-only planner', oracle: 'Oracle planner (floor plan)' };
+    const labels = {
+      policy: 'Policy, sensor planner fallback',
+      sensor: 'Sensor-only planner',
+      oracle: 'Oracle planner (floor plan)',
+      policyQuad: 'Quadrotor: policy, planner fallback',
+      sensorQuad: 'Quadrotor: sensor-only planner',
+    };
+    const benchModes = Object.keys(labels).filter((m) => missionBench.modes[m]);
     const scenarios = Object.keys(missionBench.modes.sensor).filter((k) => k !== 'all');
     const rows = [];
     for (const key of [...scenarios, 'all']) {
-      for (const mode of ['policy', 'sensor', 'oracle']) {
+      for (const mode of benchModes) {
         const s = missionBench.modes[mode][key];
         rows.push([
           key === 'all' ? '**All**' : key,
           labels[mode],
           `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`,
           String(s.buildingsEntered),
-          mode === 'policy' ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
+          mode === 'policy' || mode === 'policyQuad' ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
           pct(s.meanIndoorCoverage),
           s.collisionsPerFlight.toFixed(2),
           `${Math.floor(s.meanDurationSec / 60)}:${String(s.meanDurationSec % 60).padStart(2, '0')}`,
@@ -468,9 +497,10 @@ function benchmarks() {
       rows,
     );
     out.MISSION_BENCH_NOTE = [
-      `Each scenario's settings flown on ${missionBench.seedsPerScenario} fresh world seeds (${missionBench.seedBase}–${missionBench.seedBase + missionBench.seedsPerScenario - 1}) with three indoor explorers, from \`src/eval/missions.ts\` at \`${missionBench.commit}\`.`,
+      `Each scenario's settings flown on ${missionBench.seedsPerScenario} fresh world seeds (${missionBench.seedBase}–${missionBench.seedBase + missionBench.seedsPerScenario - 1}) with each indoor explorer, from \`src/eval/missions.ts\` at \`${missionBench.commit}\`.`,
       'The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around.',
       'The sensor-only planner reads only the drone\'s own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode.',
+      'The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
       'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
     ].join(' ');
   } else {
