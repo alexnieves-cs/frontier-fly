@@ -59,6 +59,7 @@ function run(mission: Mission, over: Partial<RunRecord> = {}): RunRecord {
     batteryEndPct: 62.5,
     landedHome: true,
     indoorExplorer: null,
+    localization: [],
     log: [],
     ...over,
   };

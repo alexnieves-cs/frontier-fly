@@ -10,11 +10,13 @@ import {
   IndoorVisibility,
   PolicyExplorer,
   SensorExplorer,
+  type LidarWorld,
   sensorNav,
   shellLidar,
   toLocal,
   toWorld,
 } from '../planner/indoor';
+import { Localizer } from '../localizer';
 import { QuadVehicle } from '../quadVehicle';
 import { type VehicleCommand } from '../vehicle';
 import {
@@ -54,12 +56,9 @@ export abstract class IndoorPhases extends EntryPhases {
       flashlightOn: this.world.flashlightOn,
       sensorMode: this.world.sensorMode,
     };
-    v.sensing = new IndoorSensing(
-      v.grid,
-      shellLidar(v.grid, (...a) => this.physics.cast(...a)),
-      lighting,
-      this.world.seed,
-    );
+    const lidar = shellLidar(v.grid, (...a) => this.physics.cast(...a));
+    if (this.options.localization === 'estimated') this.startLocalization(lighting, lidar);
+    v.sensing = new IndoorSensing(v.grid, this.loc ? this.loc.frameLidar(lidar) : lidar, lighting, this.world.seed);
     v.sensing.lastNewVoxelSec = this.t;
     if (this.vehicle instanceof QuadVehicle) v.sensing.braking = this.vehicle.braking;
     const extra = this.options.lidarFault;
@@ -81,6 +80,17 @@ export abstract class IndoorPhases extends EntryPhases {
     }
     this.log('info', `Sensor-only frontier exploration of ${v.b.label}.`);
     this.startSensorExplore();
+  }
+
+  /** Hand the visit to the pose estimator, starting from a doorway fix with the entry error. */
+  protected startLocalization(lighting: LightingState, lidar: LidarWorld): void {
+    const v = this.visit!;
+    this.endLocalization();
+    let h = this.world.seed >>> 0;
+    for (const ch of v.b.id) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+    const dark = nightFactor(lighting) > 0.5 && !lighting.interiorLightsOn;
+    this.loc = new Localizer(v.grid, lidar, h, dark, this.localTruth(), this.options.locFault ?? null);
+    this.log('info', `Flying ${v.b.label} on the estimated pose (lidar scan matching, IMU and optical flow).`);
   }
 
   protected startPolicy(): void {
@@ -114,7 +124,7 @@ export abstract class IndoorPhases extends EntryPhases {
       phase: 'indoor_explore',
       plan: () => [],
       tick: (): VehicleCommand => {
-        const local = toLocal(v.grid, this.vehicle.pos);
+        const local = toLocal(v.grid, this.navPos);
         if (this.t - v.sensing!.lastNewVoxelSec > POLICY_STALL_SEC) end(`stalled (no new coverage for ${POLICY_STALL_SEC} s)`, 'fallback');
         else if (v.policyCollisions >= POLICY_MAX_COLLISIONS) end(`collided ${v.policyCollisions} times`, 'fallback');
         else if (pe.exhausted)
@@ -124,7 +134,7 @@ export abstract class IndoorPhases extends EntryPhases {
           );
         else if (this.t - start > POLICY_MAX_SEC) end(`reached its ${POLICY_MAX_SEC} s slot`, 'continue');
         if (ended) return { vel: [0, 0, 0] };
-        const cmd = pe.act(local, this.vehicle.vel, this.vehicle.yaw, this.t);
+        const cmd = pe.act(local, this.navVel, this.navYaw, this.t);
         return { vel: cmd.vel, yawRate: cmd.yawRate };
       },
     };
@@ -150,7 +160,7 @@ export abstract class IndoorPhases extends EntryPhases {
       plan: () => [],
       tick: (): VehicleCommand => {
         if (v.sensorJob !== job) return { vel: [0, 0, 0] };
-        const local = toLocal(v.grid, this.vehicle.pos);
+        const local = toLocal(v.grid, this.navPos);
         // The slot is per floor. When it runs out, the explorer first gets back to the entry floor.
         const used = this.t - v.exploreStart - MAX_EXPLORE_SEC * v.grid.floors;
         if (used > 0 && !wrapping) {
@@ -166,7 +176,7 @@ export abstract class IndoorPhases extends EntryPhases {
           this.explorationDone();
           return { vel: [0, 0, 0] };
         }
-        const cmd = se.act(local, this.vehicle.vel, this.vehicle.yaw, this.t);
+        const cmd = se.act(local, this.navVel, this.navYaw, this.t);
         if (se.exhausted) {
           v.sensorJob = null;
           this.explorationDone();
@@ -263,7 +273,7 @@ export abstract class IndoorPhases extends EntryPhases {
       return;
     }
     const ft = new FlyThrough(v.axis, 'out');
-    const local = toLocal(v.grid, this.vehicle.pos);
+    const local = toLocal(v.grid, this.navPos);
     const goal = toLocal(v.grid, ft.start);
     const route = (from: V3): Waypoint[] | null => v.nav.path(from, goal)?.map((p) => ({ pos: toWorld(v.grid, p) })) ?? null;
     let wps = route(local);
@@ -289,6 +299,8 @@ export abstract class IndoorPhases extends EntryPhases {
 
   protected crossOut(after: 'continue' | 'rth'): void {
     const v = this.visit!;
+    // The fly-through servoes on the opening in view: the estimate's job ends at its start.
+    this.endLocalization();
     const ft = new FlyThrough(v.axis!, 'out');
     this.setPhase('exit');
     this.setJob(

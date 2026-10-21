@@ -21,6 +21,7 @@ import type { VehicleCommand } from './vehicle';
 import { IndoorPhases } from './phases/indoor';
 import { DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
 import { DEFAULT_BATTERY } from './battery';
+import type { HealthInput } from './failsafe';
 
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
 /**
@@ -55,7 +56,11 @@ const LAND_CUT_AGL = 0.4;
  * (exploration and the way out). This class adds the public API, the tick,
  * return and landing, and the safety ladder.
  */
+/** A drone that cannot re-acquire its pose for this long lands where it is. */
+const LOC_LOST_LAND_SEC = 20;
+
 class Runner extends IndoorPhases {
+  private locLostSince = -1;
   // ----------------------------------------------------------- public
 
   get done(): boolean {
@@ -120,6 +125,7 @@ class Runner extends IndoorPhases {
       batteryEndPct: this.battery.remainingPct(),
       landedHome: this.landedHome,
       indoorExplorer: this.policyClean ? 'policy' : this.frontierRan ? (this.oracle ? 'oracle' : 'frontier') : null,
+      localization: [...this.locVisits, ...(this.loc && this.loc.flownTicks > 0 ? [this.loc.record(this.visit?.b.id ?? '')] : [])],
       log: this.logs.slice(),
       faults: this.faults ? this.faults.transitions().slice() : [],
       ...(this.sar ? { search: { pos: this.sar.history.slice(), reachable: 1 - this.sar.prior.rest, replans: this.sar.replans } } : {}),
@@ -149,8 +155,9 @@ class Runner extends IndoorPhases {
     }
     if (this.finished) return;
 
-    const cmd = this.believed(() => this.climbClear(this.job.tick()));
+    let cmd = this.believed(() => this.climbClear(this.job.tick()));
     if (this.finished) return;
+    if (this.loc) cmd = this.flyOnEstimate(cmd);
     this.lastCmd = cmd;
     const wind: V3 = this.faults && !this.inside ? this.faults.wind() : (this.options.wind?.(this.t) ?? [0, 0, 0]);
     const step = this.vehicle.step(cmd, this.dt, this.limits(), { wind });
@@ -158,6 +165,7 @@ class Runner extends IndoorPhases {
     const k = 1 - Math.exp(-this.dt / WIND_ESTIMATE_TAU);
     for (let i = 0; i < 3; i++) this.windEstimate[i] = this.windEstimate[i]! + (wind[i]! - this.windEstimate[i]!) * k;
     this.lastCollided = step.collided;
+    if (this.loc) this.loc.step(this.localTruth(), this.t);
     if (step.collided) {
       const pos = this.vehicle.pos;
       this.collisions.push({
@@ -178,6 +186,47 @@ class Runner extends IndoorPhases {
       this.log('warn', `Time limit ${fmt(this.maxSim, 0)} s reached before landing.`);
       this.finish();
     }
+  }
+
+  /**
+   * A command planned in the estimate's frame, as the flight controller flies
+   * it: velocities and headings are body-relative, so they turn by the
+   * heading error on the way to the real world. While the estimate is lost
+   * the drone hovers so the matcher can re-acquire.
+   */
+  /**
+   * The estimator's health as the failsafe reads it. A lost estimate counts
+   * only once the re-acquire hover has run LOC_LOST_LAND_SEC: then the
+   * failsafe lands in place (estimator_fault).
+   */
+  private poseHealth(): HealthInput['poseHealth'] {
+    if (!this.loc || !this.inside) return null;
+    const h = this.loc.estimate.health;
+    if (h.state !== 'lost') return h;
+    return this.locLostSince >= 0 && this.t - this.locLostSince > LOC_LOST_LAND_SEC ? h : null;
+  }
+
+  protected flyOnEstimate(cmd: VehicleCommand): VehicleCommand {
+    const l = this.loc!;
+    if (this.phase === 'land') return cmd;
+    if (l.lost) {
+      if (this.locLostSince < 0) {
+        this.locLostSince = this.t;
+        this.log('warn', 'Pose estimate lost. Hovering while the scan matcher re-acquires.');
+      }
+      return { vel: [0, 0, 0] };
+    }
+    if (this.locLostSince >= 0) this.log('info', `Pose estimate re-acquired after ${fmt(this.t - this.locLostSince)} s.`);
+    this.locLostSince = -1;
+    const d = l.yawError;
+    const c = Math.cos(d);
+    const s = Math.sin(d);
+    const [vx, vy, vz] = cmd.vel;
+    return {
+      ...cmd,
+      vel: [c * vx - s * vy, s * vx + c * vy, vz],
+      yaw: cmd.yaw === undefined || cmd.yaw === null ? cmd.yaw : cmd.yaw + d,
+    };
   }
 
   protected startReturn(reason: string): void {
@@ -441,7 +490,7 @@ class Runner extends IndoorPhases {
       lidar: this.lastRing,
       lidarExpected: this.lastExpected,
       gnssFix: this.faults ? this.faults.gnss().fix : true,
-      poseHealth: null,
+      poseHealth: this.poseHealth(),
       motorRatio: this.motorTelemetry(),
       batteryPct: this.battery.remainingPct(),
       modelPowerW: this.lastPowerW,
@@ -517,7 +566,7 @@ class Runner extends IndoorPhases {
     }
     // Backtrack: retrace the breadcrumb trail.
     const meters = action.meters ?? 1.5;
-    const pos = this.vehicle.pos;
+    const pos = this.navPos;
     const trail: Waypoint[] = [];
     let acc = 0;
     let prev: V3 = pos;
@@ -526,7 +575,7 @@ class Runner extends IndoorPhases {
       const d = dist(prev, c);
       if (d < 0.05) continue;
       acc += d;
-      trail.push({ pos: c, yaw: this.vehicle.yaw });
+      trail.push({ pos: c, yaw: this.navYaw });
       prev = c;
     }
     this.setJob(this.followJob('recover', trail, back, 0.15));

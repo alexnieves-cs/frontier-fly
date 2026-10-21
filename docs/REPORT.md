@@ -11,11 +11,12 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **A classical sensor-only planner is the stronger indoor coverage pilot.** On 30 fresh hard buildings it covers 65.5% with no collisions. The learned policy covers 60.7% and averages 6.4 collisions per episode; under a lidar guard it keeps its coverage (60.8%) at 0.03 collisions per episode. The oracle teacher it imitates covers 67.3%.
 - **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps and an anchored PPO fine-tune change little. DAgger adds 11 points over behavior cloning.
 - **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 59 s restricted mean time against 274 s over 100 fresh daytime scenes, a paired difference of -215 s (95% CI -275 to -156 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -11 s (95% CI -25 to +2 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+151 s (95% CI +54 to +249 s) against the sweep-width lanes).
-- **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage (43.6% for the planner, 27.0% for the policy, 22.7% for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from 6.7 to 1.2 per episode and the guarded policy's from 14.5 to 2.1. Whole missions flown on the quadrotor meet the expected outcome in 91.1% (planner) and 91.1% (policy) of flights.
+- **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage (43.6% for the planner, 27.0% for the policy, 22.7% for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from 6.7 to 1.2 per episode and the guarded policy's from 14.5 to 2.1. Whole missions flown on the quadrotor meet the expected outcome in 95.6% (planner) and 93.3% (policy) of flights.
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in 30 of 30 fresh multi-floor buildings and covers 41.8% of them against 37.7% without climbing, with 0.00 collisions per episode. The policy and the teacher still stay on the ground floor.
 - **A rendered camera and a learned detector can fly the same missions.** The drone now renders what its camera sees and a small network, trained here on CC0 people and procedural objects, finds targets in the pixels. On 180 fresh paired flights it meets the expected outcome in 90.6% (85–94%) of them against 96.7% (93–98%) for the analytic detector, with no false alarms or false clears. The gap is all at night: under the flashlight alone it confirms the backpack in 78.3% of flights against 93.3%.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² 0.94 against 0.45). Ranking frontiers by it leaves coverage unchanged (66.0% against 65.5% on hard buildings), and so does the true hidden gain (64.7%). In this environment coverage is limited by flight time, not by which frontier comes next.
 - **A team of drones is the lever coverage was waiting for.** On 30 fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches 29.5%, three search 79.1% and four 93.2%, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median 59 s; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
+- **The drone can estimate its own pose indoors.** An estimator that matches each lidar sweep against a map it builds itself, fused with the gyro and a downward optical-flow sensor, drifts 4.9 cm by day and 5.1 cm at night from its own map over about 200 m of flight in fresh hard buildings, and was 0.5 m off at some point in 0 of 60 flights. Dead reckoning on the same sensors drifts 1.86 m and 2.08 m. Displaced mid-flight, it noticed and re-acquired in 120 of 120 flights. Flown closed loop, with every indoor map, path and command on the estimate instead of the simulator's pose, whole missions meet the expected outcome in 91.1% of flights for the planner (vs 93.3% on the true pose) and 85.6% for the policy (vs 91.1%), with the estimate 7.6 cm from the drone's own map; daytime missions are unaffected and most of the gap is the night search.
 
 ## Setup
 
@@ -32,6 +33,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 | Sensor-only planner (`src/sim/sensorPlanner.ts`) | Its lidar, its seen and flown voxels, lidar occupancy evidence | No |
 | Mission indoor explorer (`SensorExplorer`) | The above, plus up and down range finders (shafts) and its own estimate of what the camera has looked at | No |
 | Oracle mission planner (`indoor: 'oracle'`) | True floor plan | Yes. Reference only. |
+| Pose estimator (`src/loc`) | Gyro, accelerometer, optical flow, barometer, down range finder and a 90-beam 2D lidar, all with noise; the entry pose with a 10 cm, 1.7° error | No. In the estimated-pose mission arms, every indoor map, path, shield check and command runs on its output; the fly-through in and out, outdoor flight and detection placement still use the true pose. |
 | Confirm-clear (`clearStatus`) | Ground-truth cells the camera saw | Partly. It decides whether a building may be declared clear and whether a safety sweep flies a second pass, so it tells the drone one thing per building: whether its look was complete. It never routes the drone. |
 
 ## Methods
@@ -51,6 +53,8 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 **Lidar guard for the policy.** The policy's action goes through the same velocity filter with a tighter margin, and its altitude is pulled to 1.15 m above the floor. The guard does not descend while a wall is within 0.6 m, because a sill under the lidar ring is invisible to it.
 
 **Mission explorer.** Per floor: *sweep* (the planner), then *look* (fly to the viewpoint that shows the most voxels the camera has not looked at, per metre of travel, and turn a full circle), then take a shaft that the up or down range finder found to a floor not yet searched, and finally return to the entry floor. At night the look estimate models the flashlight cone around the tilted camera, so the floor right under the drone does not count as looked at. The policy can fly the sweep instead; on a stall or collision it hands over to the planner, which always does the look phase.
+
+**Pose estimation** (`src/loc`). An extended Kalman filter over position, heading and gyro bias. Between sweeps it integrates the gyro and a body-velocity filter (the accelerometer predicts, the optical-flow sensor corrects; in the dark the flow sensor drops most samples). Each 10 Hz lidar sweep is matched by Gauss-Newton against the estimator's own occupancy map, point to line: every occupied cell keeps the mean of the returns that hit it, and its wall direction comes from its neighbours, so walls sit where the lidar saw them rather than at cell centres. The odometry prior enters the match as a Mahalanobis term. Three details carry most of the accuracy. A *Manhattan heading fix* reads the building's wall directions in each sweep: walls run along the axes the drone measured from outside, so the dominant wall direction measures heading modulo 90° and removes both the entry heading error and gyro drift. *Degenerate directions* (the axis of a bare corridor) get neither a correction nor information from the sweep (Zhang, Kaess and Singh, 2016), so slight tilts in the map's wall normals can't drag the pose along the wall. When sweeps keep contradicting the map (returns landing in space it knows is free), a *correlative search* over a widening window re-acquires. The estimator reports its own health: position sigma against the building and against its map, and tracking, degraded or lost.
 
 **Confirmation.** A contact is confirmed from at least three bearings whose best confidences average above the mission threshold. Indoors on a young map, re-views wait until the map offers enough bearings, plan one spare bearing, narrow the spacing for a target in a corner, skip bearings that added nothing, re-view the weakest bearing first, and hold longer in the dark.
 
@@ -130,7 +134,7 @@ Every pilot flies the same 30 fresh buildings per condition, from `scripts/study
 
 ### Missions on fresh worlds
 
-Each scenario's settings flown on 30 fresh world seeds (9600–9629) with each indoor explorer, from `src/eval/missions.ts` at `4d601db`. The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around. The sensor-only planner reads only the drone's own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode. The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield. Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.
+Each scenario's settings flown on 30 fresh world seeds (9600–9629) with each indoor explorer, from `src/eval/missions.ts` at `419cac6`. The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around. The sensor-only planner reads only the drone's own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode. The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield. The estimated-pose rows fly the same explorers indoors on the drone's own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator's pose; the fly-through in and out stays on the true pose. Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.
 
 | Scenario | Indoors | Expected outcome (95% CI) | Buildings entered | Handed to planner (95% CI) | Indoor coverage | Collisions per flight | Mean mission time | False clears | False alarms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -139,23 +143,35 @@ Each scenario's settings flown on 30 fresh world seeds (9600–9629) with each i
 | cabin-day | Oracle planner (floor plan) | 100.0% (89–100%) | 30 | — | 92.5% | 0.00 | 3:02 | 0 | 0 |
 | cabin-day | Quadrotor: policy, planner fallback | 100.0% (89–100%) | 30 | 6.7% (2–21%) | 93.3% | 0.03 | 3:08 | 0 | 0 |
 | cabin-day | Quadrotor: sensor-only planner | 100.0% (89–100%) | 30 | — | 94.3% | 0.00 | 3:06 | 0 | 0 |
-| compound-clear | Policy, sensor planner fallback | 90.0% (74–97%) | 60 | 81.7% (70–89%) | 95.2% | 0.07 | 14:26 | 0 | 0 |
-| compound-clear | Sensor-only planner | 90.0% (74–97%) | 60 | — | 95.2% | 0.00 | 13:38 | 0 | 0 |
+| cabin-day | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 30 | 6.7% (2–21%) | 93.1% | 0.00 | 3:24 | 0 | 0 |
+| cabin-day | Estimated pose: sensor-only planner | 100.0% (89–100%) | 30 | — | 96.3% | 0.00 | 3:16 | 0 | 0 |
+| cabin-day | Estimated pose, quadrotor: sensor-only planner | 100.0% (89–100%) | 30 | — | 94.7% | 0.00 | 3:07 | 0 | 0 |
+| compound-clear | Policy, sensor planner fallback | 90.0% (74–97%) | 60 | 80.0% (68–88%) | 95.2% | 0.07 | 14:52 | 0 | 0 |
+| compound-clear | Sensor-only planner | 90.0% (74–97%) | 60 | — | 95.2% | 0.00 | 14:03 | 0 | 0 |
 | compound-clear | Oracle planner (floor plan) | 90.0% (74–97%) | 60 | — | 95.2% | 0.00 | 8:45 | 0 | 0 |
-| compound-clear | Quadrotor: policy, planner fallback | 83.3% (66–93%) | 60 | 70.0% (57–80%) | 93.9% | 0.13 | 13:25 | 0 | 0 |
-| compound-clear | Quadrotor: sensor-only planner | 76.7% (59–88%) | 59 | — | 91.1% | 0.00 | 13:11 | 0 | 0 |
+| compound-clear | Quadrotor: policy, planner fallback | 90.0% (74–97%) | 60 | 70.0% (57–80%) | 95.2% | 0.13 | 13:27 | 0 | 0 |
+| compound-clear | Quadrotor: sensor-only planner | 90.0% (74–97%) | 60 | — | 95.2% | 0.00 | 12:39 | 0 | 0 |
+| compound-clear | Estimated pose: policy, planner fallback | 83.3% (66–93%) | 60 | 73.3% (61–83%) | 93.2% | 0.17 | 13:28 | 0 | 0 |
+| compound-clear | Estimated pose: sensor-only planner | 90.0% (74–97%) | 60 | — | 95.2% | 0.00 | 12:33 | 0 | 0 |
+| compound-clear | Estimated pose, quadrotor: sensor-only planner | 90.0% (74–97%) | 60 | — | 95.2% | 0.00 | 11:37 | 0 | 0 |
 | backpack-night | Policy, sensor planner fallback | 83.3% (66–93%) | 30 | 16.7% (7–34%) | 88.3% | 0.00 | 4:14 | 0 | 0 |
 | backpack-night | Sensor-only planner | 90.0% (74–97%) | 30 | — | 88.3% | 0.00 | 3:53 | 0 | 0 |
 | backpack-night | Oracle planner (floor plan) | 76.7% (59–88%) | 30 | — | 88.6% | 0.00 | 3:27 | 0 | 0 |
 | backpack-night | Quadrotor: policy, planner fallback | 90.0% (74–97%) | 30 | 20.0% (10–37%) | 88.6% | 0.07 | 3:53 | 0 | 0 |
 | backpack-night | Quadrotor: sensor-only planner | 96.7% (83–99%) | 30 | — | 89.7% | 0.00 | 3:34 | 0 | 0 |
-| **All** | Policy, sensor planner fallback | 91.1% (83–95%) | 120 | 46.7% (38–56%) | 92.3% | 0.02 | 7:19 | 0 | 0 |
-| **All** | Sensor-only planner | 93.3% (86–97%) | 120 | — | 92.2% | 0.00 | 6:54 | 0 | 0 |
+| backpack-night | Estimated pose: policy, planner fallback | 73.3% (56–86%) | 30 | 13.3% (5–30%) | 90.2% | 0.00 | 4:36 | 0 | 0 |
+| backpack-night | Estimated pose: sensor-only planner | 83.3% (66–93%) | 30 | — | 90.1% | 0.00 | 3:56 | 0 | 0 |
+| backpack-night | Estimated pose, quadrotor: sensor-only planner | 76.7% (59–88%) | 30 | — | 94.9% | 0.00 | 4:03 | 0 | 0 |
+| **All** | Policy, sensor planner fallback | 91.1% (83–95%) | 120 | 45.8% (37–55%) | 92.3% | 0.02 | 7:28 | 0 | 0 |
+| **All** | Sensor-only planner | 93.3% (86–97%) | 120 | — | 92.2% | 0.00 | 7:03 | 0 | 0 |
 | **All** | Oracle planner (floor plan) | 88.9% (81–94%) | 120 | — | 92.1% | 0.00 | 5:05 | 0 | 0 |
-| **All** | Quadrotor: policy, planner fallback | 91.1% (83–95%) | 120 | 41.7% (33–51%) | 91.9% | 0.08 | 6:49 | 0 | 0 |
-| **All** | Quadrotor: sensor-only planner | 91.1% (83–95%) | 119 | — | 91.7% | 0.00 | 6:37 | 0 | 0 |
+| **All** | Quadrotor: policy, planner fallback | 93.3% (86–97%) | 120 | 41.7% (33–51%) | 92.4% | 0.08 | 6:49 | 0 | 0 |
+| **All** | Quadrotor: sensor-only planner | 95.6% (89–98%) | 120 | — | 93.1% | 0.00 | 6:26 | 0 | 0 |
+| **All** | Estimated pose: policy, planner fallback | 85.6% (77–91%) | 120 | 41.7% (33–51%) | 92.2% | 0.06 | 7:09 | 0 | 0 |
+| **All** | Estimated pose: sensor-only planner | 91.1% (83–95%) | 120 | — | 93.8% | 0.00 | 6:35 | 0 | 0 |
+| **All** | Estimated pose, quadrotor: sensor-only planner | 88.9% (81–94%) | 120 | — | 94.9% | 0.00 | 6:15 | 0 | 0 |
 
-The night search is where the explorers differ most: the sensor-only explorer finds the backpack in 90.0% of worlds and the oracle planner in 76.7%. The oracle knows the floor plan, but the night changes (the flashlight-cone look estimate, closer re-views and a longer dwell) key off the drone's own sensing and do not apply to it. The compound sweep succeeds in 90.0% of worlds for every explorer; the misses are worlds where no opening into one building is safe enough to enter, so the drone correctly reports the sweep incomplete. The policy hands 46.7% of buildings to the planner, all after a stall and most of them in the compound sweep.
+The night search is where the explorers differ most: the sensor-only explorer finds the backpack in 90.0% of worlds and the oracle planner in 76.7%. The oracle knows the floor plan, but the night changes (the flashlight-cone look estimate, closer re-views and a longer dwell) key off the drone's own sensing and do not apply to it. The compound sweep succeeds in 90.0% of worlds for every explorer; the misses are worlds where no opening into one building is safe enough to enter, so the drone correctly reports the sweep incomplete. The policy hands 45.8% of buildings to the planner, all after a stall and most of them in the compound sweep.
 
 ### Quadrotor dynamics and the braking filter
 
@@ -198,6 +214,74 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 | Quadrotor | Guarded policy | 33.6% (2.1) | 39.4% (6.0) | 44.3% (7.8) | 46.9% (8.8) | 5.02 → 5.11 |
 
 ![Coverage against the speed cap for each pilot, kinematic drone and quadrotor](report/speed.svg)
+
+### Indoor localization
+
+Each flight is a trajectory the sensor-only planner flew with the true pose on a fresh building (hard: seeds 60001+, easy: 62001+, 30 each, day and night), replayed open loop through every estimator arm with its own simulated sensors, from `scripts/study/loc-study.ts` at `ba4e165`. The estimator's parameters were tuned only on stage-3 seeds 7001–7012. *Drift vs own map* removes the entry offset (the estimator starts 10 cm and 1.7° off, 1-sigma, and cannot learn where its map sits); *vs building* keeps it. *Inside own 95%* is the share of ticks whose map-relative error falls inside the filter's own 95% ellipse; 95% is ideal, lower is overconfident. Brackets are bootstrap 95% intervals of the mean over flights.
+
+| Estimator (hard buildings) | Drift vs own map, day | Drift vs own map, night | Error vs building, day / night | Heading error, day / night | Worst error | Flights ever 0.5 m off | Inside own 95% |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Shipped: IMU + flow + 90-beam lidar scan matching | 4.9 cm (4.3–5.7) | 5.1 cm (4.4–5.9) | 14.1 cm / 14.2 cm | 0.27° / 0.28° | 34.9 cm | 0 of 60 | 96.2% |
+| Dead reckoning: IMU + flow only | 1.86 m (1.58–2.15 m) | 2.08 m (1.82–2.35 m) | 1.87 m / 2.10 m | 16.26° / 14.66° | 8.88 m | 60 of 60 | 100.0% |
+| Scan matching only (no IMU or flow) | 36.3 cm (10.4–76.9) | 45.9 cm (0.10–1.18 m) | 42.7 cm / 52.1 cm | 4.50° / 8.33° | 21.09 m | 6 of 60 | 86.0% |
+| Fused with the policy's 32-beam ring | 17.2 cm (12.9–22.6) | 45.4 cm (23.8–71.2) | 24.0 cm / 52.0 cm | 0.95° / 1.04° | 4.22 m | 14 of 60 | 84.6% |
+
+The shipped estimator's error against the building (14.2 cm on average) is mostly the entry offset, which no amount of matching against its own map can remove; its drift against that map is about 5 cm. Without the lidar the same sensors drift 1.86 m and 2.08 m by day and at night, mostly from gyro bias (15° of heading error on average). Matching sweeps without the IMU and flow drifts 36.3 cm and 45.9 cm and occasionally loses the building outright. The 32-beam ring the policy reads is too sparse: 17.2 cm and 45.4 cm of drift, with 14 of 60 flights at some point 0.5 m off. The seen-free map the explorers plan on agrees 99.8% with the one painted from the true pose. The filter's own 95% ellipse held the true map-relative error 96.2% of the time. The shipped estimator called itself lost while still accurate in 0 of 120 flights.
+
+**Kidnapped drone.** Halfway through each flight the estimate is moved 1 m and 15° without telling the filter, as a collision spin might. It re-acquired in 120 of 120 flights, in 0.4 s on average:
+
+| Condition | Lighting | Re-acquired | Median time to < 30 cm | Error ticks > 0.5 m flagged |
+| --- | --- | --- | --- | --- |
+| easy | day | 30 of 30 | 0.40 s | 64.7% |
+| easy | night-dark | 30 of 30 | 0.45 s | 65.8% |
+| hard | day | 30 of 30 | 0.40 s | 69.6% |
+| hard | night-dark | 30 of 30 | 0.40 s | 67.4% |
+
+<details>
+<summary>Every condition and estimator</summary>
+
+| Condition | Lighting | Estimator | Error vs building | Drift vs own map (95% CI) | Heading error | Worst | Flights ever 0.5 m off | Inside own 95% | Seen-map agreement | CPU per flight |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| easy | day | Shipped: IMU + flow + 90-beam lidar scan matching | 14.1 cm | 2.7 cm (2.4–2.9) | 0.25° | 29.9 cm | 0 of 30 | 100.0% | 100.0% | 0.4 s |
+| easy | day | Dead reckoning: IMU + flow only | 33.0 cm | 32.2 cm (29.1–35.5) | 3.81° | 1.09 m | 22 of 30 | 100.0% | 100.0% | 0.2 s |
+| easy | day | Scan matching only (no IMU or flow) | 21.2 cm | 13.4 cm (7.0–25.9) | 4.06° | 4.82 m | 1 of 30 | 99.0% | 100.0% | 0.4 s |
+| easy | day | Fused with the policy's 32-beam ring | 14.5 cm | 4.3 cm (3.5–5.3) | 0.76° | 49.1 cm | 0 of 30 | 99.0% | 100.0% | 0.3 s |
+| easy | day | Fused, drone displaced 1 m and 15° mid-flight | 17.7 cm | 10.5 cm (9.8–11.4) | 1.53° | 1.35 m | 30 of 30 | 98.9% | 100.0% | 0.4 s |
+| hard | day | Shipped: IMU + flow + 90-beam lidar scan matching | 14.1 cm | 4.9 cm (4.3–5.7) | 0.27° | 33.0 cm | 0 of 30 | 96.7% | 99.8% | 2.2 s |
+| hard | day | Dead reckoning: IMU + flow only | 1.87 m | 1.86 m (1.58–2.15 m) | 16.26° | 8.43 m | 30 of 30 | 100.0% | 86.7% | 0.9 s |
+| hard | day | Scan matching only (no IMU or flow) | 42.7 cm | 36.3 cm (10.4–76.9) | 4.50° | 11.64 m | 4 of 30 | 85.6% | 98.3% | 2.4 s |
+| hard | day | Fused with the policy's 32-beam ring | 24.0 cm | 17.2 cm (12.9–22.6) | 0.95° | 1.02 m | 6 of 30 | 84.2% | 99.5% | 1.7 s |
+| hard | day | Fused, drone displaced 1 m and 15° mid-flight | 16.1 cm | 8.9 cm (8.2–9.6) | 1.13° | 1.43 m | 30 of 30 | 96.1% | 99.8% | 2.3 s |
+| easy | night-dark | Shipped: IMU + flow + 90-beam lidar scan matching | 13.8 cm | 2.8 cm (2.5–3.2) | 0.25° | 30.7 cm | 0 of 30 | 100.0% | 100.0% | 0.4 s |
+| easy | night-dark | Dead reckoning: IMU + flow only | 90.7 cm | 91.7 cm (0.79–1.05 m) | 3.87° | 2.77 m | 30 of 30 | 100.0% | 100.0% | 0.2 s |
+| easy | night-dark | Scan matching only (no IMU or flow) | 15.7 cm | 7.2 cm (7.0–7.4) | 2.58° | 41.5 cm | 0 of 30 | 99.9% | 100.0% | 0.4 s |
+| easy | night-dark | Fused with the policy's 32-beam ring | 14.8 cm | 5.8 cm (4.6–7.4) | 0.88° | 48.9 cm | 0 of 30 | 97.6% | 100.0% | 0.3 s |
+| easy | night-dark | Fused, drone displaced 1 m and 15° mid-flight | 17.8 cm | 11.3 cm (10.2–12.4) | 1.63° | 1.45 m | 30 of 30 | 98.8% | 100.0% | 0.4 s |
+| hard | night-dark | Shipped: IMU + flow + 90-beam lidar scan matching | 14.2 cm | 5.1 cm (4.4–5.9) | 0.28° | 34.9 cm | 0 of 30 | 95.6% | 99.8% | 2.3 s |
+| hard | night-dark | Dead reckoning: IMU + flow only | 2.10 m | 2.08 m (1.82–2.35 m) | 14.66° | 8.88 m | 30 of 30 | 100.0% | 88.1% | 0.9 s |
+| hard | night-dark | Scan matching only (no IMU or flow) | 52.1 cm | 45.9 cm (0.10–1.18 m) | 8.33° | 21.09 m | 2 of 30 | 86.4% | 98.5% | 2.5 s |
+| hard | night-dark | Fused with the policy's 32-beam ring | 52.0 cm | 45.4 cm (23.8–71.2) | 1.04° | 4.22 m | 8 of 30 | 84.9% | 97.3% | 1.6 s |
+| hard | night-dark | Fused, drone displaced 1 m and 15° mid-flight | 16.2 cm | 8.9 cm (8.2–9.7) | 1.12° | 1.36 m | 30 of 30 | 94.7% | 99.8% | 2.3 s |
+
+</details>
+
+**Closed loop, in missions.** The `Loc` arms of the mission bench fly each explorer indoors on this estimate. The estimator starts at the doorway from the pose the fly-through ends at, plus a 10 cm and 1.7° error drawn per visit. From there the drone's lidar paints its maps where the estimate says it is, the planners and the shield read the estimate, and each velocity and heading command turns by the heading error on its way to the airframe, as a flight controller holding the estimated heading would fly it. When the estimate reports itself lost, the drone hovers so the matcher can re-acquire. If it is still lost after 20 s, the failsafe ([SAFETY_CASE.md](SAFETY_CASE.md)) lands it where it is. The failsafe also sends it out of the building slowly once the estimate's own 1-sigma error passes 0.35 m. Over 270 flights, 270 of which entered a building:
+
+| Indoors | Expected outcome, estimate vs truth | Flights with a collision, estimate vs truth | Error vs own map (RMS) | Error vs building (RMS) | Worst error per flight, median / max | Heading error (RMS) | Flights ever 0.5 m off | Flights that lost the pose (time lost) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Estimated pose: sensor-only planner | 91.1% vs 93.3% | 0 vs 0 | 6.9 cm | 16.1 cm | 18.7 cm / 37.4 cm | 0.33° | 0 of 90 | 0 (0.0 s) |
+| Estimated pose: policy, planner fallback | 85.6% vs 91.1% | 3 vs 1 | 8.7 cm | 17.5 cm | 18.5 cm / 118.1 cm | 1.36° | 1 of 90 | 2 (43.2 s) |
+| Estimated pose, quadrotor: sensor-only planner | 88.9% vs 95.6% | 0 vs 0 | 7.3 cm | 16.1 cm | 18.8 cm / 41.9 cm | 0.36° | 0 of 90 | 0 (0.0 s) |
+
+Daytime missions are unchanged: the cabin search succeeds in every world on either pose. The estimate costs 5 points of expected outcome overall, and the Wilson intervals overlap. Most of it is the night search (77.8% on the estimate vs 90.0% on the true pose), where the flashlight cone leaves little margin for a re-view placed 15–20 cm off; in an earlier check on 30 other night worlds (9117–9146), before the last two fixes below, the sensor planner found the backpack in 28 on either pose, so part of the gap may be these worlds. The rest is mostly compound sweeps that ended aborted. In those flights the estimate went lost and did not re-acquire within 20 s, so the failsafe landed the drone where it was. 3 estimated-pose flights touched anything (vs 1 for the same explorers on the true pose). The worst error in any flight was 118 cm; flights ever 0.5 m off: 1. Flights that called the pose lost at some point: 2.
+
+Closing the loop found faults that replaying logged flights could not, all fixed on the mission tuning worlds (9101–9116) or by construction:
+
+- **Walls first seen edge-on read as contradictions.** A free ray grazing along a wall marks the cells beside it free; a later return from that wall, a few cm off, lands in one of those cells, and the estimator rejected whole sweeps as inconsistent with its map. A return now contradicts the map only where the cell and all its neighbours have been seen: free space next to unseen space is where new surfaces appear. On the first mission tried, matched sweeps went from 78% to all but one.
+- **Shaft climbs relied on the voxel grid lining up with the building.** The explorer climbed or descended at the centre of the voxels where the range finder saw through to the next floor. On the true pose those 0.5 m voxels align with the 1 m building cells, so a voxel that saw through lies inside the shaft. Offset by the entry error they don't, and a drone 9 cm from the slab edge clipped it. Before a climb the drone now finds the hole's edges with the range finder itself, flying slowly along each building axis until the reading closes, and centres between them. This changes the true-pose arms too.
+- **Detections were placed with the true pose.** The camera model places a contact from the true pose, while the drone planned its re-views in the estimate's frame, so night re-views aimed 15–25 cm off the target. Contacts are now re-placed with the estimate. This fix came after a first full bench run, which it changed only in the estimated-pose arms (sensor planner at night: 73% to 80%).
+- **A gyro read once per tick misses the turn.** The quadrotor's body rate sampled at the end of each 50 ms tick differs from its mean over the tick while the heading controller is turning, and the estimator, trusting it, drifted 15° in heading on quadrotor flights. A real IMU is read far faster than the control loop and its rate is integrated over the tick; the localizer now feeds the tick's heading change, and the quadrotor's heading error dropped to under 1°.
+- **A sweep through the slab founded the next floor's map.** Climbing a shaft, the drone's estimated floor changes as it passes the slab, and the first sweep on the new floor founds that floor's map. Taken at slab height, that sweep sees the edge of the hole, not the rooms above, and nothing later matched it: the estimate coasted on odometry until it called itself lost. Sweeps within 35 cm of an upper slab are now neither matched nor mapped. It showed up after the slab geometry changed (a slab is now open only where a shaft joins two floors). It appeared on a tuning world and in a third full bench run, where the sensor planner's compound sweep ended aborted in 8 of 30 worlds. The fix was found on the tuning world, and the bench above is the fourth run.
 
 ### Ablations
 
@@ -496,6 +580,9 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **The camera is a renderer, not a photograph.** People are one low-poly mannequin in ten poses with a coloured shirt, objects are boxes with a few details, and the detector trains and tests on the same renderer. Its scores say nothing about real images. Range comes from a perfect depth image plus 3% noise, and which space counts as looked at is still estimated geometrically, not from the detector.
 - **Phones are not found.** The detector's AP for phones is near zero; at 160×120 a phone is a few pixels. No mission asks for one.
+- **Localization is closed loop only inside buildings.** In the estimated-pose arms the drone starts each visit from the doorway with a 10 cm, 1.7° pose error and flies the visit on its estimate, but the fly-through in and out still servoes on the true pose (standing in for tracking the opening it can see), outdoor flight uses the true pose (standing in for GNSS), and the perception source places detections with the true pose. Each would add error the bench does not count.
+- **The coverage study's policy and planner never fly on the estimate.** Only the mission bench does; the coverage numbers above are on the true pose.
+- **The localization sensors are idealized in places.** Each lidar sweep is instantaneous (no motion distortion), the flow sensor's errors are white plus a per-flight scale error, walls are perfectly flat and axis-aligned (which the Manhattan heading fix relies on), and nothing in the building moves. There is no loop closure: drift that enters the map stays in it.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -516,6 +603,8 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Training and checking the camera detector | Frames from worlds 66001–66400 (training), 66501–66560 (checkpoint and calibration), 67001–67060 (reported) |
 | Tuning camera contacts | Mission worlds 66601–66616 |
 | Camera mission bench (reported) | 67101–67130 |
+| Tuning the pose estimator | Coverage buildings 7001–7012 (stage 3), mission worlds 9101–9116 for the closed-loop fixes |
+| Localization study (reported) | 60001+ (hard) and 62001+ (easy), 30 each |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -523,13 +612,14 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 ```bash
 npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
-npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
+npm run study:missions   # docs/mission-bench.json: each indoor explorer, airframe and pose source, 30 fresh worlds per scenario
 npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
 npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 npm install --no-save @tensorflow/tfjs-node@4.22.0   # native TF.js for the camera scripts
 npm run study:vision     # docs/vision-bench.json: missions with the camera and the learned detector
 # Camera detector: scripts/vision/make-dataset.ts, train-detector.ts and eval-detector.ts (see their headers)
+npm run study:loc        # docs/localization.json: pose estimator arms over 120 fresh flights
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README

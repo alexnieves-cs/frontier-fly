@@ -34,7 +34,8 @@ import {
   sub,
 } from '../planner/geometry';
 import { GIMBAL_RANGE_SCALE } from '../perception';
-import { type ActingPolicy, toLocal } from '../planner/indoor';
+import { type ActingPolicy, toLocal, toWorld } from '../planner/indoor';
+import type { LocalTruth, Localizer, LocVisitRecord } from '../localizer';
 import { QuadVehicle } from '../quadVehicle';
 import { createFailsafe, type Failsafe, type HealthVerdict } from '../failsafe';
 import { FaultInjector } from '../faults';
@@ -151,6 +152,9 @@ export abstract class RunnerBase implements MissionRunner {
   protected policyRun: { resume: () => void; release: () => void } | null = null;
   protected outcome: RunOutcome = 'incomplete';
   protected landedHome = false;
+  /** The visit's pose estimator while the drone flies a building on it (localization 'estimated'). */
+  protected loc: Localizer | null = null;
+  protected readonly locVisits: LocVisitRecord[] = [];
 
   constructor(
     readonly mission: Mission,
@@ -218,6 +222,48 @@ export abstract class RunnerBase implements MissionRunner {
     return OUTDOOR_LIMITS;
   }
 
+  /**
+   * The pose the planners and controllers fly on: the estimate while a
+   * localizer runs, else the vehicle's true pose. Truth stays in use for the
+   * record, the safety referee and outdoor flight.
+   */
+  protected get navPos(): V3 {
+    const l = this.loc;
+    if (!l) return this.vehicle.pos;
+    return toWorld(l.grid, l.pos);
+  }
+
+  protected get navVel(): V3 {
+    return this.loc ? this.loc.vel : this.vehicle.vel;
+  }
+
+  protected get navYaw(): number {
+    return this.loc ? this.loc.yaw : this.vehicle.yaw;
+  }
+
+  /** The vehicle's true motion in the visit's building frame: what the localization sensors measure. */
+  protected localTruth(): LocalTruth {
+    const grid = this.loc?.grid ?? this.visit!.grid;
+    const a = this.vehicle.accel;
+    const v = this.vehicle.vel;
+    return {
+      pos: toLocal(grid, this.vehicle.pos),
+      yaw: this.vehicle.yaw,
+      vel: [v[0], v[1], v[2]],
+      accel: [a[0], a[1], a[2]],
+      yawRate: this.vehicle.yawRate,
+      dt: this.dt,
+    };
+  }
+
+  /** Stop flying on the estimate and keep the visit's localization record. */
+  protected endLocalization(): void {
+    const l = this.loc;
+    if (!l) return;
+    this.loc = null;
+    if (l.flownTicks > 0) this.locVisits.push(l.record(this.visit?.b.id ?? ''));
+  }
+
   protected setPhase(phase: Phase): void {
     if (phase === this.phase) return;
     const last = this.phases[this.phases.length - 1];
@@ -249,7 +295,7 @@ export abstract class RunnerBase implements MissionRunner {
   }
 
   protected breadcrumb(): void {
-    const p = this.vehicle.pos;
+    const p = this.navPos;
     const last = this.crumbs[this.crumbs.length - 1];
     if (!last || dist(last, p) >= 0.3) {
       this.crumbs.push([p[0], p[1], p[2]]);
@@ -265,7 +311,7 @@ export abstract class RunnerBase implements MissionRunner {
   /** Retrace flown positions (known clear) backwards until `enough` holds. String-pulled with casts. */
   protected retrace(trail: readonly V3[], enough: (p: V3) => boolean): Waypoint[] {
     const out: Waypoint[] = [];
-    let cur: V3 = this.vehicle.pos;
+    let cur: V3 = this.navPos;
     let i = trail.length - 1;
     for (let guard = 0; i >= 0 && guard < 400 && !enough(cur); guard++) {
       let j = i;
@@ -287,12 +333,13 @@ export abstract class RunnerBase implements MissionRunner {
 
   protected followJob(phase: Phase, route: Waypoint[], onDone: () => void, passTol?: number): Job {
     // Close to obstacles, brake to a stop before turning onto a new path.
-    const v0 = this.vehicle.vel;
+    const v0 = this.navVel;
+    const p0 = this.navPos;
     const wps =
       passTol !== undefined && passTol <= 0.3 && Math.hypot(v0[0], v0[1], v0[2]) > 0.15 && route.length
         ? [
             {
-              pos: [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]] as V3,
+              pos: [p0[0], p0[1], p0[2]] as V3,
               tol: 0.12,
             },
             ...route,
@@ -318,7 +365,7 @@ export abstract class RunnerBase implements MissionRunner {
     };
     const cornerSpeed = (i: number): number => {
       if (isStop(i)) return 0;
-      const prev = i === 0 ? this.vehicle.pos : wps[i - 1]!.pos;
+      const prev = i === 0 ? this.navPos : wps[i - 1]!.pos;
       const a = sub(wps[i]!.pos, prev);
       const b = sub(wps[i + 1]!.pos, wps[i]!.pos);
       const la = len(a);
@@ -334,13 +381,13 @@ export abstract class RunnerBase implements MissionRunner {
       phase,
       plan: () => wps.slice(idx).map((w) => w.pos),
       tick: (): VehicleCommand => {
-        const pos = this.vehicle.pos;
+        const pos = this.navPos;
         while (idx < wps.length) {
           const wp = wps[idx]!;
           const d = dist(pos, wp.pos);
           const stop = isStop(idx) || cornerSpeed(idx) === 0;
           const tol = stop ? 0.12 : tolFor(idx);
-          const slow = len(this.vehicle.vel) < 0.3;
+          const slow = len(this.navVel) < 0.3;
           if (d < tol && (!stop || slow)) {
             if (wp.spin && spin < 0 && dwell < 0) spin = Math.PI * 2;
             if (spin > 0) {
@@ -405,9 +452,9 @@ export abstract class RunnerBase implements MissionRunner {
   protected shielded(phase: Phase, vel: V3): V3 {
     const v = this.visit;
     if (!this.inside || !v?.sensing || phase === 'fly_through') return vel;
-    const local = toLocal(v.grid, this.vehicle.pos);
-    v.sensing.sense(local, this.vehicle.vel, this.vehicle.yaw, this.t);
-    const [vx, vy] = v.sensing.filter(vel[0], vel[1], this.vehicle.yaw);
+    const local = toLocal(v.grid, this.navPos);
+    v.sensing.sense(local, this.navVel, this.navYaw, this.t);
+    const [vx, vy] = v.sensing.filter(vel[0], vel[1], this.navYaw);
     const vz = vel[2] < 0 && !descentClear(v.sensing.lidar) ? 0 : vel[2];
     return [vx, vy, vz];
   }
@@ -452,7 +499,8 @@ export abstract class RunnerBase implements MissionRunner {
   }
 
   protected holdJob(phase: Phase, seconds: number, onDone: () => void): Job {
-    const at: V3 = [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]];
+    const p = this.navPos;
+    const at: V3 = [p[0], p[1], p[2]];
     const end = this.t + seconds;
     let called = false;
     return {
@@ -463,7 +511,7 @@ export abstract class RunnerBase implements MissionRunner {
           called = true;
           onDone();
         }
-        return { vel: hold(this.vehicle.pos, at) };
+        return { vel: hold(this.navPos, at) };
       },
     };
   }
