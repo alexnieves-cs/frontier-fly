@@ -81,6 +81,7 @@ function markup(): string {
       </div>
       <nav class="actions" aria-label="Start here">
         <a class="btn primary" href="./film.html">Watch the full mission</a>
+        <a class="btn" href="./race.html">Race the pilots live</a>
         <a class="btn" href="./demo.html">Plan a mission</a>
         <a class="btn" href="./sim.html">Fly it yourself</a>
         <a class="btn" href="./sim.html?train=1&amp;quality=low">Train it in your tab</a>
