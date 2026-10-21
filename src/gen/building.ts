@@ -140,20 +140,27 @@ function tryGenerate(p: GenParams): BuildingSpec | null {
     reachableVoxels: 0,
   };
   if (!isFullyReachable(spec, computeFlightMap(spec))) return null;
-  // Furniture is solid. Its keep-out margin keeps doors and shafts clear, but if
-  // a layout still cuts a room off at flight altitude, drop props from the end
-  // (deterministically) until every room is reachable again.
+  furnish(spec);
+  return spec;
+}
+
+/**
+ * Seeded furniture plus the coverage denominator, for a spec whose rooms are all
+ * reachable when empty. Furniture is solid. Its keep-out margin keeps doors and
+ * shafts clear, but if a layout still cuts a room off at flight altitude, drop
+ * props from the end (deterministically) until every room is reachable again.
+ */
+export function furnish(spec: BuildingSpec): void {
   let furniture = planFurniture(spec);
   for (;;) {
     spec.furniture = furniture;
     const map = computeFlightMap(spec);
     if (isFullyReachable(spec, map)) {
       spec.reachableVoxels = map.count;
-      break;
+      return;
     }
     furniture = withoutProps(spec, furniture, new Set([furniture.props.length - 1]));
   }
-  return spec;
 }
 
 /** Seeded building. Retries with seed+1 until every room is reachable. */

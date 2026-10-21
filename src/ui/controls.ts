@@ -15,6 +15,8 @@ export interface LaunchParams {
   renderer: RendererChoice;
   sensor: SensorMode;
   pilot: 'keys' | 'heuristic' | 'policy';
+  /** `?plan=<id or index>` flies a real apartment (public/plans) instead of a generated building. */
+  plan: string | null;
 }
 
 export function readLaunchParams(search = window.location.search): LaunchParams {
@@ -85,6 +87,7 @@ export function readLaunchParams(search = window.location.search): LaunchParams 
     renderer: readRendererChoice(search),
     sensor,
     pilot,
+    plan: q.get('plan') || null,
   };
 }
 
@@ -97,6 +100,7 @@ export function writeLaunchParams(params: LaunchParams): void {
   if (params.train) q.set('train', '1');
   if (params.shot) q.set('shot', params.shot);
   if (params.renderer === 'webgpu') q.set('renderer', 'webgpu');
+  if (params.plan) q.set('plan', params.plan);
   const url = `${window.location.pathname}?${q.toString()}`;
   window.history.replaceState(null, '', url);
 }

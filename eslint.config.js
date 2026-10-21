@@ -24,6 +24,7 @@ export default tseslint.config(
   {
     files: [
       'src/gen/**/*.ts',
+      'src/plans/**/*.ts',
       'src/sim/**/*.ts',
       'src/rl/**/*.ts',
       'src/workers/env.worker.ts',

@@ -1,5 +1,6 @@
 import './styles.css';
 import { generateBuilding } from '../gen/building';
+import { parsePlanSet, PLAN_SET_URL, PLAN_STAGE, planBuilding, type PlanRecord, type PlanSet } from '../plans';
 import { OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { MetricsPayload } from '../shared/messages';
@@ -65,6 +66,7 @@ export async function startApp(root: HTMLElement = document.querySelector('#app'
 
 class Session {
   private spec: BuildingSpec | null = null;
+  private plans: PlanSet | null = null;
   private obs = new Float32Array(OBS_DIM);
   private shown: DroneState = makeDroneState([1, 1, 1]);
   private lighting: LightingState = { timeOfDay: 12, interiorLightsOn: new Uint8Array(), flashlightOn: false, sensorMode: 'rgb' };
@@ -122,6 +124,7 @@ class Session {
     this.view.setCamera(this.camera);
     this.syncButtons();
     await this.loadShipped();
+    if (this.launch.plan) await this.loadPlans();
     this.rebuild(this.launch.seed, false);
     this.resize();
     const chartHost = [
@@ -178,7 +181,11 @@ class Session {
       stage = 0;
       size = { floors: 1, w: 14, d: 12 };
     }
-    this.spec = generateBuilding({ seed, floors: size.floors, w: size.w, d: size.d, stage });
+    const plan = showcase ? null : this.launchPlan();
+    const real = plan ? planBuilding(plan) : null;
+    if (real) stage = PLAN_STAGE;
+    this.spec = real ? real.spec : generateBuilding({ seed, floors: size.floors, w: size.w, d: size.d, stage });
+    this.root.dataset.plan = real ? plan!.id : '';
     const nRooms = this.spec.floors.reduce((n, floor) => n + floor.rooms.length, 0);
     const lights = new Uint8Array(nRooms);
     if (this.launch.lights) lights.fill(1);
@@ -498,6 +505,28 @@ class Session {
     this.q('#kl-num').textContent = metrics.kl.toFixed(3);
     this.best = metrics.bestReward;
     this.resize();
+  }
+
+  /** Real apartments for `?plan=`. A failed fetch falls back to generated buildings. */
+  private async loadPlans(): Promise<void> {
+    try {
+      const response = await fetch(`${import.meta.env.BASE_URL}${PLAN_SET_URL}`);
+      if (response.ok) this.plans = parsePlanSet(await response.json());
+    } catch {
+      this.plans = null;
+    }
+  }
+
+  /** The plan named by `?plan=`: an id, or an index into the eval split (wrapping). */
+  private launchPlan(): PlanRecord | null {
+    const key = this.launch.plan;
+    if (!this.plans || !key) return null;
+    const byId = this.plans.plans.find((p) => p.id === key);
+    if (byId) return byId;
+    const evalPlans = this.plans.plans.filter((p) => p.split === 'eval');
+    const index = Number(key);
+    if (!Number.isInteger(index) || evalPlans.length === 0) return null;
+    return evalPlans[((index % evalPlans.length) + evalPlans.length) % evalPlans.length]!;
   }
 
   private async loadShipped(): Promise<void> {
