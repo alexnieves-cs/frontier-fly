@@ -207,6 +207,23 @@ export class TargetView {
         cross.position.y = height + 0.02;
         root.add(cross);
       }
+      // A real pack has a dark top flap and straps and a toolbox has a handle; their look-alike decoys
+      // do not. The drone camera (src/vision/scene.ts) draws the same details.
+      const detail = new THREE.MeshStandardMaterial({ color: '#1d2a22', roughness: 0.7 });
+      if (target.classId === 'backpack') {
+        const flap = new THREE.Mesh(new THREE.BoxGeometry(hx * 2.12, height * 0.28, hy * 2.12), detail);
+        flap.position.y = height * 0.86;
+        root.add(flap);
+        for (const side of [-0.5, 0.5]) {
+          const strap = new THREE.Mesh(new THREE.BoxGeometry(hx * 2.16, height * 0.95, 0.05), detail);
+          strap.position.set(0, height / 2, side * hy * 1.2);
+          root.add(strap);
+        }
+      } else if (target.classId === 'toolbox') {
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(hx * 1.2, 0.08, 0.04), detail);
+        handle.position.y = height + 0.04;
+        root.add(handle);
+      }
     }
     if (target.classId === 'person' && target.state === 'sitting') {
       const chair = new THREE.Mesh(

@@ -84,3 +84,18 @@ for (const scenario of CASES) {
     expect(external).toEqual([]);
   });
 }
+
+test('demo camera mode renders the drone camera and runs the learned detector', async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/demo.html?scenario=cabin-day&speed=16&detector=camera&autorun=1&operator=approve');
+  const app = page.locator('#app');
+  await expect(app).toHaveAttribute('data-detector', 'camera');
+  await expect(page.locator('[data-testid=camera-inset]')).toBeVisible();
+  // Frames arrive once the drone is flying; the inset caption names the detector once it has loaded.
+  await expect(page.locator('[data-testid=camera-caption]')).toHaveText(/learned detector/, { timeout: 60_000 });
+  await expect.poll(async () => Number((await app.getAttribute('data-camera-frames')) ?? 0), { timeout: 120_000 }).toBeGreaterThan(20);
+  if (process.env.VISION_SHOT) await page.locator('[data-testid=camera-inset]').screenshot({ path: process.env.VISION_SHOT });
+  expect(errors).toEqual([]);
+});
