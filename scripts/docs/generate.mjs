@@ -9,6 +9,7 @@
 // Numbers only come from those files. A missing file renders as "not measured".
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
+import { rlSection } from './rl.mjs';
 import { sarSection } from './sar.mjs';
 import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
@@ -857,6 +858,7 @@ function replaceBlock(text, name, body) {
 }
 
 const ablations = ablationTables(readJson('docs/ablations.json'));
+const rl = rlSection(readJson('docs/rl-finetune.json'));
 const sar = sarSection(readJson('docs/sar-bench.json'), readJson('docs/report/sar-belief.json'));
 const team = teamSection(readJson('docs/team-bench.json'));
 const speed = speedSection(readJson('docs/speed-study.json'));
@@ -870,6 +872,7 @@ const values = {
   ...benchSection(ROOT),
   ...visionSection(readJson('docs/vision-detector.json'), readJson('docs/vision-bench.json')).values,
   ...localizationTables(readJson('docs/localization.json')),
+  ...rl.values,
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json')]),
 };
@@ -884,6 +887,7 @@ const outputs = {
   ...sar.files,
   ...team.files,
   ...speed.files,
+  ...rl.files,
 };
 let readme = read('README.md');
 readme = replaceBlock(readme, 'benchmarks', values.README_SUMMARY);
