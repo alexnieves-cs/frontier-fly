@@ -567,6 +567,15 @@ export class IndoorSensing implements SensorGrid {
     return this.occ.occupied;
   }
 
+  /**
+   * Ranges the drone's own map predicts for the horizontal lidar ring from a local pose: the first
+   * wall each beam would meet among voxels the lidar has returned from at about this height, or
+   * Infinity. The fault failsafe compares them with the ring to catch beams that read open wrongly.
+   */
+  expectedRanges(local: V3, yaw: number, out: Float64Array): Float64Array {
+    return this.occ.expected(floorOf(this.grid, local[2]), local[0], local[1], local[2], yaw, out);
+  }
+
   /** Sense from a local pose: marks flown and seen-free voxels and writes obs and lidar (meters). */
   sense(local: V3, vel: V3, yaw: number, tSec: number): Float32Array {
     if (markVisited(this.grid.spec, this.visited, local[0], local[1], local[2])) {
@@ -606,7 +615,7 @@ export class IndoorSensing implements SensorGrid {
     this.velWorld[0] = vel[0];
     this.velWorld[1] = vel[1];
     const f = floorOf(this.grid, local[2]);
-    this.occ.mark(f, local[0], local[1], yaw, this.lidar);
+    this.occ.mark(f, local[0], local[1], yaw, this.lidar, local[2]);
     this.look(local, yaw);
     // Range finders: open air well past the ceiling or the floor of this storey means a shaft.
     const zf = local[2] - f * this.grid.H;
