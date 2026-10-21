@@ -1,8 +1,10 @@
 // Mission benchmark: each scenario's settings on fresh world seeds, flown with each indoor explorer.
 // bench/missions.test.ts runs it in one process; scripts/study/mission-study.ts runs it in shards.
 import { readFileSync } from 'node:fs';
-import { policyFromJson } from '../mission/autonomy/policy';
+import { policyFromFile } from '../mission/autonomy/policy';
+import { SHIPPED_CHECKPOINT_PATH } from '../rl/checkpoint';
 import { buildReport } from '../mission/autonomy/report';
+import type { RunnerOptions } from '../mission/autonomy/contracts';
 import { runMission } from '../mission/autonomy/runner';
 import { SCENARIOS } from '../mission/autonomy/scenarios';
 import { createPerceptionSource } from '../mission/autonomy/perception';
@@ -17,9 +19,21 @@ export const MISSION_SEED_BASE = 9600;
  * Indoor explorers. `policy`: the trained policy flies first, under the lidar guard, and the sensor
  * planner takes over on a stall or collision and always does the look phase. `sensor`: the sensor-only
  * planner alone. `oracle`: the old frontier planner on the true floor plan, a reference only.
+ * `policyQuad` and `sensorQuad` fly the first two on the quadrotor airframe, whose indoor shield is
+ * the braking filter.
  */
-export const MISSION_MODES = ['policy', 'sensor', 'oracle'] as const;
+export const MISSION_MODES = ['policy', 'sensor', 'oracle', 'policyQuad', 'sensorQuad'] as const;
 export type MissionMode = (typeof MISSION_MODES)[number];
+
+/** Runner options for an explorer mode; `policy` is the shipped policy, needed by the policy modes. */
+export function missionModeOptions(mode: MissionMode, policy: RunnerOptions['policy']): RunnerOptions {
+  const usesPolicy = mode === 'policy' || mode === 'policyQuad';
+  return {
+    indoor: mode === 'oracle' ? 'oracle' : mode === 'sensor' || mode === 'sensorQuad' ? 'frontier' : 'auto',
+    ...(usesPolicy ? { policy } : {}),
+    ...(mode === 'policyQuad' || mode === 'sensorQuad' ? { vehicle: 'quad' as const } : {}),
+  };
+}
 
 export interface MissionFlight {
   scenario: string;
@@ -53,21 +67,20 @@ export function missionJobs(seeds = MISSION_SEEDS_PER_SCENARIO, base = MISSION_S
   return out;
 }
 
-let shipped: ReturnType<typeof policyFromJson> | null = null;
+let shipped: ReturnType<typeof policyFromFile> | null = null;
 
 export async function flyMission(job: MissionJob): Promise<MissionFlight> {
   const scenario = SCENARIOS.find((s) => s.id === job.scenario)!;
   const world = buildMissionWorld({ ...scenario.world, seed: job.seed });
   const mission = missionForWorld(world, scenario.mission);
   const source = createPerceptionSource(world);
-  if (job.indoor === 'policy' && !shipped) shipped = policyFromJson(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+  if ((job.indoor === 'policy' || job.indoor === 'policyQuad') && !shipped) shipped = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
   // A marginal opening asks the operator even under auto entry. The bench plays an operator who
   // approves every ask, and counts the asks.
   const options = {
     ...scenario.runner,
     operator: () => 'approve' as const,
-    indoor: job.indoor === 'oracle' ? ('oracle' as const) : job.indoor === 'sensor' ? ('frontier' as const) : ('auto' as const),
-    ...(job.indoor === 'policy' ? { policy: shipped! } : {}),
+    ...missionModeOptions(job.indoor, shipped ?? undefined),
   };
   const run = await runMission(mission, world, source, options);
   const report = buildReport(run, source, world);

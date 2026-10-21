@@ -150,8 +150,13 @@ function coverageSummary(rows, stage) {
 const PILOT_LABELS = {
   teacher: 'Oracle teacher (floor plan)',
   classical: 'Sensor-only planner',
+  classicalBrake: 'Sensor-only planner, braking filter',
+  classicalClimb: 'Sensor-only planner, takes shafts',
+  classicalPredict: 'Sensor-only planner + learned map prediction',
+  classicalOracleGain: 'Sensor-only planner + true hidden gain (reference)',
   policy: 'Policy',
   guarded: 'Policy + lidar guard',
+  guardedBrake: 'Policy + braking guard',
   waypoint: 'Waypoint follower',
   heuristic: 'Lidar heuristic',
 };
@@ -264,8 +269,22 @@ function ablationTables(ab) {
 function reportInline(study, bench) {
   const out = {};
   const keys = ['R_TEACHER_HARD', 'R_PLANNER_HARD', 'R_POLICY_HARD', 'R_GUARD_HARD', 'R_POLICY_COLL', 'R_GUARD_COLL', 'R_PLANNER_QUAD', 'R_POLICY_QUAD', 'R_TEACHER_QUAD'];
+  const keys3 = ['R_Q_PLANNER', 'R_Q_PLANNER_COLL', 'R_Q_PLANNER_BRAKE', 'R_Q_PLANNER_BRAKE_COLL', 'R_Q_GUARD', 'R_Q_GUARD_COLL', 'R_Q_GUARD_BRAKE', 'R_Q_GUARD_BRAKE_COLL'];
+  const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
+  const keys5 = ['R_CLIMB_FLOORS', 'R_CLIMB_FLOORS_CI', 'R_PLANNER_FLOORS', 'R_PLANNER_FLOORS_CI', 'R_CLIMB_REACHED', 'R_CLIMB_COLL', 'R_PRED_HARD', 'R_PRED_HARD_CI', 'R_ORACLEGAIN_HARD', 'R_PRED_FLOORS', 'R_ORACLEGAIN_FLOORS', 'R_PLANNER_FLOORS_N'];
+  const keys6 = ['R_MP_R2', 'R_MP_BASE_R2', 'R_MP_MAE', 'R_MP_BASE_MAE', 'R_MP_TRAIN', 'R_MP_VAL'];
   const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL'];
-  for (const k of [...keys, ...keys2]) out[k] = 'n/a';
+  for (const k of [...keys, ...keys2, ...keys3, ...keys4, ...keys5, ...keys6]) out[k] = 'n/a';
+  const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
+  const mp = readJson('public/models/mappred.json');
+  if (mp?.meta) {
+    out.R_MP_R2 = mp.meta.valR2.toFixed(2);
+    out.R_MP_BASE_R2 = mp.meta.baselineR2.toFixed(2);
+    out.R_MP_MAE = mp.meta.valMae.toFixed(1);
+    out.R_MP_BASE_MAE = mp.meta.baselineMae.toFixed(1);
+    out.R_MP_TRAIN = mp.meta.trainSamples.toLocaleString('en-US');
+    out.R_MP_VAL = mp.meta.valSamples.toLocaleString('en-US');
+  }
   if (study) {
     const c = (cond, pilot) => study.cells.find((x) => x.condition === cond && x.lighting === 'day' && x.pilot === pilot);
     out.R_TEACHER_HARD = pct(c('hard', 'teacher').coverage);
@@ -277,6 +296,35 @@ function reportInline(study, bench) {
     out.R_PLANNER_QUAD = pct(c('quad', 'classical').coverage);
     out.R_POLICY_QUAD = pct(c('quad', 'policy').coverage);
     out.R_TEACHER_QUAD = pct(c('quad', 'teacher').coverage);
+    const climb = c('floors', 'classicalClimb');
+    const pred = c('hard', 'classicalPredict');
+    if (climb && pred) {
+      const planFloors = c('floors', 'classical');
+      out.R_CLIMB_FLOORS = pct(climb.coverage);
+      out.R_CLIMB_FLOORS_CI = ci(climb.coverageCi);
+      out.R_PLANNER_FLOORS = pct(planFloors.coverage);
+      out.R_PLANNER_FLOORS_CI = ci(planFloors.coverageCi);
+      out.R_PLANNER_FLOORS_N = String(climb.episodes);
+      out.R_CLIMB_REACHED = `${climb.reachedAnotherFloor} of ${climb.episodes}`;
+      out.R_CLIMB_COLL = climb.collisionsPerEpisode.toFixed(2);
+      out.R_PRED_HARD = pct(pred.coverage);
+      out.R_PRED_HARD_CI = ci(pred.coverageCi);
+      out.R_ORACLEGAIN_HARD = pct(c('hard', 'classicalOracleGain').coverage);
+      out.R_PRED_FLOORS = pct(c('floors', 'classicalPredict').coverage);
+      out.R_ORACLEGAIN_FLOORS = pct(c('floors', 'classicalOracleGain').coverage);
+    }
+    const brake = c('quad', 'classicalBrake');
+    const guardBrake = c('quad', 'guardedBrake');
+    if (brake && guardBrake) {
+      out.R_Q_PLANNER = out.R_PLANNER_QUAD;
+      out.R_Q_PLANNER_COLL = c('quad', 'classical').collisionsPerEpisode.toFixed(1);
+      out.R_Q_PLANNER_BRAKE = pct(brake.coverage);
+      out.R_Q_PLANNER_BRAKE_COLL = brake.collisionsPerEpisode.toFixed(1);
+      out.R_Q_GUARD = pct(c('quad', 'guarded').coverage);
+      out.R_Q_GUARD_COLL = c('quad', 'guarded').collisionsPerEpisode.toFixed(1);
+      out.R_Q_GUARD_BRAKE = pct(guardBrake.coverage);
+      out.R_Q_GUARD_BRAKE_COLL = guardBrake.collisionsPerEpisode.toFixed(1);
+    }
   }
   if (bench) {
     const m = bench.modes;
@@ -290,6 +338,12 @@ function reportInline(study, bench) {
     out.R_M_NIGHT_SENSOR = pct(m.sensor['backpack-night'].expectedOutcome);
     out.R_M_NIGHT_ORACLE = pct(m.oracle['backpack-night'].expectedOutcome);
     out.R_M_COMPOUND = pct(m.sensor['compound-clear'].expectedOutcome);
+    if (m.sensorQuad && m.policyQuad) {
+      out.R_MQ_SENSOR = pct(m.sensorQuad.all.expectedOutcome);
+      out.R_MQ_POLICY = pct(m.policyQuad.all.expectedOutcome);
+      out.R_MQ_ALL = String(m.sensorQuad.all.flights + m.policyQuad.all.flights);
+      out.R_MQ_COLL = String(m.sensorQuad.all.flightsWithCollision + m.policyQuad.all.flightsWithCollision);
+    }
   }
   return out;
 }
@@ -432,18 +486,25 @@ function benchmarks() {
   }
   if (missionBench) {
     const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
-    const labels = { policy: 'Policy, sensor planner fallback', sensor: 'Sensor-only planner', oracle: 'Oracle planner (floor plan)' };
+    const labels = {
+      policy: 'Policy, sensor planner fallback',
+      sensor: 'Sensor-only planner',
+      oracle: 'Oracle planner (floor plan)',
+      policyQuad: 'Quadrotor: policy, planner fallback',
+      sensorQuad: 'Quadrotor: sensor-only planner',
+    };
+    const benchModes = Object.keys(labels).filter((m) => missionBench.modes[m]);
     const scenarios = Object.keys(missionBench.modes.sensor).filter((k) => k !== 'all');
     const rows = [];
     for (const key of [...scenarios, 'all']) {
-      for (const mode of ['policy', 'sensor', 'oracle']) {
+      for (const mode of benchModes) {
         const s = missionBench.modes[mode][key];
         rows.push([
           key === 'all' ? '**All**' : key,
           labels[mode],
           `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`,
           String(s.buildingsEntered),
-          mode === 'policy' ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
+          mode === 'policy' || mode === 'policyQuad' ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
           pct(s.meanIndoorCoverage),
           s.collisionsPerFlight.toFixed(2),
           `${Math.floor(s.meanDurationSec / 60)}:${String(s.meanDurationSec % 60).padStart(2, '0')}`,
@@ -468,19 +529,82 @@ function benchmarks() {
       rows,
     );
     out.MISSION_BENCH_NOTE = [
-      `Each scenario's settings flown on ${missionBench.seedsPerScenario} fresh world seeds (${missionBench.seedBase}–${missionBench.seedBase + missionBench.seedsPerScenario - 1}) with three indoor explorers, from \`src/eval/missions.ts\` at \`${missionBench.commit}\`.`,
+      `Each scenario's settings flown on ${missionBench.seedsPerScenario} fresh world seeds (${missionBench.seedBase}–${missionBench.seedBase + missionBench.seedsPerScenario - 1}) with each indoor explorer, from \`src/eval/missions.ts\` at \`${missionBench.commit}\`.`,
       'The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around.',
       'The sensor-only planner reads only the drone\'s own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode.',
+      'The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
       'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
     ].join(' ');
   } else {
     out.MISSION_BENCH_TABLE = '';
     out.MISSION_BENCH_NOTE = '_Not measured yet. `npm run study:missions` writes `docs/mission-bench.json`._';
   }
-  Object.assign(out, studyTables(readJson('docs/study.json')));
-  out.README_MISSIONS = out.MISSION_TABLE;
+  const study = readJson('docs/study.json');
+  Object.assign(out, studyTables(study));
+  out.README_MISSIONS = missionBench ? readmeMissions(missionBench) : out.MISSION_TABLE;
+  // The README leads with the large study (30 fresh buildings per condition, every pilot) and keeps
+  // the small fixed protocol below it, so the headline number is the one with the tighter interval.
+  if (study && bench) {
+    out.README_SUMMARY = [
+      `**Coverage on ${study.seedsPerCondition} fresh buildings per condition**, every pilot on the same seeds, bootstrap 95% intervals ([REPORT.md](docs/REPORT.md)):`,
+      '',
+      out.STUDY_HEADLINE,
+      '',
+      `**Targets.** Fixed protocol (${bench.protocol.easy.seeds.length} easy and ${bench.protocol.hard.seeds.length} hard seeds) unless the row says otherwise:`,
+      '',
+      readmeTargets(out, study),
+      '',
+      out.THROUGHPUT_TABLE,
+    ].join('\n');
+  }
   out.README_SUMMARY ??= out.TARGET_TABLE;
   return out;
+}
+
+
+/** The fixed-protocol target table plus the same hard-building goal measured on the 30-seed study. */
+function readmeTargets(out, study) {
+  const lines = out.TARGET_TABLE.split('\n');
+  const extra = [];
+  for (const [pilot, label] of [
+    ['policy', 'Coverage, new hard buildings, 30 fresh seeds (policy)'],
+    ['guarded', 'Coverage, new hard buildings, 30 fresh seeds (policy + lidar guard)'],
+  ]) {
+    const c = study.cells.find((x) => x.condition === 'hard' && x.lighting === 'day' && x.pilot === pilot);
+    if (!c) continue;
+    const [lo, hi] = c.coverageCi;
+    const status = lo >= TARGETS.hard ? '✅ meets' : c.coverage >= TARGETS.hard ? '⚠️ meets on the mean; interval spans the target' : '❌ misses';
+    extra.push(`| ${label} | ≥ ${pct(TARGETS.hard)} | ${pct(c.coverage)} (${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}) | ${status} |`);
+  }
+  const at = lines.findIndex((l) => l.startsWith('| Coverage, new hard buildings'));
+  lines.splice(at + 1, 0, ...extra);
+  return lines.join('\n');
+}
+
+/** Mission outcome per scenario and indoor explorer, from the 30-world mission bench. */
+function readmeMissions(mb) {
+  const titles = { 'cabin-day': 'Woods to cabin: find the missing person', 'compound-clear': 'Compound search: confirm two buildings clear', 'backpack-night': 'Night search: find the lost backpack' };
+  const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
+  const cell = (s) => `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`;
+  const scenarios = Object.keys(mb.modes.sensor).filter((k) => k !== 'all');
+  const rows = [...scenarios, 'all'].map((k) => [
+    k === 'all' ? '**All**' : (titles[k] ?? k),
+    cell(mb.modes.policy[k]),
+    cell(mb.modes.sensor[k]),
+    cell(mb.modes.oracle[k]),
+  ]);
+  const modes = ['policy', 'sensor', 'oracle'];
+  const flights = modes.reduce((a, m) => a + mb.modes[m].all.flights, 0);
+  const touched = modes.reduce((a, m) => a + mb.modes[m].all.flightsWithCollision, 0);
+  const falseClears = modes.reduce((a, m) => a + mb.modes[m].all.falseClears, 0);
+  const falseAlarms = modes.reduce((a, m) => a + mb.modes[m].all.falseAlarms, 0);
+  return [
+    table(['Scenario', 'Policy, planner fallback', 'Sensor-only planner', 'Oracle planner (floor plan, reference)'], rows),
+    '',
+    `Share of ${mb.seedsPerScenario} fresh mission worlds per scenario (seeds ${mb.seedBase}–${mb.seedBase + mb.seedsPerScenario - 1}) where the mission ends with the expected outcome: found, or correctly cleared. Brackets are Wilson 95% intervals.`,
+    `Across all ${flights} flights: ${touched} with a collision, ${falseClears} false clears, ${falseAlarms} false alarms. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
+    `From \`npm run study:missions\` at \`${mb.commit}\`; per-scenario detail is in [BENCHMARKS.md](docs/BENCHMARKS.md).`,
+  ].join('\n');
 }
 
 // ---------------------------------------------------------------------------------------------

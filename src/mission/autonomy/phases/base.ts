@@ -1,4 +1,4 @@
-import { descentClear, filterVelocity, SAFETY_MARGIN } from '../../../sim/sensorPlanner';
+import { descentClear } from '../../../sim/sensorPlanner';
 import { OutdoorPhysics } from '../../../world/outdoor/physics';
 import type { Mission } from '../../types';
 import { createBattery } from '../battery';
@@ -32,7 +32,8 @@ import {
   segmentClear,
   sub,
 } from '../planner/geometry';
-import { type ActingPolicy, toLocal, INDOOR_FILTER_HORIZON } from '../planner/indoor';
+import { type ActingPolicy, toLocal } from '../planner/indoor';
+import { QuadVehicle } from '../quadVehicle';
 import { createSafetyMonitor } from '../safety';
 import {
   INDOOR_LIMITS,
@@ -142,7 +143,10 @@ export abstract class RunnerBase implements MissionRunner {
     this.agl = cruiseAglFor(mission);
     this.battery = createBattery();
     this.batteryStart = this.battery.remainingPct();
-    this.vehicle = new Vehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor);
+    this.vehicle =
+      options.vehicle === 'quad'
+        ? new QuadVehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor)
+        : new Vehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor);
     this.monitor = createSafetyMonitor(mission, world);
     this.tracker = new ConfirmTracker(mission);
     this.coverage = planCoverage(mission, world, { agl: this.agl });
@@ -356,7 +360,7 @@ export abstract class RunnerBase implements MissionRunner {
     if (!this.inside || !v?.sensing || phase === 'fly_through') return vel;
     const local = toLocal(v.grid, this.vehicle.pos);
     v.sensing.sense(local, this.vehicle.vel, this.vehicle.yaw, this.t);
-    const [vx, vy] = filterVelocity(vel[0], vel[1], this.vehicle.yaw, v.sensing.lidar, SAFETY_MARGIN, INDOOR_FILTER_HORIZON);
+    const [vx, vy] = v.sensing.filter(vel[0], vel[1], this.vehicle.yaw);
     const vz = vel[2] < 0 && !descentClear(v.sensing.lidar) ? 0 : vel[2];
     return [vx, vy, vz];
   }

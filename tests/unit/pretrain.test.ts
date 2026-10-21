@@ -1,14 +1,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseCheckpoint, serializeCheckpoint } from '../../src/rl/checkpoint';
+import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH, serializeCheckpointFor } from '../../src/rl/checkpoint';
 import { continueExplorer, distillExplorer } from '../../src/rl/pretrain';
 
 const updates = Number(process.env.PRETRAIN_UPDATES ?? '0');
 
 describe.skipIf(!updates)('shipped checkpoint', () => {
-  it('trains a stage-0 policy and writes public/checkpoints/pretrained.json', async () => {
+  it('trains a stage-0 policy and writes the shipped checkpoint', async () => {
     const result = process.env.PRETRAIN_CONTINUE
-      ? await continueExplorer(parseCheckpoint(readFileSync('public/checkpoints/pretrained.json', 'utf8')), updates)
+      ? await continueExplorer(parseCheckpoint(readFileSync(SHIPPED_CHECKPOINT_PATH)), updates)
       : await distillExplorer({
           epochs: updates,
           onEpoch: (epoch, loss) => {
@@ -21,6 +21,6 @@ describe.skipIf(!updates)('shipped checkpoint', () => {
     expect(Number.isFinite(result.stage0)).toBe(true);
     expect(result.checkpoint.weights).toHaveLength(13);
     mkdirSync('public/checkpoints', { recursive: true });
-    writeFileSync('public/checkpoints/pretrained.json', serializeCheckpoint(result.checkpoint));
+    writeFileSync(SHIPPED_CHECKPOINT_PATH, serializeCheckpointFor(SHIPPED_CHECKPOINT_PATH, result.checkpoint));
   }, 600_000);
 });

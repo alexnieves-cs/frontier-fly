@@ -5,7 +5,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { policyFromJson, type NormalizedPolicy } from '../mission/autonomy/policy';
+import { policyFromFile, type NormalizedPolicy } from '../mission/autonomy/policy';
+import { SHIPPED_CHECKPOINT_URL } from '../rl/checkpoint';
 import { DEFAULT_SCENARIO, isScenarioId, SCENARIOS, type ScenarioId } from '../mission/autonomy/scenarios';
 import { buildTimeline, Director, FILM_FPS, type FilmFrame } from './director';
 import { recordFlight, sampleFlight, type FlightLog } from './flight';
@@ -61,8 +62,8 @@ declare global {
 
 async function shippedPolicy(): Promise<NormalizedPolicy | null> {
   try {
-    const response = await fetch('checkpoints/pretrained.json');
-    return response.ok ? policyFromJson(await response.text()) : null;
+    const response = await fetch(SHIPPED_CHECKPOINT_URL);
+    return response.ok ? policyFromFile(await response.arrayBuffer()) : null;
   } catch {
     return null;
   }

@@ -10,7 +10,13 @@ const RATE_KP = 0.18;
 const RATE_KD = 0.01;
 const YAW_RATE_KP = 0.15;
 const MAX_TILT = 0.4;
-const MAX_RATE = 8;
+/**
+ * Body-rate setpoint cap, rad/s (about 230°/s, near PX4's 220°/s default).
+ * At 8 rad/s a hard reversal asked for more differential thrust than the
+ * motors have, the mixer clipped it out of the collective, and light-thrust
+ * airframes flipped.
+ */
+const MAX_RATE = 4;
 const MOTOR_MAX = 1100;
 const AZ_LIM = 8;
 
@@ -38,6 +44,10 @@ export class AngleController {
   private b = 0.02;
   private fMax = 1;
   private integZ = 0;
+  private speedH = MAX_SPEED_H;
+  private speedV = MAX_SPEED_V;
+  private yawRateMax = MAX_YAW_RATE;
+  private gain = 1;
 
   setParams(p: DynParams): void {
     this.mass = p.mass > 1e-6 ? p.mass : 1e-6;
@@ -51,6 +61,18 @@ export class AngleController {
 
   reset(): void {
     this.integZ = 0;
+  }
+
+  /**
+   * Setpoint caps for a different airframe (the mission quad flies faster
+   * outdoors than the coverage env's micro quad) and a scale on the rate-loop
+   * gains, which a flight controller tunes to the airframe's inertia.
+   */
+  setLimits(speedH: number, speedV: number, yawRate: number, rateGain = 1): void {
+    this.speedH = speedH;
+    this.speedV = speedV;
+    this.yawRateMax = yawRate;
+    this.gain = rateGain;
   }
 
   compute(
@@ -67,10 +89,10 @@ export class AngleController {
     dt: number,
     wCmd: Float32Array,
   ): void {
-    const vxCmd = clamp(cmd[0] ?? 0, -MAX_SPEED_H, MAX_SPEED_H);
-    const vyCmd = clamp(cmd[1] ?? 0, -MAX_SPEED_H, MAX_SPEED_H);
-    const vzCmd = clamp(cmd[2] ?? 0, -MAX_SPEED_V, MAX_SPEED_V);
-    const yawCmd = clamp(cmd[3] ?? 0, -MAX_YAW_RATE, MAX_YAW_RATE);
+    const vxCmd = clamp(cmd[0] ?? 0, -this.speedH, this.speedH);
+    const vyCmd = clamp(cmd[1] ?? 0, -this.speedH, this.speedH);
+    const vzCmd = clamp(cmd[2] ?? 0, -this.speedV, this.speedV);
+    const yawCmd = clamp(cmd[3] ?? 0, -this.yawRateMax, this.yawRateMax);
 
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
@@ -112,9 +134,10 @@ export class AngleController {
 
     const pSp = clamp(ATT_KP * wrapPi(rollDes - roll), -MAX_RATE, MAX_RATE);
     const qSp = clamp(ATT_KP * wrapPi(pitchDes - pitch), -MAX_RATE, MAX_RATE);
-    const tx = RATE_KP * (pSp - wx) - RATE_KD * wx;
-    const ty = RATE_KP * (qSp - wy) - RATE_KD * wy;
-    const tz = YAW_RATE_KP * (yawCmd - wz) - RATE_KD * wz;
+    const g = this.gain;
+    const tx = g * (RATE_KP * (pSp - wx) - RATE_KD * wx);
+    const ty = g * (RATE_KP * (qSp - wy) - RATE_KD * wy);
+    const tz = g * (YAW_RATE_KP * (yawCmd - wz) - RATE_KD * wz);
 
     this.mix(thrust, tx, ty, tz, wCmd);
   }

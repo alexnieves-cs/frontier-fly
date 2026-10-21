@@ -7,7 +7,7 @@
  * PPO result to <out>.ppo.json. Never writes public/checkpoints unless --out says so.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { parseCheckpoint, serializeCheckpoint } from '../src/rl/checkpoint';
+import { parseCheckpoint, serializeCheckpoint, serializeCheckpointFor } from '../src/rl/checkpoint';
 import { trainDagger } from '../src/rl/dagger';
 import { ppoFinetune } from '../src/rl/finetune';
 
@@ -41,7 +41,7 @@ async function main() {
     weighting: args.includes('--no-reweight')
       ? { divergeBoost: 0, stallBoost: 0, collisionBoost: 0 }
       : undefined,
-    init: init ? parseCheckpoint(readFileSync(init, 'utf8')) : undefined,
+    init: init ? parseCheckpoint(readFileSync(init)) : undefined,
     onIter: (m) => {
       const v = m.validation;
       console.log(
@@ -54,7 +54,7 @@ async function main() {
     },
   });
   console.log(`dagger best iter ${result.bestIter}`);
-  writeFileSync(out, serializeCheckpoint(result.checkpoint));
+  writeFileSync(out, serializeCheckpointFor(out, result.checkpoint));
   writeFileSync(out.replace(/\.json$/, '') + '.last.json', serializeCheckpoint(result.lastCheckpoint));
   console.log(`wrote ${out} (best) and .last.json`);
   const ppoUpdates = num('ppo-updates', 0);
@@ -74,7 +74,7 @@ async function main() {
     });
     console.log(`ppo start val ${pct(tuned.startValidation.score)} best ${pct(tuned.bestValidation.score)} at ${tuned.bestUpdate}`);
     const ppoOut = out.replace(/\.json$/, '') + '.ppo.json';
-    writeFileSync(ppoOut, serializeCheckpoint(tuned.checkpoint));
+    writeFileSync(ppoOut, serializeCheckpointFor(ppoOut, tuned.checkpoint));
     console.log(`wrote ${ppoOut}`);
   }
   console.log(`done in ${((Date.now() - started) / 1000).toFixed(1)} s`);
