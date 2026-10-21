@@ -15,6 +15,7 @@ import type {
 } from './contracts';
 import { requirementsMet } from './planner/confirm';
 import { columnClear, cruiseZ, dist, segmentClear } from './planner/geometry';
+import { containsPoint } from '../../world/outdoor/geofence';
 import { landedAtHome, landingCommand, planReturn } from './planner/home';
 import { floorOf } from './planner/indoor';
 import type { VehicleCommand } from './vehicle';
@@ -36,6 +37,21 @@ const LAND_TRIM_MAX = 3;
 const LAND_COLUMN_M = 0.8;
 const LAND_SEARCH_M = 15;
 const LAND_ALIGN_M = 0.5;
+/** The same in severe wind, when the drone drifts on the way down: a wider clearing, searched further out. */
+const LAND_COLUMN_WINDY_M = 3;
+const LAND_SEARCH_WINDY_M = 40;
+/**
+ * An emergency landing that has not got over its column in this long, s, lands on the move instead:
+ * it descends wherever the column under it, and under where it will be in LAND_LOOKAHEAD_S, is open.
+ * In wind the airframe can't hold position in, it would otherwise hover beside its column until the
+ * time limit.
+ */
+const LAND_ALIGN_TIMEOUT_S = 10;
+const LAND_LOOKAHEAD_S = 1.5;
+/** Climbing clear in severe wind ends this close under cruise height, m. */
+const CLIMB_CLEAR_TOL_M = 0.5;
+/** ...and does not apply this close to home, m. */
+const CLIMB_CLEAR_HOME_M = 8;
 /** Height a weak airframe may lose on the way to its landing column, m. */
 const LAND_SINK_M = 2;
 /** Height over the range-finder ground at which a landing cuts the motors, m. */
@@ -257,7 +273,9 @@ class Runner extends IndoorPhases {
     let target: V3 = reason === 'home' ? this.world.home : [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]];
     if (reason !== 'home') {
       this.landingEmergency = true;
-      const site = this.inside ? null : this.landingSite();
+      // In wind the airframe can't hold position in, look for a wider clearing: the drone drifts on the way down.
+      const windy = !!this.health?.flags.has('wind_severe');
+      const site = this.inside ? null : ((windy ? this.landingSite(LAND_COLUMN_WINDY_M, LAND_SEARCH_WINDY_M) : null) ?? this.landingSite());
       if (site && dist(site, this.vehicle.pos) > 0.3) {
         target = site;
         this.log('warn', `Landing in place: ${reason}. Moving ${fmt(dist(site, this.vehicle.pos), 1)} m to clear ground first.`);
@@ -278,6 +296,10 @@ class Runner extends IndoorPhases {
     // Integral on the horizontal error, so a steady wind doesn't leave the drone off the pad.
     const trim: [number, number] = [0, 0];
     let touchedAt: V3 | null = null;
+    const landStart = this.t;
+    let moveCheckAt = -Infinity;
+    let moveOpen = false;
+    let movingLogged = false;
     this.setJob({
       phase: 'land',
       plan: () => [target],
@@ -286,7 +308,26 @@ class Runner extends IndoorPhases {
         const g = groundNow();
         const c = landingCommand(pos, target, g);
         // Over the chosen column before descending, so the drone never sinks onto a roof or into canopy.
-        const aligned = Math.hypot(target[0] - pos[0], target[1] - pos[1]) <= LAND_ALIGN_M;
+        let aligned = Math.hypot(target[0] - pos[0], target[1] - pos[1]) <= LAND_ALIGN_M;
+        if (!aligned && !this.inside && reason !== 'home' && this.t - landStart > LAND_ALIGN_TIMEOUT_S) {
+          // Re-checked a few times a second; the ray casts are not free.
+          if (this.t - moveCheckAt >= 0.25) {
+            moveCheckAt = this.t;
+            const v = this.vehicle.vel;
+            const ahead: [number, number] = [pos[0] + v[0] * LAND_LOOKAHEAD_S, pos[1] + v[1] * LAND_LOOKAHEAD_S];
+            const open = (x: number, y: number): boolean =>
+              columnClear(this.physics, x, y, sampleHeight(this.world.outdoor.terrain, x, y) + 0.2, pos[2], LAND_COLUMN_M);
+            const was = moveOpen;
+            moveOpen = open(pos[0], pos[1]) && open(ahead[0], ahead[1]) && segmentClear(this.physics, pos, [ahead[0], ahead[1], pos[2]]);
+            if (moveOpen && !was && !movingLogged) {
+              movingLogged = true;
+              this.log('warn', `Can't hold over the landing column in this wind. Descending where the ground below is open.`);
+            }
+          }
+          if (moveOpen) aligned = true;
+          // Over trees or a roof and drifting: hold height and keep working toward the column.
+          else c.vel[2] = Math.max(c.vel[2]!, 0);
+        }
         if (!aligned && !c.touched) c.vel[2] = Math.max(c.vel[2]!, 0);
         for (let i = 0; i < 2; i++) {
           trim[i] = Math.max(-LAND_TRIM_MAX, Math.min(LAND_TRIM_MAX, trim[i]! + (target[i]! - pos[i]!) * LAND_TRIM_KI * this.dt));
@@ -315,12 +356,16 @@ class Runner extends IndoorPhases {
    * Nearest point at the current height, within LAND_SEARCH_M, with an open column down to the
    * ground and a clear straight line to it. Null when there is none (land straight down then).
    */
-  protected landingSite(): V3 | null {
+  protected landingSite(column = LAND_COLUMN_M, search = LAND_SEARCH_M): V3 | null {
     const pos = this.vehicle.pos;
     const terrain = this.world.outdoor.terrain;
-    const open = (x: number, y: number): boolean => columnClear(this.physics, x, y, sampleHeight(terrain, x, y) + 0.2, pos[2], LAND_COLUMN_M);
+    const fence = this.world.outdoor.geofence;
+    // Inside the geofence by the column's width too: the fence stops the drone, and a site past it can't be reached.
+    const inFence = (x: number, y: number): boolean =>
+      containsPoint(fence, x - column, y - column) && containsPoint(fence, x + column, y - column) && containsPoint(fence, x - column, y + column) && containsPoint(fence, x + column, y + column);
+    const open = (x: number, y: number): boolean => inFence(x, y) && columnClear(this.physics, x, y, sampleHeight(terrain, x, y) + 0.2, pos[2], column);
     if (open(pos[0], pos[1])) return [pos[0], pos[1], pos[2]];
-    for (let r = 1; r <= LAND_SEARCH_M; r += 1) {
+    for (let r = 1; r <= search; r += 1) {
       const n = Math.max(8, Math.round(r * 4));
       for (let k = 0; k < n; k++) {
         const a = (k / n) * Math.PI * 2;
@@ -447,8 +492,12 @@ class Runner extends IndoorPhases {
     // Without a fix, hold position by climbing rather than hovering where drift can carry the drone into a wall.
     // In strong wind, get above the roofline before the trip home, since the gusts push the drone around near walls.
     const gnss = flags?.has('gnss_lost') && !this.returning;
-    if (!(gnss || flags?.has('wind_severe')) || this.inside || this.phase === 'land' || this.phase === 'done') return cmd;
     const pos = this.vehicle.pos;
+    // Not on the final descent over the pad: the clearing around home is open, and climbing back up there
+    // turns a landing into a climb-descend cycle that never ends.
+    const atHome = Math.hypot(pos[0] - this.world.home[0], pos[1] - this.world.home[1]) < CLIMB_CLEAR_HOME_M;
+    const severe = flags?.has('wind_severe') && !atHome;
+    if (!(gnss || severe) || this.inside || this.phase === 'land' || this.phase === 'done') return cmd;
     const vz = Math.max(0, Math.min(1.2, cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2]));
     let away: [number, number] = [0, 0];
     let nearest = Infinity;
@@ -462,9 +511,11 @@ class Runner extends IndoorPhases {
         away = [(pos[0] - cx) / d, (pos[1] - cy) / d];
       }
     }
-    // Only near a building, and only until the drone is above the roofline.
-    if (!gnss && vz <= 0.05) return cmd;
-    const near = nearest < 15 && vz > 0.05;
+    // Only near a building, and only until the drone is up at cruise height. Within half a metre counts:
+    // the altitude loop holds a few centimetres low in wind, and a stricter test never hands back.
+    const below = cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2] > CLIMB_CLEAR_TOL_M;
+    if (!gnss && !below) return cmd;
+    const near = nearest < 15 && below;
     return { vel: [near ? away[0] * 0.5 : 0, near ? away[1] * 0.5 : 0, vz], yaw: null };
   }
 

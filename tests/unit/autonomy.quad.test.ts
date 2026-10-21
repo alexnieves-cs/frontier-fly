@@ -40,6 +40,30 @@ describe('quad mission vehicle', () => {
     expect(Math.abs(q.pos[2] - start[2]!)).toBeLessThan(0.2);
   });
 
+  it('holds position in an 8 m/s wind with the wind tilt limit, and keeps its tilt inside it', () => {
+    // The runner raises the tilt limit to 40° when it estimates wind (phases/base.ts limits()). The default
+    // 23° per axis holds only about 5 m/s on the 1.2 kg airframe.
+    const drift = (limits: typeof OUTDOOR_LIMITS, wind: V3) => {
+      const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
+      for (let i = 0; i < 40; i++) q.step({ vel: [0, 0, 0], yaw: null }, 0.05, limits);
+      let tilt = 0;
+      for (let i = 0; i < 200; i++) {
+        q.step({ vel: [0, 0, 0], yaw: null }, 0.05, limits, { wind });
+        tilt = Math.max(tilt, Math.acos(Math.cos(q.attitude.roll) * Math.cos(q.attitude.pitch)));
+      }
+      return { speed: horizontalSpeed(q), tilt, vz: Math.abs(q.vel[2]) };
+    };
+    const windy = { ...OUTDOOR_LIMITS, maxTilt: 0.7 };
+    expect(drift(OUTDOOR_LIMITS, [8, 0, 0]).speed).toBeGreaterThan(2);
+    for (const wind of [[8, 0, 0], [5.7, 5.7, 0]] as V3[]) {
+      const r = drift(windy, wind);
+      expect(r.speed).toBeLessThan(1);
+      // A quartering wind asks for roll and pitch together; the tilt vector stays inside the limit.
+      expect(r.tilt).toBeLessThan(0.7 + 0.05);
+      expect(r.vz).toBeLessThan(0.2);
+    }
+  });
+
   it('stops within the braking model from indoor and outdoor speeds', () => {
     // MISSION_QUAD_BRAKING was fitted on the coverage env's micro quad; check it holds on the 1.2 kg airframe.
     for (const [limits, v0] of [

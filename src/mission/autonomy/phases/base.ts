@@ -60,6 +60,10 @@ import {
   scaleTo,
 } from './shared';
 
+/** Wind estimate, m/s, above which the quad may lean to WIND_TILT_RAD to hold against it. */
+const WIND_TILT_ONSET_MPS = 3;
+const WIND_TILT_RAD = 0.7;
+
 /**
  * Runner state, the constructor and the motion primitives every phase builds on:
  * waypoint following, holds, the indoor shield and breadcrumb retracing. The
@@ -210,7 +214,11 @@ export abstract class RunnerBase implements MissionRunner {
   }
 
   protected limits(): VehicleLimits {
-    const base = this.baseLimits();
+    let base = this.baseLimits();
+    // In wind, let the airframe lean further to hold its ground. The default 23° holds only about 5 m/s on
+    // the 1.2 kg quad; 40° holds about 8 m/s (PX4's MPC_TILTMAX_AIR allows 45°). Calm air keeps the gentler
+    // limit, which close-in inspection and fault recovery are tuned around.
+    if (!this.inside && Math.hypot(this.windEstimate[0], this.windEstimate[1]) >= WIND_TILT_ONSET_MPS) base = { ...base, maxTilt: WIND_TILT_RAD };
     const k = this.health?.speedScale ?? 1;
     return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
   }

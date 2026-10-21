@@ -48,6 +48,9 @@ export class AngleController {
   private speedV = MAX_SPEED_V;
   private yawRateMax = MAX_YAW_RATE;
   private gain = 1;
+  private maxTilt = MAX_TILT;
+  /** A tilt limit was set: clamp the tilt vector. The default keeps the per-axis clamp every checkpoint was trained on. */
+  private tiltNorm = false;
 
   setParams(p: DynParams): void {
     this.mass = p.mass > 1e-6 ? p.mass : 1e-6;
@@ -66,13 +69,17 @@ export class AngleController {
   /**
    * Setpoint caps for a different airframe (the mission quad flies faster
    * outdoors than the coverage env's micro quad) and a scale on the rate-loop
-   * gains, which a flight controller tunes to the airframe's inertia.
+   * gains, which a flight controller tunes to the airframe's inertia, and
+   * the tilt limit (PX4's MPC_TILTMAX_AIR), which sets the strongest wind
+   * the airframe can hold position in.
    */
-  setLimits(speedH: number, speedV: number, yawRate: number, rateGain = 1): void {
+  setLimits(speedH: number, speedV: number, yawRate: number, rateGain = 1, maxTilt?: number): void {
     this.speedH = speedH;
     this.speedV = speedV;
     this.yawRateMax = yawRate;
     this.gain = rateGain;
+    this.tiltNorm = maxTilt !== undefined;
+    this.maxTilt = maxTilt ?? MAX_TILT;
   }
 
   compute(
@@ -99,8 +106,22 @@ export class AngleController {
     const vxB = vx * cy + vy * sy;
     const vyB = -vx * sy + vy * cy;
 
-    const pitchDes = clamp(VEL_KP * (vxCmd - vxB), -MAX_TILT, MAX_TILT);
-    const rollDes = clamp(-VEL_KP * (vyCmd - vyB), -MAX_TILT, MAX_TILT);
+    let pitchDes: number;
+    let rollDes: number;
+    if (this.tiltNorm) {
+      // A set tilt limit bounds the tilt vector, as PX4 does: clamping each axis alone lets roll and pitch
+      // together lean the airframe ~40% past it, where the collective can no longer hold height.
+      pitchDes = VEL_KP * (vxCmd - vxB);
+      rollDes = -VEL_KP * (vyCmd - vyB);
+      const n = Math.hypot(pitchDes, rollDes);
+      if (n > this.maxTilt) {
+        pitchDes *= this.maxTilt / n;
+        rollDes *= this.maxTilt / n;
+      }
+    } else {
+      pitchDes = clamp(VEL_KP * (vxCmd - vxB), -MAX_TILT, MAX_TILT);
+      rollDes = clamp(-VEL_KP * (vyCmd - vyB), -MAX_TILT, MAX_TILT);
+    }
 
     const evz = vzCmd - vz;
     let az = ALT_KP * evz + ALT_KI * this.integZ;
