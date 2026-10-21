@@ -12,6 +12,8 @@ Everything here runs in software and on simulators. Fly a real aircraft only whe
 The latest run, made in the cloud container with `scripts/px4/report.ts`. Every row is one plan flown on a fresh PX4 instance.
 
 <!-- px4-results:start -->
+| Simulator | Plan | Result | Waypoints | Off route, max / p95 (m) | Height error (m) | Fence margin (m) | Landed from target (m) | Flight (s, plan estimate) | PX4 estimate vs truth, p95 / max (m) | Closest tree (m) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 <!-- px4-results:end -->
 
 How to read the table:
