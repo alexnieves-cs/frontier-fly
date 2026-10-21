@@ -10,9 +10,11 @@
  *
  * The seed blocks 81001+ (dev) and 82001+ (test) are used nowhere else.
  */
+import type { PlanRecord, PlanSet } from '../plans';
 import type { LightingPreset } from '../sim/lighting';
 
-export const BENCH_VERSION = 1;
+/** v2 adds the real-apartments task, so v1 and v2 scores are not comparable. */
+export const BENCH_VERSION = 2;
 
 export interface BenchTask {
   id: string;
@@ -24,6 +26,11 @@ export interface BenchTask {
   speedH: number;
   /** Domain randomization scale for the quadrotor (mass, thrust, drag, lag, noise, latency). */
   dr: number;
+  /**
+   * Fly real apartment plans (src/plans, Swiss Dwellings, CC BY 4.0) instead of generated
+   * buildings: the dev split flies the set's 20 dev plans, the test split its 60 eval plans.
+   */
+  plans?: boolean;
 }
 
 export const BENCH_TASKS: readonly BenchTask[] = [
@@ -33,6 +40,7 @@ export const BENCH_TASKS: readonly BenchTask[] = [
   { id: 'fast', label: 'Rooms, hallways, loops at 4 m/s', stage: 3, dynamics: 'kinematic', lighting: 'day', speedH: 4, dr: 0 },
   { id: 'floors', label: 'Several floors joined by shafts', stage: 4, dynamics: 'kinematic', lighting: 'day', speedH: 2, dr: 0 },
   { id: 'quad', label: 'Quadrotor with randomized dynamics and noise', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1 },
+  { id: 'apartments', label: 'Real apartment plans', stage: 3, dynamics: 'kinematic', lighting: 'day', speedH: 2, dr: 0, plans: true },
 ];
 
 export type BenchSplit = 'dev' | 'test';
@@ -45,6 +53,24 @@ export const BENCH_SEEDS: Record<BenchSplit, { base: number; count: number }> = 
 export function benchSeeds(split: BenchSplit, taskIndex: number): number[] {
   const { base, count } = BENCH_SEEDS[split];
   return Array.from({ length: count }, (_, i) => base + taskIndex * 100 + i);
+}
+
+/** Env seeds for the real-plan task: the plans' own blocks (72001-75999) are the plans study's. */
+export const BENCH_PLAN_SEEDS: Record<BenchSplit, number> = { dev: 84001, test: 84101 };
+
+/** One flight of a task: a seed, and on the real-plan task the plan it flies. */
+export interface BenchRun {
+  seed: number;
+  plan?: { set: PlanSet; record: PlanRecord };
+}
+
+/** The flights of a task on a split. A real-plan task needs the plan set. */
+export function benchRuns(split: BenchSplit, taskIndex: number, plans?: PlanSet): BenchRun[] {
+  const task = BENCH_TASKS[taskIndex]!;
+  if (!task.plans) return benchSeeds(split, taskIndex).map((seed) => ({ seed }));
+  if (!plans) throw new Error(`task ${task.id} needs the plan set`);
+  const want = split === 'dev' ? 'dev' : 'eval';
+  return plans.plans.filter((p) => p.split === want).map((record, i) => ({ seed: BENCH_PLAN_SEEDS[split] + i, plan: { set: plans, record } }));
 }
 
 /** A flight counts as safe when it touched nothing. */

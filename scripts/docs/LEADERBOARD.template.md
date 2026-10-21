@@ -1,18 +1,20 @@
 # FrontierBench leaderboard
 
-FrontierBench is this repository's indoor exploration benchmark, frozen so that anyone can score a pilot the same way [REPORT.md](REPORT.md) scores ours. A pilot flies six tasks, 30 test buildings each, and its **score** is the mean fraction of the reachable building it flew through, averaged over tasks. Each building gets a fixed flight time: 1,000 policy steps (50 s) for one room, 2,400 (120 s) for the rest.
+FrontierBench is this repository's indoor exploration benchmark, frozen so that anyone can score a pilot the same way [REPORT.md](REPORT.md) scores ours. A pilot flies seven tasks: six on 30 generated test buildings each, and one on 60 real apartment plans, and its **score** is the mean fraction of the reachable building it flew through, averaged over tasks. Each building gets a fixed flight time: 1,000 policy steps (50 s) for one room, 2,400 (120 s) for the rest.
 
 ## Leaderboard
 
 {{BENCH_BOARD}}
 
-The last-but-one column is the share of all 180 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
+The last-but-one column is the share of all 240 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
 
 ## Tasks
 
 {{BENCH_TASKS}}
 
-Task definitions and seeds are in [`src/bench/tasks.ts`](../src/bench/tasks.ts): a **dev** split (seeds 81001+, 20 buildings per task) to tune on, and a **test** split (82001+, 30 per task) to score once. Both are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
+Task definitions and seeds are in [`src/bench/tasks.ts`](../src/bench/tasks.ts): a **dev** split (seeds 81001+, 20 buildings per task) to tune on, and a **test** split (82001+, 30 per task) to score once. The `apartments` task flies the 20 dev and 60 eval plans of the real-plan set ([REAL_PLANS.md](REAL_PLANS.md)), converted from Swiss Dwellings 3.0.0 (CC BY 4.0), with env seeds 84001+ (dev) and 84101+ (test).
+
+Version 2 added the `apartments` task, so scores from version 1 (six tasks) are not comparable and were re-run. Both are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
 
 ## What a pilot sees
 
