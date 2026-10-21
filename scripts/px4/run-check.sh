@@ -51,6 +51,8 @@ for plan in "$PLAN_DIR"/*.plan; do
   if ! "$PY" "$HERE/flight_check.py" "$plan" --meta "${plan%.plan}.meta.json" --speed "$SPEED" \
     --out "$OUT_DIR/$id.json"; then
     status=1
+    echo "--- PX4 log, warnings and errors"
+    grep -E "WARN|ERROR" "$OUT_DIR/$id.px4.log" | tail -40
   fi
   kill "$px4_pid" 2>/dev/null
   [ -n "$sim_pid" ] && kill "$sim_pid" 2>/dev/null
