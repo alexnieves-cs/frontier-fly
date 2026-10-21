@@ -14,6 +14,17 @@ The latest run, made in the cloud container with `scripts/px4/report.ts`. Every 
 <!-- px4-results:start -->
 | Simulator | Plan | Result | Waypoints | Off route, max / p95 (m) | Height error (m) | Fence margin (m) | Landed from target (m) | Flight (s, plan estimate) | PX4 estimate vs truth, p95 / max (m) | Closest tree (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| PX4's own simulator (SIH) | Practice site, land at the pad | pass | 25/25 | 1.15 / 0.80 | 0.25 | 0.89 | 0.36 | 361 (286) | – | – |
+| PX4's own simulator (SIH) | Woods seed 11, video on, land at the pad | pass | 10/10 | 1.32 / 0.66 | 0.32 | 2.16 | 0.29 | 113 (61) | – | – |
+| PX4's own simulator (SIH) | Woods seed 11, return to launch | pass | 9/9 | 1.51 / 0.69 | 0.31 | 2.16 | 1.70 | 142 (61) | – | – |
+| PX4's own simulator (SIH) | Woods seed 4242, return to launch | pass | 12/12 | 1.56 / 1.07 | 0.47 | 2.26 | 2.21 | 144 (61) | – | – |
+| PX4's own simulator (SIH) | Woods seed 5150, return to launch | pass | 12/12 | 1.38 / 0.87 | 0.37 | 2.14 | 1.12 | 145 (60) | – | – |
+| frontier-fly physics, headless bridge | Practice site, land at the pad | pass | 25/25 | 0.78 / 0.58 | 0.13 | 1.45 | 0.01 | 324 (286) | 0.23 / 0.37 | – |
+| frontier-fly physics, headless bridge | Woods seed 11, video on, land at the pad | pass | 10/10 | 0.92 / 0.61 | 0.29 | 3.12 | 0.01 | 102 (61) | 0.27 / 0.35 | 5.7 |
+| frontier-fly physics, headless bridge | Woods seed 11, return to launch | pass | 9/9 | 1.42 / 0.62 | 0.29 | 3.18 | 0.02 | 123 (61) | 0.13 / 0.21 | 5.7 |
+| frontier-fly physics, headless bridge | Woods seed 4242, return to launch | pass | 12/12 | 1.37 / 0.64 | 0.47 | 3.35 | 0.01 | 129 (61) | 0.28 / 0.40 | 3.7 |
+| frontier-fly physics, headless bridge | Woods seed 5150, return to launch | pass | 12/12 | 1.29 / 0.57 | 0.29 | 3.15 | 0.02 | 125 (60) | 0.10 / 0.14 | 5.9 |
+| frontier-fly page in Chromium | Woods seed 4242, return to launch | pass | 12/12 | 1.38 / 0.63 | 0.47 | 3.33 | 0.01 | 129 (61) | – | – |
 <!-- px4-results:end -->
 
 How to read the table:
