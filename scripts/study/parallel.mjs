@@ -23,7 +23,8 @@ const files = Array.from({ length: shards }, (_, i) => join(dir, `shard-${i}.jso
 
 function run(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['vite-node', script, '--', ...args], { stdio: 'inherit' });
+    // STUDY_ENTRY tells a study module it is the entry script: vite-node drops the script path from argv.
+    const child = spawn('npx', ['vite-node', script, '--', ...args], { stdio: 'inherit', env: { ...process.env, STUDY_ENTRY: name } });
     child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${script} ${args.join(' ')} exited ${code}`))));
   });
 }
