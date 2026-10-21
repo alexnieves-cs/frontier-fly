@@ -22,6 +22,7 @@ const TYPES = {
   '.wasm': 'application/wasm',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
   '.glb': 'model/gltf-binary',
   '.hdr': 'application/octet-stream',
 };
