@@ -436,6 +436,22 @@ describe('failsafe', () => {
     expect(slow.out.every((o) => o.v.action.kind !== 'land')).toBe(true);
   });
 
+  it('latches severe wind through gust dips and lets it go after a calm spell', () => {
+    // 8 m/s with dips to 5 m/s: the short estimate drops under 6 m/s but stays over 4 m/s, so the flag holds.
+    const dips = feed(30, (t) => ({ windEstimate: [t > 10 && t < 12 ? 5 : 8, 0, 0], toHome: [1, 0] }));
+    const after = dips.out.filter((o) => o.t > 2.5);
+    expect(after.every((o) => o.v.flags.has('wind_severe'))).toBe(true);
+    // Under 4 m/s for 5 s clears it.
+    const calm = feed(30, (t) => ({ windEstimate: [t < 10 ? 8 : 1, 0, 0], toHome: [1, 0] }));
+    expect(calm.out.find((o) => o.t > 12 && o.t < 14.5)!.v.flags.has('wind_severe')).toBe(true);
+    expect(calm.out.find((o) => o.t > 16)!.v.flags.has('wind_severe')).toBe(false);
+  });
+
+  it('does not call a hover over the pad a lack of headway', () => {
+    const { out } = feed(60, () => ({ windEstimate: [-7, 0, 0], toHome: [1, 0], phase: 'return_home', homeDistM: 2 }));
+    expect(out.every((o) => o.v.action.kind !== 'land')).toBe(true);
+  });
+
   it('suppresses actions once landing', () => {
     const { out } = feed(30, () => ({ linkUp: false, phase: 'land' }));
     expect(out.every((o) => o.v.action.kind === 'none')).toBe(true);
