@@ -7,10 +7,9 @@
 // module whose default export is a BenchPilotFactory (src/bench/pilot.ts). --tasks narrows the run.
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
-import { BENCH_TASKS, BENCH_VERSION, benchSeeds, type BenchSplit } from '../../src/bench/tasks';
+import { BENCH_TASKS, BENCH_VERSION, type BenchSplit } from '../../src/bench/tasks';
 import { createEnv } from '../../src/sim/env';
-import { loadPilot, summarize } from './lib';
+import { flyAll, loadPilot, summarize } from './lib';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -22,14 +21,10 @@ const only = arg('tasks', '').split(',').filter(Boolean);
 const { make, source } = await loadPilot(arg('pilot', 'planner'));
 const pilot = await make();
 const env = await createEnv();
-const episodes: BenchEpisode[] = [];
 const t0 = Date.now();
-BENCH_TASKS.forEach((task, ti) => {
-  if (only.length && !only.includes(task.id)) return;
-  for (const seed of benchSeeds(split, ti)) episodes.push(runBenchEpisode(env, task, seed, pilot));
-  const rs = episodes.filter((e) => e.task === task.id);
-  console.log(`${task.id}: ${((rs.reduce((a, e) => a + e.coverage, 0) / rs.length) * 100).toFixed(1)}% over ${rs.length} flights (${Math.round((Date.now() - t0) / 1000)} s)`);
-});
+const episodes = flyAll(env, pilot, split, only, (task, rs) =>
+  console.log(`${task}: ${((rs.reduce((a, e) => a + e.coverage, 0) / rs.length) * 100).toFixed(1)}% over ${rs.length} flights (${Math.round((Date.now() - t0) / 1000)} s)`),
+);
 env.dispose();
 const result = {
   bench: BENCH_VERSION,

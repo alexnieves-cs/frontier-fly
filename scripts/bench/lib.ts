@@ -3,8 +3,11 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BASELINES, policyPilot } from '../../src/bench/baselines';
 import type { BenchPilot, BenchPilotFactory } from '../../src/bench/pilot';
-import type { BenchEpisode } from '../../src/bench/run';
-import { BENCH_TASKS, SAFE_COLLISIONS } from '../../src/bench/tasks';
+import { readFileSync } from 'node:fs';
+import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
+import { parsePlanSet, PLAN_SET_PATH, type PlanSet } from '../../src/plans';
+import type { ExplorerEnv } from '../../src/sim/env';
+import { BENCH_TASKS, benchRuns, SAFE_COLLISIONS, type BenchSplit } from '../../src/bench/tasks';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { bootstrapCi, loadPolicy } from '../study/common';
 
@@ -40,4 +43,23 @@ export function summarize(episodes: BenchEpisode[]) {
     };
   }
   return { score: mean(covs), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), tasks };
+}
+
+let planSet: PlanSet | null = null;
+export function loadPlanSet(): PlanSet {
+  planSet ??= parsePlanSet(JSON.parse(readFileSync(PLAN_SET_PATH, 'utf8')));
+  return planSet;
+}
+
+/** Fly every task of a split (or the listed ones) with one pilot. */
+export function flyAll(env: ExplorerEnv, pilot: BenchPilot, split: BenchSplit, only: string[] = [], log?: (task: string, eps: BenchEpisode[]) => void): BenchEpisode[] {
+  const episodes: BenchEpisode[] = [];
+  BENCH_TASKS.forEach((task, ti) => {
+    if (only.length && !only.includes(task.id)) return;
+    const mine: BenchEpisode[] = [];
+    for (const run of benchRuns(split, ti, task.plans ? loadPlanSet() : undefined)) mine.push(runBenchEpisode(env, task, run, pilot));
+    episodes.push(...mine);
+    log?.(task.id, mine);
+  });
+  return episodes;
 }
