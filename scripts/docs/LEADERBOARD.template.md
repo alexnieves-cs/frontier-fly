@@ -16,6 +16,14 @@ Task definitions and seeds are in [`src/bench/tasks.ts`](../src/bench/tasks.ts):
 
 Version 2 added the `apartments` task, so scores from version 1 (six tasks) are not comparable and were re-run. Both are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
 
+## Team track
+
+{{BENCH_TEAM}}
+
+The team track ([`src/bench/team.ts`](../src/bench/team.ts)) flies up to four sensor-only planners into one building through the same entry, sharing maps over the lossy, wall-attenuated radio of the [drone-team study](REPORT.md). Two conditions, 30 test buildings each: `hard` (the 20 x 20 m stage-3 buildings, 120 s) and `large` (four of them tiled 2 x 2, 40 x 40 m, 240 s, where the radio no longer reaches everywhere). The **score** is the mean fraction of the reachable building the team flew through. *Base knows* is the part of that the radio outside had heard about by the end, which is what an operator could act on, and *80% in* is the mean time to 80% coverage over the flights that got there (the share in brackets).
+
+An entry here is a team configuration, not a new pilot: the number of drones (1 to 4), which fly as relays, how frontiers are split between them, cruise speed (at most 2 m/s), and how often they talk. The radio, buildings and time budget are fixed. Seeds are 83001+ (dev, 10 per condition) and 83101+ (test, 30 per condition), with the `large` condition offset by 500. To enter, add `team.ts` (default export: a `TeamEntry`) to your entry folder, tune with `npm run bench:team -- --entry bench/entries/<your-name>/team.ts --split dev`, then score test once with `--split test --out bench/entries/<your-name>/team-result.json`. CI re-scores it the same way as single-drone entries.
+
 ## What a pilot sees
 
 A pilot implements `BenchPilot` ([`src/bench/pilot.ts`](../src/bench/pilot.ts)). Each step it gets:
