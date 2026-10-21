@@ -172,6 +172,31 @@ On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the poli
 
 A geometry fix in this round changes the multi-floor numbers slightly for pilots that do not climb. Before it, on buildings with three or more floors, a slab opened over every shaft cell of the floor above it, while the physics kept some of those holes closed. The range finders could see through ceilings the drone could not fly through. Slabs and physics now open only where a shaft joins the two floors, and the ground-floor slab no longer has holes over shafts that lead up.
 
+### Speed and energy
+
+Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 5 m/s on the same 30 held-out hard buildings, on the kinematic drone and on the quadrotor with domain randomization, and meters energy along each flight. A full action now asks for the episode's cap, so the shipped policy flies faster without retraining. The planner's speed is set to the cap. Brackets are bootstrap 95% intervals; collisions per episode are in parentheses in the table. The momentum weight was chosen on the tuning buildings (`scripts/study/speed-diag.ts`).
+
+- **On the kinematic drone, speed is the lever.** The planner covers 65.5% (62.2–68.7%) at 2 m/s and 84.4% (81.3–87.3%) at 5 m/s, with no collisions at any speed. Half the building is flown after 89 s at 2 m/s and 60 s at 5 m/s. This is the flight-time limit the map-prediction null result pointed to: choosing better frontiers barely matters, flying them faster does.
+- **Momentum-aware goal choice saves energy, not coverage.** Scoring each frontier by how far the drone would have to swing round to reach it leaves coverage where it was (65.6% at 2 m/s, 84.1% at 5 m/s) and uses 7% less energy at 2 m/s and 21% less at 5 m/s, because the drone brakes and re-accelerates less. Energy is metered with the mission battery model for a 1.2 kg quadrotor, which charges for acceleration and gives nothing back on braking.
+- **The guarded policy also gains from speed; the raw policy does not.** With the lidar guard it covers 60.8% at 2 m/s and 79.8% at 5 m/s, at 3.4 collisions per episode. Without the guard it falls from 60.7% to 32.0%, and most episodes end early at the collision limit, which is why its energy falls. It was trained at 2 m/s and never saw these speeds.
+- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers 42.1% at 2 m/s and 33.6% at 5 m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: 41.3% against 36.9% at 4 m/s. A path tracker that sets a speed for each corner within the airframe's acceleration and starts each turn early did no better on the tuning buildings (44–47% at 2–4 m/s, against 44–46% for the planner with momentum), so it is not shipped.
+- **The guarded policy is the exception on the quadrotor.** It covers 33.6% at 2 m/s and 46.9% at 5 m/s, more than any planner, but at 8.8 collisions per episode. It pushes into corners the planners slow down for.
+
+| Airframe | Pilot | 2 m/s | 3 m/s | 4 m/s | 5 m/s | Energy, Wh (2 → 5 m/s) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Kinematic | Planner | 65.5% (0.0) | 79.3% (0.0) | 83.3% (0.0) | 84.4% (0.0) | 5.23 → 9.28 |
+| Kinematic | Planner + momentum | 65.6% (0.0) | 79.4% (0.0) | 82.2% (0.0) | 84.1% (0.0) | 4.86 → 7.29 |
+| Kinematic | Policy | 60.7% (6.4) | 60.5% (13.9) | 46.1% (16.6) | 32.0% (17.0) | 5.51 → 3.34 |
+| Kinematic | Guarded policy | 60.8% (0.0) | 69.9% (0.7) | 74.9% (2.0) | 79.8% (3.4) | 5.55 → 8.81 |
+| Quadrotor | Planner | 43.6% (6.7) | 40.6% (10.3) | 37.4% (13.8) | 36.3% (13.0) | 5.19 → 4.96 |
+| Quadrotor | Planner + momentum | 45.7% (7.0) | 41.2% (13.1) | 38.8% (14.6) | 39.1% (14.7) | 5.15 → 4.57 |
+| Quadrotor | Planner, braking filter | 42.1% (1.2) | 38.0% (2.3) | 36.9% (2.6) | 33.6% (2.1) | 5.18 → 5.36 |
+| Quadrotor | Planner, braking filter + momentum | 43.7% (1.2) | 42.0% (1.8) | 41.3% (2.5) | 39.8% (2.8) | 5.14 → 5.30 |
+| Quadrotor | Policy | 27.0% (15.3) | 25.0% (17.0) | 20.4% (17.0) | 20.7% (17.0) | 3.84 → 1.62 |
+| Quadrotor | Guarded policy | 33.6% (2.1) | 39.4% (6.0) | 44.3% (7.8) | 46.9% (8.8) | 5.02 → 5.11 |
+
+![Coverage against the speed cap for each pilot, kinematic drone and quadrotor](report/speed.svg)
+
 ### Ablations
 
 Each arm is one `npm run train:indoor` run with the default recipe (BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint), the checkpoint kept by held-out validation, then flown on the coverage study's 30 hard buildings, from `scripts/study/ablations.ts` at `4ef0a1c`. Observation ablations zero the block in training and evaluation alike. Brackets are bootstrap 95% intervals.
@@ -346,6 +371,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
 - **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts {{R_SAR_UNI_POS_900_PRED}} success and {{R_SAR_UNI_POS_900_OBS}} of searches succeed.
+- **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -357,6 +383,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Tuning the sensor planner and guard | Coverage buildings 9101–9108 |
 | Tuning the mission explorer and re-views | Mission worlds 9101–9116 and the three showcase seeds |
 | Coverage study (reported) | 20001+, 30001+, 40001+, 50001+ (30 each) |
+| Speed study (reported) | 30001+ and 50001+, the coverage study's hard and quadrotor buildings |
 | Mission bench (reported) | 9600–9629 |
 | Tuning the outdoor search, its prior and POD model | 7100–7139 |
 | Outdoor search bench (reported) | 7600–7699 (day), 7600–7659 (uniform person, night) |
@@ -369,6 +396,7 @@ npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
 npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
+npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README
