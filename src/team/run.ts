@@ -63,6 +63,8 @@ export interface TeamResult {
   awarenessGap: number;
   awarenessGapMax: number;
   collisions: number;
+  /** Each drone's battery energy used, Wh (DEFAULT_BATTERY power model, integrated by its env). */
+  energyWh: number[];
   /** Steps on which two drones were closer than 0.35 m (centers): they would have touched. */
   droneContacts: number;
   /** Each drone's own flown voxels over reachable. */
@@ -115,6 +117,7 @@ interface Drone {
   launched: boolean;
   done: boolean;
   collisions: number;
+  energyWh: number;
   /** Relay state: breadcrumbs with their mean base margin. */
   crumbs: { x: number; y: number; z: number; margin: number }[];
   relay: 'explore' | 'return' | 'hold';
@@ -230,6 +233,7 @@ export class TeamSim {
         launched: false,
         done: false,
         collisions: 0,
+        energyWh: 0,
         crumbs: [],
         relay: 'explore',
         relayTarget: -1,
@@ -290,6 +294,7 @@ export class TeamSim {
       const step = d.env.step(commandToAction(cmd, f.yaw, this.out));
       d.obs = step.obs;
       d.collisions = step.info.collisions;
+      d.energyWh = step.info.energyWh;
       if (step.done) d.done = true;
     }
 
@@ -374,6 +379,7 @@ export class TeamSim {
       awarenessGap: curve.length ? curve.reduce((acc, c, i) => acc + c - baseCurve[i]!, 0) / curve.length : 0,
       awarenessGapMax: curve.reduce((acc, c, i) => Math.max(acc, c - baseCurve[i]!), 0),
       collisions: drones.reduce((s, d) => s + d.collisions, 0),
+      energyWh: drones.map((d) => d.energyWh),
       droneContacts: this.droneContacts,
       perDrone,
       overlap: this.unionCount > 0 ? own / this.unionCount : 1,

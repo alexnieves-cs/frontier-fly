@@ -115,6 +115,9 @@ export function teamSection(bench) {
     'R_TEAM_WEAK_RELAY_GAPMAX_D',
     'R_TEAM_RELAY_GAPMAX_D',
     'R_TEAM_CONTACTS',
+    'R_TEAM_PACK',
+    'R_TEAM_WH_SOLO',
+    'R_TEAM_WH_FOUR',
   ];
   if (!bench || !bench.cells?.length || !bench.episodes) return { values: Object.fromEntries(keys.map((k) => [k, MISSING])), files: {} };
   const cell = (cond, arm) => bench.cells.find((c) => c.condition === cond && c.arm === arm);
@@ -135,6 +138,8 @@ export function teamSection(bench) {
         x.overlap.toFixed(2),
         pct(x.baseKnown),
         pct(x.delivery),
+        x.energyWh === undefined ? '—' : x.energyWh.toFixed(1),
+        x.coveragePerWh === undefined ? '—' : x.coveragePerWh.toFixed(1),
       ]);
     }
   }
@@ -161,7 +166,7 @@ export function teamSection(bench) {
   return {
     values: {
       TEAM_NOTE: `Commit \`${bench.commit}\`. ${bench.seedsPerCondition} fresh buildings per condition (hard ${bench.evalSeedBase.hard}+, large ${bench.evalSeedBase.large}+); the claim weights were tuned on ${bench.tuneSeeds[0]}–${bench.tuneSeeds[1]} only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.`,
-      TEAM_TABLE: table(['Building', 'Team', 'Searched (95% CI)', 'vs 1 drone', 'Median time to 50%', 'Median time to 80%', 'Points per drone-minute', 'Overlap', 'Base knows at end', 'Packets through'], rows),
+      TEAM_TABLE: table(['Building', 'Team', 'Searched (95% CI)', 'vs 1 drone', 'Median time to 50%', 'Median time to 80%', 'Points per drone-minute', 'Overlap', 'Base knows at end', 'Packets through', 'Team battery, Wh', 'Points per Wh'], rows),
       TEAM_ABLATION_TABLE: table(['Building', 'Three drones', 'Searched', 'vs 3 drones, full system', 'Median time to 80%', 'Base knows at end', 'Awareness gap, mean / worst', 'Collisions per episode'], ab),
       TEAM_FIGURE: '![Mean searched floor over time for one to four drones](report/team-curves.svg)',
       R_TEAM_SEEDS: String(bench.seedsPerCondition),
@@ -183,6 +188,9 @@ export function teamSection(bench) {
       R_TEAM_WEAK_RELAY_GAPMAX_D: d(pairedFromEpisodes(bench, 'large', 'team3-weak-relay', 'team3-weak', (e) => e.awarenessGapMax)),
       R_TEAM_RELAY_GAPMAX_D: d(pairedFromEpisodes(bench, 'large', 'team3-relay', 'team3', (e) => e.awarenessGapMax)),
       R_TEAM_CONTACTS: String(Math.round(contacts)),
+      R_TEAM_PACK: pct(Math.max(...bench.cells.map((c) => c.maxPackUsed ?? 0))),
+      R_TEAM_WH_SOLO: L('solo').coveragePerWh?.toFixed(1) ?? '—',
+      R_TEAM_WH_FOUR: L('team4').coveragePerWh?.toFixed(1) ?? '—',
     },
     files: { 'docs/report/team-curves.svg': `${curves(bench)}\n` },
   };

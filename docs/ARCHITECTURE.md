@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (239 files, 45,836 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (240 files, 46,025 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -99,9 +99,11 @@ flowchart LR
   world_outdoor["world/outdoor"]
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
+  bench -->|2| app
   bench -->|2| eval
   bench -->|2| shared
   bench -->|8| sim
+  bench -->|3| team
   eval -->|3| gen
   eval -->|34| mission
   eval -->|2| rl
@@ -187,7 +189,7 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/bench` | 4 | 198 | `eval`, `shared`, `sim` | — | — |
+| `src/bench` | 5 | 381 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
 | `src/eval` | 10 | 1,446 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
@@ -200,7 +202,7 @@ flowchart LR
 | `src/shared` | 5 | 579 | — | — | — |
 | `src/sim` | 23 | 4,885 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
-| `src/team` | 6 | 1,019 | `eval`, `gen`, `shared`, `sim` | — | — |
+| `src/team` | 6 | 1,025 | `eval`, `gen`, `shared`, `sim` | — | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 29 | 4,887 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 5 | 2,050 | `mission` | — | — |
