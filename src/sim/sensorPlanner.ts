@@ -82,6 +82,19 @@ export interface SensorPlannerOptions {
   gain?: GainSource;
   /** Path cost, in voxel steps, traded for one voxel of predicted gain. */
   gainWeight?: number;
+  /**
+   * Extra cost per frontier candidate, in voxel steps (team/allocate.ts: frontiers a
+   * teammate has claimed cost more). Must be zero or positive.
+   */
+  penalty?: CandidatePenalty;
+}
+
+/** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
+export interface CandidatePenalty {
+  /** Called once per replan, before any cost() on that floor. */
+  prepare(floor: number, vw: number): void;
+  /** Cost of voxel k on the floor plane (k = vy * vw + vx), in voxel steps. */
+  cost(k: number): number;
 }
 
 /** Free air the safety filter keeps between the airframe edge and a lidar return, meters. */
@@ -255,6 +268,8 @@ export class SensorPlanner {
   readonly momentum: number;
   readonly gain: GainSource | null;
   readonly gainWeight: number;
+  /** Swappable so a team can attach its claim map after construction. */
+  penalty: CandidatePenalty | null;
   private n = 0;
   private dist = new Float64Array(0);
   private prev = new Int32Array(0);
@@ -283,6 +298,7 @@ export class SensorPlanner {
     this.momentum = opts.momentum ?? 0;
     this.gain = opts.gain ?? null;
     this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
+    this.penalty = opts.penalty ?? null;
   }
 
   reset(): void {
@@ -418,6 +434,8 @@ export class SensorPlanner {
     // How far past the cheapest candidate a better one could still lie, once gains are counted.
     const reach = gain ? gw * gain.max : 0;
     if (gain) gain.prepare({ vw, vd, base, seen: f.seen, visited: f.visited, occupied: f.occupied });
+    const claim = this.penalty;
+    claim?.prepare(floor, vw);
     while (size > 0) {
       const k = pop();
       if (done[k]! & 128) continue;
@@ -436,6 +454,8 @@ export class SensorPlanner {
         }
         // The gain is only worth computing where it could still change the choice.
         if (gain && score - reach < bestCost) score -= gw * gain.gain(k);
+        // A penalty only raises the score, so the early-exit bound below still holds.
+        if (claim) score += claim.cost(k);
         if (k === keep) keepCost = score;
         if (score < bestCost) {
           bestCost = score;

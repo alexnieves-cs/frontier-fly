@@ -12,6 +12,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage ({{R_PLANNER_QUAD}} for the planner, {{R_POLICY_QUAD}} for the policy, {{R_TEACHER_QUAD}} for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from {{R_Q_PLANNER_COLL}} to {{R_Q_PLANNER_BRAKE_COLL}} per episode and the guarded policy's from {{R_Q_GUARD_COLL}} to {{R_Q_GUARD_BRAKE_COLL}}. Whole missions flown on the quadrotor meet the expected outcome in {{R_MQ_SENSOR}} (planner) and {{R_MQ_POLICY}} (policy) of flights.
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in {{R_CLIMB_REACHED}} fresh multi-floor buildings and covers {{R_CLIMB_FLOORS}} of them against {{R_PLANNER_FLOORS}} without climbing, with {{R_CLIMB_COLL}} collisions per episode. The policy and the teacher still stay on the ground floor.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² {{R_MP_R2}} against {{R_MP_BASE_R2}}). Ranking frontiers by it leaves coverage unchanged ({{R_PRED_HARD}} against {{R_PLANNER_HARD}} on hard buildings), and so does the true hidden gain ({{R_ORACLEGAIN_HARD}}). In this environment coverage is limited by flight time, not by which frontier comes next.
+- **A team of drones is the lever coverage was waiting for.** On {{R_TEAM_SEEDS}} fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches {{R_TEAM_SOLO_LARGE}}, three search {{R_TEAM_THREE_LARGE}} and four {{R_TEAM_FOUR_LARGE}}, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median {{R_TEAM_THREE_HARD_EIGHTY}}; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
 
 ## Setup
 
@@ -176,6 +177,40 @@ By how the person moved (daytime scenes; found / median time to find):
 
 {{SAR_CALIBRATION_FIGURE}}
 
+## Drone teams
+
+The single-drone results above say coverage is limited by flight time. The direct answer is more drones. Here two to four copies of the sensor-only planner search one building together (`src/team/`).
+
+### Method
+
+- **Radio.** Every drone and a base radio outside the entry talk over a 2.4 GHz link modelled with the multi-wall model: free-space loss plus a fixed loss for each wall the straight line crosses (drywall 3 dB, glass 2 dB, wood 5 dB, concrete 12 dB, metal 26 dB, a floor slab 15 dB; typical 2.4 GHz values from ITU-R P.2040 and indoor measurements), and 4 dB of log-normal shadowing per packet. The transmitter is deliberately weak (0 dBm, sensitivity −82 dBm) so walls matter inside a 40 m building; the weak setting is −10 dBm. The radio reads the true floor plan, as radio waves do; no drone does.
+- **Map sharing.** Each radio keeps the team map as far as it knows it (seen-free and flown voxels) and an append-only log of what it learned. Twice a second it sends every other radio the part of its log that radio has not acknowledged, at most 1,500 voxels per packet; a lost packet is resent next round. What a drone hears it forwards, so maps travel over several hops, through teammates, to the base.
+- **Frontier split.** Each drone runs its own planner on its own copy of the team map. A frontier costs more within 6 m of a goal a lower-numbered teammate announced, and more when a teammate it has heard from is closer to it, in the spirit of coordinated multi-robot exploration and RACER's pairwise split. Without the fixed order, strong goal claims let two drones push each other off their goals in turn. The two weights and the order were picked from 25 settings on the tuning buildings (`docs/team-tuning.json`).
+- **Relay.** In the relay arms the last drone explores until its mean link margin to the base drops below 6 dB, then flies back along its own track to the deepest point with 3 dB to spare and hovers there.
+- **Separation.** Drones are not physics bodies in the simulator, so they cannot hit each other. Each drone instead cuts the part of its velocity that closes on a teammate within 1.5 m, as its lidar filter does for walls, and the bench counts steps where two drone centres come within 0.35 m.
+- **Buildings and metrics.** *Hard* is the coverage study's 20 m stage-3 building and two-minute budget. *Large* tiles four hard floor plans 2 × 2 with doorways between them (the stage-3 generator itself stops at eight rooms, so a 40 m request gives halls wider than the lidar's range) and allows four minutes. Drones launch one second apart from the same entry. Coverage is the union of voxels flown. *Base knows* is the share whose report reached the base radio, the picture an operator could act on; the *awareness gap* is coverage minus base-known, averaged over the run and at its worst.
+
+### Results
+
+{{TEAM_NOTE}}
+
+{{TEAM_TABLE}}
+
+{{TEAM_FIGURE}}
+
+Three drones on large buildings search {{R_TEAM_THREE_LARGE_D}} more than one. Scaling is close to linear up to three drones: coverage per drone-minute falls only a little as drones are added, and overlap, the flown voxels summed over drones divided by their union, stays near 1.1. On hard buildings two drones already reach the 95% stop, so more drones show up as time to clear rather than coverage.
+
+Ablations, three drones:
+
+{{TEAM_ABLATION_TABLE}}
+
+- **Sharing maps is most of the gain.** Without the radio each drone explores alone and covers what the others already did: {{R_TEAM_NONE_D}} against the full team on large buildings, and overlap near 2.7.
+- **Splitting frontiers adds a few points and keeps drones apart.** Without claims the drones share maps but chase the same frontiers: {{R_TEAM_NOCLAIMS_D}}, and they spend many more steps within 0.35 m of each other.
+- **The radio limits what the base knows, not how much gets searched.** A perfect radio changes coverage by {{R_TEAM_PERFECT_D}}. With the 0 dBm radio the base trails the truth by {{R_TEAM_GAP}} (mean / worst); with the −10 dBm radio by {{R_TEAM_WEAK_GAP}}.
+- **A dedicated relay is not worth a drone here.** On the weak radio it changes the worst awareness gap by {{R_TEAM_WEAK_RELAY_GAPMAX_D}} ({{R_TEAM_WEAK_RELAY_GAP}} against {{R_TEAM_WEAK_GAP}}) and coverage by {{R_TEAM_WEAK_RELAY_D}}. Three explorers already chain the link back to the base most of the time. A relay should pay where the building is deeper than the team can chain, or where an operator needs a live picture more than a fast one.
+
+The live page (`team.html`) runs this code in the browser: the truth beside what the base sees, with the radio links drawn.
+
 ## Failure gallery
 
 Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture grey, flown voxels light blue, the track blue, the start green, collisions red. The episodes are picked by rule from the coverage study (`scripts/study/gallery.ts`).
@@ -193,6 +228,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
 - **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts {{R_SAR_UNI_POS_900_PRED}} success and {{R_SAR_UNI_POS_900_OBS}} of searches succeed.
+- **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: {{R_TEAM_CONTACTS}} steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day, and the battery is not modelled in the team bench yet.
 - **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
@@ -209,6 +245,8 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | Mission bench (reported) | 9600–9629 |
 | Tuning the outdoor search, its prior and POD model | 7100–7139 |
 | Outdoor search bench (reported) | 7600–7699 (day), 7600–7659 (uniform person, night) |
+| Tuning the team's frontier split | 66001–66016 (hard and large) |
+| Drone-team bench (reported) | 70001–70030 (hard), 71001–71030 (large) |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -217,6 +255,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
 npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
+npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
 npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
