@@ -105,4 +105,6 @@ jobs:
         env:
           DIRS: ${{ steps.changed.outputs.dirs }}
         # DIRS holds only validated folder names; word splitting is intended.
-        run: npm run bench:verify -- $DIRS
+        run: |
+          npm run bench:verify -- $DIRS
+          npm run bench:team -- --verify $DIRS

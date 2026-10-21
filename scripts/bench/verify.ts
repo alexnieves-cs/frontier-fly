@@ -16,6 +16,8 @@ let failed = 0;
 for (const dir of dirs) {
   const resultPath = join(dir, 'result.json');
   const pilotPath = join(dir, 'pilot.ts');
+  // A team-track-only entry (team.ts) is verified by bench:team -- --verify.
+  if (!existsSync(resultPath) && !existsSync(pilotPath) && existsSync(join(dir, 'team.ts'))) continue;
   if (!existsSync(resultPath) || !existsSync(pilotPath)) {
     console.log(`${dir}: needs pilot.ts and result.json`);
     failed += 1;

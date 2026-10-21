@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (233 files, 44,511 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (234 files, 44,661 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -102,6 +102,7 @@ flowchart LR
   bench -->|2| eval
   bench -->|2| shared
   bench -->|8| sim
+  bench -->|3| team
   eval -->|3| gen
   eval -->|34| mission
   eval -->|2| rl
@@ -184,7 +185,7 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/bench` | 4 | 231 | `app`, `eval`, `shared`, `sim` | — | — |
+| `src/bench` | 5 | 381 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
 | `src/eval` | 10 | 1,446 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
