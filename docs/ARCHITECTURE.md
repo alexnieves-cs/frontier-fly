@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (251 files, 48,181 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (262 files, 50,777 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -82,6 +82,7 @@ flowchart LR
   film["film"]
   gen["gen"]
   landing["landing"]
+  loc["loc"]
   mission["mission"]
   perception["perception"]
   plans["plans"]
@@ -106,10 +107,11 @@ flowchart LR
   bench -->|8| sim
   bench -->|3| team
   eval -->|3| gen
+  eval -->|4| loc
   eval -->|36| mission
   eval -->|2| rl
-  eval -->|10| shared
-  eval -->|10| sim
+  eval -->|12| shared
+  eval -->|15| sim
   eval -->|2| train
   eval -->|3| vision
   eval -->|2| world_outdoor
@@ -120,10 +122,12 @@ flowchart LR
   film -->|5| viz
   gen -->|16| shared
   landing -->|1| film
+  loc -->|3| shared
   mission -->|1| gen
+  mission -->|6| loc
   mission -->|11| perception
   mission -->|4| rl
-  mission -->|24| shared
+  mission -->|25| shared
   mission -->|15| sim
   mission -->|14| targets
   mission -->|45| world_outdoor
@@ -199,11 +203,12 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
 | `src/bench` | 5 | 381 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
-| `src/eval` | 11 | 1,558 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `vision`, `world/outdoor` | — | — |
+| `src/eval` | 12 | 1,826 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
 | `src/landing` | 1 | 152 | `film` | — | — |
-| `src/mission` | 57 | 13,724 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/loc` | 8 | 1,841 | `shared` | — | — |
+| `src/mission` | 59 | 14,211 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 6 | 1,263 | `mission`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
@@ -236,6 +241,7 @@ Simulation, generation, and learning must run in Node and in workers without a D
 | `src/mission` | ✅ no Three.js |
 | `src/perception` | ✅ no Three.js |
 | `src/vision` | ✅ no Three.js |
+| `src/loc` | ✅ no Three.js |
 
 ## Pages
 

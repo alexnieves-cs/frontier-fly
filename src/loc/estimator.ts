@@ -124,6 +124,8 @@ export interface EstimatorStats {
 }
 
 const N = 4;
+/** Height band around an upper slab in which a sweep is neither matched nor mapped, m. */
+const SLAB_BAND_M = 0.35;
 
 function wrap(a: number): number {
   return Math.atan2(Math.sin(a), Math.cos(a));
@@ -328,6 +330,11 @@ export class PoseEstimator {
     const o = this.opts;
     this.stats.sweeps += 1;
     if (o.mode === 'odometry') return;
+    // Climbing a shaft, the ring passes through the slab: at that height it sees the slab's edge
+    // around the hole, not the floor's walls, and a map founded on it matches nothing above. Neither
+    // match nor map until the drone is clear of the slab.
+    const slab = Math.round(this.z / o.floorHeight);
+    if (slab > 0 && slab < o.floors && Math.abs(this.z - slab * o.floorHeight) < SLAB_BAND_M) return;
     const floor = this.floor;
     const grid = this.grid(floor);
     grid.refresh();
