@@ -33,7 +33,7 @@ pids+=($!)
 
 # Playwright empties its output folder when it starts, and the default one,
 # test-results/, may hold this run's plans and logs, so give it its own.
-(cd "$ROOT" && PX4_LIVE=1 npx playwright test tests/e2e/px4.spec.ts -g "flies the browser" --project=chromium --no-deps \
+(cd "$ROOT" && PX4_LIVE=1 PX4_CHECK_DONE="$work/done" npx playwright test tests/e2e/px4.spec.ts -g "flies the browser" --project=chromium --no-deps \
   --output "$OUT_DIR/playwright") \
   > "$OUT_DIR/$id.playwright.log" 2>&1 &
 pw=$!
@@ -56,6 +56,7 @@ pids+=($!)
 status=0
 "$PY" "$HERE/flight_check.py" "$PLAN" --meta "${PLAN%.plan}.meta.json" --ready-timeout 240 \
   --out "$OUT_DIR/$id.json" || status=1
+touch "$work/done"
 wait "$pw" || status=1
 tail -15 "$OUT_DIR/$id.playwright.log"
 exit $status

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import Ajv2020 from 'ajv/dist/2020.js';
 import { expect, test } from '@playwright/test';
 
@@ -55,4 +55,8 @@ test('PX4 SITL flies the browser sim through the bridge', async ({ page }) => {
   console.log(`page flew ${flown} m, max ${await page.locator('#app').getAttribute('data-max-agl')} m AGL`);
   expect(flown).toBeGreaterThan(100);
   await page.screenshot({ path: 'test-results/px4/browser-flight-landed.png' });
+  // Closing the page cuts PX4's sensors, so stay until the flight check has
+  // seen the disarm and stopped (run-browser-check.sh creates this file).
+  const done = process.env.PX4_CHECK_DONE;
+  if (done) await expect.poll(() => existsSync(done), { timeout: 120_000 }).toBe(true);
 });
