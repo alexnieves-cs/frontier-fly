@@ -49,6 +49,8 @@ export const PILOTS = [
   'teacher',
   'classical',
   'classicalBrake',
+  'classicalTrack',
+  'classicalBrakeTrack',
   'classicalClimb',
   'classicalPredict',
   'classicalOracleGain',
@@ -66,6 +68,8 @@ export type PilotId = (typeof PILOTS)[number];
  */
 export const PILOT_CONDITIONS: Partial<Record<PilotId, string[]>> = {
   classicalBrake: ['quad'],
+  classicalTrack: ['quad'],
+  classicalBrakeTrack: ['quad'],
   guardedBrake: ['quad'],
   classicalClimb: ['floors'],
   classicalPredict: ['hard', 'floors'],
@@ -152,6 +156,11 @@ export async function startEpisode(
     act = p.act;
   } else if (job.pilot === 'classicalBrake') {
     const p = classicalPilot({ braking: QUAD_BRAKING });
+    p.reset();
+    act = p.act;
+  } else if (job.pilot === 'classicalTrack' || job.pilot === 'classicalBrakeTrack') {
+    // Quad-aware trajectory tracking (sim/tracker.ts), defaults tuned on 9101-9108.
+    const p = classicalPilot({ tracker: {}, ...(job.pilot === 'classicalBrakeTrack' ? { braking: QUAD_BRAKING } : {}) });
     p.reset();
     act = p.act;
   } else if (job.pilot === 'classicalClimb') {

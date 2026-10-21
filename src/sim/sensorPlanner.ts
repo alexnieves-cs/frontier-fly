@@ -1,5 +1,6 @@
 import * as C from '../shared/constants';
 import type { GainSource } from './mapPredict';
+import { approachSpeed, CommandShaper, profileSpeed, uTurnSpeed, resolveTracker, type ResolvedTracker, type TrackerOptions } from './tracker';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -9,6 +10,7 @@ const MAX_SPEED_H = C.MAX_SPEED_H;
 const MAX_SPEED_V = C.MAX_SPEED_V;
 const MAX_YAW_RATE = C.MAX_YAW_RATE;
 const DRONE_RADIUS = C.DRONE_RADIUS;
+const POLICY_DT = C.POLICY_DT;
 
 /**
  * What a robot actually has: its own pose, its lidar, and the maps it built
@@ -87,6 +89,12 @@ export interface SensorPlannerOptions {
    * teammate has claimed cost more). Must be zero or positive.
    */
   penalty?: CandidatePenalty;
+  /**
+   * Quad-aware trajectory tracking (sim/tracker.ts): a speed profile from the
+   * corners of the path ahead and an acceleration limit on the command. Off
+   * by default; pass {} for the tuned defaults.
+   */
+  tracker?: TrackerOptions;
 }
 
 /** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
@@ -270,6 +278,11 @@ export class SensorPlanner {
   readonly gainWeight: number;
   /** Swappable so a team can attach its claim map after construction. */
   penalty: CandidatePenalty | null;
+  readonly tracker: ResolvedTracker | null;
+  private readonly shaper = new CommandShaper();
+  private readonly corners: [number, number][] = [];
+  /** The last string-pulled point is the path's end (the goal), not a lookahead cut. */
+  private pulledToEnd = false;
   private n = 0;
   private dist = new Float64Array(0);
   private prev = new Int32Array(0);
@@ -299,6 +312,7 @@ export class SensorPlanner {
     this.gain = opts.gain ?? null;
     this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
     this.penalty = opts.penalty ?? null;
+    this.tracker = opts.tracker ? resolveTracker(opts.tracker) : null;
   }
 
   reset(): void {
@@ -311,6 +325,7 @@ export class SensorPlanner {
     this.noProgress = 0;
     this.lastFloor = -1;
     this.idle = 0;
+    this.shaper.reset();
   }
 
   /** Goals dropped for lack of progress (diagnostics). */
@@ -609,15 +624,91 @@ export class SensorPlanner {
     const ex = tx - f.pos[0];
     const ey = ty - f.pos[1];
     const el = Math.hypot(ex, ey);
-    const sp = this.speed;
+    const tr = this.tracker;
+    let sp = this.speed;
+    if (tr && el > 1e-6) {
+      sp = profileSpeed(f.pos[0], f.pos[1], this.stringPull(f, base, tr.lookahead), sp, tr, this.pulledToEnd);
+      // Lane end: the sweep turns where the run of unflown air ahead stops, so arrive there at turning speed.
+      if (tr.lane) sp = Math.min(sp, approachSpeed(uTurnSpeed(tr, sp), this.laneAhead(f, base, ex / el, ey / el, tr.lookahead), tr));
+    }
     let vx = el > 1e-6 ? (ex / el) * sp : 0;
     let vy = el > 1e-6 ? (ey / el) * sp : 0;
+    if (tr) [vx, vy] = this.shaper.shape(vx, vy, tr.accel, POLICY_DT, f.vel);
+    const sx = vx;
+    const sy = vy;
     [vx, vy] = this.braking
       ? brakingFilter(vx, vy, f.yaw, f.lidar, f.vel, this.braking, this.brakingMargin)
       : filterVelocity(vx, vy, f.yaw, f.lidar, SAFETY_MARGIN, this.horizon);
+    // A cut by the safety filter is where the next ramp starts from.
+    if (tr && (vx !== sx || vy !== sy)) this.shaper.hold(vx, vy);
     let yawRate = 0;
-    if (this.faceTravel && el > 0.2) yawRate = clamp(wrap(Math.atan2(ey, ex) - f.yaw) * 2, -MAX_YAW_RATE, MAX_YAW_RATE);
+    if (this.faceTravel && el > 0.2) {
+      const cap = tr ? Math.min(tr.yawRate, MAX_YAW_RATE) : MAX_YAW_RATE;
+      yawRate = clamp(wrap(Math.atan2(ey, ex) - f.yaw) * 2, -cap, cap);
+    }
     return { vx, vy, vz, yawRate, exploring: true };
+  }
+
+  /**
+   * Meters of unflown, traversable air straight ahead along (ux, uy) before the
+   * first flown or blocked voxel, up to `max`: where the current sweep lane ends.
+   */
+  private laneAhead(f: SensorFrame, base: number, ux: number, uy: number, max: number): number {
+    const stepM = VOXEL * 0.5;
+    let lastK = -1;
+    for (let d = stepM; d <= max; d += stepM) {
+      const x = Math.floor((f.pos[0] + ux * d) / VOXEL);
+      const y = Math.floor((f.pos[1] + uy * d) / VOXEL);
+      if (x < 0 || y < 0 || x >= f.vw || y >= f.vd) return d - stepM;
+      const k = y * f.vw + x;
+      if (k === lastK) continue;
+      lastK = k;
+      if (f.visited[base + k] === 1 && d > VOXEL) return d - stepM;
+      if (!this.traversable(f, base, k)) return d - stepM;
+    }
+    return max;
+  }
+
+  /**
+   * The path ahead as straight legs: from the drone, repeatedly jump to the
+   * farthest path voxel in clear line of sight, up to `lookahead` meters of
+   * path. Returns the leg end points (the last one is the path's end or the
+   * lookahead cut).
+   */
+  private stringPull(f: SensorFrame, base: number, lookahead: number): [number, number][] {
+    const out = this.corners;
+    out.length = 0;
+    this.pulledToEnd = false;
+    const path = this.path;
+    if (!path.length) return out;
+    const vw = f.vw;
+    const px = (k: number) => ((k % vw) + 0.5) * VOXEL;
+    const py = (k: number) => (Math.floor(k / vw) + 0.5) * VOXEL;
+    // Path voxels within the lookahead, by path length from the first one.
+    let last = 0;
+    let along = Math.hypot(px(path[0]!) - f.pos[0], py(path[0]!) - f.pos[1]);
+    while (last + 1 < path.length && along < lookahead) {
+      along += Math.hypot(px(path[last + 1]!) - px(path[last]!), py(path[last + 1]!) - py(path[last]!));
+      last += 1;
+    }
+    let ax = f.pos[0];
+    let ay = f.pos[1];
+    let i = -1;
+    while (i < last && out.length < 8) {
+      let j = i + 1;
+      for (let c = last; c > i + 1; c--) {
+        if (this.lineClear(f, base, ax, ay, px(path[c]!), py(path[c]!))) {
+          j = c;
+          break;
+        }
+      }
+      ax = px(path[j]!);
+      ay = py(path[j]!);
+      out.push([ax, ay]);
+      i = j;
+    }
+    this.pulledToEnd = last === path.length - 1;
+    return out;
   }
 }
 
