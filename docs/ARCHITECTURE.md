@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (234 files, 44,661 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (240 files, 46,025 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -85,6 +85,7 @@ flowchart LR
   mission["mission"]
   perception["perception"]
   plans["plans"]
+  px4["px4"]
   rl["rl"]
   shared["shared"]
   sim["sim"]
@@ -130,6 +131,9 @@ flowchart LR
   plans -->|2| gen
   plans -->|3| shared
   plans -->|2| sim
+  px4 -->|8| mission
+  px4 -->|4| world_outdoor
+  px4 -->|2| world_outdoor_viz
   rl -->|1| eval
   rl -->|2| gen
   rl -->|18| shared
@@ -190,9 +194,10 @@ flowchart LR
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
 | `src/landing` | 1 | 152 | `film` | — | — |
-| `src/mission` | 57 | 13,601 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 57 | 13,702 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
+| `src/px4` | 6 | 1,263 | `mission`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
 | `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 579 | — | — | — |
 | `src/sim` | 23 | 4,885 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
@@ -232,6 +237,7 @@ Each page is its own Vite entry. The production build also loads `coi-servicewor
 | `index.html` | `src/landing/main.ts` | `landing` |
 | `mission.html` | `src/ui/mission/main.ts` | `ui/mission` |
 | `outdoor.html` | `src/world/outdoor/viz/page.ts` | `world/outdoor/viz` |
+| `px4.html` | `src/px4/page.ts` | `px4` |
 | `race.html` | `src/ui/race/main.ts` | `ui` |
 | `sim.html` | `src/main.ts` | `app` |
 | `team.html` | `src/ui/team/main.ts` | `ui` |

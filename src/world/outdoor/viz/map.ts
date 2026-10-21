@@ -135,7 +135,7 @@ function paintMapLayer(
   return layer;
 }
 
-function mapProject(world: OutdoorWorld, cssWidth: number, cssHeight: number): {
+export function mapProject(world: OutdoorWorld, cssWidth: number, cssHeight: number): {
   scale: number;
   toX: (x: number) => number;
   toY: (y: number) => number;

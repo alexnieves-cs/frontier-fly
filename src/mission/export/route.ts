@@ -1,8 +1,9 @@
 import type { MissionWorld, V3 } from '../autonomy/contracts';
 import { cruiseAglFor, planCoverage, type CoveragePlan } from '../autonomy/planner/coverage';
 import { sampleHeight } from '../../world/outdoor/terrain';
-import { planPath } from '../path';
-import type { Mission } from '../types';
+import { isOperable, planPath } from '../path';
+import { distToSegment } from '../polygon';
+import type { Mission, Point } from '../types';
 
 /**
  * The flight an export describes, before any file format: ordered legs of
@@ -201,12 +202,112 @@ export function routeFromCoverage(
   });
 }
 
+/**
+ * How far an exported waypoint stays from a fence edge, meters. The editor's
+ * preview runs its lanes edge to edge, but an autopilot checks every waypoint
+ * against the uploaded fence before it accepts a mission (PX4 refuses one on
+ * the line), and a multicopter rounds a corner a meter or two wide.
+ */
+export const FENCE_CLEARANCE_M = 2;
+
+function fenceRings(mission: Mission): (readonly Point[])[] {
+  return [mission.geofence.points, ...mission.noFlyZones.map((z) => z.polygon.points)];
+}
+
+function fenceDistance(p: Point, mission: Mission): number {
+  let best = Infinity;
+  for (const ring of fenceRings(mission)) {
+    for (let i = 0; i < ring.length; i++) best = Math.min(best, distToSegment(p, ring[i]!, ring[(i + 1) % ring.length]!));
+  }
+  return best;
+}
+
+/** Closest point on any fence edge, and that edge's unit normal. */
+function nearestFenceEdge(p: Point, mission: Mission): { q: Point; n: Point; d: number } {
+  let best = { q: p, n: { x: 0, y: 1 }, d: Infinity };
+  for (const ring of fenceRings(mission)) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]!;
+      const b = ring[(i + 1) % ring.length]!;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const ll = dx * dx + dy * dy;
+      if (ll === 0) continue;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / ll));
+      const q = { x: a.x + t * dx, y: a.y + t * dy };
+      const d = Math.hypot(p.x - q.x, p.y - q.y);
+      if (d < best.d) best = { q, n: { x: -dy / Math.sqrt(ll), y: dx / Math.sqrt(ll) }, d };
+    }
+  }
+  return best;
+}
+
+/**
+ * Moves any waypoint closer than `clearance` to a fence edge straight away
+ * from that edge, onto the operable side (the editor's detours run along
+ * no-fly zone edges). A few passes settle points near two edges, such as a
+ * zone's corner.
+ */
+export function clearFences(waypoints: V3[], mission: Mission, clearance: number): V3[] {
+  return waypoints.map((w) => {
+    let p: Point = { x: w[0], y: w[1] };
+    for (let pass = 0; pass < 8; pass++) {
+      const { q, n, d } = nearestFenceEdge(p, mission);
+      if (d >= clearance - 1e-9) break;
+      let away = d > 1e-6 ? { x: (p.x - q.x) / d, y: (p.y - q.y) / d } : n;
+      if (!isOperable({ x: p.x + away.x * 0.05, y: p.y + away.y * 0.05 }, mission)) away = { x: -away.x, y: -away.y };
+      // A centimeter extra survives the rounding below.
+      p = { x: q.x + away.x * (clearance + 0.01), y: q.y + away.y * (clearance + 0.01) };
+    }
+    return [Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, w[2]];
+  });
+}
+
+/**
+ * Pulls the ends of each east-west lane in along the lane until they clear
+ * every fence edge by `clearance`, never past the lane's middle. The hops
+ * between lanes move with the ends they join.
+ */
+export function insetLaneEnds(waypoints: V3[], mission: Mission, clearance: number): V3[] {
+  const out = waypoints.map((w) => [...w] as V3);
+  for (let i = 1; i < out.length; i++) {
+    const a = out[i - 1]!;
+    const b = out[i]!;
+    if (Math.abs(a[1] - b[1]) > 1e-6) continue;
+    const len = Math.abs(b[0] - a[0]);
+    if (len < 1e-6) continue;
+    const dir = Math.sign(b[0] - a[0]);
+    for (const [end, sign] of [
+      [a, 1],
+      [b, -1],
+    ] as const) {
+      const x0 = end[0];
+      for (let moved = 0; moved <= len / 2; moved += 0.1) {
+        const x = x0 + sign * dir * moved;
+        if (fenceDistance({ x, y: end[1] }, mission) >= clearance) {
+          end[0] = Math.round(x * 100) / 100;
+          break;
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /** The editor's flat-site sweep preview (planPath) at cruise height. Used for the mock practice site, which has no terrain. */
 export function routeFromPreview(mission: Mission, options: SimplifyOptions = {}): MissionRoute {
   const agl = cruiseAglFor(mission);
   const path = planPath(mission);
   // planPath starts at the start pose; the takeoff item covers that point.
-  const waypoints: V3[] = path.slice(1).map((p) => [p.x, p.y, agl]);
+  const waypoints: V3[] = clearFences(
+    insetLaneEnds(
+      path.slice(1).map((p) => [p.x, p.y, agl]),
+      mission,
+      FENCE_CLEARANCE_M,
+    ),
+    mission,
+    FENCE_CLEARANCE_M,
+  );
   const home: RoutePoint = { x: mission.startPose.x, y: mission.startPose.y, z: 0, groundZ: 0 };
   // Preview lanes are the east-west runs; the hops between them are connectors.
   const lanes: { y: number; x0: number; x1: number }[] = [];

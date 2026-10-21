@@ -52,6 +52,7 @@ export default defineConfig({
         film: resolve(root, 'film.html'),
         race: resolve(root, 'race.html'),
         team: resolve(root, 'team.html'),
+        px4: resolve(root, 'px4.html'),
       },
     },
   },

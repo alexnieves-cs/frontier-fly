@@ -14,7 +14,9 @@ import { GEO_ORIGINS, haversineM, localFrame } from '../../src/mission/export/ge
 import { importQgcPlan, planStructureIssues } from '../../src/mission/export/importPlan';
 import { MAV_CMD, MAV_CMD_NAMES, MAV_FRAME } from '../../src/mission/export/mavlink';
 import planSchema from '../../src/mission/export/qgc-plan.schema.json';
+import { distToSegment } from '../../src/mission/polygon';
 import {
+  FENCE_CLEARANCE_M,
   routeFromCoverage,
   routeFromPreview,
   routeFromWaypoints,
@@ -185,6 +187,18 @@ describe('route', () => {
       }
       // Simplification never cuts a corner through a no-fly zone.
       expect(pathIsOperable(c.mission, pts)).toBe(true);
+    });
+
+    it(`${c.name}: every waypoint clears every fence edge, so an autopilot accepts the upload`, () => {
+      // PX4 refuses a mission with a waypoint on the fence line (found by the SITL flight check).
+      const rings = [c.mission.geofence.points, ...c.mission.noFlyZones.map((z) => z.polygon.points)];
+      let worst = Infinity;
+      for (const p of allPoints(c.route)) {
+        for (const ring of rings) {
+          for (let i = 0; i < ring.length; i++) worst = Math.min(worst, distToSegment(p, ring[i]!, ring[(i + 1) % ring.length]!));
+        }
+      }
+      expect(worst).toBeGreaterThanOrEqual(c.route.source === 'preview' ? FENCE_CLEARANCE_M - 1e-6 : 1);
     });
   }
 });

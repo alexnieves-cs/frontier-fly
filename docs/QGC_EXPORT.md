@@ -16,7 +16,7 @@ Open **Export to QGroundControl** at the bottom of the right panel. While it is 
 | Geofence | An inclusion fence polygon |
 | No-fly zones | One exclusion fence polygon each |
 
-On the generated woods (the default page) the waypoints come from the autonomy stack's own coverage planner, `planCoverage` in `src/mission/autonomy/planner/coverage.ts`: east-west lanes spaced from the camera footprint, connectors routed around no-fly zones, and heights that follow the terrain. On the flat practice site (`?site=mock`) they come from the editor's sweep preview. Densely sampled stretches are thinned with a 3D Douglas-Peucker pass (0.5 m tolerance), so a straight lane is two waypoints instead of a dozen.
+On the generated woods (the default page) the waypoints come from the autonomy stack's own coverage planner, `planCoverage` in `src/mission/autonomy/planner/coverage.ts`: east-west lanes spaced from the camera footprint, connectors routed around no-fly zones, and heights that follow the terrain. On the flat practice site (`?site=mock`) they come from the editor's sweep preview, with every waypoint pulled at least 2 m inside the fence: the preview runs its lanes edge to edge, and PX4 refuses a waypoint on the fence line. Densely sampled stretches are thinned with a 3D Douglas-Peucker pass (0.5 m tolerance), so a straight lane is two waypoints instead of a dozen.
 
 ### What is not in the file
 
@@ -55,6 +55,8 @@ With a SITL preset, the plan opens right next to the simulated vehicle.
 2. In the mission editor, open **Export to QGroundControl**, keep **PX4**, **PX4 SITL home** and **.plan**, and press **Download**.
 3. In QGroundControl, go to **Plan**, then **File > Open**, pick the file, and **Upload**. The fence and the mission upload together.
 4. Arm and start the mission from the Fly view.
+
+CI does this on every push without QGroundControl: PX4 SITL flies each exported plan and a script checks the flight against it. PX4 can also fly frontier-fly's own physics in the browser. See [PX4.md](PX4.md).
 
 For ArduPilot, pick **ArduPilot** and **ArduPilot SITL home**, run `sim_vehicle.py -v ArduCopter`, and load either the `.plan` in QGroundControl or the `.waypoints` file in Mission Planner or MAVProxy (`wp load file.waypoints`).
 

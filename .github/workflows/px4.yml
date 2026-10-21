@@ -1,0 +1,157 @@
+name: px4
+
+# PX4 software-in-the-loop flight check. Informational, like ci.yml: a failure
+# here does not gate merges or publish anything.
+#
+# 1. Build PX4 v1.15.4 SITL once (cached by version).
+# 2. Export the mission editor's .plan files and fly each one on a fresh PX4:
+#    - sih:     PX4's own built-in simulator flies the vehicle,
+#    - bridge:  frontier-fly's motor-level physics is PX4's simulator, headless,
+#    - browser: the px4.html page in Chromium is PX4's simulator, through
+#               the WebSocket bridge.
+# 3. Check each flight against its plan (scripts/px4/flight_check.py).
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: px4-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PX4_VERSION: v1.15.4
+  PX4_BUILD: ${{ github.workspace }}/px4-sitl
+
+jobs:
+  build-px4:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/cache@v4
+        id: px4
+        with:
+          path: px4-sitl.tar.gz
+          key: px4-sitl-${{ env.PX4_VERSION }}-ubuntu-24.04-v1
+      - if: steps.px4.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build PX4 SITL
+        if: steps.px4.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ninja-build cmake build-essential
+          # PX4 1.15's code generators need empy 3 (empy 4 changed its API).
+          pip install -q empy==3.3.4 jinja2 pyyaml jsonschema kconfiglib pyros-genmsg packaging future
+          git clone -q --depth 1 --branch "$PX4_VERSION" https://github.com/PX4/PX4-Autopilot.git px4
+          cd px4
+          # SITL needs neither NuttX nor the other simulators' sources.
+          git -c submodule.recurse=false submodule update --init --recursive --depth 1 --jobs 8 -- \
+            $(git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}' \
+              | grep -v -e '^platforms/nuttx' -e '^Tools/simulation')
+          make px4_sitl_default
+          tar -C build/px4_sitl_default -czf "$GITHUB_WORKSPACE/px4-sitl.tar.gz" bin etc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: px4-sitl
+          path: px4-sitl.tar.gz
+          retention-days: 3
+
+  flight-check:
+    needs: build-px4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # At 4x on a CI runner, PX4 sometimes raised a failsafe that the flight did not
+          # cause (once a stale battery simulator, once right after takeoff); 2x has not.
+          - sim: sih
+            speed: 2
+          - sim: bridge
+            speed: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: pip install -q pymavlink
+      - uses: actions/download-artifact@v4
+        with:
+          name: px4-sitl
+      - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
+      # PX4 runs its work queues as real-time threads when it may. Without that, the queue
+      # with the simulated baro, compass and battery can stall for seconds after arming, and
+      # PX4 fails safe. Root (as in the cloud container) has it; the runner user does not.
+      - run: sudo setcap cap_sys_nice+ep "$PX4_BUILD/bin/px4"
+      - run: npx vite-node scripts/px4/export-plans.ts -- --set full --out test-results/px4/plans
+      - name: Fly every plan (${{ matrix.sim }})
+        env:
+          PX4_SIM_SPEED_FACTOR: ${{ matrix.speed }}
+        run: scripts/px4/run-check.sh test-results/px4/plans test-results/px4/${{ matrix.sim }} ${{ matrix.sim }}
+      - if: always()
+        run: npx vite-node scripts/px4/report.ts -- --${{ matrix.sim }} test-results/px4/${{ matrix.sim }} --summary "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: px4-${{ matrix.sim }}
+          path: test-results/px4
+          retention-days: 14
+
+  browser:
+    needs: build-px4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: '1'
+      PX4_SIM_SPEED_FACTOR: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: pip install -q pymavlink
+      - uses: actions/cache@v4
+        id: playwright
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install-deps chromium
+      - if: steps.playwright.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: px4-sitl
+      - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
+      # PX4 runs its work queues as real-time threads when it may. Without that, the queue
+      # with the simulated baro, compass and battery can stall for seconds after arming, and
+      # PX4 fails safe. Root (as in the cloud container) has it; the runner user does not.
+      - run: sudo setcap cap_sys_nice+ep "$PX4_BUILD/bin/px4"
+      - run: npx vite-node scripts/px4/export-plans.ts -- --out test-results/px4/plans
+      - name: PX4 flies the page in Chromium
+        run: scripts/px4/run-browser-check.sh test-results/px4/plans/woods-4242-rtl.plan test-results/px4/browser
+      - if: always()
+        run: npx vite-node scripts/px4/report.ts -- --browser test-results/px4/browser --summary "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: px4-browser
+          path: test-results/px4
+          retention-days: 14
