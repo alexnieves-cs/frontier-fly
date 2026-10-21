@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseCheckpoint } from '../../src/rl/checkpoint';
+import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { OBS_DIM } from '../../src/shared/constants';
 import { RNG } from '../../src/shared/rng';
@@ -11,7 +11,7 @@ import { matchesStudy, studyEpisode } from '../../src/ui/race/study';
 import { CONDITIONS } from '../../scripts/study/coverage-study';
 
 function shippedPolicy() {
-  const ck = parseCheckpoint(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+  const ck = parseCheckpoint(readFileSync(SHIPPED_CHECKPOINT_PATH));
   const policy = new InferPolicy(ck.obsDim, ck.actDim, ck.hidden, 1);
   policy.setWeights(ck.weights.map((row) => Float32Array.from(row).buffer));
   return policy;

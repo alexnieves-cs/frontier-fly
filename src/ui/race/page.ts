@@ -1,3 +1,4 @@
+import { SHIPPED_CHECKPOINT_URL } from '../../rl/checkpoint';
 import { POLICY_DT } from '../../shared/constants';
 import type { BuildingSpec } from '../../shared/types';
 import type { LightingPreset } from '../../sim/lighting';
@@ -247,7 +248,7 @@ class RacePage {
     this.bind();
     this.syncControls();
     this.publish('loading');
-    this.send({ type: 'init', checkpointUrl: new URL('checkpoints/pretrained.json', location.href).href });
+    this.send({ type: 'init', checkpointUrl: new URL(SHIPPED_CHECKPOINT_URL, location.href).href });
     requestAnimationFrame(this.draw);
   }
 

@@ -49,7 +49,7 @@ async function init(url: string): Promise<void> {
   try {
     const response = await fetch(url);
     if (!response.ok) throw new Error(`checkpoint HTTP ${response.status}`);
-    const checkpoint = parseCheckpoint(await response.text());
+    const checkpoint = parseCheckpoint(await response.arrayBuffer());
     const mismatch = checkpointMismatch(checkpoint);
     if (mismatch) throw new Error(mismatch);
     net = policyFromCheckpoint(checkpoint);
