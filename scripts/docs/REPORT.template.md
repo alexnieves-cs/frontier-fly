@@ -14,6 +14,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **A rendered camera and a learned detector can fly the same missions.** The drone now renders what its camera sees and a small network, trained here on CC0 people and procedural objects, finds targets in the pixels. On {{R_V_PAIRS}} fresh paired flights it meets the expected outcome in {{R_V_VISION}} of them against {{R_V_ANALYTIC}} for the analytic detector, with no false alarms or false clears. The gap is all at night: under the flashlight alone it confirms the backpack in {{R_V_NIGHT_VISION}} of flights against {{R_V_NIGHT_ANALYTIC}}.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² {{R_MP_R2}} against {{R_MP_BASE_R2}}). Ranking frontiers by it leaves coverage unchanged ({{R_PRED_HARD}} against {{R_PLANNER_HARD}} on hard buildings), and so does the true hidden gain ({{R_ORACLEGAIN_HARD}}). In this environment coverage is limited by flight time, not by which frontier comes next.
 - **A team of drones is the lever coverage was waiting for.** On {{R_TEAM_SEEDS}} fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches {{R_TEAM_SOLO_LARGE}}, three search {{R_TEAM_THREE_LARGE}} and four {{R_TEAM_FOUR_LARGE}}, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median {{R_TEAM_THREE_HARD_EIGHTY}}; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
+- **The drone can estimate its own pose indoors.** An estimator that matches each lidar sweep against a map it builds itself, fused with the gyro and a downward optical-flow sensor, drifts {{R_LOC_DRIFT}} by day and {{R_LOC_DRIFT_NIGHT}} at night from its own map over about 200 m of flight in fresh hard buildings, and was 0.5 m off at some point in {{R_LOC_OVER}} flights. Dead reckoning on the same sensors drifts {{R_LOC_ODO}}. Displaced mid-flight, it noticed and re-acquired in {{R_LOC_KIDNAP}} flights. Flown closed loop, with every indoor map, path and command on the estimate instead of the simulator's pose, whole missions meet the expected outcome in {{R_ML_SENSOR}} of flights for the planner (vs {{R_ML_SENSOR_TRUTH}} on the true pose) and {{R_ML_POLICY}} for the policy (vs {{R_ML_POLICY_TRUTH}}), with the estimate {{R_ML_MAP}} from the drone's own map; daytime missions are unaffected and most of the gap is the night search.
 
 ## Setup
 
@@ -30,6 +31,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 | Sensor-only planner (`src/sim/sensorPlanner.ts`) | Its lidar, its seen and flown voxels, lidar occupancy evidence | No |
 | Mission indoor explorer (`SensorExplorer`) | The above, plus up and down range finders (shafts) and its own estimate of what the camera has looked at | No |
 | Oracle mission planner (`indoor: 'oracle'`) | True floor plan | Yes. Reference only. |
+| Pose estimator (`src/loc`) | Gyro, accelerometer, optical flow, barometer, down range finder and a 90-beam 2D lidar, all with noise; the entry pose with a 10 cm, 1.7° error | No. In the estimated-pose mission arms, every indoor map, path, shield check and command runs on its output; the fly-through in and out, outdoor flight and detection placement still use the true pose. |
 | Confirm-clear (`clearStatus`) | Ground-truth cells the camera saw | Partly. It decides whether a building may be declared clear and whether a safety sweep flies a second pass, so it tells the drone one thing per building: whether its look was complete. It never routes the drone. |
 
 ## Methods
@@ -49,6 +51,8 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 **Lidar guard for the policy.** The policy's action goes through the same velocity filter with a tighter margin, and its altitude is pulled to 1.15 m above the floor. The guard does not descend while a wall is within 0.6 m, because a sill under the lidar ring is invisible to it.
 
 **Mission explorer.** Per floor: *sweep* (the planner), then *look* (fly to the viewpoint that shows the most voxels the camera has not looked at, per metre of travel, and turn a full circle), then take a shaft that the up or down range finder found to a floor not yet searched, and finally return to the entry floor. At night the look estimate models the flashlight cone around the tilted camera, so the floor right under the drone does not count as looked at. The policy can fly the sweep instead; on a stall or collision it hands over to the planner, which always does the look phase.
+
+**Pose estimation** (`src/loc`). An extended Kalman filter over position, heading and gyro bias. Between sweeps it integrates the gyro and a body-velocity filter (the accelerometer predicts, the optical-flow sensor corrects; in the dark the flow sensor drops most samples). Each 10 Hz lidar sweep is matched by Gauss-Newton against the estimator's own occupancy map, point to line: every occupied cell keeps the mean of the returns that hit it, and its wall direction comes from its neighbours, so walls sit where the lidar saw them rather than at cell centres. The odometry prior enters the match as a Mahalanobis term. Three details carry most of the accuracy. A *Manhattan heading fix* reads the building's wall directions in each sweep: walls run along the axes the drone measured from outside, so the dominant wall direction measures heading modulo 90° and removes both the entry heading error and gyro drift. *Degenerate directions* (the axis of a bare corridor) get neither a correction nor information from the sweep (Zhang, Kaess and Singh, 2016), so slight tilts in the map's wall normals can't drag the pose along the wall. When sweeps keep contradicting the map (returns landing in space it knows is free), a *correlative search* over a widening window re-acquires. The estimator reports its own health: position sigma against the building and against its map, and tracking, degraded or lost.
 
 **Confirmation.** A contact is confirmed from at least three bearings whose best confidences average above the mission threshold. Indoors on a young map, re-views wait until the map offers enough bearings, plan one spare bearing, narrow the spacing for a target in a corner, skip bearings that added nothing, re-view the weakest bearing first, and hold longer in the dark.
 
@@ -101,6 +105,38 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 {{SPEED_TABLE}}
 
 {{SPEED_FIGURE}}
+
+### Indoor localization
+
+{{LOC_NOTE}}
+
+{{LOC_HEADLINE}}
+
+The shipped estimator's error against the building ({{R_LOC_ABS}} on average) is mostly the entry offset, which no amount of matching against its own map can remove; its drift against that map is about 5 cm. Without the lidar the same sensors drift {{R_LOC_ODO}} by day and at night, mostly from gyro bias ({{R_LOC_ODO_YAW}} of heading error on average). Matching sweeps without the IMU and flow drifts {{R_LOC_SCAN}} and occasionally loses the building outright. The 32-beam ring the policy reads is too sparse: {{R_LOC_SPARSE}} of drift, with {{R_LOC_SPARSE_OVER}} flights at some point 0.5 m off. The seen-free map the explorers plan on agrees {{R_LOC_IOU}} with the one painted from the true pose. The filter's own 95% ellipse held the true map-relative error {{R_LOC_HONEST}} of the time. The shipped estimator called itself lost while still accurate in {{R_LOC_FALSE_LOST}} of {{R_LOC_FLIGHTS}} flights.
+
+**Kidnapped drone.** Halfway through each flight the estimate is moved 1 m and 15° without telling the filter, as a collision spin might. It re-acquired in {{R_LOC_KIDNAP}} flights, in {{R_LOC_KIDNAP_SEC}} on average:
+
+{{LOC_KIDNAP}}
+
+<details>
+<summary>Every condition and estimator</summary>
+
+{{LOC_TABLE}}
+
+</details>
+
+**Closed loop, in missions.** The `Loc` arms of the mission bench fly each explorer indoors on this estimate. The estimator starts at the doorway from the pose the fly-through ends at, plus a 10 cm and 1.7° error drawn per visit. From there the drone's lidar paints its maps where the estimate says it is, the planners and the shield read the estimate, and each velocity and heading command turns by the heading error on its way to the airframe, as a flight controller holding the estimated heading would fly it. When the estimate reports itself lost, the drone hovers so the matcher can re-acquire, and lands where it is after 20 s. Over {{R_ML_FLIGHTS}} flights, {{R_ML_INDOOR}} of which entered a building:
+
+{{MISSION_LOC_TABLE}}
+
+Daytime missions are unchanged: the cabin search succeeds in every world on either pose. The estimate costs {{R_ML_GAP}} points of expected outcome overall, and the Wilson intervals overlap. Most of it is the night search ({{R_ML_NIGHT}} on the estimate vs {{R_ML_NIGHT_TRUTH}} on the true pose), where the flashlight cone leaves little margin for a re-view placed 15–20 cm off; on 30 other night worlds (9117–9146) the sensor planner found the backpack in 28 on either pose, so part of the gap may be these worlds. The rest is compound sweeps that ended aborted: the estimate went lost, the drone hovered for 20 s without re-acquiring, and landed where it was. {{R_ML_COLL}} estimated-pose flights touched anything (vs {{R_ML_COLL_TRUTH}} for the same explorers on the true pose). The worst error in any flight was {{R_ML_WORST}}; {{R_ML_OVER}} flights were ever 0.5 m off, and {{R_ML_LOST}} called the pose lost at some point.
+
+Closing the loop found faults that replaying logged flights could not, all fixed on the mission tuning worlds (9101–9116) or by construction:
+
+- **Walls first seen edge-on read as contradictions.** A free ray grazing along a wall marks the cells beside it free; a later return from that wall, a few cm off, lands in one of those cells, and the estimator rejected whole sweeps as inconsistent with its map. A return now contradicts the map only where the cell and all its neighbours have been seen: free space next to unseen space is where new surfaces appear. On the first mission tried, matched sweeps went from 78% to all but one.
+- **Shaft climbs relied on the voxel grid lining up with the building.** The explorer climbed or descended at the centre of the voxels where the range finder saw through to the next floor. On the true pose those 0.5 m voxels align with the 1 m building cells, so a voxel that saw through lies inside the shaft. Offset by the entry error they don't, and a drone 9 cm from the slab edge clipped it. Before a climb the drone now finds the hole's edges with the range finder itself, flying slowly along each building axis until the reading closes, and centres between them. This changes the true-pose arms too.
+- **Detections were placed with the true pose.** The camera model places a contact from the true pose, while the drone planned its re-views in the estimate's frame, so night re-views aimed 15–25 cm off the target. Contacts are now re-placed with the estimate. This fix came after a first full bench run, which it changed only in the estimated-pose arms (sensor planner at night: 73% to 80%); the bench above is the second run.
+- **A gyro read once per tick misses the turn.** The quadrotor's body rate sampled at the end of each 50 ms tick differs from its mean over the tick while the heading controller is turning, and the estimator, trusting it, drifted 15° in heading on quadrotor flights. A real IMU is read far faster than the control loop and its rate is integrated over the tick; the localizer now feeds the tick's heading change, and the quadrotor's heading error dropped to under 1°.
 
 ### Ablations
 
@@ -268,6 +304,9 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **The camera is a renderer, not a photograph.** People are one low-poly mannequin in ten poses with a coloured shirt, objects are boxes with a few details, and the detector trains and tests on the same renderer. Its scores say nothing about real images. Range comes from a perfect depth image plus 3% noise, and which space counts as looked at is still estimated geometrically, not from the detector.
 - **Phones are not found.** The detector's AP for phones is near zero; at 160×120 a phone is a few pixels. No mission asks for one.
+- **Localization is closed loop only inside buildings.** In the estimated-pose arms the drone starts each visit from the doorway with a 10 cm, 1.7° pose error and flies the visit on its estimate, but the fly-through in and out still servoes on the true pose (standing in for tracking the opening it can see), outdoor flight uses the true pose (standing in for GNSS), and the perception source places detections with the true pose. Each would add error the bench does not count.
+- **The coverage study's policy and planner never fly on the estimate.** Only the mission bench does; the coverage numbers above are on the true pose.
+- **The localization sensors are idealized in places.** Each lidar sweep is instantaneous (no motion distortion), the flow sensor's errors are white plus a per-flight scale error, walls are perfectly flat and axis-aligned (which the Manhattan heading fix relies on), and nothing in the building moves. There is no loop closure: drift that enters the map stays in it.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -288,6 +327,8 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | Training and checking the camera detector | Frames from worlds 66001–66400 (training), 66501–66560 (checkpoint and calibration), 67001–67060 (reported) |
 | Tuning camera contacts | Mission worlds 66601–66616 |
 | Camera mission bench (reported) | 67101–67130 |
+| Tuning the pose estimator | Coverage buildings 7001–7012 (stage 3), mission worlds 9101–9116 for the closed-loop fixes |
+| Localization study (reported) | 60001+ (hard) and 62001+ (easy), 30 each |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -295,13 +336,14 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 ```bash
 npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
-npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
+npm run study:missions   # docs/mission-bench.json: each indoor explorer, airframe and pose source, 30 fresh worlds per scenario
 npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
 npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 npm install --no-save @tensorflow/tfjs-node@4.22.0   # native TF.js for the camera scripts
 npm run study:vision     # docs/vision-bench.json: missions with the camera and the learned detector
 # Camera detector: scripts/vision/make-dataset.ts, train-detector.ts and eval-detector.ts (see their headers)
+npm run study:loc        # docs/localization.json: pose estimator arms over 120 fresh flights
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README

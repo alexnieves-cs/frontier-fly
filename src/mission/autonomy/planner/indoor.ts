@@ -493,6 +493,15 @@ export class IndoorSensing implements SensorGrid {
   /** Voxels where the up (down) range finder saw past the ceiling (floor): a shaft to the next floor. */
   readonly shaftUp: Uint8Array;
   readonly shaftDown: Uint8Array;
+  /**
+   * Per shaft voxel: summed x, y and count of the positions the range finder
+   * saw through from. Their mean is inside the hole whatever the voxel grid's
+   * alignment to the building, which a voxel centre is not.
+   */
+  private readonly shaftObsUp: Float64Array;
+  private readonly shaftObsDown: Float64Array;
+  /** Shaft voxels the drone tried and could not fly through; never marked again. */
+  private readonly shaftRejected: Uint8Array;
   /** Camera half-angle and range the look estimate trusts; set from the lighting the drone knows. */
   lookHalf = SEE_HALF_FOV;
   lookRange = LOOK_RANGE;
@@ -554,6 +563,9 @@ export class IndoorSensing implements SensorGrid {
     this.looked = new Uint8Array(grid.floors * this.vw * this.vd);
     this.shaftUp = new Uint8Array(grid.floors * this.vw * this.vd);
     this.shaftDown = new Uint8Array(grid.floors * this.vw * this.vd);
+    this.shaftObsUp = new Float64Array(grid.floors * this.vw * this.vd * 3);
+    this.shaftRejected = new Uint8Array(grid.floors * this.vw * this.vd);
+    this.shaftObsDown = new Float64Array(grid.floors * this.vw * this.vd * 3);
     this.rng = new RNG(seed >>> 0, 'indoor-policy');
     this.noise = new SensorNoise(zeroNoise(), this.rng.fork('noise'));
     this.seenMap.reset(grid.spec);
@@ -621,10 +633,21 @@ export class IndoorSensing implements SensorGrid {
     const zf = local[2] - f * this.grid.H;
     const vx = Math.floor(local[0] / VOXEL);
     const vy = Math.floor(local[1] / VOXEL);
-    if (vx >= 0 && vy >= 0 && vx < this.vw && vy < this.vd) {
+    if (vx >= 0 && vy >= 0 && vx < this.vw && vy < this.vd && !this.shaftRejected[f * this.vw * this.vd + vy * this.vw + vx]) {
       const k = f * this.vw * this.vd + vy * this.vw + vx;
-      if (f < this.grid.floors - 1 && this.obs[OBS.ceil]! * FLOOR_HEIGHT > this.grid.H - zf + 0.8) this.shaftUp[k] = 1;
-      if (f > 0 && this.obs[OBS.alt]! * FLOOR_HEIGHT > zf + 0.8) this.shaftDown[k] = 1;
+      const note = (obs: Float64Array) => {
+        obs[k * 3] += local[0];
+        obs[k * 3 + 1] += local[1];
+        obs[k * 3 + 2] += 1;
+      };
+      if (f < this.grid.floors - 1 && this.seesThrough('up', zf)) {
+        this.shaftUp[k] = 1;
+        note(this.shaftObsUp);
+      }
+      if (f > 0 && this.seesThrough('down', zf)) {
+        this.shaftDown[k] = 1;
+        note(this.shaftObsDown);
+      }
     }
     return this.obs;
   }
@@ -664,13 +687,34 @@ export class IndoorSensing implements SensorGrid {
     return fresh;
   }
 
+  /** Drop the shaft voxels within a metre of `at` on `floor`: the drone tried them and could not get through. */
+  forgetShaft(floor: number, dir: 'up' | 'down', at: [number, number]): void {
+    const map = dir === 'up' ? this.shaftUp : this.shaftDown;
+    const base = floor * this.vw * this.vd;
+    for (let k = 0; k < this.vw * this.vd; k++) {
+      if (Math.hypot(((k % this.vw) + 0.5) * VOXEL - at[0], (Math.floor(k / this.vw) + 0.5) * VOXEL - at[1]) >= 1) continue;
+      map[base + k] = 0;
+      this.shaftRejected[base + k] = 1;
+    }
+  }
+
+  /**
+   * True when the last reading of the up (down) range finder, taken `zf` above
+   * the current floor, saw well past the ceiling (floor): open air to the next storey.
+   */
+  seesThrough(dir: 'up' | 'down', zf: number): boolean {
+    return dir === 'up' ? this.obs[OBS.ceil]! * FLOOR_HEIGHT > this.grid.H - zf + 0.8 : this.obs[OBS.alt]! * FLOOR_HEIGHT > zf + 0.8;
+  }
+
   /**
    * Centre of the shaft voxels (found by the range finders) nearest `from` on
    * `floor`, leading up or down, or null when none is known. The centre is
-   * the mean of the 8-connected group, so the climb stays inside the column.
+   * the mean of the positions the 8-connected group was seen through from, so
+   * the climb stays inside the column.
    */
   shaftPoint(floor: number, dir: 'up' | 'down', from: V3): [number, number] | null {
     const map = dir === 'up' ? this.shaftUp : this.shaftDown;
+    const obs = dir === 'up' ? this.shaftObsUp : this.shaftObsDown;
     const { vw, vd } = this;
     const base = floor * vw * vd;
     let best = -1;
@@ -688,12 +732,14 @@ export class IndoorSensing implements SensorGrid {
     const seen = new Set(group);
     let sx = 0;
     let sy = 0;
+    let n = 0;
     for (let i = 0; i < group.length; i++) {
       const k = group[i]!;
       const x = k % vw;
       const y = (k - x) / vw;
-      sx += (x + 0.5) * VOXEL;
-      sy += (y + 0.5) * VOXEL;
+      sx += obs[(base + k) * 3]!;
+      sy += obs[(base + k) * 3 + 1]!;
+      n += obs[(base + k) * 3 + 2]!;
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const nx = x + dx;
@@ -707,7 +753,7 @@ export class IndoorSensing implements SensorGrid {
         }
       }
     }
-    return [sx / group.length, sy / group.length];
+    return [sx / n, sy / n];
   }
 
   /** Looked-at voxels over known-free voxels: the drone's own estimate of search coverage. */
@@ -911,6 +957,14 @@ export class SensorExplorer {
   private readonly floorsDone = new Set<number>();
   /** Shaft leg: hover point (local xy) and the floor to reach. */
   private shaft: { x: number; y: number; to: number } | null = null;
+  /** Centring on the shaft before climbing: the axis being probed, its direction, and the edges found. */
+  private centring: { axis: 0 | 1; dir: 1 | -1; open: boolean; from: number; ends: number[]; ticks: number } | null = null;
+  private centred = false;
+  /** Progress watch on the climb: closest the drone has come to the target height, and ticks since. */
+  private climbBest = Infinity;
+  private followBest = Infinity;
+  private followStall = 0;
+  private climbStall = 0;
 
   constructor(
     readonly grid: IndoorGrid,
@@ -990,8 +1044,22 @@ export class SensorExplorer {
     const dx = target[0] - local[0];
     const dy = target[1] - local[1];
     const d = Math.hypot(dx, dy);
+    // A waypoint the shield will not let the drone reach (it hugs a wall the map put a hair too far)
+    // is skipped after a while, as the runner's routed moves do.
+    if (d < this.followBest - 0.03) {
+      this.followBest = d;
+      this.followStall = 0;
+    } else if ((this.followStall += 1) > FOLLOW_STALL_TICKS && this.route.length > 1) {
+      this.route.shift();
+      this.followBest = Infinity;
+      this.followStall = 0;
+      out.cmd = { vel: [0, 0, this.hold(local)], yawRate: 0 };
+      return false;
+    }
     if (d < (this.route.length === 1 ? 0.12 : 0.2)) {
       this.route.shift();
+      this.followBest = Infinity;
+      this.followStall = 0;
       out.cmd = { vel: [0, 0, this.hold(local)], yawRate: 0 };
       return this.route.length === 0;
     }
@@ -1035,6 +1103,10 @@ export class SensorExplorer {
       if (!path) continue;
       this.route = path.map(([x, y]) => [x, y, f * this.grid.H + INDOOR_FLY_Z] as V3);
       this.shaft = { x: at[0], y: at[1], to: g };
+      this.centred = false;
+      this.centring = null;
+      this.climbBest = Infinity;
+      this.climbStall = 0;
       this.phase = 'shaft';
       return this.shaftStep(local, yaw);
     }
@@ -1049,6 +1121,7 @@ export class SensorExplorer {
       this.follow(local, yaw, out);
       return out.cmd!;
     }
+    if (!this.centred) return this.centreStep(local, yaw);
     // In the column: hold xy on the shaft centre and climb or descend to the next floor's flight height.
     const zTarget = shaft.to * this.grid.H + INDOOR_FLY_Z;
     const ez = zTarget - local[2];
@@ -1059,11 +1132,74 @@ export class SensorExplorer {
       if (this.phase === 'look' && shaft.to === this.entryFloor) this.phase = 'done';
       return { vel: [0, 0, 0], yawRate: 0 };
     }
+    // A climb that stops gaining height is not a shaft (open air over a doorway, say): forget it and
+    // pick again. Only before the drone has left its floor; once between floors it keeps going.
+    if (Math.abs(ez) < this.climbBest - 0.02) {
+      this.climbBest = Math.abs(ez);
+      this.climbStall = 0;
+    } else if ((this.climbStall += 1) > CLIMB_STALL_TICKS && Math.abs(ez) > this.grid.H - 0.5) {
+      const f = floorOf(this.grid, local[2]);
+      this.sensing.forgetShaft(f, shaft.to > f ? 'up' : 'down', [shaft.x, shaft.y]);
+      this.shaft = null;
+      this.phase = 'look';
+      return this.floorDone(local, yaw);
+    }
     const vx = clamp((shaft.x - local[0]) * 2, -0.3, 0.3);
     const vy = clamp((shaft.y - local[1]) * 2, -0.3, 0.3);
     return { vel: [vx, vy, clamp(ez * 1.5, -0.5, 0.5)], yawRate: 0 };
   }
+
+  /**
+   * Before a climb or descent, find the hole's edges with the range finder:
+   * fly slowly along each building axis until it stops seeing through, both
+   * ways, and centre between the edges. The shaft point alone is only known
+   * to be somewhere over the hole, possibly at its rim, and the airframe is
+   * wider than a point.
+   */
+  private centreStep(local: V3, yaw: number): PolicyCommand {
+    const shaft = this.shaft!;
+    const f = floorOf(this.grid, local[2]);
+    const open = this.sensing.seesThrough(shaft.to > f ? 'up' : 'down', local[2] - f * this.grid.H);
+    const at = [shaft.x, shaft.y];
+    const c = (this.centring ??= { axis: 0, dir: 1, open: false, from: at[0]!, ends: [], ticks: 0 });
+    const p = local[c.axis]!;
+    c.open ||= open;
+    c.ticks += 1;
+    // An edge: the reading closed after being open, or the probe ran out of room or time (a wall the
+    // shield will not let it approach).
+    if ((c.open && !open) || Math.abs(p - c.from) > CENTRE_PROBE_M || c.ticks > CENTRE_PROBE_TICKS) {
+      c.ends.push(p);
+      c.open = false;
+      c.ticks = 0;
+      if (c.dir === 1) c.dir = -1;
+      else {
+        at[c.axis] = (c.ends[0]! + c.ends[1]!) / 2;
+        shaft.x = at[0]!;
+        shaft.y = at[1]!;
+        if (c.axis === 1) {
+          this.centred = true;
+          this.centring = null;
+          return { vel: [0, 0, this.hold(local)], yawRate: 0 };
+        }
+        this.centring = { axis: 1, dir: 1, open: false, from: at[1]!, ends: [], ticks: 0 };
+      }
+    }
+    const k = this.centring!;
+    const v: [number, number] = [clamp((at[0]! - local[0]) * 2, -0.3, 0.3), clamp((at[1]! - local[1]) * 2, -0.3, 0.3)];
+    v[k.axis] = k.dir * CENTRE_PROBE_SPEED;
+    const [vx, vy] = this.sensing.filter(v[0], v[1], yaw);
+    return { vel: [vx, vy, this.hold(local)], yawRate: 0 };
+  }
 }
+
+/** Speed and reach of the range-finder probe that centres the drone on a shaft, m/s and m. */
+const CENTRE_PROBE_SPEED = 0.3;
+const CENTRE_PROBE_M = 0.9;
+const CENTRE_PROBE_TICKS = 120;
+/** A climb or descent that gains no height for this many ticks gives the shaft up. */
+const CLIMB_STALL_TICKS = 60;
+/** Ticks without progress toward a route waypoint before it is skipped (not the last one). */
+const FOLLOW_STALL_TICKS = 60;
 
 /** Yaw rate for turning in place indoors, rad/s (the vehicle's indoor limit). */
 const MAX_YAW_RATE_INDOOR = Math.PI / 2;

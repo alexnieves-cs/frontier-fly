@@ -116,7 +116,7 @@ function architecture() {
     }),
   );
 
-  const headless = ['gen', 'sim', 'rl', 'shared', 'world/outdoor', 'eval', 'mission', 'perception', 'vision'].filter((m) => modules.has(m));
+  const headless = ['gen', 'sim', 'rl', 'shared', 'world/outdoor', 'eval', 'mission', 'perception', 'vision', 'loc'].filter((m) => modules.has(m));
   const headlessRows = headless.map((m) => {
     const info = modules.get(m);
     const three = info.external.has('Three.js');
@@ -343,6 +343,33 @@ function reportInline(study, bench) {
     out.R_M_NIGHT_SENSOR = pct(m.sensor['backpack-night'].expectedOutcome);
     out.R_M_NIGHT_ORACLE = pct(m.oracle['backpack-night'].expectedOutcome);
     out.R_M_COMPOUND = pct(m.sensor['compound-clear'].expectedOutcome);
+    if (m.sensorLoc?.all.loc) {
+      const all = ['sensorLoc', 'policyLoc', 'sensorQuadLoc'].filter((k) => m[k]?.all.loc);
+      const flights = all.reduce((a, k) => a + m[k].all.flights, 0);
+      out.R_ML_FLIGHTS = String(flights);
+      out.R_ML_SENSOR = pct(m.sensorLoc.all.expectedOutcome);
+      out.R_ML_SENSOR_TRUTH = pct(m.sensor.all.expectedOutcome);
+      out.R_ML_POLICY = m.policyLoc ? pct(m.policyLoc.all.expectedOutcome) : '—';
+      out.R_ML_POLICY_TRUTH = pct(m.policy.all.expectedOutcome);
+      out.R_ML_QUAD = m.sensorQuadLoc ? pct(m.sensorQuadLoc.all.expectedOutcome) : '—';
+      out.R_ML_QUAD_TRUTH = m.sensorQuad ? pct(m.sensorQuad.all.expectedOutcome) : '—';
+      const meanOf = (ks, sc) => ks.reduce((a, k) => a + m[k][sc].expectedOutcome, 0) / ks.length;
+      const truthKs = all.map((k) => k.replace('Loc', '')).filter((k) => m[k]);
+      out.R_ML_GAP = ((meanOf(truthKs, 'all') - meanOf(all, 'all')) * 100).toFixed(0);
+      out.R_ML_NIGHT = pct(meanOf(all, 'backpack-night'));
+      out.R_ML_NIGHT_TRUTH = pct(meanOf(truthKs, 'backpack-night'));
+      out.R_ML_COLL = String(all.reduce((a, k) => a + m[k].all.flightsWithCollision, 0));
+      out.R_ML_COLL_TRUTH = String(all.reduce((a, k) => a + (m[k.replace('Loc', '')]?.all.flightsWithCollision ?? 0), 0));
+      const locs = all.map((k) => m[k].all.loc);
+      const ticksW = all.map((k) => m[k].all.loc.flights);
+      const wmean = (f) => locs.reduce((a, l, i) => a + f(l) * ticksW[i], 0) / ticksW.reduce((a, b) => a + b, 0);
+      out.R_ML_MAP = `${(wmean((l) => l.ateMapRmse) * 100).toFixed(1)} cm`;
+      out.R_ML_ABS = `${(wmean((l) => l.ateRmse) * 100).toFixed(0)} cm`;
+      out.R_ML_WORST = `${(Math.max(...locs.map((l) => l.ateMaxWorst)) * 100).toFixed(0)} cm`;
+      out.R_ML_OVER = String(locs.reduce((a, l) => a + l.flightsOverHalfMeter, 0));
+      out.R_ML_LOST = String(locs.reduce((a, l) => a + l.flightsLost, 0));
+      out.R_ML_INDOOR = String(locs.reduce((a, l) => a + l.flights, 0));
+    }
     if (m.sensorQuad && m.policyQuad) {
       out.R_MQ_SENSOR = pct(m.sensorQuad.all.expectedOutcome);
       out.R_MQ_POLICY = pct(m.policyQuad.all.expectedOutcome);
@@ -497,6 +524,9 @@ function benchmarks() {
       oracle: 'Oracle planner (floor plan)',
       policyQuad: 'Quadrotor: policy, planner fallback',
       sensorQuad: 'Quadrotor: sensor-only planner',
+      policyLoc: 'Estimated pose: policy, planner fallback',
+      sensorLoc: 'Estimated pose: sensor-only planner',
+      sensorQuadLoc: 'Estimated pose, quadrotor: sensor-only planner',
     };
     const benchModes = Object.keys(labels).filter((m) => missionBench.modes[m]);
     const scenarios = Object.keys(missionBench.modes.sensor).filter((k) => k !== 'all');
@@ -509,7 +539,7 @@ function benchmarks() {
           labels[mode],
           `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`,
           String(s.buildingsEntered),
-          mode === 'policy' || mode === 'policyQuad' ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
+          mode.startsWith('policy') ? `${pct(s.handoffRate)} (${ci(...s.handoffRateCi)})` : '—',
           pct(s.meanIndoorCoverage),
           s.collisionsPerFlight.toFixed(2),
           `${Math.floor(s.meanDurationSec / 60)}:${String(s.meanDurationSec % 60).padStart(2, '0')}`,
@@ -538,11 +568,14 @@ function benchmarks() {
       'The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around.',
       'The sensor-only planner reads only the drone\'s own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode.',
       'The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
+      'The estimated-pose rows fly the same explorers indoors on the drone\'s own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator\'s pose; the fly-through in and out stays on the true pose.',
       'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
     ].join(' ');
+    out.MISSION_LOC_TABLE = missionLocTable(missionBench, labels);
   } else {
     out.MISSION_BENCH_TABLE = '';
     out.MISSION_BENCH_NOTE = '_Not measured yet. `npm run study:missions` writes `docs/mission-bench.json`._';
+    out.MISSION_LOC_TABLE = '';
   }
   const study = readJson('docs/study.json');
   Object.assign(out, studyTables(study));
@@ -586,6 +619,46 @@ function readmeTargets(out, study) {
   return lines.join('\n');
 }
 
+/** Pose error of the mission bench flights flown indoors on the estimate, against the same explorer on the true pose. */
+function missionLocTable(mb, labels) {
+  const pairs = [
+    ['sensorLoc', 'sensor'],
+    ['policyLoc', 'policy'],
+    ['sensorQuadLoc', 'sensorQuad'],
+  ].filter(([a, b]) => mb.modes[a]?.all.loc && mb.modes[b]);
+  if (!pairs.length) return '';
+  const cm = (m) => `${(m * 100).toFixed(1)} cm`;
+  const rows = pairs.map(([est, truth]) => {
+    const a = mb.modes[est].all;
+    const b = mb.modes[truth].all;
+    return [
+      labels[est],
+      `${pct(a.expectedOutcome)} vs ${pct(b.expectedOutcome)}`,
+      `${a.flightsWithCollision} vs ${b.flightsWithCollision}`,
+      cm(a.loc.ateMapRmse),
+      cm(a.loc.ateRmse),
+      `${cm(a.loc.ateMaxMedian)} / ${cm(a.loc.ateMaxWorst)}`,
+      `${a.loc.yawRmseDeg.toFixed(2)}°`,
+      `${a.loc.flightsOverHalfMeter} of ${a.loc.flights}`,
+      `${a.loc.flightsLost} (${a.loc.lostSec.toFixed(1)} s)`,
+    ];
+  });
+  return table(
+    [
+      'Indoors',
+      'Expected outcome, estimate vs truth',
+      'Flights with a collision, estimate vs truth',
+      'Error vs own map (RMS)',
+      'Error vs building (RMS)',
+      'Worst error per flight, median / max',
+      'Heading error (RMS)',
+      'Flights ever 0.5 m off',
+      'Flights that lost the pose (time lost)',
+    ],
+    rows,
+  );
+}
+
 /** Mission outcome per scenario and indoor explorer, from the 30-world mission bench. */
 function readmeMissions(mb) {
   const titles = { 'cabin-day': 'Woods to cabin: find the missing person', 'compound-clear': 'Compound search: confirm two buildings clear', 'backpack-night': 'Night search: find the lost backpack' };
@@ -610,6 +683,86 @@ function readmeMissions(mb) {
     `Across all ${flights} flights: ${touched} with a collision, ${falseClears} false clears, ${falseAlarms} false alarms. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
     `From \`npm run study:missions\` at \`${mb.commit}\`; per-scenario detail is in [BENCHMARKS.md](docs/BENCHMARKS.md).`,
   ].join('\n');
+}
+
+/** Indoor localization study (scripts/study/loc-study.ts). */
+function localizationTables(loc) {
+  const keys = ['LOC_NOTE', 'LOC_HEADLINE', 'LOC_TABLE', 'LOC_KIDNAP', 'R_LOC_DRIFT', 'R_LOC_DRIFT_NIGHT', 'R_LOC_ABS', 'R_LOC_ODO', 'R_LOC_ODO_YAW', 'R_LOC_HONEST', 'R_LOC_OVER', 'R_LOC_SPARSE', 'R_LOC_SPARSE_OVER', 'R_LOC_SCAN', 'R_LOC_KIDNAP', 'R_LOC_KIDNAP_SEC', 'R_LOC_FALSE_LOST', 'R_LOC_IOU', 'R_LOC_FLIGHTS'];
+  if (!loc) {
+    const none = '_Not measured yet. `npm run study:loc` writes `docs/localization.json`._';
+    return Object.fromEntries(keys.map((k) => [k, k.startsWith('R_') ? 'not measured' : none]));
+  }
+  const cell = (condition, lighting, arm) => loc.cells.find((c) => c.condition === condition && c.lighting === lighting && c.arm === arm);
+  const cm = (m) => `${(m * 100).toFixed(1)} cm`;
+  const m = (v) => (v >= 1 ? `${v.toFixed(2)} m` : cm(v));
+  const ci = ([lo, hi]) => (hi >= 1 ? `${lo.toFixed(2)}–${hi.toFixed(2)} m` : `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}`);
+  const label = (id) => loc.arms.find((a) => a.id === id)?.label ?? id;
+  const headArms = ['fused', 'odometry', 'scan', 'beams32'];
+  const headline = headArms.map((arm) => {
+    const d = cell('hard', 'day', arm);
+    const n = cell('hard', 'night-dark', arm);
+    return [
+      label(arm),
+      `${m(d.ateMapRmse)} (${ci(d.ateMapRmseCi)})`,
+      `${m(n.ateMapRmse)} (${ci(n.ateMapRmseCi)})`,
+      `${m(d.ateRmse)} / ${m(n.ateRmse)}`,
+      `${d.yawRmseDeg.toFixed(2)}° / ${n.yawRmseDeg.toFixed(2)}°`,
+      m(Math.max(d.ateMax, n.ateMax)),
+      `${d.flightsOver50cm + n.flightsOver50cm} of ${d.flights + n.flights}`,
+      pct((d.within95 + n.within95) / 2),
+    ];
+  });
+  const rows = loc.cells.map((c) => [
+    c.condition,
+    c.lighting,
+    label(c.arm),
+    m(c.ateRmse),
+    `${m(c.ateMapRmse)} (${ci(c.ateMapRmseCi)})`,
+    `${c.yawRmseDeg.toFixed(2)}°`,
+    m(c.ateMax),
+    `${c.flightsOver50cm} of ${c.flights}`,
+    pct(c.within95),
+    pct(c.seenIoU),
+    `${fmt(c.msPerFlight / 1000, 1)} s`,
+  ]);
+  const kid = ['easy', 'hard'].flatMap((cond) => ['day', 'night-dark'].map((l) => cell(cond, l, 'kidnap')).filter(Boolean));
+  const recovered = kid.reduce((n, c) => n + c.recovered, 0);
+  const flights = kid.reduce((n, c) => n + c.flights, 0);
+  const kidRows = kid.map((c) => [c.condition, c.lighting, `${c.recovered} of ${c.flights}`, `${c.recoverSec.toFixed(2)} s`, pct(c.failDetected)]);
+  const hd = cell('hard', 'day', 'fused');
+  const hn = cell('hard', 'night-dark', 'fused');
+  const od = cell('hard', 'day', 'odometry');
+  const on = cell('hard', 'night-dark', 'odometry');
+  const b32d = cell('hard', 'day', 'beams32');
+  const b32n = cell('hard', 'night-dark', 'beams32');
+  const sd = cell('hard', 'day', 'scan');
+  const sn = cell('hard', 'night-dark', 'scan');
+  return {
+    LOC_NOTE: [
+      `Each flight is a trajectory the sensor-only planner flew with the true pose on a fresh building (hard: seeds ${loc.seeds.hard}+, easy: ${loc.seeds.easy}+, 30 each, day and night), replayed open loop through every estimator arm with its own simulated sensors, from \`scripts/study/loc-study.ts\` at \`${loc.commit}\`.`,
+      'The estimator\'s parameters were tuned only on stage-3 seeds 7001–7012.',
+      '*Drift vs own map* removes the entry offset (the estimator starts 10 cm and 1.7° off, 1-sigma, and cannot learn where its map sits); *vs building* keeps it. *Inside own 95%* is the share of ticks whose map-relative error falls inside the filter\'s own 95% ellipse; 95% is ideal, lower is overconfident.',
+      'Brackets are bootstrap 95% intervals of the mean over flights.',
+    ].join(' '),
+    LOC_HEADLINE: table(['Estimator (hard buildings)', 'Drift vs own map, day', 'Drift vs own map, night', 'Error vs building, day / night', 'Heading error, day / night', 'Worst error', 'Flights ever 0.5 m off', 'Inside own 95%'], headline),
+    LOC_TABLE: table(['Condition', 'Lighting', 'Estimator', 'Error vs building', 'Drift vs own map (95% CI)', 'Heading error', 'Worst', 'Flights ever 0.5 m off', 'Inside own 95%', 'Seen-map agreement', 'CPU per flight'], rows),
+    LOC_KIDNAP: table(['Condition', 'Lighting', 'Re-acquired', 'Median time to < 30 cm', 'Error ticks > 0.5 m flagged'], kidRows),
+    R_LOC_DRIFT: cm(hd.ateMapRmse),
+    R_LOC_DRIFT_NIGHT: cm(hn.ateMapRmse),
+    R_LOC_ABS: cm((hd.ateRmse + hn.ateRmse) / 2),
+    R_LOC_ODO: `${m(od.ateMapRmse)} and ${m(on.ateMapRmse)}`,
+    R_LOC_ODO_YAW: `${Math.round((od.yawRmseDeg + on.yawRmseDeg) / 2)}°`,
+    R_LOC_HONEST: pct((hd.within95 + hn.within95) / 2),
+    R_LOC_OVER: `${hd.flightsOver50cm + hn.flightsOver50cm} of ${hd.flights + hn.flights}`,
+    R_LOC_SPARSE: `${cm(b32d.ateMapRmse)} and ${cm(b32n.ateMapRmse)}`,
+    R_LOC_SPARSE_OVER: `${b32d.flightsOver50cm + b32n.flightsOver50cm} of ${b32d.flights + b32n.flights}`,
+    R_LOC_SCAN: `${cm(sd.ateMapRmse)} and ${cm(sn.ateMapRmse)}`,
+    R_LOC_KIDNAP: `${recovered} of ${flights}`,
+    R_LOC_KIDNAP_SEC: `${(kid.reduce((s, c) => s + c.recoverSec, 0) / kid.length).toFixed(1)} s`,
+    R_LOC_FALSE_LOST: String(loc.falseLostFlights ?? '—'),
+    R_LOC_IOU: pct((hd.seenIoU + hn.seenIoU) / 2),
+    R_LOC_FLIGHTS: String(loc.cells.filter((c) => c.arm === 'fused').reduce((n, c) => n + c.flights, 0)),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -693,6 +846,7 @@ const values = {
   ...speed.values,
   ...benchSection(ROOT),
   ...visionSection(readJson('docs/vision-detector.json'), readJson('docs/vision-bench.json')).values,
+  ...localizationTables(readJson('docs/localization.json')),
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), readJson('docs/fault-bench-run1.json')),
 };

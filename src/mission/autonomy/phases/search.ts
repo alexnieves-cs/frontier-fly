@@ -255,7 +255,12 @@ export abstract class SearchPhases extends RunnerBase {
 
     const obs = this.source.observe(pose, this.t);
     if (this.sar && !this.inside) this.sar.observe(pose, obs.contacts, this.t);
-    for (const c of obs.contacts) {
+    for (const raw of obs.contacts) {
+      // Flying on the estimate, the drone places what it sees with its own pose.
+      const l = this.loc;
+      const c = l
+        ? { ...raw, estimate: toWorld(l.grid, l.toEstimateFrame(toLocal(l.grid, raw.estimate))), bearing: l.toEstimateDir(raw.bearing) }
+        : raw;
       this.recent.push(c);
       if (this.recent.length > 60) this.recent.shift();
       this.tracker.ingest(c);

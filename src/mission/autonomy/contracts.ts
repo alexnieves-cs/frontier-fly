@@ -20,6 +20,8 @@ import type { BuildingShell, Opening, OutdoorWorld } from '../../world/outdoor/t
 import type { Mission, MissionType, Point } from '../types';
 import type { Fault, FaultTransition } from './faults';
 import type { PlannerConfig } from './sar/planner';
+import type { LocVisitRecord } from './localizer';
+import type { LocSensorHook } from './locSensors';
 
 export type V3 = [number, number, number];
 
@@ -280,6 +282,8 @@ export interface RunRecord {
   /** True when the drone landed within 1.5 m of home. */
   landedHome: boolean;
   indoorExplorer: 'policy' | 'frontier' | 'oracle' | null;
+  /** Per building visit flown on the estimated pose; empty when the run used the true pose. */
+  localization: LocVisitRecord[];
   log: LogEntry[];
   /** Injected fault starts and ends (ground truth). Empty without faults. */
   faults?: FaultTransition[];
@@ -343,6 +347,17 @@ export interface RunnerOptions {
    * `seed` defaults to the world seed.
    */
   faults?: { plan: readonly Fault[]; seed?: number };
+  /**
+   * Where the drone's indoor pose comes from. 'truth' (default) hands the
+   * planners the simulator's pose. 'estimated' flies every non-oracle indoor
+   * visit on the src/loc estimator (IMU, optical flow, lidar scan matching):
+   * maps, paths, the shield and the controller all run in the estimate's frame.
+   * The fly-through in and out stays on the truth, as if the drone servoed on
+   * the opening it can see.
+   */
+  localization?: 'truth' | 'estimated';
+  /** Rewrites the localization sensor readings in place before the estimator reads them. */
+  locFault?: LocSensorHook;
   /** Outdoor search pattern. Default: lanes. */
   search?: OutdoorSearchOptions;
 }
