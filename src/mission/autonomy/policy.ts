@@ -40,6 +40,7 @@ export function policyFromCheckpoint(checkpoint: Checkpoint): NormalizedPolicy {
   return new NormalizedPolicy(policy, norm, checkpoint.stage);
 }
 
-export function policyFromJson(text: string): NormalizedPolicy {
-  return policyFromCheckpoint(parseCheckpoint(text));
+/** From a checkpoint file's contents, JSON or binary (see parseCheckpoint). */
+export function policyFromFile(data: string | ArrayBuffer | Uint8Array): NormalizedPolicy {
+  return policyFromCheckpoint(parseCheckpoint(data));
 }

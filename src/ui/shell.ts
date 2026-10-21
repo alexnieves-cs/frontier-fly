@@ -88,7 +88,7 @@ export function shell(): string {
             <button type="button" class="text-btn" data-act="save">Download</button>
             <button type="button" class="text-btn" data-act="idb-save">Save local</button>
             <button type="button" class="text-btn" data-act="idb-load">Load local</button>
-            <input id="file" type="file" accept="application/json" />
+            <input id="file" type="file" accept=".json,.bin,application/json,application/octet-stream" />
             <div class="seg">
               <button type="button" data-act="quality" data-quality="low">Low</button>
               <button type="button" data-act="quality" data-quality="high">High</button>

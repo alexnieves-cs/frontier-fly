@@ -4,7 +4,7 @@ import { OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { MetricsPayload } from '../shared/messages';
 import type { BuildingSpec, CameraMode, DroneState, LightingState, QualityPreset, SensorMode } from '../shared/types';
-import { checkpointMismatch, parseCheckpoint, saveCheckpointIdb, loadCheckpointIdb, type Checkpoint } from '../rl/checkpoint';
+import { checkpointMismatch, parseCheckpoint, SHIPPED_CHECKPOINT_URL, saveCheckpointIdb, loadCheckpointIdb, type Checkpoint } from '../rl/checkpoint';
 import type { InferPolicy } from '../rl/infer';
 import type { RunningNorm } from '../rl/normalize';
 import { makeDroneState } from '../sim/drone';
@@ -388,7 +388,7 @@ class Session {
     this.q<HTMLInputElement>('#file').addEventListener('change', () => {
       const file = this.q<HTMLInputElement>('#file').files?.[0];
       if (!file) return;
-      void file.text().then((text) => this.applyCheckpoint(parseCheckpoint(text)));
+      void file.arrayBuffer().then((bytes) => this.applyCheckpoint(parseCheckpoint(bytes)));
     });
     window.addEventListener('keydown', (event) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
@@ -502,9 +502,9 @@ class Session {
 
   private async loadShipped(): Promise<void> {
     try {
-      const response = await fetch('checkpoints/pretrained.json');
+      const response = await fetch(SHIPPED_CHECKPOINT_URL);
       if (!response.ok) return;
-      this.applyCheckpoint(parseCheckpoint(await response.text()), false);
+      this.applyCheckpoint(parseCheckpoint(await response.arrayBuffer()), false);
     } catch {
       /* flying still works without a checkpoint */
     }

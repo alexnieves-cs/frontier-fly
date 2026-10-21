@@ -1,4 +1,12 @@
-/** JSON checkpoint plus an IndexedDB helper. IndexedDB is touched only through globalThis. */
+/**
+ * Checkpoints as JSON or packed binary, plus an IndexedDB helper. IndexedDB is
+ * touched only through globalThis.
+ *
+ * The binary form is what ships: a magic tag, a JSON header holding everything
+ * but the weights, then the weights as little-endian float32. The weights are
+ * float32 in memory, so the two forms decode to identical numbers; the binary
+ * one is about a sixth of the size.
+ */
 import { OBS_DIM, OBS_VERSION } from '../shared/constants';
 
 export interface Checkpoint {
@@ -17,6 +25,12 @@ export interface Checkpoint {
 }
 
 const WEIGHT_BUFFERS = 13;
+/** "FFW1": frontier-fly weights, format 1. */
+const MAGIC = [0x46, 0x46, 0x57, 0x31];
+
+/** The shipped checkpoint, relative to the site root (browser) or under public/ (Node). */
+export const SHIPPED_CHECKPOINT_URL = 'checkpoints/pretrained.bin';
+export const SHIPPED_CHECKPOINT_PATH = `public/${SHIPPED_CHECKPOINT_URL}`;
 const DB_NAME = 'frontier-fly';
 const STORE = 'checkpoints';
 const DB_VERSION = 1;
@@ -36,13 +50,75 @@ export function serializeCheckpoint(c: Checkpoint): string {
   return JSON.stringify({ ...c, weights: c.weights.map((row) => row.map(shortestFloat32)) });
 }
 
-export function parseCheckpoint(text: string): Checkpoint {
+/**
+ * Packed binary form: MAGIC, uint32 header length, the UTF-8 JSON header (the
+ * checkpoint with `weightShapes` in place of `weights`), zero padding to a
+ * 4-byte boundary, then every weight array as float32 in order.
+ */
+export function serializeCheckpointBinary(c: Checkpoint): Uint8Array {
+  const { weights, ...rest } = c;
+  const header = new TextEncoder().encode(JSON.stringify({ ...rest, weightShapes: weights.map((w) => w.length) }));
+  const start = Math.ceil((8 + header.length) / 4) * 4;
+  const total = weights.reduce((a, w) => a + w.length, 0);
+  const out = new Uint8Array(start + total * 4);
+  out.set(MAGIC, 0);
+  new DataView(out.buffer).setUint32(4, header.length, true);
+  out.set(header, 8);
+  const view = new DataView(out.buffer, start);
+  let k = 0;
+  for (const w of weights) for (const v of w) view.setFloat32(4 * k++, v, true);
+  return out;
+}
+
+/** The file contents to write for a path: packed binary for `.bin`, JSON otherwise. */
+export function serializeCheckpointFor(path: string, c: Checkpoint): string | Uint8Array {
+  return path.endsWith('.bin') ? serializeCheckpointBinary(c) : serializeCheckpoint(c);
+}
+
+/** True when the bytes start with the binary checkpoint tag. */
+function isBinary(bytes: Uint8Array): boolean {
+  return bytes.length >= 8 && MAGIC.every((b, i) => bytes[i] === b);
+}
+
+/**
+ * Reads either form: JSON text, or the bytes of a JSON or binary file (a
+ * fetch's arrayBuffer(), or readFileSync without an encoding).
+ */
+export function parseCheckpoint(data: string | ArrayBuffer | Uint8Array): Checkpoint {
+  if (typeof data !== 'string') {
+    const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+    if (!isBinary(bytes)) return parseCheckpoint(new TextDecoder().decode(bytes));
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const headerLen = view.getUint32(4, true);
+    if (8 + headerLen > bytes.length) throw new Error('invalid checkpoint: truncated header');
+    let header: Record<string, unknown>;
+    try {
+      header = JSON.parse(new TextDecoder().decode(bytes.subarray(8, 8 + headerLen))) as Record<string, unknown>;
+    } catch {
+      throw new Error('invalid checkpoint: bad header');
+    }
+    const shapes = numList(header.weightShapes, 'weightShapes');
+    let offset = Math.ceil((8 + headerLen) / 4) * 4;
+    const weights = shapes.map((n) => {
+      if (offset + 4 * n > bytes.length) throw new Error('invalid checkpoint: truncated weights');
+      const row = new Array<number>(n);
+      for (let i = 0; i < n; i++) row[i] = view.getFloat32(offset + 4 * i, true);
+      offset += 4 * n;
+      return row;
+    });
+    delete header.weightShapes;
+    return fromRaw({ ...header, weights });
+  }
   let raw: unknown;
   try {
-    raw = JSON.parse(text);
+    raw = JSON.parse(data);
   } catch {
     throw new Error('invalid checkpoint: not JSON');
   }
+  return fromRaw(raw);
+}
+
+function fromRaw(raw: unknown): Checkpoint {
   if (raw == null || typeof raw !== 'object') throw new Error('invalid checkpoint: expected object');
   const o = raw as Record<string, unknown>;
   const hidden = numList(o.hidden, 'hidden');

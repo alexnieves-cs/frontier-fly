@@ -307,6 +307,19 @@ export interface RunnerOptions {
   indoor?: 'auto' | 'frontier' | 'policy' | 'oracle';
   /** Optional trained policy weights (InferPolicy). */
   policy?: unknown;
+  /**
+   * Airframe model. 'kinematic' (default) follows commands within the
+   * acceleration caps; 'quad' flies a 1.2 kg quadrotor on rigid-body dynamics
+   * and an angle-mode flight controller, and indoors uses the braking filter.
+   */
+  vehicle?: 'kinematic' | 'quad';
+  /** Wind at sim time t, world frame, m/s. Default calm. */
+  wind?: (tSec: number) => V3;
+  /**
+   * Rewrites the indoor lidar ranges (metres, in place) before the explorers
+   * read them, e.g. to drop sectors. A NaN range is a missing reading.
+   */
+  lidarFault?: (lidar: Float64Array, tSec: number) => void;
   /** Outdoor search pattern. Default: lanes. */
   search?: OutdoorSearchOptions;
 }

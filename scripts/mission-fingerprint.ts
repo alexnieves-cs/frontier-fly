@@ -10,12 +10,13 @@
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { policyFromJson } from '../src/mission/autonomy/policy';
+import { policyFromFile } from '../src/mission/autonomy/policy';
+import { SHIPPED_CHECKPOINT_PATH } from '../src/rl/checkpoint';
 import { createPerceptionSource } from '../src/mission/autonomy/perception';
 import { runMission } from '../src/mission/autonomy/runner';
 import { SCENARIOS } from '../src/mission/autonomy/scenarios';
 import { buildMissionWorld, missionForWorld } from '../src/mission/autonomy/world';
-import { MISSION_MODES } from '../src/eval/missions';
+import { MISSION_MODES, missionModeOptions } from '../src/eval/missions';
 
 const args = process.argv.slice(2);
 const opt = (name: string) => {
@@ -23,7 +24,7 @@ const opt = (name: string) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const seeds = (opt('seeds') ?? '9101,9102').split(',').map(Number);
-const policy = policyFromJson(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+const policy = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
 const rows: Record<string, string> = {};
 for (const scenario of SCENARIOS) {
   for (const seed of seeds) {
@@ -34,8 +35,7 @@ for (const scenario of SCENARIOS) {
       const run = await runMission(mission, world, source, {
         ...scenario.runner,
         operator: () => 'approve' as const,
-        indoor: mode === 'oracle' ? 'oracle' : mode === 'sensor' ? 'frontier' : 'auto',
-        ...(mode === 'policy' ? { policy } : {}),
+        ...missionModeOptions(mode, policy),
       });
       const hash = createHash('sha256').update(JSON.stringify(run)).digest('hex').slice(0, 16);
       const key = `${scenario.id}/${seed}/${mode}`;

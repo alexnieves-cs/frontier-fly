@@ -4,14 +4,14 @@
  */
 import { readFileSync } from 'node:fs';
 import { evalCoverage, formatCoverageTable } from '../src/eval/coverage';
-import { checkpointMismatch, parseCheckpoint } from '../src/rl/checkpoint';
+import { checkpointMismatch, parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../src/rl/checkpoint';
 import { InferPolicy } from '../src/rl/infer';
 import { RNG } from '../src/shared/rng';
 import { frontierAction } from '../src/sim/frontier';
 
 const args = process.argv.slice(2);
 const teacher = args.includes('--teacher');
-const path = args.find((a) => !a.startsWith('--')) ?? 'public/checkpoints/pretrained.json';
+const path = args.find((a) => !a.startsWith('--')) ?? SHIPPED_CHECKPOINT_PATH;
 
 async function main() {
   const started = Date.now();
@@ -24,7 +24,7 @@ async function main() {
     });
     console.log(formatCoverageTable(report, 'privileged frontier teacher'));
   } else {
-    const checkpoint = parseCheckpoint(readFileSync(path, 'utf8'));
+    const checkpoint = parseCheckpoint(readFileSync(path));
     const mismatch = checkpointMismatch(checkpoint);
     if (mismatch) {
       console.error(`${path}: ${mismatch}`);

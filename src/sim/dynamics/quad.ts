@@ -57,6 +57,21 @@ export class QuadrotorDynamics implements Dynamics {
   private readonly bodyForce: [number, number, number] = [0, 0, 0];
   private readonly worldForce: [number, number, number] = [0, 0, 0];
   private readonly euler = { roll: 0, pitch: 0, yaw: 0 };
+  /** Air velocity in the world frame, m/s: drag acts on velocity relative to it. */
+  readonly wind: [number, number, number] = [0, 0, 0];
+  /** Per-motor thrust authority, 0..1 (a damaged prop or a weak motor). */
+  readonly thrustScale = new Float64Array([1, 1, 1, 1]);
+  /** Body rates of the last step, rad/s (what a gyro measures). */
+  get bodyRates(): ArrayLike<number> {
+    return this.omega;
+  }
+  /** Specific force of the last step in the body frame, m/s² (what an accelerometer measures). */
+  readonly specificForce: [number, number, number] = [0, 0, 0];
+
+  /** The flight controller, so a vehicle can set its limits and gains. */
+  get controller(): AngleController {
+    return this.ctrl;
+  }
 
   reset(s: DroneState, p: DynParams): void {
     this.state = s;
@@ -162,7 +177,7 @@ export class QuadrotorDynamics implements Dynamics {
       const w = motors[i] ?? 0;
       const aw = w < 0 ? -w : w;
       wSum += aw;
-      const f = kf * w * w * ge;
+      const f = kf * w * w * ge * (this.thrustScale[i] ?? 1);
       thrust += f;
       tx += (this.py[i] ?? 0) * f;
       ty += -(this.px[i] ?? 0) * f;
@@ -181,9 +196,21 @@ export class QuadrotorDynamics implements Dynamics {
     const vx = s.vel[0];
     const vy = s.vel[1];
     const vz = s.vel[2];
-    this.worldForce[0] += -this.dLx * vx - this.dQx * Math.abs(vx) * vx;
-    this.worldForce[1] += -this.dLy * vy - this.dQy * Math.abs(vy) * vy;
-    this.worldForce[2] += -this.mass * GRAVITY - this.dLz * vz - this.dQz * Math.abs(vz) * vz;
+    const rx = vx - this.wind[0];
+    const ry = vy - this.wind[1];
+    const rz = vz - this.wind[2];
+    this.worldForce[0] += -this.dLx * rx - this.dQx * Math.abs(rx) * rx;
+    this.worldForce[1] += -this.dLy * ry - this.dQy * Math.abs(ry) * ry;
+    this.worldForce[2] += -this.mass * GRAVITY - this.dLz * rz - this.dQz * Math.abs(rz) * rz;
+    // An accelerometer reads everything but gravity.
+    const invMass = 1 / this.mass;
+    this.specificForce[0] = this.worldForce[0];
+    this.specificForce[1] = this.worldForce[1];
+    this.specificForce[2] = this.worldForce[2] + this.mass * GRAVITY;
+    rotateWorldToBody(q, this.specificForce, this.specificForce);
+    this.specificForce[0] *= invMass;
+    this.specificForce[1] *= invMass;
+    this.specificForce[2] *= invMass;
 
     const invM = 1 / this.mass;
     const ax = clamp(this.worldForce[0] * invM, -ACCEL_MAX, ACCEL_MAX);

@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { evalCoverage, formatCoverageTable, mean, TARGETS } from '../../src/eval/coverage';
-import { checkpointMismatch, parseCheckpoint } from '../../src/rl/checkpoint';
+import { checkpointMismatch, parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { ACT_DIM, OBS_DIM } from '../../src/shared/constants';
 import { RNG } from '../../src/shared/rng';
 
-const shipped = parseCheckpoint(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+const shipped = parseCheckpoint(readFileSync(SHIPPED_CHECKPOINT_PATH));
 const mismatch = checkpointMismatch(shipped);
 
 describe('shipped checkpoint', () => {
@@ -23,7 +23,7 @@ describe('shipped checkpoint', () => {
     policy.setWeights(shipped.weights.map((row) => Float32Array.from(row).buffer));
     const rng = new RNG(1);
     const report = await evalCoverage({ act: (obs) => policy.actWith(obs, 1, rng, true).action });
-    console.info(formatCoverageTable(report, 'public/checkpoints/pretrained.json'));
+    console.info(formatCoverageTable(report, SHIPPED_CHECKPOINT_PATH));
     const day0 = mean(report.stage0Day);
     const day3 = mean(report.stage3Day);
     expect(day0).toBeGreaterThanOrEqual(TARGETS.stage0);
