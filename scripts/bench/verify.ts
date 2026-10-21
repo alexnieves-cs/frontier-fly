@@ -5,10 +5,9 @@
 //   npm run bench:verify -- bench/entries/example
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
-import { BENCH_TASKS, BENCH_VERSION, benchSeeds } from '../../src/bench/tasks';
+import { BENCH_VERSION } from '../../src/bench/tasks';
 import { createEnv } from '../../src/sim/env';
-import { loadPilot, summarize } from './lib';
+import { flyAll, loadPilot, summarize } from './lib';
 
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dirs = args.length ? args : readdirSync('bench/entries').map((d) => join('bench/entries', d));
@@ -25,10 +24,7 @@ for (const dir of dirs) {
   const claimed = JSON.parse(readFileSync(resultPath, 'utf8')) as { bench: number; split: string; score: number };
   const { make } = await loadPilot(pilotPath);
   const pilot = await make();
-  const episodes: BenchEpisode[] = [];
-  BENCH_TASKS.forEach((task, ti) => {
-    for (const seed of benchSeeds('test', ti)) episodes.push(runBenchEpisode(env, task, seed, pilot));
-  });
+  const episodes = flyAll(env, pilot, 'test');
   const got = summarize(episodes);
   // Flights are deterministic, so a re-score matches to rounding.
   const ok = claimed.bench === BENCH_VERSION && claimed.split === 'test' && Math.abs(got.score - claimed.score) < 1e-6;

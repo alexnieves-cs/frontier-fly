@@ -2,21 +2,21 @@
 
 # FrontierBench leaderboard
 
-FrontierBench is this repository's indoor exploration benchmark, frozen so that anyone can score a pilot the same way [REPORT.md](REPORT.md) scores ours. A pilot flies six tasks, 30 test buildings each, and its **score** is the mean fraction of the reachable building it flew through, averaged over tasks. Each building gets a fixed flight time: 1,000 policy steps (50 s) for one room, 2,400 (120 s) for the rest.
+FrontierBench is this repository's indoor exploration benchmark, frozen so that anyone can score a pilot the same way [REPORT.md](REPORT.md) scores ours. A pilot flies seven tasks: six on 30 generated test buildings each, and one on 60 real apartment plans, and its **score** is the mean fraction of the reachable building it flew through, averaged over tasks. Each building gets a fixed flight time: 1,000 policy steps (50 s) for one room, 2,400 (120 s) for the rest.
 
 ## Leaderboard
 
-| # | Pilot | Score | room | hard | dark | fast | floors | quad | Flights that touched nothing | Commit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Sensor-only planner + momentum (baseline) | **64.7%** | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 42.6% | 91% | `57419cf` |
-| 2 | Sensor-only planner (baseline) | **64.5%** | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 41.1% | 92% | `57419cf` |
-| 3 | Shipped policy under the lidar guard (baseline) | **59.6%** | 95.1% | 56.9% | 60.4% | 76.5% | 36.1% | 32.7% | 67% | `57419cf` |
-| 4 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **56.2%** | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 95% | `57419cf` |
-| 5 | Shipped policy (DAgger) (baseline) | **53.6%** | 95.1% | 61.9% | 60.7% | 44.7% | 34.8% | 24.2% | 21% | `57419cf` |
-| 6 | Frontier waypoint follower (baseline) | **27.5%** | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 0% | `57419cf` |
-| 7 | Lidar wall-follower (baseline) | **18.1%** | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 99% | `57419cf` |
+| # | Pilot | Score | room | hard | dark | fast | floors | quad | apartments | Flights that touched nothing | Commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sensor-only planner + momentum (baseline) | **67.8%** | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 42.6% | 86.1% | 93% | `dc6f478` |
+| 2 | Sensor-only planner (baseline) | **67.5%** | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 41.1% | 85.5% | 94% | `dc6f478` |
+| 3 | Shipped policy under the lidar guard (baseline) | **60.9%** | 95.1% | 56.9% | 60.4% | 76.5% | 36.1% | 32.7% | 68.8% | 67% | `dc6f478` |
+| 4 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.7%** | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 80.6% | 96% | `dc6f478` |
+| 5 | Shipped policy (DAgger) (baseline) | **53.9%** | 95.1% | 61.9% | 60.7% | 44.7% | 34.8% | 24.2% | 55.8% | 15% | `dc6f478` |
+| 6 | Frontier waypoint follower (baseline) | **28.6%** | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 34.6% | 0% | `dc6f478` |
+| 7 | Lidar wall-follower (baseline) | **17.0%** | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `dc6f478` |
 
-The last-but-one column is the share of all 180 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
+The last-but-one column is the share of all 240 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
 
 ## Tasks
 
@@ -28,8 +28,11 @@ The last-but-one column is the share of all 180 test flights that ended without 
 | `fast` | Rooms, hallways, loops at 4 m/s | Kinematic | Day | 4 m/s |
 | `floors` | Several floors joined by shafts | Kinematic | Day | 2 m/s |
 | `quad` | Quadrotor with randomized dynamics and noise | Quadrotor, randomized | Day | 2 m/s |
+| `apartments` | Real apartment plans | Kinematic | Day | 2 m/s |
 
-Task definitions and seeds are in [`src/bench/tasks.ts`](../src/bench/tasks.ts): a **dev** split (seeds 81001+, 20 buildings per task) to tune on, and a **test** split (82001+, 30 per task) to score once. Both are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
+Task definitions and seeds are in [`src/bench/tasks.ts`](../src/bench/tasks.ts): a **dev** split (seeds 81001+, 20 buildings per task) to tune on, and a **test** split (82001+, 30 per task) to score once. The `apartments` task flies the 20 dev and 60 eval plans of the real-plan set ([REAL_PLANS.md](REAL_PLANS.md)), converted from Swiss Dwellings 3.0.0 (CC BY 4.0), with env seeds 84001+ (dev) and 84101+ (test).
+
+Version 2 added the `apartments` task, so scores from version 1 (six tasks) are not comparable and were re-run. Both are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
 
 ## What a pilot sees
 

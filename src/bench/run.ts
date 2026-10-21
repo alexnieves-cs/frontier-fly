@@ -5,11 +5,14 @@ import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import type { ExplorerEnv } from '../sim/env';
 import type { BenchPilot } from './pilot';
-import type { BenchTask } from './tasks';
+import { planEpisodeSetup } from '../plans';
+import type { BenchRun, BenchTask } from './tasks';
 
 export interface BenchEpisode {
   task: string;
   seed: number;
+  /** The real plan flown, on the real-plan task. */
+  plan?: string;
   coverage: number;
   collisions: number;
   energyWh: number;
@@ -18,8 +21,12 @@ export interface BenchEpisode {
   steps: number;
 }
 
-export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, seed: number, pilot: BenchPilot): BenchEpisode {
-  const { spec, envSeed, cfg } = evalEpisodeSetup(task.stage, seed, task.lighting);
+export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun, pilot: BenchPilot): BenchEpisode {
+  const seed = run.seed;
+  const setup = run.plan ? planEpisodeSetup(run.plan.set, run.plan.record, task.lighting) : evalEpisodeSetup(task.stage, seed, task.lighting);
+  const { spec, cfg } = setup;
+  // Real plans fly with the bench's own env seed, not the plans study's.
+  const envSeed = run.plan ? seed : setup.envSeed;
   cfg.dynamics = task.dynamics;
   cfg.speedH = task.speedH;
   if (task.dynamics === 'quad' && task.dr > 0) {
@@ -40,5 +47,5 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, seed: number,
     if (halfS === null && info.coverage >= 0.5) halfS = steps / 20;
     if (s.done) break;
   }
-  return { task: task.id, seed, coverage: info.coverage, collisions: info.collisions, energyWh: info.energyWh, halfS, steps };
+  return { task: task.id, seed, ...(run.plan ? { plan: run.plan.record.id } : {}), coverage: info.coverage, collisions: info.collisions, energyWh: info.energyWh, halfS, steps };
 }
