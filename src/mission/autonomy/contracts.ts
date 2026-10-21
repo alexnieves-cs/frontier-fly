@@ -18,6 +18,7 @@ import type { SensorMode } from '../../shared/types';
 import type { ObjectId, PersonState, TargetCategory, TargetClass, TargetScene } from '../../targets/types';
 import type { BuildingShell, Opening, OutdoorWorld } from '../../world/outdoor/types';
 import type { Mission, MissionType, Point } from '../types';
+import type { Fault, FaultTransition } from './faults';
 import type { PlannerConfig } from './sar/planner';
 
 export type V3 = [number, number, number];
@@ -163,7 +164,21 @@ export interface SafetyAction {
 
 export interface SafetyEvent {
   tSec: number;
-  kind: 'geofence' | 'no_fly' | 'altitude' | 'battery_reserve' | 'battery_critical' | 'collision';
+  kind:
+    | 'geofence'
+    | 'no_fly'
+    | 'altitude'
+    | 'battery_reserve'
+    | 'battery_critical'
+    | 'collision'
+    // Raised by the fault failsafe (failsafe.ts).
+    | 'comms_loss'
+    | 'sensor_fault'
+    | 'motor_fault'
+    | 'battery_fault'
+    | 'gnss_loss'
+    | 'estimator_fault'
+    | 'wind';
   message: string;
   action: SafetyActionKind;
 }
@@ -266,6 +281,8 @@ export interface RunRecord {
   landedHome: boolean;
   indoorExplorer: 'policy' | 'frontier' | 'oracle' | null;
   log: LogEntry[];
+  /** Injected fault starts and ends (ground truth). Empty without faults. */
+  faults?: FaultTransition[];
   /**
    * Probability search only: the model's cumulative probability of success every 5 s, the share of
    * the prior within aerial reach (inside the fence, off crown-covered ground), and the replans.
@@ -320,6 +337,12 @@ export interface RunnerOptions {
    * read them, e.g. to drop sectors. A NaN range is a missing reading.
    */
   lidarFault?: (lidar: Float64Array, tSec: number) => void;
+  /**
+   * Faults to inject (faults.ts), for the fault bench and the demo. The
+   * failsafe always runs; without faults it only watches the healthy drone.
+   * `seed` defaults to the world seed.
+   */
+  faults?: { plan: readonly Fault[]; seed?: number };
   /** Outdoor search pattern. Default: lanes. */
   search?: OutdoorSearchOptions;
 }

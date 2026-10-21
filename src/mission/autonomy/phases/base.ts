@@ -1,4 +1,5 @@
 import { descentClear } from '../../../sim/sensorPlanner';
+import { RNG } from '../../../shared/rng';
 import { OutdoorPhysics } from '../../../world/outdoor/physics';
 import type { Mission } from '../../types';
 import { createBattery } from '../battery';
@@ -35,6 +36,8 @@ import {
 import { GIMBAL_RANGE_SCALE } from '../perception';
 import { type ActingPolicy, toLocal } from '../planner/indoor';
 import { QuadVehicle } from '../quadVehicle';
+import { createFailsafe, type Failsafe, type HealthVerdict } from '../failsafe';
+import { FaultInjector } from '../faults';
 import { createSafetyMonitor } from '../safety';
 import { SarSearch } from '../sar/search';
 import {
@@ -78,6 +81,21 @@ export abstract class RunnerBase implements MissionRunner {
   /** Reference mode: indoor exploration and paths read the true floor plan. */
   protected readonly oracle: boolean;
   protected readonly batteryStart: number;
+  /** Injected faults, when the run has any. Ground truth: only hardware and sensor models read it. */
+  protected readonly faults: FaultInjector | null;
+  protected readonly failsafe: Failsafe;
+  /** The failsafe's latest verdict. */
+  protected health: HealthVerdict | null = null;
+  /** No operator heartbeat this tick. */
+  protected linkDown = false;
+  /** The last lidar ring as measured this tick (indoors), and what the drone's map predicted for it. */
+  protected lastRing: Float64Array | null = null;
+  protected lastExpected: Float64Array | null = null;
+  /** Electrical power of the last vehicle step, W. */
+  protected lastPowerW = 0;
+  protected readonly escNoise: RNG;
+  /** The flight controller's wind estimate, world frame, m/s: the wind it has to lean into, low-passed. */
+  protected windEstimate: V3 = [0, 0, 0];
 
   protected ticks = 0;
   protected t = 0;
@@ -145,7 +163,10 @@ export abstract class RunnerBase implements MissionRunner {
     this.maxSim = options.maxSimSec ?? mission.budgets.timeSec;
     this.air = airspaceFor(mission, world);
     this.agl = cruiseAglFor(mission);
-    this.battery = createBattery();
+    this.faults = options.faults ? new FaultInjector(options.faults.plan, options.faults.seed ?? world.seed) : null;
+    this.failsafe = createFailsafe();
+    this.escNoise = new RNG(world.seed >>> 0, 'esc-telemetry');
+    this.battery = this.faults ? this.faults.wrapBattery(createBattery()) : createBattery();
     this.batteryStart = this.battery.remainingPct();
     this.vehicle =
       options.vehicle === 'quad'
@@ -185,6 +206,12 @@ export abstract class RunnerBase implements MissionRunner {
   }
 
   protected limits(): VehicleLimits {
+    const base = this.baseLimits();
+    const k = this.health?.speedScale ?? 1;
+    return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
+  }
+
+  private baseLimits(): VehicleLimits {
     if (this.inside || this.phase === 'fly_through') return INDOOR_LIMITS;
     const pos = this.vehicle.pos;
     if (pos[2] < cruiseZ(this.air, pos[0], pos[1], this.agl) - 3) return NEAR_LIMITS;
@@ -358,7 +385,8 @@ export abstract class RunnerBase implements MissionRunner {
           const dir = sub(wp.pos, pos);
           const vel = this.shielded(phase, scaleTo(dir, speed, this.limits()));
           const moving = Math.hypot(vel[0], vel[1]) > 0.3;
-          const yaw = wp.yaw !== undefined && wp.yaw !== null && d < 4 ? wp.yaw : moving ? Math.atan2(vel[1], vel[0]) : null;
+          // With a failed lidar arc, turn the middle of the healthy arc toward the direction of travel.
+          const yaw = wp.yaw !== undefined && wp.yaw !== null && d < 4 ? wp.yaw : moving ? Math.atan2(vel[1], vel[0]) - this.blindYawOffset() : null;
           return { vel, yaw };
         }
         if (!called) {
@@ -382,6 +410,45 @@ export abstract class RunnerBase implements MissionRunner {
     const [vx, vy] = v.sensing.filter(vel[0], vel[1], this.vehicle.yaw);
     const vz = vel[2] < 0 && !descentClear(v.sensing.lidar) ? 0 : vel[2];
     return [vx, vy, vz];
+  }
+
+  /**
+   * IndoorSensing range hook, called on every indoor lidar reading before anything uses it: inject
+   * lidar faults, keep the ring as measured (and what the drone's map predicts for it) for the
+   * failsafe, and blank the beams the failsafe distrusts. NaN reads as blocked to every filter.
+   */
+  protected lidarHook(lidar: Float64Array): void {
+    this.faults?.lidarRing(lidar);
+    const v = this.visit;
+    if (v?.sensing) {
+      this.lastExpected = v.sensing.expectedRanges(toLocal(v.grid, this.vehicle.pos), this.vehicle.yaw, new Float64Array(lidar.length));
+      this.lastRing = Float64Array.from(lidar);
+    }
+    for (const i of this.health?.unknownBeams ?? []) lidar[i] = NaN;
+  }
+
+  /**
+   * Body angle (rad, counter-clockwise from the nose) of the middle of the widest healthy lidar arc
+   * while the failsafe distrusts some beams; 0 when the lidar is healthy.
+   */
+  protected blindYawOffset(): number {
+    const bad = this.health?.unknownBeams;
+    if (!bad || bad.length === 0) return 0;
+    const n = this.visit?.sensing?.lidar.length ?? 32;
+    const blocked = new Set(bad);
+    if (blocked.size >= n) return 0;
+    let best = 0;
+    let bestGap = -1;
+    for (let i = 0; i < n; i++) {
+      if (blocked.has(i)) continue;
+      let gap = n;
+      for (const j of blocked) gap = Math.min(gap, Math.abs(i - j), n - Math.abs(i - j));
+      if (gap > bestGap) {
+        bestGap = gap;
+        best = i;
+      }
+    }
+    return (best / n) * Math.PI * 2;
   }
 
   protected holdJob(phase: Phase, seconds: number, onDone: () => void): Job {

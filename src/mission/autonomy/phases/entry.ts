@@ -157,7 +157,11 @@ export abstract class EntryPhases extends SearchPhases {
       plan: () => [],
       tick: (): VehicleCommand => {
         let answer = this.operatorAnswer;
-        if (!answer && this.options.operator) {
+        if (this.linkDown) {
+          // No link, no consent: an unanswerable request is a denial (SAFETY_CASE.md H2).
+          answer = 'deny';
+          this.log('warn', `Operator link down. Treating the request for opening ${cand.openingId} as denied.`);
+        } else if (!answer && this.options.operator) {
           const r = this.options.operator(cand);
           if (r !== 'pending') answer = r;
         }
