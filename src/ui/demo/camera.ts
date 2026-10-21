@@ -1,5 +1,5 @@
 import type { FrameDetector, VisionDetection } from '../../vision/detector';
-import type { HumanoidPoses } from '../../vision/humanoid';
+import { parseHumanoidPoses, type HumanoidPoses } from '../../vision/humanoid';
 import type { Frame } from '../../vision/scene';
 
 export interface VisionKit {
@@ -9,13 +9,10 @@ export interface VisionKit {
 
 let kit: Promise<VisionKit> | null = null;
 
-/** The baked people and the shipped detector, fetched once. tfjs and the model load only on demand. */
+/** The baked people and the shipped detector, fetched once. TF.js and the model load only in camera mode. */
 export function loadVisionKit(): Promise<VisionKit> {
   kit ??= (async () => {
-    const [{ parseHumanoidPoses }, { frameDetector, loadDetectorFromUrl }] = await Promise.all([
-      import('../../vision/humanoid'),
-      import('../../vision/detector'),
-    ]);
+    const { frameDetector, loadDetectorFromUrl } = await import('../../vision/detector');
     const [buffer, bundle] = await Promise.all([
       fetch(`${import.meta.env.BASE_URL}assets/targets/humanoid-poses.bin`).then((r) => {
         if (!r.ok) throw new Error(`humanoid poses: HTTP ${r.status}`);
