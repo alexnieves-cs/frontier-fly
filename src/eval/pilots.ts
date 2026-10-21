@@ -60,7 +60,7 @@ export function classicalPilot(opts: SensorPlannerOptions = {}): { reset(): void
       const floor = Math.max(0, Math.min(f.floors - 1, Math.floor(f.pos[2] / f.floorHeight)));
       occ.mark(floor, f.pos[0], f.pos[1], f.yaw, f.lidar);
       f.occupied = occ.occupied;
-      return commandToAction(planner.act(f), f.yaw, out).slice();
+      return commandToAction(planner.act(f), f.yaw, out, env.speedLimit).slice();
     },
   };
 }
@@ -83,7 +83,7 @@ export function climbingPilot(opts: SensorPlannerOptions = {}, climb: ClimberOpt
       const floor = Math.max(0, Math.min(f.floors - 1, Math.floor(f.pos[2] / f.floorHeight)));
       occ.mark(floor, f.pos[0], f.pos[1], f.yaw, f.lidar);
       f.occupied = occ.occupied;
-      return commandToAction(climber.act(f, obs[OBS.ceil]! * FLOOR_HEIGHT), f.yaw, out).slice();
+      return commandToAction(climber.act(f, obs[OBS.ceil]! * FLOOR_HEIGHT), f.yaw, out, env.speedLimit).slice();
     },
   };
 }
@@ -99,5 +99,5 @@ export function guardedAction(action: Float32Array, obs: Float32Array, env: Expl
   const floor = Math.max(0, Math.min(spec.floors.length - 1, Math.floor(s.pos[2] / spec.floorHeight)));
   for (let i = 0; i < LIDAR_H; i++) lidarScratch[i] = obs[OBS.lidar + i]! * LIDAR_MAX;
   const brake = braking ? { model: braking, vel: measuredVelocity(obs, s.yaw) } : undefined;
-  return guardAction(action, s.pos[2] - floor * spec.floorHeight, s.yaw, lidarScratch, undefined, undefined, brake);
+  return guardAction(action, s.pos[2] - floor * spec.floorHeight, s.yaw, lidarScratch, undefined, undefined, brake, env.speedLimit);
 }

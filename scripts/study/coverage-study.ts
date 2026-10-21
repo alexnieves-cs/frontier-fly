@@ -12,10 +12,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { OracleGain } from '../../src/eval/gainLabels';
 import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
-import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
-import { InferPolicy } from '../../src/rl/infer';
+import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { RNG } from '../../src/shared/rng';
-import { bootstrapCi } from './stats';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
 import { frontierAction } from '../../src/sim/frontier';
@@ -24,6 +22,9 @@ import { QUAD_BRAKING } from '../../src/sim/sensorPlanner';
 import { heuristicAction } from '../../src/sim/heuristic';
 import type { LightingPreset } from '../../src/sim/lighting';
 import { waypointAction } from '../../src/sim/waypointPilot';
+import { bootstrapCi, loadPolicy } from './common';
+
+export { bootstrapCi, loadPolicy };
 
 export const SEEDS_PER_CONDITION = 30;
 
@@ -106,13 +107,6 @@ export function jobs(): Job[] {
 
 type Act = (obs: Float32Array, env: ExplorerEnv) => Float32Array;
 
-export function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
-  const ck = parseCheckpoint(readFileSync(path));
-  const policy = new InferPolicy(ck.obsDim, ck.actDim, ck.hidden, 1);
-  policy.setWeights(ck.weights.map((row) => Float32Array.from(row).buffer));
-  const rng = new RNG(1);
-  return (obs) => policy.actWith(obs, 1, rng, true).action.slice();
-}
 
 export const GAIN_MODEL_PATH = 'public/models/mappred.json';
 let gainData: GainModelData | null = null;
@@ -202,7 +196,6 @@ function arg(name: string, fallback: string): string {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1]! : fallback;
 }
 
-export { bootstrapCi };
 
 export function summarizeStudy(rows: Result[]) {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);

@@ -11,6 +11,11 @@ function clamp(v: number, lo: number, hi: number): number {
  */
 export class KinematicDynamics implements Dynamics {
   private state: DroneState | null = null;
+  private speedH = MAX_SPEED_H;
+
+  setSpeedLimit(speedH: number): void {
+    this.speedH = speedH;
+  }
 
   reset(s: DroneState, p: DynParams): void {
     void p;
@@ -21,8 +26,8 @@ export class KinematicDynamics implements Dynamics {
   step(cmd: Float32Array, dt: number): DroneState {
     const s = this.state;
     if (!s) throw new Error('KinematicDynamics.step before reset');
-    const vx = clamp(cmd[0] ?? 0, -MAX_SPEED_H, MAX_SPEED_H);
-    const vy = clamp(cmd[1] ?? 0, -MAX_SPEED_H, MAX_SPEED_H);
+    const vx = clamp(cmd[0] ?? 0, -this.speedH, this.speedH);
+    const vy = clamp(cmd[1] ?? 0, -this.speedH, this.speedH);
     const vz = clamp(cmd[2] ?? 0, -MAX_SPEED_V, MAX_SPEED_V);
     const yawRate = clamp(cmd[3] ?? 0, -MAX_YAW_RATE, MAX_YAW_RATE);
     const cy = Math.cos(s.yaw);

@@ -28,11 +28,11 @@ export function cloneDroneState(s: DroneState): DroneState {
   };
 }
 
-/** Map a tanh action in [-1, 1] to body-frame setpoints. */
-export function scaleAction(action: ArrayLike<number>, out: Float32Array): Float32Array {
+/** Map a tanh action in [-1, 1] to body-frame setpoints. `speedH` is the horizontal speed a full action asks for, m/s. */
+export function scaleAction(action: ArrayLike<number>, out: Float32Array, speedH = MAX_SPEED_H): Float32Array {
   const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-  out[0] = clamp(action[0] ?? 0, -1, 1) * MAX_SPEED_H;
-  out[1] = clamp(action[1] ?? 0, -1, 1) * MAX_SPEED_H;
+  out[0] = clamp(action[0] ?? 0, -1, 1) * speedH;
+  out[1] = clamp(action[1] ?? 0, -1, 1) * speedH;
   out[2] = clamp(action[2] ?? 0, -1, 1) * MAX_SPEED_V;
   out[3] = clamp(action[3] ?? 0, -1, 1) * MAX_YAW_RATE;
   return out;

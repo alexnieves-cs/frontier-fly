@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from '
 import { dirname, join, relative, resolve } from 'node:path';
 import { sarSection } from './sar.mjs';
 import { teamSection } from './team.mjs';
+import { speedSection } from './speed.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -680,12 +681,14 @@ function replaceBlock(text, name, body) {
 const ablations = ablationTables(readJson('docs/ablations.json'));
 const sar = sarSection(readJson('docs/sar-bench.json'), readJson('docs/report/sar-belief.json'));
 const team = teamSection(readJson('docs/team-bench.json'));
+const speed = speedSection(readJson('docs/speed-study.json'));
 const values = {
   ...architecture(),
   ...benchmarks(),
   ...ablations.values,
   ...sar.values,
   ...team.values,
+  ...speed.values,
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), readJson('docs/fault-bench-run1.json')),
 };
@@ -698,6 +701,7 @@ const outputs = {
   ...ablations.files,
   ...sar.files,
   ...team.files,
+  ...speed.files,
 };
 let readme = read('README.md');
 readme = replaceBlock(readme, 'benchmarks', values.README_SUMMARY);

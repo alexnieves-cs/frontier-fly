@@ -8,7 +8,7 @@
 // and 71001+ (large) are drawn only here, after tuning, and no choice was made on them.
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { bootstrapCi } from './stats';
+import { bootstrapCi } from './common';
 import { DEFAULT_CLAIMS, type ClaimOptions } from '../../src/team/allocate';
 import { TEAM_CONDITIONS, teamEpisodeSetup } from '../../src/team/conditions';
 import { runTeam, TIME_KEYS, type Comms, type Role, type TeamResult } from '../../src/team/run';
