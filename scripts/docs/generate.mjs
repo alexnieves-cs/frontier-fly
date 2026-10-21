@@ -11,6 +11,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from '
 import { dirname, join, relative, resolve } from 'node:path';
 import { sarSection } from './sar.mjs';
 import { speedSection } from './speed.mjs';
+import { benchSection } from './bench.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -686,6 +687,7 @@ const values = {
   ...ablations.values,
   ...sar.values,
   ...speed.values,
+  ...benchSection(ROOT),
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), readJson('docs/fault-bench-run1.json')),
 };
@@ -695,6 +697,7 @@ const outputs = {
   'docs/BENCHMARKS.md': header + fill(read('scripts/docs/BENCHMARKS.template.md'), values),
   'docs/REPORT.md': header + fill(read('scripts/docs/REPORT.template.md'), values),
   'docs/SAFETY_CASE.md': header + fill(read('scripts/docs/SAFETY_CASE.template.md'), values),
+  'docs/LEADERBOARD.md': header + fill(read('scripts/docs/LEADERBOARD.template.md'), values),
   ...ablations.files,
   ...sar.files,
   ...speed.files,

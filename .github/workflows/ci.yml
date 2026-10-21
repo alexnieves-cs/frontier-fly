@@ -77,3 +77,32 @@ jobs:
       - run: npm run test:e2e
       # Serve dist/ with no COOP/COEP headers, as GitHub Pages does, and load every page.
       - run: npm run check:pages
+
+  # FrontierBench entries: re-score every submitted pilot from its code (scripts/bench/verify.ts).
+  # Runs for fork pull requests too: it needs no secrets, and the token here is read-only.
+  bench-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then base=$(git rev-parse HEAD~1); fi
+          # Entry folders that still exist, with plain names only (letters, digits, - and _).
+          dirs=$(git diff --name-only "$base" HEAD -- bench/entries | cut -d/ -f1-3 | sort -u | { grep -E '^bench/entries/[A-Za-z0-9_-]+$' || true; } | while read -r d; do if [ -d "$d" ]; then echo "$d"; fi; done | tr '\n' ' ')
+          echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
+      - if: steps.changed.outputs.dirs != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.changed.outputs.dirs != ''
+        run: npm ci
+      - if: steps.changed.outputs.dirs != ''
+        env:
+          DIRS: ${{ steps.changed.outputs.dirs }}
+        # DIRS holds only validated folder names; word splitting is intended.
+        run: npm run bench:verify -- $DIRS
