@@ -342,18 +342,18 @@ The single-drone results above say coverage is limited by flight time. The direc
 
 ### Results
 
-Commit `c9b65d7`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.
+Commit `c518149`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.
 
-| Building | Team | Searched (95% CI) | vs 1 drone | Median time to 50% | Median time to 80% | Points per drone-minute | Overlap | Base knows at end | Packets through |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Hard 20 m | 1 drone | 63.2% (60.4%–66.1%) | — | 97 s | not reached | 31.6 | 1.00 | 63.2% | 96.1% |
-| Hard 20 m | 2 drones | 94.4% (93.9%–94.9%) | +31.2 pts | 50 s | 84 s | 23.6 | 1.06 | 94.2% | 97.2% |
-| Hard 20 m | 3 drones | 95.1% (95.1%–95.1%) | +31.8 pts | 34 s | 59 s | 15.8 | 1.12 | 94.8% | 98.0% |
-| Hard 20 m | 4 drones | 95.1% (95.1%–95.1%) | +31.9 pts | 27 s | 45 s | 11.9 | 1.16 | 94.7% | 98.3% |
-| Large 40 m | 1 drone | 29.5% (28.5%–30.4%) | — | not reached | not reached | 7.4 | 1.00 | 29.4% | 87.2% |
-| Large 40 m | 2 drones | 55.9% (54.1%–57.8%) | +26.5 pts | 218 s | not reached | 7.0 | 1.04 | 55.8% | 81.3% |
-| Large 40 m | 3 drones | 79.1% (76.9%–81.3%) | +49.6 pts | 147 s | not reached | 6.6 | 1.10 | 79.0% | 80.5% |
-| Large 40 m | 4 drones | 93.2% (92.3%–94.2%) | +63.8 pts | 115 s | 188 s | 5.8 | 1.18 | 93.1% | 81.0% |
+| Building | Team | Searched (95% CI) | vs 1 drone | Median time to 50% | Median time to 80% | Points per drone-minute | Overlap | Base knows at end | Packets through | Team battery, Wh | Points per Wh |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hard 20 m | 1 drone | 63.2% (60.4%–66.1%) | — | 97 s | not reached | 31.6 | 1.00 | 63.2% | 96.1% | 5.3 | 12.1 |
+| Hard 20 m | 2 drones | 94.4% (93.9%–94.9%) | +31.2 pts | 50 s | 84 s | 23.6 | 1.06 | 94.2% | 97.2% | 8.9 | 10.7 |
+| Hard 20 m | 3 drones | 95.1% (95.1%–95.1%) | +31.8 pts | 34 s | 59 s | 15.8 | 1.12 | 94.8% | 98.0% | 9.3 | 10.4 |
+| Hard 20 m | 4 drones | 95.1% (95.1%–95.1%) | +31.9 pts | 27 s | 45 s | 11.9 | 1.16 | 94.7% | 98.3% | 9.6 | 10.0 |
+| Large 40 m | 1 drone | 29.5% (28.5%–30.4%) | — | not reached | not reached | 7.4 | 1.00 | 29.4% | 87.2% | 10.5 | 2.8 |
+| Large 40 m | 2 drones | 55.9% (54.1%–57.8%) | +26.5 pts | 218 s | not reached | 7.0 | 1.04 | 55.8% | 81.3% | 21.0 | 2.7 |
+| Large 40 m | 3 drones | 79.1% (76.9%–81.3%) | +49.6 pts | 147 s | not reached | 6.6 | 1.10 | 79.0% | 80.5% | 31.1 | 2.5 |
+| Large 40 m | 4 drones | 93.2% (92.3%–94.2%) | +63.8 pts | 115 s | 188 s | 5.8 | 1.18 | 93.1% | 81.0% | 39.7 | 2.4 |
 
 ![Mean searched floor over time for one to four drones](report/team-curves.svg)
 
@@ -379,6 +379,7 @@ Ablations, three drones:
 - **Sharing maps is most of the gain.** Without the radio each drone explores alone and covers what the others already did: −46.3 pts (95% CI −49.1 pts to −43.0 pts) against the full team on large buildings, and overlap near 2.7.
 - **Splitting frontiers adds a few points and keeps drones apart.** Without claims the drones share maps but chase the same frontiers: −3.3 pts (95% CI −4.6 pts to −1.8 pts), and they spend many more steps within 0.35 m of each other.
 - **The radio limits what the base knows, not how much gets searched.** A perfect radio changes coverage by −0.0 pts (95% CI −0.0 pts to +0.0 pts). With the 0 dBm radio the base trails the truth by 0.1% / 1.0% (mean / worst); with the −10 dBm radio by 1.1% / 7.5%.
+- **Energy follows drone count, and no pack runs low.** The battery column integrates the power model from the speed study (`DEFAULT_BATTERY`, 74 Wh pack) over each drone's flight. A 240 s search never uses more than 16.9% of any drone's usable pack, so endurance does not bind at this budget; time does. Searched points per team Wh fall slowly with team size on large buildings (2.8 for one drone, 2.4 for four), because extra drones spend some of their flight on ground a teammate already covered. Without the radio, each searched point costs more than twice the energy.
 - **A dedicated relay is not worth a drone here.** On the weak radio it changes the worst awareness gap by −5.4 pts (95% CI −7.3 pts to −3.8 pts) (0.2% / 2.1% against 1.1% / 7.5%) and coverage by −22.6 pts (95% CI −24.1 pts to −21.1 pts). Three explorers already chain the link back to the base most of the time. A relay should pay where the building is deeper than the team can chain, or where an operator needs a live picture more than a fast one.
 
 The live page (`team.html`) runs this code in the browser: the truth beside what the base sees, with the radio links drawn.
@@ -428,7 +429,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
 - **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts 96% success and 77% of searches succeed.
-- **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: 2082 steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day, and the battery is not modelled in the team bench yet.
+- **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: 2082 steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day. The bench reports battery energy, but no drone turns back for a low pack, since none comes close in 240 s.
 - **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 

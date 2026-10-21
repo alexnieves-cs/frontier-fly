@@ -12,6 +12,7 @@ import { bootstrapCi } from './common';
 import { DEFAULT_CLAIMS, type ClaimOptions } from '../../src/team/allocate';
 import { TEAM_CONDITIONS, teamEpisodeSetup } from '../../src/team/conditions';
 import { runTeam, TIME_KEYS, type Comms, type Role, type TeamResult } from '../../src/team/run';
+import { DEFAULT_BATTERY } from '../../src/mission/autonomy/battery';
 
 export const SEEDS_PER_CONDITION = 30;
 export const EVAL_SEED_BASE: Record<string, number> = { hard: 70001, large: 71001 };
@@ -77,6 +78,7 @@ function arg(name: string, fallback: string): string {
 }
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
 /** Paired difference arm - base over the same seeds, with a bootstrap interval. */
 function paired(rows: Row[], condition: string, arm: string, base: string, key: (r: Row) => number) {
@@ -114,6 +116,11 @@ export function summarize(rows: Row[]) {
         coveragePerDroneMinute: (mean(cov) * 100) / (a.drones * minutes),
         timeTo,
         overlap: mean(rs.map((r) => r.overlap)),
+        // Battery energy (DEFAULT_BATTERY power model): the team's total, the most any one drone used as a share of
+        // its usable pack, and coverage points per team Wh.
+        energyWh: mean(rs.map((r) => sum(r.energyWh))),
+        maxPackUsed: mean(rs.map((r) => Math.max(...r.energyWh) / (DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction))),
+        coveragePerWh: mean(rs.map((r) => (r.coverage * 100) / Math.max(1e-9, sum(r.energyWh)))),
         collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
         droneContactsPerEpisode: mean(rs.map((r) => r.droneContacts)),
         delivery: mean(rs.map((r) => r.packets.delivered / Math.max(1, r.packets.sent))),

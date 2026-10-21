@@ -194,5 +194,9 @@ describe('team runs', () => {
     expect(duo.perDrone.length).toBe(2);
     expect(duo.baseKnown).toBeLessThanOrEqual(duo.coverage + 1e-9);
     expect(duo.droneContacts).toBe(0);
+    // Each drone draws at least hover power for its 45 s budget (~2 Wh at ~150 W), well inside a 74 Wh pack.
+    expect(again.energyWh).toEqual(duo.energyWh);
+    for (const wh of duo.energyWh) expect(wh).toBeGreaterThan(1);
+    expect(Math.max(...duo.energyWh)).toBeLessThan(10);
   });
 });
