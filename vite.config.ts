@@ -50,6 +50,7 @@ export default defineConfig({
         outdoor: resolve(root, 'outdoor.html'),
         demo: resolve(root, 'demo.html'),
         film: resolve(root, 'film.html'),
+        race: resolve(root, 'race.html'),
       },
     },
   },
