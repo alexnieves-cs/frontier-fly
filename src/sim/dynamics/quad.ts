@@ -1,5 +1,5 @@
 import type { DroneState, DynParams, Dynamics } from '../../shared/types';
-import { GRAVITY } from '../../shared/constants';
+import { GRAVITY, MAX_SPEED_V, MAX_YAW_RATE } from '../../shared/constants';
 import { integrateQuat, quatFromEulerZXY, quatNormalize, quatToEulerInto, rotateBodyToWorld, rotateWorldToBody } from './spatial';
 import { AngleController } from './controller';
 
@@ -67,6 +67,10 @@ export class QuadrotorDynamics implements Dynamics {
   }
   /** Specific force of the last step in the body frame, m/s² (what an accelerometer measures). */
   readonly specificForce: [number, number, number] = [0, 0, 0];
+
+  setSpeedLimit(speedH: number): void {
+    this.ctrl.setLimits(speedH, MAX_SPEED_V, MAX_YAW_RATE);
+  }
 
   /** The flight controller, so a vehicle can set its limits and gains. */
   get controller(): AngleController {

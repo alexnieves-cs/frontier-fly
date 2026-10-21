@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (222 files, 43,247 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (239 files, 45,836 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -49,6 +49,8 @@ The same loop runs in the browser when you press **Train**, so a visitor can wat
 
 ## Mission layer
 
+`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them.
+
 `src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, the canonical share-link encoding, and a run session. It talks to the world and the detector only through `WorldProvider` and `DetectionSource`, so the planner page does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear.
 
 ## Limits of the indoor stack
@@ -75,17 +77,20 @@ Edges are relative imports between modules. The label is the number of import st
 ```mermaid
 flowchart LR
   app["app"]
+  bench["bench"]
   eval["eval"]
   film["film"]
   gen["gen"]
   landing["landing"]
   mission["mission"]
   perception["perception"]
+  plans["plans"]
   px4["px4"]
   rl["rl"]
   shared["shared"]
   sim["sim"]
   targets["targets"]
+  team["team"]
   train["train"]
   ui["ui"]
   ui_mission["ui/mission"]
@@ -94,6 +99,9 @@ flowchart LR
   world_outdoor["world/outdoor"]
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
+  bench -->|2| eval
+  bench -->|2| shared
+  bench -->|8| sim
   eval -->|3| gen
   eval -->|34| mission
   eval -->|2| rl
@@ -118,6 +126,9 @@ flowchart LR
   perception -->|6| shared
   perception -->|1| sim
   perception -->|6| targets
+  plans -->|2| gen
+  plans -->|3| shared
+  plans -->|2| sim
   px4 -->|8| mission
   px4 -->|4| world_outdoor
   px4 -->|2| world_outdoor_viz
@@ -128,10 +139,15 @@ flowchart LR
   rl -->|1| workers
   sim -->|1| eval
   sim -->|8| gen
+  sim -->|1| mission
   sim -->|1| rl
   sim -->|35| shared
   targets -->|2| gen
   targets -->|6| shared
+  team -->|2| eval
+  team -->|3| gen
+  team -->|11| shared
+  team -->|6| sim
   train -->|1| eval
   train -->|1| gen
   train -->|8| rl
@@ -139,14 +155,15 @@ flowchart LR
   train -->|10| sim
   train -->|2| workers
   ui_mission -->|25| mission
-  ui -->|3| app
+  ui -->|4| app
   ui -->|2| eval
   ui -->|1| gen
   ui -->|9| mission
   ui -->|11| rl
-  ui -->|24| shared
+  ui -->|28| shared
   ui -->|14| sim
   ui -->|1| targets
+  ui -->|4| team
   ui -->|3| viz
   ui -->|2| workers
   ui -->|2| world_outdoor
@@ -170,19 +187,22 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
+| `src/bench` | 4 | 198 | `eval`, `shared`, `sim` | — | — |
 | `src/eval` | 10 | 1,446 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
-| `src/gen` | 7 | 1,350 | `shared` | — | — |
-| `src/landing` | 1 | 151 | `film` | — | — |
+| `src/gen` | 7 | 1,357 | `shared` | — | — |
+| `src/landing` | 1 | 152 | `film` | — | — |
 | `src/mission` | 57 | 13,702 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
+| `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 6 | 1,263 | `mission`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
 | `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
-| `src/shared` | 5 | 570 | — | — | — |
-| `src/sim` | 23 | 4,820 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
+| `src/shared` | 5 | 579 | — | — | — |
+| `src/sim` | 23 | 4,885 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
+| `src/team` | 6 | 1,019 | `eval`, `gen`, `shared`, `sim` | — | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 26 | 4,328 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
+| `src/ui` | 29 | 4,887 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 5 | 2,050 | `mission` | — | — |
 | `src/viz` | 19 | 2,332 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 873 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
@@ -218,3 +238,4 @@ Each page is its own Vite entry. The production build also loads `coi-servicewor
 | `px4.html` | `src/px4/page.ts` | `px4` |
 | `race.html` | `src/ui/race/main.ts` | `ui` |
 | `sim.html` | `src/main.ts` | `app` |
+| `team.html` | `src/ui/team/main.ts` | `ui` |

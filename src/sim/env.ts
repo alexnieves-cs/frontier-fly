@@ -3,6 +3,7 @@ import {
   COVERAGE_SUCCESS,
   MAX_HARD_COLLISIONS,
   OBS_DIM,
+  MAX_SPEED_H,
   PHYSICS_DT,
   PHYSICS_SUBSTEPS,
   POLICY_DT,
@@ -23,6 +24,7 @@ import { isWalkable } from '../gen/validate';
 import { frontierDistance } from './frontier';
 import { FrontierNav } from './frontierFeatures';
 import { EgoMaps, SeenMap } from './seenMap';
+import { DEFAULT_BATTERY, powerFor } from '../mission/autonomy/battery';
 
 export function defaultEpisodeConfig(stage = 0, nRooms = 1): EpisodeConfig {
   return {
@@ -74,6 +76,9 @@ export class ExplorerEnv implements Env {
   private steps = 0;
   private stall = 0;
   private maxSteps = 1000;
+  private speedH = MAX_SPEED_H;
+  private energyWh = 0;
+  private readonly accel: [number, number, number] = [0, 0, 0];
   private stallLimit = STALL_STEPS;
   private yawRate = 0;
   private prevYaw = 0;
@@ -118,6 +123,9 @@ export class ExplorerEnv implements Env {
     this.state = makeDroneState([spec.spawn[0], spec.spawn[1], spec.spawn[2]], 0);
     this.dyn = this.cfg.dynamics === 'quad' ? new QuadrotorDynamics() : new KinematicDynamics();
     this.dyn.reset(this.state, this.cfg.dyn);
+    this.speedH = this.cfg.speedH ?? MAX_SPEED_H;
+    this.dyn.setSpeedLimit?.(this.speedH);
+    this.energyWh = 0;
     const floor0 = spec.floors[0]!;
     const vw = floor0.w * 2;
     const vd = floor0.d * 2;
@@ -166,7 +174,7 @@ export class ExplorerEnv implements Env {
         info: this.info(false, false),
       };
     }
-    scaleAction(action, this.scaled);
+    scaleAction(action, this.scaled, this.speedH);
     // The latency line keeps references, so it needs its own copy; without latency it returns the input.
     const delayed = this.noise.latency(this.latencyTicks > 0 ? new Float32Array(this.scaled) : this.scaled);
     this.held[0] = delayed[0] ?? 0;
@@ -258,6 +266,8 @@ export class ExplorerEnv implements Env {
     this.penalty = this.progress.update(this.state.pos[0], this.state.pos[1], newVoxels, action);
     const reward = base - this.penalty.total;
     this.prevAction.set(action.length >= 4 ? action.subarray(0, 4) : action);
+    for (let i = 0; i < 3; i++) this.accel[i] = (this.state.vel[i]! - this.prevVel[i]!) / POLICY_DT;
+    this.energyWh += (powerFor(DEFAULT_BATTERY, this.state.vel, this.accel) * POLICY_DT) / 3600;
     this.prevVel[0] = this.state.vel[0];
     this.prevVel[1] = this.state.vel[1];
     this.prevVel[2] = this.state.vel[2];
@@ -355,6 +365,11 @@ export class ExplorerEnv implements Env {
     return this.visitedCount / this.spec.reachableVoxels;
   }
 
+  /** Horizontal speed a full action asks for this episode, m/s. */
+  get speedLimit(): number {
+    return this.speedH;
+  }
+
   get stepCount(): number {
     return this.steps;
   }
@@ -422,6 +437,7 @@ export class ExplorerEnv implements Env {
       newRoom,
       newFloor,
       success,
+      energyWh: this.energyWh,
       penalty: this.penalty,
     };
   }

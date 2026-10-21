@@ -12,8 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { OracleGain } from '../../src/eval/gainLabels';
 import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
-import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
-import { InferPolicy } from '../../src/rl/infer';
+import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { RNG } from '../../src/shared/rng';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
@@ -23,6 +22,9 @@ import { QUAD_BRAKING } from '../../src/sim/sensorPlanner';
 import { heuristicAction } from '../../src/sim/heuristic';
 import type { LightingPreset } from '../../src/sim/lighting';
 import { waypointAction } from '../../src/sim/waypointPilot';
+import { bootstrapCi, loadPolicy } from './common';
+
+export { bootstrapCi, loadPolicy };
 
 export const SEEDS_PER_CONDITION = 30;
 
@@ -105,13 +107,6 @@ export function jobs(): Job[] {
 
 type Act = (obs: Float32Array, env: ExplorerEnv) => Float32Array;
 
-export function loadPolicy(path: string): (obs: Float32Array) => Float32Array {
-  const ck = parseCheckpoint(readFileSync(path));
-  const policy = new InferPolicy(ck.obsDim, ck.actDim, ck.hidden, 1);
-  policy.setWeights(ck.weights.map((row) => Float32Array.from(row).buffer));
-  const rng = new RNG(1);
-  return (obs) => policy.actWith(obs, 1, rng, true).action.slice();
-}
 
 export const GAIN_MODEL_PATH = 'public/models/mappred.json';
 let gainData: GainModelData | null = null;
@@ -128,10 +123,17 @@ export interface Episode {
   act: Act;
 }
 
-/** Build the env and pilot for a job, reset and ready to step. */
-export async function startEpisode(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Episode> {
+/**
+ * Build the env and pilot for a job, reset and ready to step. `setup` replaces the generated
+ * building (the real-plan study passes converted floor plans).
+ */
+export async function startEpisode(
+  job: Job,
+  policy: (obs: Float32Array) => Float32Array,
+  setup: ReturnType<typeof evalEpisodeSetup> = evalEpisodeSetup(job.stage, job.seed, job.lighting),
+): Promise<Episode> {
   const env = await createEnv();
-  const { spec, envSeed, cfg } = evalEpisodeSetup(job.stage, job.seed, job.lighting);
+  const { spec, envSeed, cfg } = setup;
   if (job.quad > 0) {
     const rng = new RNG(job.seed, 'study-dr');
     cfg.dynamics = 'quad';
@@ -176,8 +178,12 @@ export async function startEpisode(job: Job, policy: (obs: Float32Array) => Floa
   return { env, spec, cfg, obs, act };
 }
 
-export async function runJob(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Result> {
-  const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy);
+export async function runJob(
+  job: Job,
+  policy: (obs: Float32Array) => Float32Array,
+  setup?: ReturnType<typeof evalEpisodeSetup>,
+): Promise<Result> {
+  const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy, setup);
   let obs = first;
   let coverage = 0;
   let collisions = 0;
@@ -201,19 +207,6 @@ function arg(name: string, fallback: string): string {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1]! : fallback;
 }
 
-/** Bootstrap 95% interval of the mean, deterministic. */
-export function bootstrapCi(xs: number[], resamples = 2000): [number, number] {
-  if (!xs.length) return [0, 0];
-  const rng = new RNG(7, 'bootstrap');
-  const means: number[] = [];
-  for (let b = 0; b < resamples; b++) {
-    let sum = 0;
-    for (let i = 0; i < xs.length; i++) sum += xs[Math.floor(rng.next() * xs.length)]!;
-    means.push(sum / xs.length);
-  }
-  means.sort((a, b) => a - b);
-  return [means[Math.floor(resamples * 0.025)]!, means[Math.floor(resamples * 0.975)]!];
-}
 
 export function summarizeStudy(rows: Result[]) {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -241,7 +234,10 @@ export function summarizeStudy(rows: Result[]) {
   return cells;
 }
 
-if (process.argv.includes('--merge')) {
+// Other studies import this module; only run the CLI when it is the entry script.
+const MAIN = process.argv.some((a) => a.endsWith('coverage-study.ts'));
+
+if (MAIN && process.argv.includes('--merge')) {
   const outPath = arg('out', 'docs/study.json');
   const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== outPath);
   const rows: Result[] = files.flatMap((f) =>
@@ -262,7 +258,7 @@ if (process.argv.includes('--merge')) {
   };
   writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`wrote ${outPath} from ${rows.length} episodes`);
-} else if (process.argv.includes('--shard')) {
+} else if (MAIN && process.argv.includes('--shard')) {
   const shard = Number(arg('shard', '0'));
   const of = Number(arg('of', '1'));
   const out = arg('out', `study-${shard}.jsonl`);

@@ -13,7 +13,8 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 59 s restricted mean time against 274 s over 100 fresh daytime scenes, a paired difference of -215 s (95% CI -275 to -156 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -11 s (95% CI -25 to +2 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+151 s (95% CI +54 to +249 s) against the sweep-width lanes).
 - **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage (43.6% for the planner, 27.0% for the policy, 22.7% for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from 6.7 to 1.2 per episode and the guarded policy's from 14.5 to 2.1. Whole missions flown on the quadrotor meet the expected outcome in 91.1% (planner) and 91.1% (policy) of flights.
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in 30 of 30 fresh multi-floor buildings and covers 41.8% of them against 37.7% without climbing, with 0.00 collisions per episode. The policy and the teacher still stay on the ground floor.
-- **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² {{R_MP_R2}} against {{R_MP_BASE_R2}}). Ranking frontiers by it leaves coverage unchanged (66.0% against 65.5% on hard buildings), and so does the true hidden gain (64.7%). In this environment coverage is limited by flight time, not by which frontier comes next.
+- **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² 0.94 against 0.45). Ranking frontiers by it leaves coverage unchanged (66.0% against 65.5% on hard buildings), and so does the true hidden gain (64.7%). In this environment coverage is limited by flight time, not by which frontier comes next.
+- **A team of drones is the lever coverage was waiting for.** On 30 fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches 29.5%, three search 79.1% and four 93.2%, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median 59 s; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
 
 ## Setup
 
@@ -172,6 +173,31 @@ On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the poli
 
 A geometry fix in this round changes the multi-floor numbers slightly for pilots that do not climb. Before it, on buildings with three or more floors, a slab opened over every shaft cell of the floor above it, while the physics kept some of those holes closed. The range finders could see through ceilings the drone could not fly through. Slabs and physics now open only where a shaft joins the two floors, and the ground-floor slab no longer has holes over shafts that lead up.
 
+### Speed and energy
+
+Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 5 m/s on the same 30 held-out hard buildings, on the kinematic drone and on the quadrotor with domain randomization, and meters energy along each flight. A full action now asks for the episode's cap, so the shipped policy flies faster without retraining. The planner's speed is set to the cap. Brackets are bootstrap 95% intervals; collisions per episode are in parentheses in the table. The momentum weight was chosen on the tuning buildings (`scripts/study/speed-diag.ts`).
+
+- **On the kinematic drone, speed is the lever.** The planner covers 65.5% (62.2–68.7%) at 2 m/s and 84.4% (81.3–87.3%) at 5 m/s, with no collisions at any speed. Half the building is flown after 89 s at 2 m/s and 60 s at 5 m/s. This is the flight-time limit the map-prediction null result pointed to: choosing better frontiers barely matters, flying them faster does.
+- **Momentum-aware goal choice saves energy, not coverage.** Scoring each frontier by how far the drone would have to swing round to reach it leaves coverage where it was (65.6% at 2 m/s, 84.1% at 5 m/s) and uses 7% less energy at 2 m/s and 21% less at 5 m/s, because the drone brakes and re-accelerates less. Energy is metered with the mission battery model for a 1.2 kg quadrotor, which charges for acceleration and gives nothing back on braking.
+- **The guarded policy also gains from speed; the raw policy does not.** With the lidar guard it covers 60.8% at 2 m/s and 79.8% at 5 m/s, at 3.4 collisions per episode. Without the guard it falls from 60.7% to 32.0%, and most episodes end early at the collision limit, which is why its energy falls. It was trained at 2 m/s and never saw these speeds.
+- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers 42.1% at 2 m/s and 33.6% at 5 m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: 41.3% against 36.9% at 4 m/s. A path tracker that sets a speed for each corner within the airframe's acceleration and starts each turn early did no better on the tuning buildings (44–47% at 2–4 m/s, against 44–46% for the planner with momentum), so it is not shipped.
+- **The guarded policy is the exception on the quadrotor.** It covers 33.6% at 2 m/s and 46.9% at 5 m/s, more than any planner, but at 8.8 collisions per episode. It pushes into corners the planners slow down for.
+
+| Airframe | Pilot | 2 m/s | 3 m/s | 4 m/s | 5 m/s | Energy, Wh (2 → 5 m/s) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Kinematic | Planner | 65.5% (0.0) | 79.3% (0.0) | 83.3% (0.0) | 84.4% (0.0) | 5.23 → 9.28 |
+| Kinematic | Planner + momentum | 65.6% (0.0) | 79.4% (0.0) | 82.2% (0.0) | 84.1% (0.0) | 4.86 → 7.29 |
+| Kinematic | Policy | 60.7% (6.4) | 60.5% (13.9) | 46.1% (16.6) | 32.0% (17.0) | 5.51 → 3.34 |
+| Kinematic | Guarded policy | 60.8% (0.0) | 69.9% (0.7) | 74.9% (2.0) | 79.8% (3.4) | 5.55 → 8.81 |
+| Quadrotor | Planner | 43.6% (6.7) | 40.6% (10.3) | 37.4% (13.8) | 36.3% (13.0) | 5.19 → 4.96 |
+| Quadrotor | Planner + momentum | 45.7% (7.0) | 41.2% (13.1) | 38.8% (14.6) | 39.1% (14.7) | 5.15 → 4.57 |
+| Quadrotor | Planner, braking filter | 42.1% (1.2) | 38.0% (2.3) | 36.9% (2.6) | 33.6% (2.1) | 5.18 → 5.36 |
+| Quadrotor | Planner, braking filter + momentum | 43.7% (1.2) | 42.0% (1.8) | 41.3% (2.5) | 39.8% (2.8) | 5.14 → 5.30 |
+| Quadrotor | Policy | 27.0% (15.3) | 25.0% (17.0) | 20.4% (17.0) | 20.7% (17.0) | 3.84 → 1.62 |
+| Quadrotor | Guarded policy | 33.6% (2.1) | 39.4% (6.0) | 44.3% (7.8) | 46.9% (8.8) | 5.02 → 5.11 |
+
+![Coverage against the speed cap for each pilot, kinematic drone and quadrotor](report/speed.svg)
+
 ### Ablations
 
 Each arm is one `npm run train:indoor` run with the default recipe (BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint), the checkpoint kept by held-out validation, then flown on the coverage study's 30 hard buildings, from `scripts/study/ablations.ts` at `4ef0a1c`. Observation ablations zero the block in training and evaluation alike. Brackets are bootstrap 95% intervals.
@@ -297,9 +323,65 @@ By how the person moved (daytime scenes; found / median time to find):
 
 Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 769 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.
 
-**Is the model calibrated?** Over 18,000 frames on development worlds the model predicts a mean per-frame POD of 14.9% against 19.2% measured (Brier score 0.127). The belief's own POS is checked against outcomes with blind flights: each scene is flown once more with nobody in it, so the POS curve runs to the end of the budget instead of stopping at a find. By day the model predicts {{R_SAR_POS_90_PRED}} success by 90 s and {{R_SAR_POS_300_PRED}} by 300 s; {{R_SAR_POS_90_OBS}} and {{R_SAR_POS_300_OBS}} of searches had confirmed the person by then. With the person placed uniformly the prior is wrong and the model says so poorly: it predicts {{R_SAR_UNI_POS_900_PRED}} success by the end of the budget against {{R_SAR_UNI_POS_900_OBS}} found.
+**Is the model calibrated?** Over 18,000 frames on development worlds the model predicts a mean per-frame POD of 14.9% against 19.2% measured (Brier score 0.127). The belief's own POS is checked against outcomes with blind flights: each scene is flown once more with nobody in it, so the POS curve runs to the end of the budget instead of stopping at a find. By day the model predicts 93% success by 90 s and 93% by 300 s; 88% and 97% of searches had confirmed the person by then. With the person placed uniformly the prior is wrong and the model says so poorly: it predicts 96% success by the end of the budget against 77% found.
 
 ![Left: per-frame POD model against the detector. Right: the belief's probability of success against the fraction found](report/sar-calibration.svg)
+
+## Drone teams
+
+The single-drone results above say coverage is limited by flight time. The direct answer is more drones. Here two to four copies of the sensor-only planner search one building together (`src/team/`).
+
+### Method
+
+- **Radio.** Every drone and a base radio outside the entry talk over a 2.4 GHz link modelled with the multi-wall model: free-space loss plus a fixed loss for each wall the straight line crosses (drywall 3 dB, glass 2 dB, wood 5 dB, concrete 12 dB, metal 26 dB, a floor slab 15 dB; typical 2.4 GHz values from ITU-R P.2040 and indoor measurements), and 4 dB of log-normal shadowing per packet. The transmitter is deliberately weak (0 dBm, sensitivity −82 dBm) so walls matter inside a 40 m building; the weak setting is −10 dBm. The radio reads the true floor plan, as radio waves do; no drone does.
+- **Map sharing.** Each radio keeps the team map as far as it knows it (seen-free and flown voxels) and an append-only log of what it learned. Twice a second it sends every other radio the part of its log that radio has not acknowledged, at most 1,500 voxels per packet; a lost packet is resent next round. What a drone hears it forwards, so maps travel over several hops, through teammates, to the base.
+- **Frontier split.** Each drone runs its own planner on its own copy of the team map. A frontier costs more within 6 m of a goal a lower-numbered teammate announced, and more when a teammate it has heard from is closer to it, in the spirit of coordinated multi-robot exploration and RACER's pairwise split. Without the fixed order, strong goal claims let two drones push each other off their goals in turn. The two weights and the order were picked from 25 settings on the tuning buildings (`docs/team-tuning.json`).
+- **Relay.** In the relay arms the last drone explores until its mean link margin to the base drops below 6 dB, then flies back along its own track to the deepest point with 3 dB to spare and hovers there.
+- **Separation.** Drones are not physics bodies in the simulator, so they cannot hit each other. Each drone instead cuts the part of its velocity that closes on a teammate within 1.5 m, as its lidar filter does for walls, and the bench counts steps where two drone centres come within 0.35 m.
+- **Buildings and metrics.** *Hard* is the coverage study's 20 m stage-3 building and two-minute budget. *Large* tiles four hard floor plans 2 × 2 with doorways between them (the stage-3 generator itself stops at eight rooms, so a 40 m request gives halls wider than the lidar's range) and allows four minutes. Drones launch one second apart from the same entry. Coverage is the union of voxels flown. *Base knows* is the share whose report reached the base radio, the picture an operator could act on; the *awareness gap* is coverage minus base-known, averaged over the run and at its worst.
+
+### Results
+
+Commit `c9b65d7`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.
+
+| Building | Team | Searched (95% CI) | vs 1 drone | Median time to 50% | Median time to 80% | Points per drone-minute | Overlap | Base knows at end | Packets through |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hard 20 m | 1 drone | 63.2% (60.4%–66.1%) | — | 97 s | not reached | 31.6 | 1.00 | 63.2% | 96.1% |
+| Hard 20 m | 2 drones | 94.4% (93.9%–94.9%) | +31.2 pts | 50 s | 84 s | 23.6 | 1.06 | 94.2% | 97.2% |
+| Hard 20 m | 3 drones | 95.1% (95.1%–95.1%) | +31.8 pts | 34 s | 59 s | 15.8 | 1.12 | 94.8% | 98.0% |
+| Hard 20 m | 4 drones | 95.1% (95.1%–95.1%) | +31.9 pts | 27 s | 45 s | 11.9 | 1.16 | 94.7% | 98.3% |
+| Large 40 m | 1 drone | 29.5% (28.5%–30.4%) | — | not reached | not reached | 7.4 | 1.00 | 29.4% | 87.2% |
+| Large 40 m | 2 drones | 55.9% (54.1%–57.8%) | +26.5 pts | 218 s | not reached | 7.0 | 1.04 | 55.8% | 81.3% |
+| Large 40 m | 3 drones | 79.1% (76.9%–81.3%) | +49.6 pts | 147 s | not reached | 6.6 | 1.10 | 79.0% | 80.5% |
+| Large 40 m | 4 drones | 93.2% (92.3%–94.2%) | +63.8 pts | 115 s | 188 s | 5.8 | 1.18 | 93.1% | 81.0% |
+
+![Mean searched floor over time for one to four drones](report/team-curves.svg)
+
+Three drones on large buildings search +49.6 pts (95% CI +48.0 pts to +51.2 pts) more than one. Scaling is close to linear up to three drones: coverage per drone-minute falls only a little as drones are added, and overlap, the flown voxels summed over drones divided by their union, stays near 1.1. On hard buildings two drones already reach the 95% stop, so more drones show up as time to clear rather than coverage.
+
+Ablations, three drones:
+
+| Building | Three drones | Searched | vs 3 drones, full system | Median time to 80% | Base knows at end | Awareness gap, mean / worst | Collisions per episode |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Hard 20 m | 3 drones | 95.1% | — | 59 s | 94.8% | 0.1% / 0.5% | 0.00 |
+| Hard 20 m | 3 drones, no radio (each flies alone) | 65.0% | −30.1 pts (95% CI −34.0 pts to −26.0 pts) | not reached | 0.0% | 33.7% / 65.0% | 0.27 |
+| Hard 20 m | 3 drones, shared maps, no frontier split | 95.1% | +0.0 pts (95% CI −0.0 pts to +0.0 pts) | 61 s | 94.8% | 0.1% / 0.5% | 0.03 |
+| Hard 20 m | 3 drones, perfect radio | 95.1% | +0.0 pts (95% CI +0.0 pts to +0.0 pts) | 59 s | 94.8% | 0.1% / 0.4% | 0.00 |
+| Hard 20 m | 2 explorers + 1 relay | 95.0% | −0.1 pts (95% CI −0.2 pts to +0.0 pts) | 66 s | 94.8% | 0.1% / 0.4% | 0.00 |
+| Large 40 m | 3 drones | 79.1% | — | not reached | 79.0% | 0.1% / 1.0% | 0.00 |
+| Large 40 m | 3 drones, no radio (each flies alone) | 32.8% | −46.3 pts (95% CI −49.1 pts to −43.0 pts) | not reached | 0.0% | 16.6% / 32.8% | 0.27 |
+| Large 40 m | 3 drones, shared maps, no frontier split | 75.9% | −3.3 pts (95% CI −4.6 pts to −1.8 pts) | not reached | 75.7% | 0.1% / 1.1% | 0.00 |
+| Large 40 m | 3 drones, perfect radio | 79.1% | −0.0 pts (95% CI −0.0 pts to +0.0 pts) | not reached | 79.1% | 0.0% / 0.1% | 0.00 |
+| Large 40 m | 2 explorers + 1 relay | 58.4% | −20.7 pts (95% CI −21.9 pts to −19.2 pts) | not reached | 58.4% | 0.0% / 0.3% | 0.00 |
+| Large 40 m | 3 drones, weak radio (-10 dBm) | 79.1% | +0.0 pts (95% CI −0.3 pts to +0.4 pts) | not reached | 76.7% | 1.1% / 7.5% | 0.00 |
+| Large 40 m | 2 explorers + 1 relay, weak radio (-10 dBm) | 56.5% | −22.6 pts (95% CI −24.1 pts to −21.1 pts) | not reached | 55.9% | 0.2% / 2.1% | 0.00 |
+
+- **Sharing maps is most of the gain.** Without the radio each drone explores alone and covers what the others already did: −46.3 pts (95% CI −49.1 pts to −43.0 pts) against the full team on large buildings, and overlap near 2.7.
+- **Splitting frontiers adds a few points and keeps drones apart.** Without claims the drones share maps but chase the same frontiers: −3.3 pts (95% CI −4.6 pts to −1.8 pts), and they spend many more steps within 0.35 m of each other.
+- **The radio limits what the base knows, not how much gets searched.** A perfect radio changes coverage by −0.0 pts (95% CI −0.0 pts to +0.0 pts). With the 0 dBm radio the base trails the truth by 0.1% / 1.0% (mean / worst); with the −10 dBm radio by 1.1% / 7.5%.
+- **A dedicated relay is not worth a drone here.** On the weak radio it changes the worst awareness gap by −5.4 pts (95% CI −7.3 pts to −3.8 pts) (0.2% / 2.1% against 1.1% / 7.5%) and coverage by −22.6 pts (95% CI −24.1 pts to −21.1 pts). Three explorers already chain the link back to the base most of the time. A relay should pay where the building is deeper than the team can chain, or where an operator needs a live picture more than a fast one.
+
+The live page (`team.html`) runs this code in the browser: the truth beside what the base sees, with the radio links drawn.
 
 ## Failure gallery
 
@@ -345,7 +427,9 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **Night confirmation is near the detector's ceiling.** Under the flashlight alone the per-frame confidence barely clears the 0.8 threshold, so confirmation needs several clean bearings. A target boxed in by furniture can leave too few.
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
-- **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts {{R_SAR_UNI_POS_900_PRED}} success and {{R_SAR_UNI_POS_900_OBS}} of searches succeed.
+- **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts 96% success and 77% of searches succeed.
+- **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: 2082 steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day, and the battery is not modelled in the team bench yet.
+- **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -357,9 +441,12 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Tuning the sensor planner and guard | Coverage buildings 9101–9108 |
 | Tuning the mission explorer and re-views | Mission worlds 9101–9116 and the three showcase seeds |
 | Coverage study (reported) | 20001+, 30001+, 40001+, 50001+ (30 each) |
+| Speed study (reported) | 30001+ and 50001+, the coverage study's hard and quadrotor buildings |
 | Mission bench (reported) | 9600–9629 |
 | Tuning the outdoor search, its prior and POD model | 7100–7139 |
 | Outdoor search bench (reported) | 7600–7699 (day), 7600–7659 (uniform person, night) |
+| Tuning the team's frontier split | 66001–66016 (hard and large) |
+| Drone-team bench (reported) | 70001–70030 (hard), 71001–71030 (large) |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -368,7 +455,9 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
 npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
+npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
+npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README

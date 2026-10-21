@@ -66,6 +66,12 @@ export interface SensorPlannerOptions {
    * (brakingFilter) instead of the kinematic closing-speed rule.
    */
   braking?: BrakingModel;
+  /**
+   * Meters of path a full reversal at 1 m/s costs when choosing the next
+   * frontier: goals ahead of the current velocity win ties, so a drone that
+   * can't turn on the spot sweeps instead of zig-zagging. 0 = off.
+   */
+  momentum?: number;
   /** Margin the braking filter keeps, meters (default BRAKING_MARGIN). */
   brakingMargin?: number;
   /**
@@ -76,6 +82,19 @@ export interface SensorPlannerOptions {
   gain?: GainSource;
   /** Path cost, in voxel steps, traded for one voxel of predicted gain. */
   gainWeight?: number;
+  /**
+   * Extra cost per frontier candidate, in voxel steps (team/allocate.ts: frontiers a
+   * teammate has claimed cost more). Must be zero or positive.
+   */
+  penalty?: CandidatePenalty;
+}
+
+/** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
+export interface CandidatePenalty {
+  /** Called once per replan, before any cost() on that floor. */
+  prepare(floor: number, vw: number): void;
+  /** Cost of voxel k on the floor plane (k = vy * vw + vx), in voxel steps. */
+  cost(k: number): number;
 }
 
 /** Free air the safety filter keeps between the airframe edge and a lidar return, meters. */
@@ -246,8 +265,11 @@ export class SensorPlanner {
   readonly horizon: number;
   readonly braking: BrakingModel | null;
   readonly brakingMargin: number;
+  readonly momentum: number;
   readonly gain: GainSource | null;
   readonly gainWeight: number;
+  /** Swappable so a team can attach its claim map after construction. */
+  penalty: CandidatePenalty | null;
   private n = 0;
   private dist = new Float64Array(0);
   private prev = new Int32Array(0);
@@ -273,8 +295,10 @@ export class SensorPlanner {
     this.horizon = opts.horizon ?? SAFETY_HORIZON;
     this.braking = opts.braking ?? null;
     this.brakingMargin = opts.brakingMargin ?? BRAKING_MARGIN;
+    this.momentum = opts.momentum ?? 0;
     this.gain = opts.gain ?? null;
     this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
+    this.penalty = opts.penalty ?? null;
   }
 
   reset(): void {
@@ -404,9 +428,14 @@ export class SensorPlanner {
     const keep = this.goalFloor === floor ? this.goal % this.plane : -1;
     const gain = this.gain;
     const gw = this.gainWeight;
+    const mom = this.momentum;
+    const vel = f.vel ?? [0, 0];
+    const vmag = Math.hypot(vel[0], vel[1]);
     // How far past the cheapest candidate a better one could still lie, once gains are counted.
     const reach = gain ? gw * gain.max : 0;
     if (gain) gain.prepare({ vw, vd, base, seen: f.seen, visited: f.visited, occupied: f.occupied });
+    const claim = this.penalty;
+    claim?.prepare(floor, vw);
     while (size > 0) {
       const k = pop();
       if (done[k]! & 128) continue;
@@ -416,8 +445,17 @@ export class SensorPlanner {
         // Prefer frontier voxels that border flown or blocked space: sweeping edges first
         // leaves fewer isolated stragglers to come back for.
         let score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
+        // Momentum: a goal behind the drone costs the distance it takes to stop and come back.
+        if (mom > 0) {
+          const ox = ((k % vw) + 0.5) * VOXEL - f.pos[0];
+          const oy = (Math.floor(k / vw) + 0.5) * VOXEL - f.pos[1];
+          const ol = Math.hypot(ox, oy);
+          if (ol > 1e-6) score += mom * (1 - (ox * vel[0] + oy * vel[1]) / (ol * vmag + 1e-6)) * 0.5 * vmag;
+        }
         // The gain is only worth computing where it could still change the choice.
         if (gain && score - reach < bestCost) score -= gw * gain.gain(k);
+        // A penalty only raises the score, so the early-exit bound below still holds.
+        if (claim) score += claim.cost(k);
         if (k === keep) keepCost = score;
         if (score < bestCost) {
           bestCost = score;
@@ -588,13 +626,14 @@ export function commandToAction(
   cmd: { vx: number; vy: number; vz: number; yawRate: number },
   yaw: number,
   out = new Float32Array(4),
+  speedH = MAX_SPEED_H,
 ): Float32Array {
   const cy = Math.cos(yaw);
   const sy = Math.sin(yaw);
   const fwd = cy * cmd.vx + sy * cmd.vy;
   const left = -sy * cmd.vx + cy * cmd.vy;
-  out[0] = clamp(fwd / MAX_SPEED_H, -1, 1);
-  out[1] = clamp(left / MAX_SPEED_H, -1, 1);
+  out[0] = clamp(fwd / speedH, -1, 1);
+  out[1] = clamp(left / speedH, -1, 1);
   out[2] = clamp(cmd.vz / MAX_SPEED_V, -1, 1);
   out[3] = clamp(cmd.yawRate / MAX_YAW_RATE, -1, 1);
   return out;
@@ -634,16 +673,17 @@ export function guardAction(
   out = new Float32Array(4),
   horizon = GUARD_HORIZON,
   braking?: { model: BrakingModel; vel: readonly [number, number] | null },
+  speedH = MAX_SPEED_H,
 ): Float32Array {
   const cy = Math.cos(yaw);
   const sy = Math.sin(yaw);
-  const f = clamp(action[0] ?? 0, -1, 1) * MAX_SPEED_H;
-  const l = clamp(action[1] ?? 0, -1, 1) * MAX_SPEED_H;
+  const f = clamp(action[0] ?? 0, -1, 1) * speedH;
+  const l = clamp(action[1] ?? 0, -1, 1) * speedH;
   const [vx, vy] = braking
     ? brakingFilter(cy * f - sy * l, sy * f + cy * l, yaw, lidar, braking.vel, braking.model, GUARD_BRAKING_MARGIN)
     : filterVelocity(cy * f - sy * l, sy * f + cy * l, yaw, lidar, GUARD_MARGIN, horizon);
-  out[0] = (cy * vx + sy * vy) / MAX_SPEED_H;
-  out[1] = (-sy * vx + cy * vy) / MAX_SPEED_H;
+  out[0] = (cy * vx + sy * vy) / speedH;
+  out[1] = (-sy * vx + cy * vy) / speedH;
   out[2] = clamp((action[2] ?? 0) + (GUARD_HEIGHT - heightAboveFloor) * 2, -1, 1);
   if (out[2] < 0 && heightAboveFloor > 0.55 && !descentClear(lidar)) out[2] = 0;
   out[3] = clamp(action[3] ?? 0, -1, 1);
