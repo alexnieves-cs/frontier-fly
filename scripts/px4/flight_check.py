@@ -489,6 +489,9 @@ def main() -> int:
     for c in report["checks"]:
         print(f"  [{'pass' if c['ok'] else 'FAIL'}] {c['label']}: {c.get('value')}" + (f" (limit {c['limit']})" if "limit" in c else ""))
     print(f"{report['id']}: {'PASS' if report['ok'] else 'FAIL'} in {report.get('flightSec', 0)} s sim (plan estimate {est:.0f} s)")
+    if not report["ok"]:
+        for t, sev, text in report.get("statustext", []):
+            print(f"    PX4 {t:7.1f} s  {text.strip()}")
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=1) + "\n")
     return 0 if report["ok"] else 1

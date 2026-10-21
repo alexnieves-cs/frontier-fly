@@ -71,10 +71,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # At 4x on a CI runner, PX4 sometimes raised a failsafe that the flight did not
+          # cause (once a stale battery simulator, once right after takeoff); 2x has not.
           - sim: sih
-            speed: 4
-          # At 4x, PX4's own battery simulator once went stale for 5 s of PX4 time during a
-          # bridge run and PX4 raised a battery failsafe; 2x has not.
+            speed: 2
           - sim: bridge
             speed: 2
     steps:

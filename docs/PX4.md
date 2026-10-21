@@ -105,7 +105,7 @@ CI=1 scripts/px4/run-browser-check.sh test-results/px4/plans/woods-4242-rtl.plan
 npx vite-node scripts/px4/report.ts -- --sih test-results/px4/sih --bridge test-results/px4/bridge --browser test-results/px4/browser --write
 ```
 
-`PX4_SIM_SPEED_FACTOR` sets how much faster than real time the headless checks run. CI and the table above use 4 for SIH and 2 for the bridge. At 4, one bridge run tripped a PX4 battery failsafe: PX4's own battery simulator stopped publishing for 5 s of PX4 time. The flight itself was clean.
+`PX4_SIM_SPEED_FACTOR` sets how much faster than real time the headless checks run. CI and the table above use 2. At 4, PX4 sometimes raised a failsafe the flight did not cause: once its own battery simulator stopped publishing for 5 s of PX4 time, and once a SIH run failed safe just after takeoff. The flights themselves were clean.
 
 ## Limits
 
