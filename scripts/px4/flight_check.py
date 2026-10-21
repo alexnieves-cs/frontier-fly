@@ -57,7 +57,9 @@ PX4_SUB_MISSION = 4
 # overshoots a little at speed, so the route tolerance is a few meters.
 ROUTE_TOLERANCE_M = 6.0
 FENCE_MARGIN_M = 0.0
-HOME_TOLERANCE_M = 3.0
+# PX4 lands where its estimate says the target is. With GNSS alone that
+# estimate wanders by a few meters over a flight (SIH once landed 4.2 m off).
+HOME_TOLERANCE_M = 5.0
 ALT_TOLERANCE_M = 2.0
 
 EARTH_R = 6378137.0

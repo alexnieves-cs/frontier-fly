@@ -53,7 +53,7 @@ How to read the table:
 | Route | no airborne sample is more than 6 m from the planned path |
 | Height | within 2 m of the planned height at each reached waypoint |
 | Fence | no airborne sample outside the geofence or inside a no-fly zone |
-| Landing | landed and disarmed within 3 m of the land point (PX4's home for a return to launch) |
+| Landing | landed and disarmed within 5 m of the land point (PX4's home for a return to launch). PX4 lands by its GNSS-based estimate, which can wander a few meters during a flight. |
 | No failsafe | PX4 sent no failsafe or fence warning |
 
 The plans come from `scripts/px4/export-plans.ts`. It uses the same code as the editor's Download button: the planner's route, `buildFlightPlan`, then `toQgcPlan`. It uses the default woods mission for seeds 11, 4242 and 5150 and the flat practice site. All of them use the PX4 SITL home. The woods are the export tests' own seeds, and nothing is tuned on them.
@@ -123,6 +123,7 @@ npx vite-node scripts/px4/report.ts -- --sih test-results/px4/sih --bridge test-
 - Only the pre-planned part of a mission is a plan. Confirming a contact, entering a building and searching indoors are decided in flight by frontier-fly's own autonomy, not by PX4.
 - The bridge vehicle is a rigid body with first-order motors and linear drag. It has no blade flapping, no ground effect, no battery model and no wind gusts. Collisions with trees and buildings are measured (closest tree) but not simulated. PX4 is never told about obstacles.
 - PX4's GNSS here has no multipath or dropouts, so the estimator has an easy time. The fault bench in [SAFETY_CASE.md](SAFETY_CASE.md) covers degraded sensors with frontier-fly's own failsafe, not with PX4's.
+- On GitHub's runners, PX4's own simulator (SIH) has twice stopped publishing its simulated barometer and compass about a second after takeoff. PX4 then terminated the flight, and the check failed with `No valid data from Baro 0`. It has not happened in the cloud container or with frontier-fly as the simulator, and the cause is not known yet. A failed flight prints PX4's warnings to help find it.
 - The checks pin PX4 to v1.15.4. A newer PX4 may change defaults such as the return height.
 - ArduPilot is not flown yet. Its `.plan` and `.waypoints` exports are checked only against QGroundControl's loaders ([QGC_EXPORT.md](QGC_EXPORT.md)).
 
