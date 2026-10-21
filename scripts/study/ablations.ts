@@ -71,7 +71,7 @@ function parseLog(path: string): { rounds: Round[]; best: string | null; ppo: { 
 
 function run(args: string[], env: NodeJS.ProcessEnv): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn('npx', ['vite-node', 'scripts/study/coverage-study.ts', '--', ...args], { stdio: 'inherit', env });
+    const child = spawn('npx', ['vite-node', 'scripts/study/coverage-study.ts', '--', ...args], { stdio: 'inherit', env: { ...env, STUDY_ENTRY: 'coverage-study' } });
     child.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`coverage-study exited ${code}`))));
   });
 }

@@ -28,10 +28,10 @@ export const SPEED_CONDITIONS = [
   { id: 'quad', label: 'Hard, quadrotor dynamics + noise', stage: 3, seedBase: 50001, quad: 1 },
 ] as const;
 
-export const SPEED_PILOTS = ['planner', 'plannerMomentum', 'plannerBrake', 'plannerBrakeMomentum', 'policy', 'guarded'] as const;
+export const SPEED_PILOTS = ['planner', 'plannerMomentum', 'plannerBrake', 'plannerBrakeMomentum', 'plannerTrack', 'plannerBrakeTrack', 'policy', 'guarded'] as const;
 type SpeedPilot = (typeof SPEED_PILOTS)[number];
-/** The braking-filter planners fly only the quad, as in the coverage study. */
-const QUAD_ONLY: SpeedPilot[] = ['plannerBrake', 'plannerBrakeMomentum'];
+/** The braking-filter and tracking planners fly only the quad, as in the coverage study. */
+const QUAD_ONLY: SpeedPilot[] = ['plannerBrake', 'plannerBrakeMomentum', 'plannerTrack', 'plannerBrakeTrack'];
 
 interface Job {
   condition: string;
@@ -62,7 +62,9 @@ function jobs(): Job[] {
 
 function plannerOptions(pilot: SpeedPilot, speed: number): SensorPlannerOptions {
   const o: SensorPlannerOptions = { speed };
-  if (pilot === 'plannerBrake' || pilot === 'plannerBrakeMomentum') o.braking = QUAD_BRAKING;
+  if (pilot === 'plannerBrake' || pilot === 'plannerBrakeMomentum' || pilot === 'plannerBrakeTrack') o.braking = QUAD_BRAKING;
+  // Quad-aware trajectory tracking (sim/tracker.ts), defaults tuned on 9101-9108.
+  if (pilot === 'plannerTrack' || pilot === 'plannerBrakeTrack') o.tracker = {};
   if (pilot === 'plannerMomentum' || pilot === 'plannerBrakeMomentum') o.momentum = MOMENTUM;
   return o;
 }
@@ -133,7 +135,7 @@ function summarize(rows: Result[]) {
 
 if (process.argv.includes('--merge')) {
   const outPath = arg('out', 'docs/speed-study.json');
-  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== outPath);
+  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => a.endsWith('.jsonl'));
   const rows: Result[] = files.flatMap((f) =>
     readFileSync(f, 'utf8')
       .split('\n')
@@ -160,7 +162,11 @@ if (process.argv.includes('--merge')) {
   const out = arg('out', `speed-${shard}.jsonl`);
   const policy = loadPolicy(SHIPPED_CHECKPOINT_PATH);
   const env = await createEnv();
-  const mine = jobs().filter((_, i) => i % of === shard);
+  // Optional subset, e.g. `--pilots plannerTrack,plannerBrakeTrack` when adding arms.
+  const pilots = arg('pilots', '').split(',').filter(Boolean);
+  const mine = jobs()
+    .filter((j) => !pilots.length || pilots.includes(j.pilot))
+    .filter((_, i) => i % of === shard);
   const lines: string[] = [];
   const t0 = Date.now();
   for (let i = 0; i < mine.length; i++) {

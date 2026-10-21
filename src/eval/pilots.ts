@@ -43,12 +43,13 @@ export function sensorFrame(env: ExplorerEnv, obs: Float32Array): SensorFrame {
 }
 
 /** Classical sensor-only explorer as a coverage-env pilot. */
-export function classicalPilot(opts: SensorPlannerOptions = {}): { reset(): void; act(obs: Float32Array, env: ExplorerEnv): Float32Array } {
+export function classicalPilot(opts: SensorPlannerOptions = {}): { reset(): void; act(obs: Float32Array, env: ExplorerEnv): Float32Array; planner: SensorPlanner } {
   const planner = new SensorPlanner(opts);
   const out = new Float32Array(4);
   let occ: OccupancyMap | null = null;
   let seen: Uint8Array | null = null;
   return {
+    planner,
     reset: () => planner.reset(),
     act(obs, env) {
       const f = sensorFrame(env, obs);
