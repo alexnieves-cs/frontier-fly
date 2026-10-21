@@ -15,6 +15,7 @@ Frontier-fly ships only assets with a clear free license. Geometry written for t
 | Outdoor terrain, tree, and shell meshes | Forest and building exteriors | Original, this repository | MIT |
 | Three.js post passes (SSAO, SMAA, TAA, bloom, afterimage) | High-preset image effects and FPV trail | [three.js addons](https://github.com/mrdoob/three.js) `0.170.0` | MIT |
 | `public/coi-serviceworker.js` v0.1.7 | Cross-origin isolation on GitHub Pages so `SharedArrayBuffer` works | [gzuidhof/coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) | MIT (header kept in the file) |
+| Five QGroundControl test plans and one Mission Planner waypoint file | Test fixtures for the `.plan` schema and the WPL parser (`tests/fixtures/qgc/`) | [mavlink/qgroundcontrol](https://github.com/mavlink/qgroundcontrol) `test/plans`, `test/MissionManager` | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) (QGC is dual Apache-2.0 / GPL-3.0) |
 | Procedural canvas textures | Fallback if a map fails to load | Original, this repository | MIT |
 | KayKit Rig_Medium mannequin and clips | Simulated people | [Kay Lousberg](https://www.kaylousberg.com), KayKit Character Animations 1.1 | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Backpack, phone, toolbox, medkit, bottle, radio, helmet, blanket, coat, hiding crate | Search objects and decoys | Original procedural meshes, this repository | MIT |

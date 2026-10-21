@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (199 files, 38,250 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (207 files, 39,765 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -112,7 +112,7 @@ flowchart LR
   mission -->|22| shared
   mission -->|15| sim
   mission -->|11| targets
-  mission -->|36| world_outdoor
+  mission -->|37| world_outdoor
   perception -->|6| shared
   perception -->|1| sim
   perception -->|6| targets
@@ -133,7 +133,7 @@ flowchart LR
   train -->|5| shared
   train -->|10| sim
   train -->|2| workers
-  ui_mission -->|16| mission
+  ui_mission -->|25| mission
   ui -->|3| app
   ui -->|2| eval
   ui -->|1| gen
@@ -169,7 +169,7 @@ flowchart LR
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,350 | `shared` | — | — |
 | `src/landing` | 1 | 151 | `film` | — | — |
-| `src/mission` | 44 | 10,892 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 51 | 12,100 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 570 | — | — | — |
@@ -177,7 +177,7 @@ flowchart LR
 | `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 26 | 4,328 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
-| `src/ui/mission` | 4 | 1,743 | `mission` | — | — |
+| `src/ui/mission` | 5 | 2,050 | `mission` | — | — |
 | `src/viz` | 19 | 2,332 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 873 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
 | `src/world/outdoor` | 14 | 1,999 | `gen`, `shared` | Rapier | — |

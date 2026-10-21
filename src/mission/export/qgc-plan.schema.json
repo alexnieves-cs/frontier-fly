@@ -1,0 +1,428 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alexnieves-cs.github.io/frontier-fly/schemas/qgc-plan.schema.json",
+  "title": "QGroundControl Plan file",
+  "description": "A QGroundControl .plan file (plan version 1, mission version 2, geofence version 2, rally version 2). QGroundControl publishes the format as prose, not as a schema. This schema encodes the published format (https://docs.qgroundcontrol.com/master/en/qgc-dev-guide/file_formats/plan.html) and the checks QGroundControl's own loaders run on open: PlanMasterController::_loadPlanJson, MissionController::_loadJsonMissionFileV2, MissionItem::load, SimpleMissionItem::load, GeoFenceController::load, QGCFencePolygon/QGCMapPolygon::loadFromJson, QGCFenceCircle/QGCMapCircle::loadFromJson, RallyPointController::load and GeoJsonHelper::loadGeoCoordinate. Unknown keys are allowed because QGC ignores them. Two checks are stricter than QGC, which would load a meaningless value: latitudes and longitudes must be numbers in range (QGC also takes null), and enum-valued fields must be integers. Survey, corridor and structure scans are accepted as opaque complex items.",
+  "type": "object",
+  "required": [
+    "fileType",
+    "version",
+    "groundStation",
+    "mission",
+    "geoFence",
+    "rallyPoints"
+  ],
+  "properties": {
+    "fileType": {
+      "const": "Plan"
+    },
+    "version": {
+      "const": 1
+    },
+    "groundStation": {
+      "type": "string"
+    },
+    "mission": {
+      "$ref": "#/$defs/mission"
+    },
+    "geoFence": {
+      "$ref": "#/$defs/geoFence"
+    },
+    "rallyPoints": {
+      "$ref": "#/$defs/rallyPoints"
+    }
+  },
+  "$defs": {
+    "nullableNumber": {
+      "description": "A double; JSON null stands for NaN (JsonParsing::possibleNaNJsonValue).",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "latitude": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "longitude": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "coordinate2": {
+      "description": "[latitude, longitude] in degrees.",
+      "type": "array",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/latitude"
+        },
+        {
+          "$ref": "#/$defs/longitude"
+        }
+      ],
+      "items": false,
+      "minItems": 2
+    },
+    "coordinate3": {
+      "description": "[latitude, longitude, altitude]. Altitude may be null (NaN).",
+      "type": "array",
+      "prefixItems": [
+        {
+          "$ref": "#/$defs/latitude"
+        },
+        {
+          "$ref": "#/$defs/longitude"
+        },
+        {
+          "$ref": "#/$defs/nullableNumber"
+        }
+      ],
+      "items": false,
+      "minItems": 3
+    },
+    "mission": {
+      "type": "object",
+      "required": [
+        "version",
+        "firmwareType",
+        "plannedHomePosition",
+        "items"
+      ],
+      "properties": {
+        "version": {
+          "const": 2
+        },
+        "firmwareType": {
+          "description": "MAV_AUTOPILOT.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "vehicleType": {
+          "description": "MAV_TYPE.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "cruiseSpeed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "hoverSpeed": {
+          "type": "number",
+          "minimum": 0
+        },
+        "globalPlanAltitudeMode": {
+          "description": "QGroundControlQmlGlobal::AltitudeFrame: 0 mixed, 1 relative, 2 absolute, 3 calculated above terrain, 4 terrain frame, 5 none.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "plannedHomePosition": {
+          "$ref": "#/$defs/coordinate3"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "enum": [
+                  "SimpleItem",
+                  "ComplexItem"
+                ]
+              }
+            },
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "SimpleItem"
+                }
+              }
+            },
+            "then": {
+              "$ref": "#/$defs/simpleItem"
+            },
+            "else": {
+              "$ref": "#/$defs/complexItem"
+            }
+          }
+        }
+      }
+    },
+    "simpleItem": {
+      "description": "One MAVLink MISSION_ITEM. Current files store param1..param4 then x (latitude), y (longitude), z (altitude) in `params`. QGC still loads two older layouts and converts them on read (MissionItem::_convertJsonV1ToV2 and _convertJsonV2ToV3): four `params` plus a `coordinate`, and separate `param1`..`param4` keys plus a `coordinate`.",
+      "type": "object",
+      "required": [
+        "type",
+        "frame",
+        "command",
+        "autoContinue"
+      ],
+      "properties": {
+        "type": {
+          "const": "SimpleItem"
+        },
+        "frame": {
+          "description": "MAV_FRAME.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "command": {
+          "description": "MAV_CMD.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "autoContinue": {
+          "type": "boolean"
+        },
+        "doJumpId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nullableNumber"
+          }
+        },
+        "Altitude": {
+          "type": "number"
+        },
+        "AltitudeMode": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "AMSLAltAboveTerrain": {
+          "$ref": "#/$defs/nullableNumber"
+        },
+        "coordinate": {
+          "$ref": "#/$defs/coordinate3"
+        },
+        "param1": {
+          "type": "number"
+        },
+        "param2": {
+          "type": "number"
+        },
+        "param3": {
+          "type": "number"
+        },
+        "param4": {
+          "type": "number"
+        }
+      },
+      "oneOf": [
+        {
+          "description": "Current layout.",
+          "required": [
+            "params"
+          ],
+          "not": {
+            "required": [
+              "coordinate"
+            ]
+          },
+          "properties": {
+            "params": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7
+            }
+          }
+        },
+        {
+          "description": "Older layout: position in coordinate.",
+          "required": [
+            "params",
+            "coordinate"
+          ],
+          "properties": {
+            "params": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4
+            }
+          }
+        },
+        {
+          "description": "Oldest layout: param1..param4 keys and a coordinate.",
+          "required": [
+            "param1",
+            "param2",
+            "param3",
+            "param4",
+            "coordinate"
+          ],
+          "not": {
+            "required": [
+              "params"
+            ]
+          }
+        }
+      ],
+      "dependentRequired": {
+        "Altitude": [
+          "AltitudeMode",
+          "AMSLAltAboveTerrain"
+        ],
+        "AltitudeMode": [
+          "Altitude",
+          "AMSLAltAboveTerrain"
+        ],
+        "AMSLAltAboveTerrain": [
+          "Altitude",
+          "AltitudeMode"
+        ]
+      }
+    },
+    "complexItem": {
+      "description": "Survey, CorridorScan or StructureScan. Accepted without inspecting its body.",
+      "type": "object",
+      "required": [
+        "type",
+        "complexItemType"
+      ],
+      "properties": {
+        "type": {
+          "const": "ComplexItem"
+        },
+        "complexItemType": {
+          "type": "string"
+        }
+      }
+    },
+    "geoFence": {
+      "description": "QGC ignores a version 1 or unversioned fence; version 2 is checked in full.",
+      "type": "object",
+      "if": {
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "not": {
+              "const": 1
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "version",
+          "circles",
+          "polygons"
+        ],
+        "properties": {
+          "version": {
+            "const": 2
+          },
+          "polygons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fencePolygon"
+            }
+          },
+          "circles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fenceCircle"
+            }
+          },
+          "breachReturn": {
+            "$ref": "#/$defs/coordinate3"
+          }
+        }
+      }
+    },
+    "fencePolygon": {
+      "type": "object",
+      "required": [
+        "version",
+        "inclusion",
+        "polygon"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "inclusion": {
+          "type": "boolean"
+        },
+        "polygon": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/coordinate2"
+          }
+        }
+      }
+    },
+    "fenceCircle": {
+      "type": "object",
+      "required": [
+        "version",
+        "inclusion",
+        "circle"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "inclusion": {
+          "type": "boolean"
+        },
+        "circle": {
+          "type": "object",
+          "required": [
+            "center",
+            "radius"
+          ],
+          "properties": {
+            "center": {
+              "$ref": "#/$defs/coordinate2"
+            },
+            "radius": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    },
+    "rallyPoints": {
+      "description": "QGC ignores version 1 rally data; otherwise version 2 with [lat, lon, alt] points.",
+      "type": "object",
+      "if": {
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "const": 1
+          }
+        }
+      },
+      "then": true,
+      "else": {
+        "required": [
+          "version",
+          "points"
+        ],
+        "properties": {
+          "version": {
+            "const": 2
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/coordinate3"
+            }
+          }
+        }
+      }
+    }
+  }
+}

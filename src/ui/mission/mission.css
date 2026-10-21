@@ -323,3 +323,41 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .placeholders dd { margin: 0; }
 
 .notes { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+
+.export {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.export summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.export[open] summary { margin-bottom: 10px; }
+.export-warnings { margin: 0 0 10px; padding: 0; list-style: none; }
+.export-warnings li {
+  border-left: 3px solid var(--warn);
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  background: #faf3e6;
+}
+.import-button {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 6px 10px;
+  cursor: pointer;
+  background: var(--surface);
+}
+.import-button:hover { background: #efece4; }
+.export input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.export input[type="file"]:focus-visible + .import-button { outline: 2px solid var(--accent); outline-offset: 2px; }
+[data-testid="export-import-status"][data-state="error"] { color: var(--danger); }
