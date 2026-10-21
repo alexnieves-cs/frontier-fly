@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { sarSection } from './sar.mjs';
+import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
 import { benchSection } from './bench.mjs';
 
@@ -663,7 +664,7 @@ function faultBench(bench, first) {
 // ---------------------------------------------------------------------------------------------
 
 function fill(template, values) {
-  return template.replace(/\{\{([A-Z_]+)\}\}/g, (_, key) => {
+  return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key) => {
     if (!(key in values)) throw new Error(`template key ${key} has no value`);
     return values[key];
   });
@@ -680,12 +681,14 @@ function replaceBlock(text, name, body) {
 
 const ablations = ablationTables(readJson('docs/ablations.json'));
 const sar = sarSection(readJson('docs/sar-bench.json'), readJson('docs/report/sar-belief.json'));
+const team = teamSection(readJson('docs/team-bench.json'));
 const speed = speedSection(readJson('docs/speed-study.json'));
 const values = {
   ...architecture(),
   ...benchmarks(),
   ...ablations.values,
   ...sar.values,
+  ...team.values,
   ...speed.values,
   ...benchSection(ROOT),
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
@@ -700,6 +703,7 @@ const outputs = {
   'docs/LEADERBOARD.md': header + fill(read('scripts/docs/LEADERBOARD.template.md'), values),
   ...ablations.files,
   ...sar.files,
+  ...team.files,
   ...speed.files,
 };
 let readme = read('README.md');

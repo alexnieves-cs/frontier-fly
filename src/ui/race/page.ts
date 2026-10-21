@@ -91,6 +91,7 @@ function markup(): string {
       <nav class="race-nav" aria-label="Pages">
         <a href="./index.html">Home</a>
         <a href="./race.html" aria-current="page">Race</a>
+        <a href="./team.html">Team</a>
         <a href="./demo.html">Missions</a>
         <a href="./sim.html">Sim</a>
         <a href="${REPO}" rel="noopener">GitHub</a>
