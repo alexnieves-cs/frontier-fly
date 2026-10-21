@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (225 files, 43,503 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (229 files, 43,701 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -49,6 +49,8 @@ The same loop runs in the browser when you press **Train**, so a visitor can wat
 
 ## Mission layer
 
+`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them.
+
 `src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, the canonical share-link encoding, and a run session. It talks to the world and the detector only through `WorldProvider` and `DetectionSource`, so the planner page does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear.
 
 ## Limits of the indoor stack
@@ -75,6 +77,7 @@ Edges are relative imports between modules. The label is the number of import st
 ```mermaid
 flowchart LR
   app["app"]
+  bench["bench"]
   eval["eval"]
   film["film"]
   gen["gen"]
@@ -94,6 +97,9 @@ flowchart LR
   world_outdoor["world/outdoor"]
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
+  bench -->|2| eval
+  bench -->|2| shared
+  bench -->|8| sim
   eval -->|3| gen
   eval -->|34| mission
   eval -->|2| rl
@@ -173,6 +179,7 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
+| `src/bench` | 4 | 198 | `eval`, `shared`, `sim` | — | — |
 | `src/eval` | 10 | 1,446 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,350 | `shared` | — | — |
