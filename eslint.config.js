@@ -18,7 +18,7 @@ export default tseslint.config(
   },
   {
     // Node scripts. Browser globals are allowed for code passed to page.evaluate.
-    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/check-pages.mjs'],
+    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/px4/**/*.mjs', 'scripts/check-pages.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {

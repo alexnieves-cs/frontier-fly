@@ -1,0 +1,51 @@
+.topbar .muted, .help .muted { color: var(--muted); font-size: 12px; }
+.topbar a { white-space: nowrap; }
+#download {
+  background: #143024;
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.px4-hud { min-width: 240px; }
+.px4-hud #link { color: var(--amber); font-size: 12px; max-width: 260px; }
+.px4-hud #link[data-link="px4"] { color: var(--cyan); }
+.motors { display: flex; gap: 6px; height: 34px; margin-top: 4px; align-items: flex-end; }
+.motor {
+  position: relative;
+  width: 14px;
+  height: 100%;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  background: #0b1712;
+}
+.motor i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--cyan); }
+
+.help {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  overflow: auto;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(8, 20, 15, 0.9);
+  border: 1px solid var(--line);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  font-size: 14px;
+  line-height: 1.45;
+}
+.help h2 { margin: 0 0 8px; font-size: 17px; }
+.help ol { padding-left: 20px; margin: 8px 0; }
+.help li { margin: 4px 0; }
+.help code { background: #10241c; border-radius: 4px; padding: 1px 4px; font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .topbar { overflow-x: auto; }
+  .topbar .muted { display: none; }
+  #map { width: 150px; height: 150px; }
+}

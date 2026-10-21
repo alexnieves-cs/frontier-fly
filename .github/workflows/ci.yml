@@ -42,6 +42,8 @@ jobs:
       - run: npm run lint
       # Generated docs (README tables, BENCHMARKS.md, REPORT.md) must match the committed JSON.
       - run: npm run docs:check
+      # The PX4 results table in docs/PX4.md must match docs/px4-flight-check.json.
+      - run: npx vite-node scripts/px4/report.ts -- --check
 
   build:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
