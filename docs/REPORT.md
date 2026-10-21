@@ -10,7 +10,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Missions did not get worse without the floor plan.** On 90 fresh mission worlds per explorer, the sensor-only explorer meets the expected outcome in 93.3% of flights, the oracle planner in 88.9%, and the policy with the sensor-only fallback in 91.1%; the intervals overlap. 1 of the 270 flights touched anything. No flight declared a building clear while a target was inside it, and none confirmed a decoy.
 - **A classical sensor-only planner is the stronger indoor coverage pilot.** On 30 fresh hard buildings it covers 65.5% with no collisions. The learned policy covers 60.7% and averages 6.4 collisions per episode; under a lidar guard it keeps its coverage (60.8%) at 0.03 collisions per episode. The oracle teacher it imitates covers 67.3%.
 - **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps and an anchored PPO fine-tune change little. DAgger adds 11 points over behavior cloning.
-- **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 59 s restricted mean time against 264 s over 100 fresh daytime scenes, a paired difference of -205 s (95% CI -264 to -149 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -9 s (95% CI -24 to +3 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+148 s (95% CI +49 to +247 s) against the sweep-width lanes).
+- **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 59 s restricted mean time against 274 s over 100 fresh daytime scenes, a paired difference of -215 s (95% CI -275 to -156 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -11 s (95% CI -25 to +2 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+151 s (95% CI +54 to +249 s) against the sweep-width lanes).
 - **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage (43.6% for the planner, 27.0% for the policy, 22.7% for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from 6.7 to 1.2 per episode and the guarded policy's from 14.5 to 2.1. Whole missions flown on the quadrotor meet the expected outcome in 91.1% (planner) and 91.1% (policy) of flights.
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in 30 of 30 fresh multi-floor buildings and covers 41.8% of them against 37.7% without climbing, with 0.00 collisions per episode. The policy and the teacher still stay on the ground floor.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² {{R_MP_R2}} against {{R_MP_BASE_R2}}). Ranking frontiers by it leaves coverage unchanged (66.0% against 65.5% on hard buildings), and so does the true hidden gain (64.7%). In this environment coverage is limited by flight time, not by which frontier comes next.
@@ -229,30 +229,30 @@ Each scene is a seeded world, a last known point 8–20 m from the command post,
 | Distance ring only | The prior with no map features |
 | Flat prior | A uniform prior: the planner and belief with no lost-person knowledge |
 
-Each condition flies the same seeded worlds (seeds 7600+, 100 by day, 60 with a uniformly placed person, 60 at night) with every method, from `src/eval/sar.ts` at `3494728`. The mission is a find-person search with a 900 s and 80% battery budget, entry on auto and an operator who approves every ask. A flight counts as found when the person is confirmed from three bearings at 0.8 mean confidence. Times to find are censored at the budget: the restricted mean counts a miss as the full budget, and the median is blank when half or more were missed. Found intervals are Wilson 95%.
+Each condition flies the same seeded worlds (seeds 7600+, 100 by day, 60 with a uniformly placed person, 60 at night) with every method, from `src/eval/sar.ts` at `005528c`. The mission is a find-person search with a 900 s and 80% battery budget, entry on auto and an operator who approves every ask. A flight counts as found when the person is confirmed from three bearings at 0.8 mean confidence. Times to find are censored at the budget: the restricted mean counts a miss as the full budget, and the median is blank when half or more were missed. Found intervals are Wilson 95%.
 
 ### Results
 
 | Condition | Method | Found (95% CI) | Found within 300 s | Median time to find | Restricted mean time | Battery used | False alarms |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Day, behavior-model person** (100 worlds) | Lane sweep (shipped) | 92% (85–96%) | 61% | 127 s | 264 s | 19.5% | 0 |
-|  | Lane sweep, sweep-width spacing, buildings last | 99% (95–100%) | 96% | 26 s | 69 s | 5.7% | 0 |
-|  | Probability search | 99% (95–100%) | 97% | 25 s | 59 s | 5.6% | 0 |
-|  | Probability search, one-leg greedy | 99% (95–100%) | 96% | 26 s | 63 s | 6.3% | 0 |
-|  | Probability search, distance ring only | 99% (95–100%) | 98% | 25 s | 56 s | 5.4% | 0 |
-|  | Probability search, flat prior | 99% (95–100%) | 97% | 26 s | 66 s | 5.6% | 0 |
-| **Day, person placed uniformly at random** (60 worlds) | Lane sweep (shipped) | 75% (63–84%) | 30% | 341 s | 474 s | 30.1% | 0 |
-|  | Lane sweep, sweep-width spacing, buildings last | 90% (80–95%) | 82% | 57 s | 177 s | 10.8% | 0 |
-|  | Probability search | 77% (65–86%) | 62% | 57 s | 324 s | 17.2% | 0 |
-|  | Probability search, one-leg greedy | 83% (72–91%) | 50% | 259 s | 358 s | 20.4% | 0 |
-|  | Probability search, distance ring only | 93% (84–97%) | 78% | 50 s | 181 s | 12.3% | 0 |
-|  | Probability search, flat prior | 92% (82–96%) | 87% | 50 s | 161 s | 10.7% | 0 |
-| **Night (thermal), behavior-model person** (60 worlds) | Lane sweep (shipped) | 93% (84–97%) | 65% | 31 s | 238 s | 17.2% | 0 |
-|  | Lane sweep, sweep-width spacing, buildings last | 98% (91–100%) | 98% | 28 s | 57 s | 4.9% | 0 |
-|  | Probability search | 100% (94–100%) | 98% | 28 s | 49 s | 5.0% | 0 |
-|  | Probability search, one-leg greedy | 100% (94–100%) | 98% | 28 s | 56 s | 5.8% | 0 |
-|  | Probability search, distance ring only | 100% (94–100%) | 98% | 28 s | 45 s | 4.7% | 0 |
-|  | Probability search, flat prior | 100% (94–100%) | 98% | 28 s | 54 s | 5.0% | 0 |
+| **Day, behavior-model person** (100 worlds) | Lane sweep (shipped) | 91% (84–95%) | 58% | 138 s | 274 s | 19.4% | 0 |
+|  | Lane sweep, sweep-width spacing, buildings last | 99% (95–100%) | 95% | 26 s | 70 s | 5.6% | 0 |
+|  | Probability search | 99% (95–100%) | 97% | 25 s | 59 s | 4.9% | 0 |
+|  | Probability search, one-leg greedy | 99% (95–100%) | 96% | 26 s | 64 s | 5.8% | 0 |
+|  | Probability search, distance ring only | 99% (95–100%) | 98% | 25 s | 58 s | 4.8% | 0 |
+|  | Probability search, flat prior | 99% (95–100%) | 95% | 26 s | 67 s | 5.4% | 0 |
+| **Day, person placed uniformly at random** (60 worlds) | Lane sweep (shipped) | 77% (65–86%) | 25% | 352 s | 476 s | 30.3% | 0 |
+|  | Lane sweep, sweep-width spacing, buildings last | 92% (82–96%) | 82% | 57 s | 172 s | 11.0% | 0 |
+|  | Probability search | 77% (65–86%) | 62% | 57 s | 323 s | 17.1% | 0 |
+|  | Probability search, one-leg greedy | 88% (78–94%) | 50% | 259 s | 339 s | 20.1% | 0 |
+|  | Probability search, distance ring only | 93% (84–97%) | 78% | 50 s | 180 s | 12.1% | 0 |
+|  | Probability search, flat prior | 93% (84–97%) | 87% | 50 s | 154 s | 10.6% | 0 |
+| **Night (thermal), behavior-model person** (60 worlds) | Lane sweep (shipped) | 95% (86–98%) | 62% | 31 s | 245 s | 17.2% | 0 |
+|  | Lane sweep, sweep-width spacing, buildings last | 100% (94–100%) | 97% | 28 s | 58 s | 4.9% | 0 |
+|  | Probability search | 100% (94–100%) | 98% | 28 s | 51 s | 4.5% | 0 |
+|  | Probability search, one-leg greedy | 100% (94–100%) | 98% | 28 s | 58 s | 5.4% | 0 |
+|  | Probability search, distance ring only | 100% (94–100%) | 98% | 28 s | 46 s | 4.2% | 0 |
+|  | Probability search, flat prior | 100% (94–100%) | 98% | 28 s | 55 s | 4.8% | 0 |
 
 ![Fraction of searches that have found the person by each time, per condition and method](report/sar-find-curves.svg)
 
@@ -260,42 +260,42 @@ Paired over the same scenes (bootstrap 95% intervals; negative times are faster 
 
 | Condition | Comparison | Restricted mean time, difference (95% CI) | Found, difference (95% CI) |
 | --- | --- | --- | --- |
-| Day, behavior-model person | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -196 s (-254 to -139) | +7 pts (+3 to +12) |
-| Day, behavior-model person | Probability search vs lanes (shipped) | -205 s (-264 to -149) | +7 pts (+3 to +12) |
-| Day, behavior-model person | Probability search, one-leg greedy vs lanes (shipped) | -201 s (-260 to -145) | +7 pts (+3 to +12) |
-| Day, behavior-model person | Probability search, distance ring only vs lanes (shipped) | -208 s (-268 to -151) | +7 pts (+3 to +12) |
-| Day, behavior-model person | Probability search, flat prior vs lanes (shipped) | -199 s (-257 to -141) | +7 pts (+3 to +12) |
-| Day, behavior-model person | Probability search vs lane sweep, sweep-width spacing, buildings last | -9 s (-24 to +3) | 0 pts (0 to 0) |
-| Day, person placed uniformly at random | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -297 s (-384 to -214) | +15 pts (+3 to +27) |
-| Day, person placed uniformly at random | Probability search vs lanes (shipped) | -150 s (-258 to -42) | +2 pts (-13 to +17) |
-| Day, person placed uniformly at random | Probability search, one-leg greedy vs lanes (shipped) | -116 s (-217 to -16) | +8 pts (-5 to +22) |
-| Day, person placed uniformly at random | Probability search, distance ring only vs lanes (shipped) | -293 s (-387 to -203) | +18 pts (+7 to +30) |
-| Day, person placed uniformly at random | Probability search, flat prior vs lanes (shipped) | -313 s (-395 to -234) | +17 pts (+5 to +28) |
-| Day, person placed uniformly at random | Probability search vs lane sweep, sweep-width spacing, buildings last | +148 s (+49 to +247) | -13 pts (-27 to -2) |
-| Night (thermal), behavior-model person | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -181 s (-260 to -111) | +5 pts (-2 to +12) |
-| Night (thermal), behavior-model person | Probability search vs lanes (shipped) | -189 s (-264 to -124) | +7 pts (+2 to +13) |
-| Night (thermal), behavior-model person | Probability search, one-leg greedy vs lanes (shipped) | -182 s (-257 to -116) | +7 pts (+2 to +13) |
-| Night (thermal), behavior-model person | Probability search, distance ring only vs lanes (shipped) | -193 s (-272 to -125) | +7 pts (+2 to +13) |
-| Night (thermal), behavior-model person | Probability search, flat prior vs lanes (shipped) | -184 s (-263 to -114) | +7 pts (+2 to +13) |
-| Night (thermal), behavior-model person | Probability search vs lane sweep, sweep-width spacing, buildings last | -8 s (-35 to +12) | +2 pts (0 to +5) |
+| Day, behavior-model person | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -204 s (-264 to -145) | +8 pts (+3 to +14) |
+| Day, behavior-model person | Probability search vs lanes (shipped) | -215 s (-275 to -156) | +8 pts (+3 to +14) |
+| Day, behavior-model person | Probability search, one-leg greedy vs lanes (shipped) | -209 s (-269 to -151) | +8 pts (+3 to +14) |
+| Day, behavior-model person | Probability search, distance ring only vs lanes (shipped) | -216 s (-277 to -156) | +8 pts (+3 to +14) |
+| Day, behavior-model person | Probability search, flat prior vs lanes (shipped) | -206 s (-267 to -147) | +8 pts (+3 to +14) |
+| Day, behavior-model person | Probability search vs lane sweep, sweep-width spacing, buildings last | -11 s (-25 to +2) | 0 pts (0 to 0) |
+| Day, person placed uniformly at random | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -304 s (-389 to -221) | +15 pts (+5 to +25) |
+| Day, person placed uniformly at random | Probability search vs lanes (shipped) | -153 s (-259 to -49) | 0 pts (-15 to +15) |
+| Day, person placed uniformly at random | Probability search, one-leg greedy vs lanes (shipped) | -137 s (-239 to -37) | +12 pts (-2 to +25) |
+| Day, person placed uniformly at random | Probability search, distance ring only vs lanes (shipped) | -296 s (-387 to -208) | +17 pts (+5 to +28) |
+| Day, person placed uniformly at random | Probability search, flat prior vs lanes (shipped) | -322 s (-403 to -242) | +17 pts (+7 to +27) |
+| Day, person placed uniformly at random | Probability search vs lane sweep, sweep-width spacing, buildings last | +151 s (+54 to +249) | -15 pts (-27 to -3) |
+| Night (thermal), behavior-model person | Lane sweep, sweep-width spacing, buildings last vs lanes (shipped) | -187 s (-265 to -116) | +5 pts (0 to +12) |
+| Night (thermal), behavior-model person | Probability search vs lanes (shipped) | -194 s (-269 to -126) | +5 pts (0 to +12) |
+| Night (thermal), behavior-model person | Probability search, one-leg greedy vs lanes (shipped) | -187 s (-262 to -120) | +5 pts (0 to +12) |
+| Night (thermal), behavior-model person | Probability search, distance ring only vs lanes (shipped) | -199 s (-278 to -128) | +5 pts (0 to +12) |
+| Night (thermal), behavior-model person | Probability search, flat prior vs lanes (shipped) | -189 s (-268 to -119) | +5 pts (0 to +12) |
+| Night (thermal), behavior-model person | Probability search vs lane sweep, sweep-width spacing, buildings last | -7 s (-28 to +10) | 0 pts (0 to 0) |
 
-**What the numbers say.** Against the shipped lanes the probability search is faster in every condition (by day, -205 s (95% CI -264 to -149 s)). The honest baseline is the sweep-width lanes, and against it the difference is -9 s (95% CI -24 to +3 s) by day and -8 s (95% CI -35 to +12 s) at night: within noise. Two changes explain most of the gain over the shipped lanes, and both are classical search theory rather than the prior: spacing lanes at the sweep width instead of a 20% image overlap, and leaving buildings until the open ground is done. The ablations agree. With the distance ring alone the probability search averages 56 s, and with a flat prior 66 s, against 59 s for the full prior. In these scenes most people stay within a sweep width or two of the last known point, so any search that starts there and spirals out finds them in the first minute; the map features would need larger areas or longer walks to matter, and the benchmark does not show that they do.
+**What the numbers say.** Against the shipped lanes the probability search is faster in every condition (by day, -215 s (95% CI -275 to -156 s)). The honest baseline is the sweep-width lanes, and against it the difference is -11 s (95% CI -25 to +2 s) by day and -7 s (95% CI -28 to +10 s) at night: within noise. Two changes explain most of the gain over the shipped lanes, and both are classical search theory rather than the prior: spacing lanes at the sweep width instead of a 20% image overlap, and leaving buildings until the open ground is done. The ablations agree. With the distance ring alone the probability search averages 58 s, and with a flat prior 67 s, against 59 s for the full prior. In these scenes most people stay within a sweep width or two of the last known point, so any search that starts there and spirals out finds them in the first minute; the map features would need larger areas or longer walks to matter, and the benchmark does not show that they do.
 
-Where the prior is wrong it hurts. With the person placed uniformly the full prior is +148 s (95% CI +49 to +247 s) slower than the sweep-width lanes, most likely because it spends its first minutes where it believes the person is, near the last known point. The one place it helps is buildings: in the uniform condition it searches every building interior that holds the person (100% found against 73% for the sweep-width lanes), because every building carries prior mass and is visited when that mass is worth the trip.
+Where the prior is wrong it hurts. With the person placed uniformly the full prior is +151 s (95% CI +54 to +249 s) slower than the sweep-width lanes, most likely because it spends its first minutes where it believes the person is, near the last known point. The one place it helps is buildings: in the uniform condition it searches every building interior that holds the person (100% found against 82% for the sweep-width lanes), because every building carries prior mass and is visited when that mass is worth the trip.
 
 By how the person moved (daytime scenes; found / median time to find):
 
 | How the person moved | Worlds | Lanes (shipped) | Lanes, sweep width | Probability search | Flat prior |
 | --- | --- | --- | --- | --- | --- |
-| shelter | 15 | 100% / 147 s | 100% / 188 s | 100% / 176 s | 100% / 214 s |
+| shelter | 15 | 100% / 155 s | 100% / 195 s | 100% / 189 s | 100% / 227 s |
 | trail | 33 | 97% / 14 s | 100% / 14 s | 100% / 14 s | 100% / 14 s |
-| wander | 31 | 81% / 293 s | 97% / 31 s | 97% / 28 s | 97% / 29 s |
-| view | 8 | 88% / 346 s | 100% / 29 s | 100% / 27 s | 100% / 43 s |
-| stay put | 13 | 100% / 326 s | 100% / 27 s | 100% / 25 s | 100% / 24 s |
+| wander | 31 | 77% / 320 s | 97% / 31 s | 97% / 28 s | 97% / 29 s |
+| view | 8 | 88% / 364 s | 100% / 29 s | 100% / 27 s | 100% / 43 s |
+| stay put | 13 | 100% / 353 s | 100% / 27 s | 100% / 25 s | 100% / 24 s |
 
-![Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 755 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.](report/sar-belief.svg)
+![Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 769 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.](report/sar-belief.svg)
 
-Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 755 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.
+Development world 7102, by day. Shading is probability per square metre of open ground, darker is likelier; buildings brown, the geofence dashed. The person (wander, 15 m from the last known point) was confirmed after 38 s by the probability search and after 769 s by the shipped lane sweep. On the right, the ground the camera has looked at is pale: the frames have searched its probability away.
 
 **Is the model calibrated?** Over 18,000 frames on development worlds the model predicts a mean per-frame POD of 14.9% against 19.2% measured (Brier score 0.127). The belief's own POS is checked against outcomes with blind flights: each scene is flown once more with nobody in it, so the POS curve runs to the end of the budget instead of stopping at a find. By day the model predicts {{R_SAR_POS_90_PRED}} success by 90 s and {{R_SAR_POS_300_PRED}} by 300 s; {{R_SAR_POS_90_OBS}} and {{R_SAR_POS_300_OBS}} of searches had confirmed the person by then. With the person placed uniformly the prior is wrong and the model says so poorly: it predicts {{R_SAR_UNI_POS_900_PRED}} success by the end of the budget against {{R_SAR_UNI_POS_900_OBS}} found.
 
