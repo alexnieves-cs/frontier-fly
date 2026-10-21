@@ -679,6 +679,8 @@ export class OccupancyMap {
   private readonly hits: Uint8Array;
   private readonly passes: Uint8Array;
   private readonly fixed: Uint8Array;
+  /** Mean height of the lidar returns in each voxel (NaN before the first), for expected(). */
+  private readonly hitZ: Float32Array;
 
   constructor(
     readonly vw: number,
@@ -690,6 +692,7 @@ export class OccupancyMap {
     this.hits = new Uint8Array(n);
     this.passes = new Uint8Array(n);
     this.fixed = new Uint8Array(n);
+    this.hitZ = new Float32Array(n).fill(NaN);
   }
 
   /** Mark voxel k occupied whatever the lidar says (structure known some other way). */
@@ -702,14 +705,16 @@ export class OccupancyMap {
     this.occupied[k] = this.fixed[k] || this.hits[k]! * 2 > this.passes[k]! ? 1 : 0;
   }
 
-  /** Add one horizontal lidar ring taken at (x, y) on `floor`. */
-  mark(floor: number, x: number, y: number, yaw: number, lidar: ArrayLike<number>): void {
+  /** Add one horizontal lidar ring taken at (x, y) on `floor`, from height `z` when known. */
+  mark(floor: number, x: number, y: number, yaw: number, lidar: ArrayLike<number>, z = NaN): void {
     const { vw, vd } = this;
     const base = floor * vw * vd;
     const cy = Math.cos(yaw);
     const sy = Math.sin(yaw);
     for (let i = 0; i < LIDAR_H; i++) {
       const r = lidar[i]!;
+      // A beam flagged invalid (NaN) says nothing about free or occupied space.
+      if (Number.isNaN(r)) continue;
       const ux = cy * RAY_COS[i]! - sy * RAY_SIN[i]!;
       const uy = sy * RAY_COS[i]! + cy * RAY_SIN[i]!;
       const hit = r < LIDAR_MAX - 1e-3;
@@ -735,8 +740,42 @@ export class OccupancyMap {
       if (hx < 0 || hy < 0 || hx >= vw || hy >= vd) continue;
       const k = base + hy * vw + hx;
       if (this.hits[k]! < 255) this.hits[k] = this.hits[k]! + 1;
+      if (!Number.isNaN(z)) {
+        const h = this.hitZ[k]!;
+        this.hitZ[k] = Number.isNaN(h) ? z : h + (z - h) / Math.min(this.hits[k]!, 16);
+      }
       this.update(k);
     }
+  }
+
+  /**
+   * Range to the first occupied voxel along each ring beam from (x, y, z), into `out`; Infinity when
+   * none within range. Only voxels with at least `minHits` lidar returns taken within `dz` of `z` count:
+   * the map is 2D per floor, and a beam at another height can pass an opening, a sill or a table top.
+   */
+  expected(floor: number, x: number, y: number, z: number, yaw: number, out: Float64Array, minHits = 3, dz = 0.25): Float64Array {
+    const { vw, vd } = this;
+    const base = floor * vw * vd;
+    const cy = Math.cos(yaw);
+    const sy = Math.sin(yaw);
+    const step = VOXEL * 0.5;
+    for (let i = 0; i < LIDAR_H; i++) {
+      const ux = cy * RAY_COS[i]! - sy * RAY_SIN[i]!;
+      const uy = sy * RAY_COS[i]! + cy * RAY_SIN[i]!;
+      out[i] = Infinity;
+      for (let d = step; d <= LIDAR_MAX; d += step) {
+        const vx = Math.floor((x + ux * d) / VOXEL);
+        const vy = Math.floor((y + uy * d) / VOXEL);
+        if (vx < 0 || vy < 0 || vx >= vw || vy >= vd) break;
+        const k = base + vy * vw + vx;
+        // Only walls the lidar itself returned from at this height: the outer wall ring is blocked in and can hold window holes.
+        if (this.occupied[k] && this.hits[k]! >= minHits && Math.abs(this.hitZ[k]! - z) <= dz) {
+          out[i] = d;
+          break;
+        }
+      }
+    }
+    return out;
   }
 }
 
