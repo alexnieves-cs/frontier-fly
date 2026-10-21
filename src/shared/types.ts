@@ -85,6 +85,8 @@ export interface StepInfo {
   newRoom: boolean;
   newFloor: boolean;
   success: boolean;
+  /** Electrical energy used so far by a 1.2 kg quad flying this track (mission/autonomy/battery.ts), Wh. */
+  energyWh: number;
   /** Progress penalties subtracted from this step's reward (see sim/reward.ts ProgressTracker). */
   penalty?: { stuck: number; still: number; flip: number; total: number };
 }
@@ -135,6 +137,8 @@ export interface NoiseParams {
 export interface Dynamics {
   reset(s: DroneState, p: DynParams): void;
   step(cmd: Float32Array, dt: number): DroneState;
+  /** Horizontal speed setpoint cap, m/s (default MAX_SPEED_H). */
+  setSpeedLimit?(speedH: number): void;
 }
 
 export type SensorMode = 'rgb' | 'ir' | 'depth';
@@ -159,6 +163,11 @@ export interface EpisodeConfig {
   stallSteps?: number;
   /** Hard collisions before the episode ends. Defaults to MAX_HARD_COLLISIONS. */
   maxCollisions?: number;
+  /**
+   * Horizontal speed a full action asks for, m/s. Defaults to MAX_SPEED_H
+   * (2 m/s), which every shipped checkpoint was trained at.
+   */
+  speedH?: number;
 }
 
 export interface Env {

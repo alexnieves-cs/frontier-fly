@@ -90,6 +90,16 @@ On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the poli
 
 A geometry fix in this round changes the multi-floor numbers slightly for pilots that do not climb. Before it, on buildings with three or more floors, a slab opened over every shaft cell of the floor above it, while the physics kept some of those holes closed. The range finders could see through ceilings the drone could not fly through. Slabs and physics now open only where a shaft joins the two floors, and the ground-floor slab no longer has holes over shafts that lead up.
 
+### Speed and energy
+
+Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 5 m/s on the same 30 held-out hard buildings, on the kinematic drone and on the quadrotor with domain randomization, and meters energy along each flight. A full action now asks for the episode's cap, so the shipped policy flies faster without retraining. The planner's speed is set to the cap. Brackets are bootstrap 95% intervals; collisions per episode are in parentheses in the table. The momentum weight was chosen on the tuning buildings (`scripts/study/speed-diag.ts`).
+
+{{SPEED_FINDINGS}}
+
+{{SPEED_TABLE}}
+
+{{SPEED_FIGURE}}
+
 ### Ablations
 
 {{ABLATION_NOTE}}
@@ -183,6 +193,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
 - **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts {{R_SAR_UNI_POS_900_PRED}} success and {{R_SAR_UNI_POS_900_OBS}} of searches succeed.
+- **The quadrotor can't use a faster cruise yet.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A planner that plans trajectories within the airframe's acceleration, so it can carry speed through turns, is not attempted here.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -194,6 +205,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | Tuning the sensor planner and guard | Coverage buildings 9101–9108 |
 | Tuning the mission explorer and re-views | Mission worlds 9101–9116 and the three showcase seeds |
 | Coverage study (reported) | 20001+, 30001+, 40001+, 50001+ (30 each) |
+| Speed study (reported) | 30001+ and 50001+, the coverage study's hard and quadrotor buildings |
 | Mission bench (reported) | 9600–9629 |
 | Tuning the outdoor search, its prior and POD model | 7100–7139 |
 | Outdoor search bench (reported) | 7600–7699 (day), 7600–7659 (uniform person, night) |
@@ -206,6 +218,7 @@ npm ci
 npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
 npm run study:missions   # docs/mission-bench.json: each indoor explorer and airframe, 30 fresh worlds per scenario
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
+npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README
