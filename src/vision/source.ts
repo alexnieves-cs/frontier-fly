@@ -9,6 +9,11 @@ import { VisionScene, type Frame } from './scene';
 export interface VisionOptions {
   /** Relative 1-sigma error of the depth camera's range. Default 0.03. */
   depthNoise?: number;
+  /**
+   * Calibrated confidence below which a detection raises no contact. Each contact of a mission class
+   * opens a track the drone flies to re-view, so faint detections cost flight time. Default 0.3.
+   */
+  minConfidence?: number;
   /** Called with every frame and its detections (the live camera inset, the bench's frame log). */
   onFrame?: (frame: Frame, detections: VisionDetection[]) => void;
 }
@@ -99,6 +104,7 @@ export function visionContacts(world: MissionWorld, poses: HumanoidPoses, detect
   const scene = new VisionScene(world, poses);
   const lighting = { timeOfDay: world.timeOfDay, flashlightOn: world.flashlightOn, sensorMode: world.sensorMode };
   const depthNoise = opts.depthNoise ?? 0.03;
+  const minConfidence = opts.minConfidence ?? 0.3;
   return {
     id: 'vision',
     contacts(view: CameraView, _pose: DronePose, tSec: number, frameNo: number): Contact[] {
@@ -109,6 +115,7 @@ export function visionContacts(world: MissionWorld, poses: HumanoidPoses, detect
       const eye = view.position;
       const out: Contact[] = [];
       detections.forEach((det, i) => {
+        if (det.confidence < minConfidence) return;
         const measured = boxRange(frame, det.bbox);
         if (measured == null) return;
         const noise = new RNG(noiseSeed, `depth:${i}`).gaussian();

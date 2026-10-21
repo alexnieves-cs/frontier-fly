@@ -13,6 +13,7 @@ import { sarSection } from './sar.mjs';
 import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
 import { benchSection } from './bench.mjs';
+import { visionSection } from './vision.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -115,7 +116,7 @@ function architecture() {
     }),
   );
 
-  const headless = ['gen', 'sim', 'rl', 'shared', 'world/outdoor', 'eval', 'mission', 'perception'].filter((m) => modules.has(m));
+  const headless = ['gen', 'sim', 'rl', 'shared', 'world/outdoor', 'eval', 'mission', 'perception', 'vision'].filter((m) => modules.has(m));
   const headlessRows = headless.map((m) => {
     const info = modules.get(m);
     const three = info.external.has('Three.js');
@@ -691,6 +692,7 @@ const values = {
   ...team.values,
   ...speed.values,
   ...benchSection(ROOT),
+  ...visionSection(readJson('docs/vision-detector.json'), readJson('docs/vision-bench.json')).values,
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), readJson('docs/fault-bench-run1.json')),
 };

@@ -28,6 +28,8 @@ No asset in the repository has an unclear or non-commercial license. The floor p
 
 The humanoid is packed into `public/assets/targets/humanoid.glb`. The license text shipped with the file is `public/assets/targets/LICENSE-KayKit.txt`.
 
+The drone camera (`src/vision`) draws people from `public/assets/targets/humanoid-poses.bin`, which `scripts/vision/bake-humanoid.mjs` derives from that same CC0 mesh and clips: ten posed, simplified copies of the mannequin. The camera detector in `public/models/vision-detector/` was trained in this repository on frames rendered from those poses and the procedural scenes; no outside dataset or pretrained weights were used.
+
 Clips included: `Idle_A` (standing), `Walking_A` (walking), `Sit_Chair_Idle` (sitting), `Sit_Floor_Idle` (hiding / low), `Lie_Idle` (lying, used for an injured or resting person). Hit, death, and other combat clips from that pack are not included.
 
 The clips and mannequin were taken from the CC0 redistribution at https://github.com/NoLimitNexus/game-models (`library/animations/Rig_Medium_*.glb` and `tools/reference/Mannequin_Medium.glb`), which credits Kay Lousberg for the skeleton, mesh, and animations. This repository does not include that project's original body kit.
