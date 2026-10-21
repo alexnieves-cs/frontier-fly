@@ -100,11 +100,23 @@ export function gimbalFootprint(aglM: number, category: 'person' | 'object' = 'p
   return { halfAlongM: along, halfAcrossM: across };
 }
 
+/**
+ * A detector that looks at pixels (src/vision). When set, it replaces the
+ * analytic detector for contacts; seen-empty maps and truth stay as they are.
+ */
+export interface CameraContactSource {
+  readonly id: string;
+  /** Contacts from one frame of the world-frame camera `view`. `frame` counts observe() calls. */
+  contacts(view: CameraView, pose: DronePose, tSec: number, frame: number): Contact[];
+}
+
 export interface PerceptionOptions {
   /** Relative 1-sigma error of the range estimate. Default 0.05. */
   rangeNoise?: number;
   /** False forces the FPV camera everywhere. Default true. */
   gimbal?: boolean;
+  /** Pixel detector for contacts. Default: the analytic detector. */
+  camera?: CameraContactSource;
 }
 
 interface BuildingView {
@@ -149,7 +161,7 @@ function seeThrough(opening: Opening): boolean {
 }
 
 /** The shell as the camera sees it: exterior walls opaque (no glass), shut openings walled back up. */
-function viewSpecOf(building: MissionBuilding): BuildingSpec {
+export function viewSpecOf(building: MissionBuilding): BuildingSpec {
   const spec = building.shell.spec;
   const floors = spec.floors.map((floor) => {
     const cells = floor.cells.slice();
@@ -175,7 +187,7 @@ function viewSpecOf(building: MissionBuilding): BuildingSpec {
 }
 
 /** Floor slabs and the roof as boxes, with holes at shafts and at a passable roof hatch. */
-function slabBoxes(building: MissionBuilding): Aabb[] {
+export function slabBoxes(building: MissionBuilding): Aabb[] {
   const spec = building.shell.spec;
   const cs = spec.cellSize;
   const top = spec.floors.length;
@@ -225,7 +237,7 @@ function slabBoxes(building: MissionBuilding): Aabb[] {
 }
 
 /** Wall left around a see-through opening: beside, below the sill, and above the head. */
-function apertureBoxes(building: MissionBuilding): Aabb[] {
+export function apertureBoxes(building: MissionBuilding): Aabb[] {
   const shell = building.shell;
   const spec = shell.spec;
   const cs = spec.cellSize;
@@ -365,7 +377,7 @@ function add3(a: V3, b: V3): V3 {
   return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 }
 
-function bboxRay(view: CameraView, bbox: Detection['bbox']): V3 {
+export function bboxRay(view: CameraView, bbox: Detection['bbox']): V3 {
   const tanY = Math.tan(view.fovY / 2);
   const tanX = tanY * Math.max(0.05, view.aspect);
   const ndcX = (bbox.x + bbox.w / 2 - 0.5) * 2;
@@ -510,74 +522,84 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
 
   const resolvedIndoor = (view: BuildingView, tSec: number): ResolvedTarget[] => resolveScene(view.building.scene.targets, tSec);
 
+  const camera = opts.camera ?? null;
+
+  const observeAnalytic = (pose: DronePose, tSec: number, view: CameraView, gimbal: boolean, agl: number): Observation => {
+    const rangeScale = gimbal ? GIMBAL_RANGE_SCALE : 1;
+    const reach = RESOLVE_DISTANCE.person * rangeScale;
+    const cameraSpeed = Math.hypot(pose.vel[0], pose.vel[1], pose.vel[2]);
+    const contacts: Contact[] = [];
+    const camPos = view.position;
+
+    for (const b of views) {
+      if (boxDistance(camPos, b.box) > reach) continue;
+      if (camPos[2] > b.box.maxZ + 0.5 && !b.roofOpen) continue;
+      const local = shifted(view, b.origin);
+      const lighting = lightingFor(b.building.interiorLightsOn);
+      const resolved = resolvedIndoor(b, tSec);
+      const seed = mixSeed(world.seed, frame, b.index + 1);
+      if (resolved.length > 0 && !camera) {
+        const targets = resolved.map((target) => ({ ...target, occluders: [...target.occluders, ...b.occluders] }));
+        const found = detect({ seed, camera: local, targets, spec: b.viewSpec, lighting, cameraSpeed, rangeScale });
+        contacts.push(...toContacts(found, local, b.origin, b.building.id, seed, tSec));
+      }
+      if (passGate(b.gate, camPos, pose.yaw, gimbal, SEEN_REFRESH.indoorM)) {
+        const cellOccluders = [...b.occluders, ...resolved.flatMap((target) => target.occluders)];
+        b.person.observe(local, resolved, lighting, cellOccluders, rangeScale);
+        b.object.observe(local, resolved, lighting, cellOccluders, rangeScale);
+      }
+    }
+
+    // Inside a shell the walls hide the woods; the outdoor pass is skipped.
+    if (insideOf(camPos)) {
+      contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      return { tSec, contacts };
+    }
+    const ground = groundReach(view, gimbal, agl, pose.yaw, reach);
+    const blockers = [...treesIn(ground, !gimbal), ...buildingBoxes.filter((box) =>
+      box.max[0] > ground.minX - 3 && box.min[0] < ground.maxX + 3 && box.max[1] > ground.minY - 3 && box.min[1] < ground.maxY + 3)];
+    const outdoorTargets = resolveScene(world.outdoorScene.targets, tSec);
+    const near = outdoorTargets.filter((target) => target.center[0] >= ground.minX - 2 && target.center[0] <= ground.maxX + 2 && target.center[1] >= ground.minY - 2 && target.center[1] <= ground.maxY + 2);
+    const lighting = lightingFor(noLights);
+    if (near.length > 0 && !camera) {
+      const seed = mixSeed(world.seed, frame, 0);
+      const targets = near.map((target) => ({ ...target, occluders: [...target.occluders, ...blockers] }));
+      const found = detect({ seed, camera: view, targets, spec: null, lighting, cameraSpeed, rangeScale });
+      contacts.push(...toContacts(found, view, [0, 0, 0], null, seed, tSec));
+    }
+    if (!passGate(outdoorGate, camPos, pose.yaw, gimbal, SEEN_REFRESH.outdoorM)) {
+      contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      return { tSec, contacts };
+    }
+    const fwdX = view.forward[0];
+    const fwdY = view.forward[1];
+    for (let ty = Math.floor(ground.minY / TILE_M); ty <= Math.floor(ground.maxY / TILE_M); ty++) {
+      for (let tx = Math.floor(ground.minX / TILE_M); tx <= Math.floor(ground.maxX / TILE_M); tx++) {
+        const tile = tileIndex.get(`${tx}:${ty}`);
+        if (!tile) continue;
+        if (!gimbal) {
+          // Skip tiles wholly behind the FPV camera.
+          const cx = (tile.minX + tile.maxX) / 2 - camPos[0];
+          const cy = (tile.minY + tile.maxY) / 2 - camPos[1];
+          if (cx * fwdX + cy * fwdY < -TILE_M) continue;
+        }
+        tile.person.observe(view, outdoorTargets, lighting, blockers, rangeScale);
+        tile.object.observe(view, outdoorTargets, lighting, blockers, rangeScale);
+      }
+    }
+    contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return { tSec, contacts };
+  };
+
   return {
-    id: `perception-${world.seed}`,
+    id: camera ? `${camera.id}-${world.seed}` : `perception-${world.seed}`,
     observe(pose: DronePose, tSec: number): Observation {
       frame += 1;
       lastT = tSec;
       const { view, gimbal, agl } = cameraFor(pose);
-      const rangeScale = gimbal ? GIMBAL_RANGE_SCALE : 1;
-      const reach = RESOLVE_DISTANCE.person * rangeScale;
-      const cameraSpeed = Math.hypot(pose.vel[0], pose.vel[1], pose.vel[2]);
-      const contacts: Contact[] = [];
-      const camPos = view.position;
-
-      for (const b of views) {
-        if (boxDistance(camPos, b.box) > reach) continue;
-        if (camPos[2] > b.box.maxZ + 0.5 && !b.roofOpen) continue;
-        const local = shifted(view, b.origin);
-        const lighting = lightingFor(b.building.interiorLightsOn);
-        const resolved = resolvedIndoor(b, tSec);
-        const seed = mixSeed(world.seed, frame, b.index + 1);
-        if (resolved.length > 0) {
-          const targets = resolved.map((target) => ({ ...target, occluders: [...target.occluders, ...b.occluders] }));
-          const found = detect({ seed, camera: local, targets, spec: b.viewSpec, lighting, cameraSpeed, rangeScale });
-          contacts.push(...toContacts(found, local, b.origin, b.building.id, seed, tSec));
-        }
-        if (passGate(b.gate, camPos, pose.yaw, gimbal, SEEN_REFRESH.indoorM)) {
-          const cellOccluders = [...b.occluders, ...resolved.flatMap((target) => target.occluders)];
-          b.person.observe(local, resolved, lighting, cellOccluders, rangeScale);
-          b.object.observe(local, resolved, lighting, cellOccluders, rangeScale);
-        }
-      }
-
-      // Inside a shell the walls hide the woods; the outdoor pass is skipped.
-      if (insideOf(camPos)) {
-        contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-        return { tSec, contacts };
-      }
-      const ground = groundReach(view, gimbal, agl, pose.yaw, reach);
-      const blockers = [...treesIn(ground, !gimbal), ...buildingBoxes.filter((box) =>
-        box.max[0] > ground.minX - 3 && box.min[0] < ground.maxX + 3 && box.max[1] > ground.minY - 3 && box.min[1] < ground.maxY + 3)];
-      const outdoorTargets = resolveScene(world.outdoorScene.targets, tSec);
-      const near = outdoorTargets.filter((target) => target.center[0] >= ground.minX - 2 && target.center[0] <= ground.maxX + 2 && target.center[1] >= ground.minY - 2 && target.center[1] <= ground.maxY + 2);
-      const lighting = lightingFor(noLights);
-      if (near.length > 0) {
-        const seed = mixSeed(world.seed, frame, 0);
-        const targets = near.map((target) => ({ ...target, occluders: [...target.occluders, ...blockers] }));
-        const found = detect({ seed, camera: view, targets, spec: null, lighting, cameraSpeed, rangeScale });
-        contacts.push(...toContacts(found, view, [0, 0, 0], null, seed, tSec));
-      }
-      if (!passGate(outdoorGate, camPos, pose.yaw, gimbal, SEEN_REFRESH.outdoorM)) {
-        contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-        return { tSec, contacts };
-      }
-      const fwdX = view.forward[0];
-      const fwdY = view.forward[1];
-      for (let ty = Math.floor(ground.minY / TILE_M); ty <= Math.floor(ground.maxY / TILE_M); ty++) {
-        for (let tx = Math.floor(ground.minX / TILE_M); tx <= Math.floor(ground.maxX / TILE_M); tx++) {
-          const tile = tileIndex.get(`${tx}:${ty}`);
-          if (!tile) continue;
-          if (!gimbal) {
-            // Skip tiles wholly behind the FPV camera.
-            const cx = (tile.minX + tile.maxX) / 2 - camPos[0];
-            const cy = (tile.minY + tile.maxY) / 2 - camPos[1];
-            if (cx * fwdX + cy * fwdY < -TILE_M) continue;
-          }
-          tile.person.observe(view, outdoorTargets, lighting, blockers, rangeScale);
-          tile.object.observe(view, outdoorTargets, lighting, blockers, rangeScale);
-        }
-      }
+      const observation = observeAnalytic(pose, tSec, view, gimbal, agl);
+      if (!camera) return observation;
+      const contacts = camera.contacts(view, pose, tSec, frame);
       contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       return { tSec, contacts };
     },

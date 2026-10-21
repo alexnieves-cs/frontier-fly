@@ -36,8 +36,12 @@ import {
   type ReportRow,
 } from './format';
 import { DemoMap, isNight } from './map';
+import { CameraInset, loadVisionKit } from './camera';
+import { createVisionSource } from '../../vision/source';
 
 export type Speed = 1 | 4 | 16 | 'max';
+export type Detector = 'analytic' | 'camera';
+const DETECTORS: Detector[] = ['analytic', 'camera'];
 
 const SPEEDS: Speed[] = [1, 4, 16, 'max'];
 /** Wall-clock budget for sim ticks per frame at Max, ms. Rendering adds a few ms. */
@@ -65,7 +69,9 @@ export function startDemo(root: HTMLElement): void {
   const autoOperator = params.get('operator') === 'approve';
   // Indoors the shipped policy flies first and hands over to frontier exploration on a stall or contact.
   const indoor = params.get('indoor') === 'frontier' ? 'frontier' : 'policy';
-  const demo = new Demo(root, scenario, speed, autoOperator, indoor);
+  // `camera`: contacts come from the rendered camera and the learned detector (src/vision).
+  const detector = params.get('detector') === 'camera' ? 'camera' : 'analytic';
+  const demo = new Demo(root, scenario, speed, autoOperator, indoor, detector);
   void demo.load().then(() => {
     if (params.get('autorun') === '1') demo.play();
   });
@@ -103,6 +109,7 @@ class Demo {
   private token = 0;
   private view: OutdoorView | null = null;
   private viewLoading = false;
+  private camera: CameraInset | null = null;
 
   constructor(
     private readonly root: HTMLElement,
@@ -110,12 +117,14 @@ class Demo {
     private speed: Speed,
     private readonly autoOperator: boolean,
     private readonly indoor: 'policy' | 'frontier',
+    private detector: Detector,
   ) {
     root.classList.add('demo');
     root.innerHTML = markup();
     this.bind();
     this.syncScenarioCards();
     this.syncSpeed();
+    this.syncDetector();
     requestAnimationFrame(this.frame);
   }
 
@@ -144,6 +153,17 @@ class Demo {
       this.loaded = loaded;
       const policy = this.indoor === 'policy' ? await shippedPolicy() : null;
       if (token !== this.token) return;
+      this.camera = null;
+      this.el('camera-inset').hidden = this.detector !== 'camera';
+      if (this.detector === 'camera') {
+        this.text('camera-caption', 'Loading the camera detector…');
+        const kit = await loadVisionKit();
+        if (token !== this.token) return;
+        const inset = new CameraInset(this.el('camera-canvas') as HTMLCanvasElement);
+        this.camera = inset;
+        loaded.source = createVisionSource(loaded.world, kit.poses, kit.detector, { onFrame: (frame, found) => inset.push(frame, found) });
+        this.text('camera-caption', 'Drone camera · 160×120 · learned detector');
+      }
       const options: RunnerOptions = {
         ...loaded.options,
         operator: this.operatorFor(loaded),
@@ -284,6 +304,8 @@ class Demo {
     const loaded = this.loaded;
     if (!snap || !loaded) return;
     this.map?.draw({ snapshot: snap, truth: this.truth, decided: this.decided, now: performance.now() });
+    this.camera?.draw();
+    if (this.camera) this.root.dataset.cameraFrames = String(this.camera.frames);
     this.root.dataset.phase = snap.phase;
     this.paintHud(snap, loaded);
     this.paintStepper(snap);
@@ -458,6 +480,15 @@ class Demo {
         this.syncUrl();
       });
     }
+    for (const detector of DETECTORS) {
+      this.el(`detector-${detector}`).addEventListener('click', () => {
+        if (this.detector === detector) return;
+        this.detector = detector;
+        this.syncDetector();
+        this.syncUrl();
+        void this.load();
+      });
+    }
     this.el('operator-approve').addEventListener('click', () => this.answer(true));
     this.el('operator-deny').addEventListener('click', () => this.answer(false));
     this.el('toggle-3d').addEventListener('click', () => void this.toggle3d());
@@ -533,10 +564,17 @@ class Demo {
     this.root.dataset.speed = String(this.speed);
   }
 
+  private syncDetector(): void {
+    for (const detector of DETECTORS) this.el(`detector-${detector}`).setAttribute('aria-pressed', String(detector === this.detector));
+    this.root.dataset.detector = this.detector;
+  }
+
   private syncUrl(): void {
     const params = new URLSearchParams(location.search);
     params.set('scenario', this.scenario);
     params.set('speed', String(this.speed));
+    if (this.detector === 'camera') params.set('detector', 'camera');
+    else params.delete('detector');
     params.delete('autorun');
     history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
   }
@@ -599,7 +637,12 @@ function markup(): string {
           <button type="button" data-testid="reset">Reset</button>
         </div>
         <div class="speeds" role="group" aria-label="Sim speed">${speeds}</div>
-        <p class="hint">Space toggles run and pause. Everything is simulated: the people, the objects, and the detector.</p>
+        <h2>Detector</h2>
+        <div class="speeds detectors" role="group" aria-label="Detector">
+          <button type="button" data-testid="detector-analytic" aria-pressed="true" title="Calibrated recall model, no pixels">Analytic</button>
+          <button type="button" data-testid="detector-camera" aria-pressed="false" title="Rendered 160×120 camera read by a learned CNN">Camera</button>
+        </div>
+        <p class="hint">Space toggles run and pause. Everything is simulated: the people, the objects, and the detector. Camera mode renders what the drone sees and runs a small learned detector on it.</p>
       </section>
       <section class="stage" aria-label="Live mission">
         <ol class="stepper" data-testid="phase-stepper">${steps}</ol>
@@ -614,6 +657,7 @@ function markup(): string {
         </div>
         <div class="map-wrap">
           <canvas data-testid="demo-map" aria-label="Top-down mission map"></canvas>
+          <div class="cam" data-testid="camera-inset" hidden><canvas data-testid="camera-canvas" aria-label="Drone camera with detections"></canvas><span data-testid="camera-caption"></span></div>
           <div class="pip" data-testid="pip" hidden><canvas data-testid="pip-canvas"></canvas><span>3D chase · daylight render</span></div>
           <button type="button" class="toggle-3d" data-testid="toggle-3d" aria-pressed="false">3D chase</button>
           <ul class="legend" aria-label="Map legend">

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { policyFromFile } from '../mission/autonomy/policy';
 import { SHIPPED_CHECKPOINT_PATH } from '../rl/checkpoint';
 import { buildReport } from '../mission/autonomy/report';
-import type { RunnerOptions } from '../mission/autonomy/contracts';
+import type { LiveDetectionSource, MissionWorld, RunnerOptions } from '../mission/autonomy/contracts';
 import { runMission } from '../mission/autonomy/runner';
 import { SCENARIOS } from '../mission/autonomy/scenarios';
 import { createPerceptionSource } from '../mission/autonomy/perception';
@@ -69,11 +69,18 @@ export function missionJobs(seeds = MISSION_SEEDS_PER_SCENARIO, base = MISSION_S
 
 let shipped: ReturnType<typeof policyFromFile> | null = null;
 
-export async function flyMission(job: MissionJob): Promise<MissionFlight> {
+/** Builds the detection source for a flight. The camera study (src/eval/vision.ts) swaps in the pixel detector. */
+export type SourceFactory = (world: MissionWorld) => LiveDetectionSource;
+
+export async function flyMission(
+  job: MissionJob,
+  makeSource: SourceFactory = (world) => createPerceptionSource(world),
+  onRun?: (run: Awaited<ReturnType<typeof runMission>>) => void,
+): Promise<MissionFlight> {
   const scenario = SCENARIOS.find((s) => s.id === job.scenario)!;
   const world = buildMissionWorld({ ...scenario.world, seed: job.seed });
   const mission = missionForWorld(world, scenario.mission);
-  const source = createPerceptionSource(world);
+  const source = makeSource(world);
   if ((job.indoor === 'policy' || job.indoor === 'policyQuad') && !shipped) shipped = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
   // A marginal opening asks the operator even under auto entry. The bench plays an operator who
   // approves every ask, and counts the asks.
@@ -83,6 +90,7 @@ export async function flyMission(job: MissionJob): Promise<MissionFlight> {
     ...missionModeOptions(job.indoor, shipped ?? undefined),
   };
   const run = await runMission(mission, world, source, options);
+  onRun?.(run);
   const report = buildReport(run, source, world);
   const asks = run.log.filter((l) => /Operator approval needed/.test(l.message)).length;
   const handoffs = run.log
