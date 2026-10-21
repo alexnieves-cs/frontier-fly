@@ -123,10 +123,17 @@ export interface Episode {
   act: Act;
 }
 
-/** Build the env and pilot for a job, reset and ready to step. */
-export async function startEpisode(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Episode> {
+/**
+ * Build the env and pilot for a job, reset and ready to step. `setup` replaces the generated
+ * building (the real-plan study passes converted floor plans).
+ */
+export async function startEpisode(
+  job: Job,
+  policy: (obs: Float32Array) => Float32Array,
+  setup: ReturnType<typeof evalEpisodeSetup> = evalEpisodeSetup(job.stage, job.seed, job.lighting),
+): Promise<Episode> {
   const env = await createEnv();
-  const { spec, envSeed, cfg } = evalEpisodeSetup(job.stage, job.seed, job.lighting);
+  const { spec, envSeed, cfg } = setup;
   if (job.quad > 0) {
     const rng = new RNG(job.seed, 'study-dr');
     cfg.dynamics = 'quad';
@@ -171,8 +178,12 @@ export async function startEpisode(job: Job, policy: (obs: Float32Array) => Floa
   return { env, spec, cfg, obs, act };
 }
 
-export async function runJob(job: Job, policy: (obs: Float32Array) => Float32Array): Promise<Result> {
-  const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy);
+export async function runJob(
+  job: Job,
+  policy: (obs: Float32Array) => Float32Array,
+  setup?: ReturnType<typeof evalEpisodeSetup>,
+): Promise<Result> {
+  const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy, setup);
   let obs = first;
   let coverage = 0;
   let collisions = 0;
@@ -223,7 +234,10 @@ export function summarizeStudy(rows: Result[]) {
   return cells;
 }
 
-if (process.argv.includes('--merge')) {
+// Other studies import this module; only run the CLI when it is the entry script.
+const MAIN = process.argv.some((a) => a.endsWith('coverage-study.ts'));
+
+if (MAIN && process.argv.includes('--merge')) {
   const outPath = arg('out', 'docs/study.json');
   const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== outPath);
   const rows: Result[] = files.flatMap((f) =>
@@ -244,7 +258,7 @@ if (process.argv.includes('--merge')) {
   };
   writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`wrote ${outPath} from ${rows.length} episodes`);
-} else if (process.argv.includes('--shard')) {
+} else if (MAIN && process.argv.includes('--shard')) {
   const shard = Number(arg('shard', '0'));
   const of = Number(arg('of', '1'));
   const out = arg('out', `study-${shard}.jsonl`);

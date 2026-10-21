@@ -1,6 +1,6 @@
 # Asset credits
 
-Frontier-fly ships only assets with a clear free license. Geometry written for this repository is original and covered by the project [MIT license](LICENSE). Files larger than 5 MB are not committed. The maps below are the 1K JPG downloads, except the outdoor ground and bark maps, which are 512×512 excerpts of the same CC0 sources.
+Frontier-fly ships only assets and data with a clear free license. Geometry written for this repository is original and covered by the project [MIT license](LICENSE). Files larger than 5 MB are not committed. The maps below are the 1K JPG downloads, except the outdoor ground and bark maps, which are 512×512 excerpts of the same CC0 sources.
 
 | Asset | Use | Source | License |
 | --- | --- | --- | --- |
@@ -16,11 +16,12 @@ Frontier-fly ships only assets with a clear free license. Geometry written for t
 | Three.js post passes (SSAO, SMAA, TAA, bloom, afterimage) | High-preset image effects and FPV trail | [three.js addons](https://github.com/mrdoob/three.js) `0.170.0` | MIT |
 | `public/coi-serviceworker.js` v0.1.7 | Cross-origin isolation on GitHub Pages so `SharedArrayBuffer` works | [gzuidhof/coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) | MIT (header kept in the file) |
 | Five QGroundControl test plans and one Mission Planner waypoint file | Test fixtures for the `.plan` schema and the WPL parser (`tests/fixtures/qgc/`) | [mavlink/qgroundcontrol](https://github.com/mavlink/qgroundcontrol) `test/plans`, `test/MissionManager` | [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) (QGC is dual Apache-2.0 / GPL-3.0) |
+| 80 apartment floor plans (rooms, walls, doors, windows), rotated, translated and rounded to 1 cm | Real-plan benchmark and `sim.html?plan=` (`public/plans/swiss-dwellings.json`) | [Swiss Dwellings v3.0.0](https://zenodo.org/records/7788422), Archilyse AG, doi:10.5281/zenodo.7788422 | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (attribution and changes recorded in the file and [docs/REAL_PLANS.md](docs/REAL_PLANS.md)) |
 | Procedural canvas textures | Fallback if a map fails to load | Original, this repository | MIT |
 | KayKit Rig_Medium mannequin and clips | Simulated people | [Kay Lousberg](https://www.kaylousberg.com), KayKit Character Animations 1.1 | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Backpack, phone, toolbox, medkit, bottle, radio, helmet, blanket, coat, hiding crate | Search objects and decoys | Original procedural meshes, this repository | MIT |
 
-No asset in the repository has an unclear or non-commercial license. Poly Haven and ambientCG downloads used here are CC0, so attribution is not required; the links above are the record of where each file came from. CC0 also does not require credit for KayKit; the credit is here anyway.
+No asset in the repository has an unclear or non-commercial license. The floor plans are the one asset that requires attribution (CC BY 4.0); the credit above and in the data file satisfies it. Poly Haven and ambientCG downloads used here are CC0, so attribution is not required; the links above are the record of where each file came from. CC0 also does not require credit for KayKit; the credit is here anyway.
 
 ## Simulated people
 
