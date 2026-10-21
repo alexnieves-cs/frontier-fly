@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (240 files, 46,025 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (251 files, 48,184 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -51,7 +51,7 @@ The same loop runs in the browser when you press **Train**, so a visitor can wat
 
 `src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them.
 
-`src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, the canonical share-link encoding, and a run session. It talks to the world and the detector only through `WorldProvider` and `DetectionSource`, so the planner page does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear.
+`src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, the canonical share-link encoding, and a run session. It talks to the world and the detector only through `WorldProvider` and `DetectionSource`, so the planner page does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear. `src/vision` is the alternative that looks at pixels: a software rasterizer renders the drone's 160×120 camera (CC0 KayKit people baked to posed meshes, room lights, flashlight, auto exposure and sensor noise), and a small CenterNet-style TF.js network finds people and objects in it. It plugs into the mission perception source as `PerceptionOptions.camera`.
 
 ## Limits of the indoor stack
 
@@ -94,6 +94,7 @@ flowchart LR
   train["train"]
   ui["ui"]
   ui_mission["ui/mission"]
+  vision["vision"]
   viz["viz"]
   workers["workers"]
   world_outdoor["world/outdoor"]
@@ -105,11 +106,12 @@ flowchart LR
   bench -->|8| sim
   bench -->|3| team
   eval -->|3| gen
-  eval -->|34| mission
+  eval -->|36| mission
   eval -->|2| rl
   eval -->|10| shared
   eval -->|10| sim
   eval -->|2| train
+  eval -->|3| vision
   eval -->|2| world_outdoor
   film -->|11| mission
   film -->|1| rl
@@ -166,10 +168,17 @@ flowchart LR
   ui -->|14| sim
   ui -->|1| targets
   ui -->|4| team
+  ui -->|6| vision
   ui -->|3| viz
   ui -->|2| workers
   ui -->|2| world_outdoor
   ui -->|2| world_outdoor_viz
+  vision -->|7| mission
+  vision -->|5| perception
+  vision -->|6| shared
+  vision -->|1| sim
+  vision -->|7| targets
+  vision -->|3| world_outdoor
   viz -->|2| gen
   viz -->|19| shared
   viz -->|2| sim
@@ -190,22 +199,23 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
 | `src/bench` | 5 | 381 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
-| `src/eval` | 10 | 1,446 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
+| `src/eval` | 11 | 1,558 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
 | `src/landing` | 1 | 152 | `film` | — | — |
-| `src/mission` | 57 | 13,702 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 57 | 13,724 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 6 | 1,263 | `mission`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
 | `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 579 | — | — | — |
 | `src/sim` | 23 | 4,885 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
-| `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
+| `src/targets` | 10 | 1,287 | `gen`, `shared` | Three.js | — |
 | `src/team` | 6 | 1,025 | `eval`, `gen`, `shared`, `sim` | — | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 29 | 4,887 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
+| `src/ui` | 30 | 5,023 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 5 | 2,050 | `mission` | — | — |
+| `src/vision` | 9 | 1,872 | `mission`, `perception`, `shared`, `sim`, `targets`, `world/outdoor` | TF.js | — |
 | `src/viz` | 19 | 2,332 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 873 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
 | `src/world/outdoor` | 14 | 1,999 | `gen`, `shared` | Rapier | — |
@@ -225,6 +235,7 @@ Simulation, generation, and learning must run in Node and in workers without a D
 | `src/eval` | ✅ no Three.js |
 | `src/mission` | ✅ no Three.js |
 | `src/perception` | ✅ no Three.js |
+| `src/vision` | ✅ no Three.js |
 
 ## Pages
 

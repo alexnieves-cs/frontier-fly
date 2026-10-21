@@ -35,6 +35,9 @@ const KEYS = [
   'VISION_CLASS_TABLE',
   'VISION_RECALL_TABLE',
   'VISION_MISSION_TABLE',
+  'VISION_RESULT_NOTE',
+  'R_V_NIGHT_ANALYTIC',
+  'R_V_NIGHT_VISION',
 ];
 
 const NAMES = { person: 'Person', backpack: 'Backpack', phone: 'Phone', toolbox: 'Toolbox', medkit: 'Medkit', bottle: 'Bottle', radio: 'Radio', helmet: 'Helmet', blanket: 'Blanket' };
@@ -95,6 +98,16 @@ export function visionSection(detector, bench) {
         ]);
       }
     }
+    const na = bench.arms.analytic['backpack-night'];
+    const nv = bench.arms.vision['backpack-night'];
+    values.R_V_NIGHT_ANALYTIC = pct(na.expectedOutcome);
+    values.R_V_NIGHT_VISION = pct(nv.expectedOutcome);
+    const p = bench.paired;
+    values.VISION_RESULT_NOTE = [
+      `**What the numbers say.** Over all ${p.pairs} paired flights the camera meets the expected outcome in ${pct(v.expectedOutcome)} against ${pct(a.expectedOutcome)} for the analytic detector. ${p.onlyAnalytic} paired flights succeed only with the analytic detector and ${p.onlyVision} only with the camera, so the camera never rescues a flight the analytic model loses.`,
+      `By day the two are within noise of each other. The gap is the night backpack: ${pct(nv.expectedOutcome)} against ${pct(na.expectedOutcome)}. Under the flashlight alone, on the practice worlds, the detector often scored the backpack around 0.4 to 0.6, below the 0.8 mean the three-bearing confirmation asks for, so the drone spends its re-views on it and finally rejects the contact. The confirmation threshold was left where the analytic missions set it.`,
+      `No camera flight confirmed a decoy or declared a building clear with a target inside (${v.falseAlarms} false alarms, ${v.falseClears} false clears). A camera flight renders and reads about ${v.framesPerFlight.toLocaleString('en-US')} frames and takes ${v.wallSecPerFlight} s of wall time on one CPU core, against ${a.wallSecPerFlight} s with the analytic detector.`,
+    ].join('\n\n');
     values.VISION_MISSION_TABLE = table(['Scenario', 'Detector', 'Expected outcome (95% CI)', 'Mean time to first find', 'Mean flight', 'False alarms', 'False clears'], rows);
   }
   return { values };

@@ -33,7 +33,8 @@ if (process.argv.includes('--merge')) {
   const backend = await useNativeTf();
   const detector = frameDetector(await loadDetectorFromDisk());
   const poses = loadHumanoidPosesSync();
-  const mine = visionJobs(seeds, base).filter((_, i) => i % of === shard);
+  // One world (both modes, both detectors) per shard turn, so camera flights spread evenly over the shards.
+  const mine = visionJobs(seeds, base).filter((_, i) => Math.floor(i / 4) % of === shard);
   const lines: string[] = [];
   const t0 = Date.now();
   for (let i = 0; i < mine.length; i++) {

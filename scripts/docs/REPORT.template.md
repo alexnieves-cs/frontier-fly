@@ -11,6 +11,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: {{R_SAR_POA_MEAN}} restricted mean time against {{R_SAR_LANES_MEAN}} over {{R_SAR_SEEDS}} fresh daytime scenes, a paired difference of {{R_SAR_D_LANES}}. Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only {{R_SAR_D_SW}}, and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time ({{R_SAR_UNI_D_SW}} against the sweep-width lanes).
 - **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage ({{R_PLANNER_QUAD}} for the planner, {{R_POLICY_QUAD}} for the policy, {{R_TEACHER_QUAD}} for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from {{R_Q_PLANNER_COLL}} to {{R_Q_PLANNER_BRAKE_COLL}} per episode and the guarded policy's from {{R_Q_GUARD_COLL}} to {{R_Q_GUARD_BRAKE_COLL}}. Whole missions flown on the quadrotor meet the expected outcome in {{R_MQ_SENSOR}} (planner) and {{R_MQ_POLICY}} (policy) of flights.
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in {{R_CLIMB_REACHED}} fresh multi-floor buildings and covers {{R_CLIMB_FLOORS}} of them against {{R_PLANNER_FLOORS}} without climbing, with {{R_CLIMB_COLL}} collisions per episode. The policy and the teacher still stay on the ground floor.
+- **A rendered camera and a learned detector can fly the same missions.** The drone now renders what its camera sees and a small network, trained here on CC0 people and procedural objects, finds targets in the pixels. On {{R_V_PAIRS}} fresh paired flights it meets the expected outcome in {{R_V_VISION}} of them against {{R_V_ANALYTIC}} for the analytic detector, with no false alarms or false clears. The gap is all at night: under the flashlight alone it confirms the backpack in {{R_V_NIGHT_VISION}} of flights against {{R_V_NIGHT_ANALYTIC}}.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² {{R_MP_R2}} against {{R_MP_BASE_R2}}). Ranking frontiers by it leaves coverage unchanged ({{R_PRED_HARD}} against {{R_PLANNER_HARD}} on hard buildings), and so does the true hidden gain ({{R_ORACLEGAIN_HARD}}). In this environment coverage is limited by flight time, not by which frontier comes next.
 - **A team of drones is the lever coverage was waiting for.** On {{R_TEAM_SEEDS}} fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches {{R_TEAM_SOLO_LARGE}}, three search {{R_TEAM_THREE_LARGE}} and four {{R_TEAM_FOUR_LARGE}}, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median {{R_TEAM_THREE_HARD_EIGHTY}}; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
 
@@ -212,6 +213,40 @@ Ablations, three drones:
 
 The live page (`team.html`) runs this code in the browser: the truth beside what the base sees, with the radio links drawn.
 
+## Search by sight
+
+Every mission above detects with an *analytic* camera: a recall curve over distance, light and blur, and a dice roll, with no pixels (`src/perception/detector.ts`). This section replaces it with a camera and a learned detector and flies the same missions again.
+
+### Method
+
+**Camera** (`src/vision/scene.ts`). A software rasterizer draws the drone's view at 160×120 from the same world the missions fly: walls with door and window cut-outs, floors, furniture, terrain, trees, people and objects. Shading has the sun, room lights and the drone's flashlight cone; a sensor model sets exposure from the scene, adds read noise that grows with gain, and quantizes to 8 bits, so night frames are dark and grainy. The renderer also writes a depth image and an instance image. The instance image is used only for labels and for scoring; the drone never reads it. It runs in Node and in the browser at about 4 ms a frame.
+
+**People** are the CC0 KayKit mannequin ([CREDITS.md](../CREDITS.md)) baked into ten poses (standing, sitting, lying, hiding and six walking frames) by `scripts/vision/bake-humanoid.mjs`. The pose, shirt colour and turn match the 3D view. Decoys look different from what they imitate: the mannequin is plain grey plastic, and the real backpack and toolbox have a flap, straps or a handle that their look-alikes lack. The same details are in the 3D view.
+
+**Detector** (`src/vision/detector.ts`). A CenterNet-style convolutional network with about 180k parameters reads the 160×120 frame and outputs, on a 20×15 grid, a heatmap for each of nine classes (person and eight objects) and a box size and offset. Decoys are trained as background. It is trained in TF.js with focal loss on 32,000 frames (80 per world), rendered from worlds 66001–66400 with random surface colours, shirt colours and light levels on three worlds in four. The checkpoint is the epoch with the lowest loss on practice frames from worlds 66501–66560. Confidences are calibrated on the same practice frames with a two-parameter logistic fit.
+
+**From box to contact** (`src/vision/source.ts`). Each detection above a calibrated confidence of 0.3 becomes a contact. Its position is the ray through the box centre at the range of the nearest surface the depth image sees inside the box, plus 15 cm to the body centre and 3% noise. The camera is assumed to be RGB-D. Everything after that is unchanged: the same tracker, the same three-bearing confirmation at the same threshold, and the same re-view flights. Which space counts as looked at is still estimated geometrically, as before.
+
+### Detector on fresh frames
+
+On {{R_V_FRAMES}} from fresh worlds 67001–67060 the detector scores a mean AP of {{R_V_MAP}} at IoU 0.5, {{R_V_PERSON_AP}} for people. Calibration brings the expected calibration error from {{R_V_ECE_RAW}} to {{R_V_ECE_CAL}}. It fires on empty background {{R_V_BG_FP}} times a frame and called a mannequin a person {{R_V_MANNEQUIN}} times it saw one; it called the decoy pack a backpack {{R_V_DECOY_PACK}} times. It takes {{R_V_MS}} a frame on the CPU with TF.js's native backend.
+
+{{VISION_CLASS_TABLE}}
+
+Recall at a calibrated confidence of 0.5, by distance (labelled boxes in brackets):
+
+{{VISION_RECALL_TABLE}}
+
+![Eight fresh camera frames with the detector's boxes, day above and night below](report/vision-frames.png)
+
+### Missions with the camera
+
+Each scenario is flown on 30 fresh worlds (67101–67130) with both indoor explorers, once with the analytic detector and once with the camera, {{R_V_FLIGHTS}} camera flights in all. Contact gating was set on practice worlds 66601–66616 and not changed after.
+
+{{VISION_MISSION_TABLE}}
+
+{{VISION_RESULT_NOTE}}
+
 ## Failure gallery
 
 Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture grey, flown voxels light blue, the track blue, the start green, collisions red. The episodes are picked by rule from the coverage study (`scripts/study/gallery.ts`).
@@ -231,6 +266,8 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **The search belief is overconfident early and when the prior is wrong.** It treats a detection as a find, while a find here needs a three-bearing confirmation, and it trusts its prior: with the person placed uniformly it predicts {{R_SAR_UNI_POS_900_PRED}} success and {{R_SAR_UNI_POS_900_OBS}} of searches succeed.
 - **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: {{R_TEAM_CONTACTS}} steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day. The bench reports battery energy, but no drone turns back for a low pack, since none comes close in 240 s.
 - **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
+- **The camera is a renderer, not a photograph.** People are one low-poly mannequin in ten poses with a coloured shirt, objects are boxes with a few details, and the detector trains and tests on the same renderer. Its scores say nothing about real images. Range comes from a perfect depth image plus 3% noise, and which space counts as looked at is still estimated geometrically, not from the detector.
+- **Phones are not found.** The detector's AP for phones is near zero; at 160×120 a phone is a few pixels. No mission asks for one.
 - **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
 
 ## Seeds and protocol
@@ -248,6 +285,9 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | Outdoor search bench (reported) | 7600–7699 (day), 7600–7659 (uniform person, night) |
 | Tuning the team's frontier split | 66001–66016 (hard and large) |
 | Drone-team bench (reported) | 70001–70030 (hard), 71001–71030 (large) |
+| Training and checking the camera detector | Frames from worlds 66001–66400 (training), 66501–66560 (checkpoint and calibration), 67001–67060 (reported) |
+| Tuning camera contacts | Mission worlds 66601–66616 |
+| Camera mission bench (reported) | 67101–67130 |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -259,6 +299,9 @@ npm run study:missions   # docs/mission-bench.json: each indoor explorer and air
 npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
 npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
+npm install --no-save @tensorflow/tfjs-node@4.22.0   # native TF.js for the camera scripts
+npm run study:vision     # docs/vision-bench.json: missions with the camera and the learned detector
+# Camera detector: scripts/vision/make-dataset.ts, train-detector.ts and eval-detector.ts (see their headers)
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README
