@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { policyFromJson } from '../../src/mission/autonomy/policy';
+import { policyFromFile } from '../../src/mission/autonomy/policy';
+import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { buildReport } from '../../src/mission/autonomy/report';
 import { runMission } from '../../src/mission/autonomy/runner';
 import { loadScenario, SCENARIOS } from '../../src/mission/autonomy/scenarios';
 import { OBS_DIM } from '../../src/shared/constants';
 
-const shipped = policyFromJson(readFileSync('public/checkpoints/pretrained.json', 'utf8'));
+const shipped = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
 
 describe('shipped policy indoors', () => {
   it('normalizes observations before acting', () => {

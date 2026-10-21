@@ -10,7 +10,7 @@ import * as esbuild from 'esbuild';
 import { describe, expect, it } from 'vitest';
 import { evalEpisodeSetup, STAGE0_SEEDS, STAGE3_SEEDS } from '../src/eval/coverage';
 import { generateBuilding } from '../src/gen/building';
-import { parseCheckpoint, type Checkpoint } from '../src/rl/checkpoint';
+import { parseCheckpoint, type Checkpoint, SHIPPED_CHECKPOINT_PATH } from '../src/rl/checkpoint';
 import { InferPolicy } from '../src/rl/infer';
 import { RunningNorm } from '../src/rl/normalize';
 import { ACT_DIM, HIDDEN, OBS_DIM } from '../src/shared/constants';
@@ -21,7 +21,7 @@ import { heuristicAction } from '../src/sim/heuristic';
 import { waypointAction } from '../src/sim/waypointPilot';
 import type { LightingPreset } from '../src/sim/lighting';
 
-const CHECKPOINT = process.env.BENCH_CHECKPOINT ?? 'public/checkpoints/pretrained.json';
+const CHECKPOINT = process.env.BENCH_CHECKPOINT ?? SHIPPED_CHECKPOINT_PATH;
 const OUT = process.env.BENCH_OUT ?? 'docs/benchmarks.json';
 
 function seedList(name: string, fallback: number[]): number[] {
@@ -176,8 +176,7 @@ function git(cmd: string): string | null {
 
 describe('benchmark report', () => {
   it('measures coverage and throughput', async () => {
-    const text = readFileSync(CHECKPOINT, 'utf8');
-    const checkpoint = parseCheckpoint(text);
+    const checkpoint = parseCheckpoint(readFileSync(CHECKPOINT));
     const policy = await sweep(loadPilot(checkpoint, 'browser'));
     const policyRaw = await sweep(loadPilot(checkpoint, 'raw'));
     const heuristic = await sweep(heuristicAction);
@@ -208,7 +207,7 @@ describe('benchmark report', () => {
       },
       checkpoint: {
         path: CHECKPOINT,
-        sha256: createHash('sha256').update(text).digest('hex'),
+        sha256: createHash('sha256').update(readFileSync(CHECKPOINT)).digest('hex'),
         stage: checkpoint.stage,
         hidden: checkpoint.hidden,
       },

@@ -71,9 +71,12 @@ export function buildingAabbs(spec: BuildingSpec): Aabb[] {
         });
       }
     }
+    // The slab under floor f is open only where a shaft joins f - 1 and f (both cells are shaft).
+    // A shaft cell on f alone leads up, and the floor below it has a ceiling there.
+    const below = f > 0 ? spec.floors[f - 1]! : null;
     const slabMask = new Uint8Array(floor.w * floor.d);
     for (let i = 0; i < slabMask.length; i++) {
-      if (floor.cells[i] !== CELL.SHAFT) slabMask[i] = 1;
+      if (!(below && floor.cells[i] === CELL.SHAFT && below.cells[i] === CELL.SHAFT)) slabMask[i] = 1;
     }
     const slabZ = f === 0 ? 0.05 : f * H;
     const slabHz = 0.05;

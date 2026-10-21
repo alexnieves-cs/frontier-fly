@@ -13,7 +13,7 @@ export const SURFACE = {
   METAL: 4,
 } as const;
 
-/** Observation contract version. v1 = 306 floats (shipped pretrained.json). See src/sim/OBS_LAYOUT.md. */
+/** Observation contract version. v1 = 306 floats (the first shipped checkpoint). See src/sim/OBS_LAYOUT.md. */
 export const OBS_VERSION = 2;
 export const ACT_DIM = 4;
 

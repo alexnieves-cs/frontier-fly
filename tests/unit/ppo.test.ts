@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCheckpoint, serializeCheckpoint, loadCheckpointIdb, saveCheckpointIdb } from '../../src/rl/checkpoint';
+import { parseCheckpoint, serializeCheckpoint, serializeCheckpointBinary, loadCheckpointIdb, saveCheckpointIdb } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { TfTrainer } from '../../src/rl/model';
 import { computeGae, computeGaeInterleaved } from '../../src/rl/ppo';
@@ -74,6 +74,15 @@ describe('policy weights', () => {
       expect(Math.abs(a.action[i]! - c.action[i]!)).toBeLessThan(1e-5);
     }
     expect(() => parseCheckpoint('not json')).toThrow(/invalid checkpoint/);
+
+    // The packed binary form decodes to the same checkpoint, and so do JSON bytes.
+    const ck = checkpointFrom(loaded, 3);
+    const packed = serializeCheckpointBinary(ck);
+    const unpacked = parseCheckpoint(packed);
+    expect({ ...unpacked, weights: [] }).toEqual({ ...ck, weights: [] });
+    unpacked.weights.forEach((row, i) => row.forEach((v, j) => expect(v).toBe(Math.fround(ck.weights[i]![j]!))));
+    expect(parseCheckpoint(new TextEncoder().encode(serializeCheckpoint(ck))).stage).toBe(3);
+    expect(() => parseCheckpoint(packed.subarray(0, packed.length - 4))).toThrow(/truncated/);
   });
 
   it('keeps inference weights aligned through the TF trainer', async () => {

@@ -1,4 +1,5 @@
 import * as C from '../shared/constants';
+import type { GainSource } from './mapPredict';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -32,6 +33,8 @@ export interface SensorFrame {
   lidar: ArrayLike<number>;
   /** Distance to whatever is below, meters. */
   alt: number;
+  /** Measured horizontal velocity in the world frame, m/s (the IMU's estimate). The braking filter needs it. */
+  vel?: readonly [number, number];
 }
 
 /** World-frame command. */
@@ -57,12 +60,114 @@ export interface SensorPlannerOptions {
   edgeBonus?: number;
   /** Safety-filter horizon, seconds. */
   horizon?: number;
+  /**
+   * Stopping model of the airframe. When set, the lidar filter keeps the
+   * drone able to stop before every return given its measured velocity
+   * (brakingFilter) instead of the kinematic closing-speed rule.
+   */
+  braking?: BrakingModel;
+  /** Margin the braking filter keeps, meters (default BRAKING_MARGIN). */
+  brakingMargin?: number;
+  /**
+   * Hidden-gain estimate for frontier candidates (mapPredict.ts). When set,
+   * a candidate's cost is its path cost minus gainWeight × its gain, so a
+   * frontier that likely opens into unseen space beats a nearer dead end.
+   */
+  gain?: GainSource;
+  /** Path cost, in voxel steps, traded for one voxel of predicted gain. */
+  gainWeight?: number;
 }
 
 /** Free air the safety filter keeps between the airframe edge and a lidar return, meters. */
 export const SAFETY_MARGIN = 0.2;
 /** Seconds of travel the filter allows toward a return: v·u ≤ (r − radius − margin) / horizon. */
 export const SAFETY_HORIZON = 0.3;
+
+/**
+ * How an airframe stops: after a command to stop it keeps going for about
+ * `reaction` seconds (latency, then tilting back), then decelerates at
+ * `decel` m/s². Stopping distance from speed v is v·reaction + v²/(2·decel).
+ */
+export interface BrakingModel {
+  reaction: number;
+  decel: number;
+}
+
+/**
+ * Stopping model of the simulator's quadrotor (sim/dynamics/quad.ts), fitted by
+ * scripts/study/quad-sysid.ts to the 97th percentile of stopping distance over
+ * domain-randomized airframes with two control ticks of latency, the most the
+ * noise model draws. It is the airframe's own spec, not knowledge of the
+ * building.
+ */
+export const QUAD_BRAKING: BrakingModel = { reaction: 0.21, decel: 5 };
+
+/**
+ * Air the braking filter keeps past the airframe edge, meters: for the planner,
+ * and for the policy guard. Picked on the planner-tuning buildings
+ * (9101-9108) as the smallest margins that bring quad collisions under about
+ * one per episode; larger margins cost coverage in doorways.
+ */
+export const BRAKING_MARGIN = 0.25;
+export const GUARD_BRAKING_MARGIN = 0.15;
+
+/** Fastest approach speed from which `model` stops within `d` meters. */
+export function safeSpeed(d: number, model: BrakingModel): number {
+  if (!(d > 0)) return 0;
+  const a = model.decel;
+  const t = model.reaction;
+  return a * (Math.sqrt(t * t + (2 * d) / a) - t);
+}
+
+/**
+ * Model-aware lidar filter, a discrete control barrier on stopping distance.
+ * For each horizontal ray with a return at range r, with d = r − radius −
+ * margin, the barrier is h = d − S(v), where S is the airframe's stopping
+ * distance at the speed v toward the return. The commanded speed toward the
+ * return is capped at safeSpeed(d). When the measured speed toward it is
+ * already past that cap (the drone is still carrying momentum from a turn),
+ * the cap drops below it by the excess, so the controller brakes hard.
+ *
+ * A NaN range is a ray whose reading is missing (a failed sector): it is
+ * treated as a return at the margin, so the drone never moves toward a sector
+ * it cannot see. A range at LIDAR_MAX or more, or Infinity, is open air.
+ */
+export function brakingFilter(
+  vx: number,
+  vy: number,
+  yaw: number,
+  lidar: ArrayLike<number>,
+  vel: readonly [number, number] | null | undefined,
+  model: BrakingModel,
+  margin = BRAKING_MARGIN,
+): [number, number] {
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+  const mx = vel ? vel[0] : vx;
+  const my = vel ? vel[1] : vy;
+  for (let pass = 0; pass < 3; pass++) {
+    let changed = false;
+    for (let i = 0; i < LIDAR_H; i++) {
+      const raw = lidar[i]!;
+      const r = Number.isNaN(raw) ? DRONE_RADIUS + margin : raw;
+      if (r >= LIDAR_MAX - 1e-3) continue;
+      const ux = cy * RAY_COS[i]! - sy * RAY_SIN[i]!;
+      const uy = sy * RAY_COS[i]! + cy * RAY_SIN[i]!;
+      const cap = safeSpeed(r - DRONE_RADIUS - margin, model);
+      const measured = mx * ux + my * uy;
+      const allowed = measured > cap ? cap - (measured - cap) : cap;
+      const along = vx * ux + vy * uy;
+      if (along > allowed) {
+        const cut = along - allowed;
+        vx -= cut * ux;
+        vy -= cut * uy;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  return [vx, vy];
+}
 
 const DX = [1, -1, 0, 0, 1, 1, -1, -1];
 const DY = [0, 0, 1, -1, 1, -1, 1, -1];
@@ -139,6 +244,10 @@ export class SensorPlanner {
   readonly faceTravel: boolean;
   readonly edgeBonus: number;
   readonly horizon: number;
+  readonly braking: BrakingModel | null;
+  readonly brakingMargin: number;
+  readonly gain: GainSource | null;
+  readonly gainWeight: number;
   private n = 0;
   private dist = new Float64Array(0);
   private prev = new Int32Array(0);
@@ -162,6 +271,10 @@ export class SensorPlanner {
     this.faceTravel = opts.faceTravel ?? true;
     this.edgeBonus = opts.edgeBonus ?? 0.3;
     this.horizon = opts.horizon ?? SAFETY_HORIZON;
+    this.braking = opts.braking ?? null;
+    this.brakingMargin = opts.brakingMargin ?? BRAKING_MARGIN;
+    this.gain = opts.gain ?? null;
+    this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
   }
 
   reset(): void {
@@ -289,6 +402,11 @@ export class SensorPlanner {
     let bestCost = Infinity;
     let keepCost = Infinity;
     const keep = this.goalFloor === floor ? this.goal % this.plane : -1;
+    const gain = this.gain;
+    const gw = this.gainWeight;
+    // How far past the cheapest candidate a better one could still lie, once gains are counted.
+    const reach = gain ? gw * gain.max : 0;
+    if (gain) gain.prepare({ vw, vd, base, seen: f.seen, visited: f.visited, occupied: f.occupied });
     while (size > 0) {
       const k = pop();
       if (done[k]! & 128) continue;
@@ -297,14 +415,16 @@ export class SensorPlanner {
       if (k !== start && f.visited[base + k] !== 1 && this.traversable(f, base, k) && !this.banned[base + k]) {
         // Prefer frontier voxels that border flown or blocked space: sweeping edges first
         // leaves fewer isolated stragglers to come back for.
-        const score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
+        let score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
+        // The gain is only worth computing where it could still change the choice.
+        if (gain && score - reach < bestCost) score -= gw * gain.gain(k);
         if (k === keep) keepCost = score;
         if (score < bestCost) {
           bestCost = score;
           best = k;
         }
       }
-      if (d0 - 8 * this.edgeBonus > bestCost + 1.5 && (keep < 0 || keepCost < Infinity)) break;
+      if (d0 - 8 * this.edgeBonus - reach > bestCost + 1.5 && (keep < 0 || keepCost < Infinity)) break;
       const x = k % vw;
       const y = (k - x) / vw;
       for (let d = 0; d < 8; d++) {
@@ -454,7 +574,9 @@ export class SensorPlanner {
     const sp = this.speed;
     let vx = el > 1e-6 ? (ex / el) * sp : 0;
     let vy = el > 1e-6 ? (ey / el) * sp : 0;
-    [vx, vy] = filterVelocity(vx, vy, f.yaw, f.lidar, SAFETY_MARGIN, this.horizon);
+    [vx, vy] = this.braking
+      ? brakingFilter(vx, vy, f.yaw, f.lidar, f.vel, this.braking, this.brakingMargin)
+      : filterVelocity(vx, vy, f.yaw, f.lidar, SAFETY_MARGIN, this.horizon);
     let yawRate = 0;
     if (this.faceTravel && el > 0.2) yawRate = clamp(wrap(Math.atan2(ey, ex) - f.yaw) * 2, -MAX_YAW_RATE, MAX_YAW_RATE);
     return { vx, vy, vz, yawRate, exploring: true };
@@ -511,12 +633,15 @@ export function guardAction(
   lidar: ArrayLike<number>,
   out = new Float32Array(4),
   horizon = GUARD_HORIZON,
+  braking?: { model: BrakingModel; vel: readonly [number, number] | null },
 ): Float32Array {
   const cy = Math.cos(yaw);
   const sy = Math.sin(yaw);
   const f = clamp(action[0] ?? 0, -1, 1) * MAX_SPEED_H;
   const l = clamp(action[1] ?? 0, -1, 1) * MAX_SPEED_H;
-  const [vx, vy] = filterVelocity(cy * f - sy * l, sy * f + cy * l, yaw, lidar, GUARD_MARGIN, horizon);
+  const [vx, vy] = braking
+    ? brakingFilter(cy * f - sy * l, sy * f + cy * l, yaw, lidar, braking.vel, braking.model, GUARD_BRAKING_MARGIN)
+    : filterVelocity(cy * f - sy * l, sy * f + cy * l, yaw, lidar, GUARD_MARGIN, horizon);
   out[0] = (cy * vx + sy * vy) / MAX_SPEED_H;
   out[1] = (-sy * vx + cy * vy) / MAX_SPEED_H;
   out[2] = clamp((action[2] ?? 0) + (GUARD_HEIGHT - heightAboveFloor) * 2, -1, 1);

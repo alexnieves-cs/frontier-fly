@@ -125,7 +125,7 @@ class Runner extends IndoorPhases {
     const cmd = this.job.tick();
     if (this.finished) return;
     this.lastCmd = cmd;
-    const step = this.vehicle.step(cmd, this.dt, this.limits());
+    const step = this.vehicle.step(cmd, this.dt, this.limits(), { wind: this.options.wind?.(this.t) });
     this.lastCollided = step.collided;
     if (step.collided) {
       const pos = this.vehicle.pos;

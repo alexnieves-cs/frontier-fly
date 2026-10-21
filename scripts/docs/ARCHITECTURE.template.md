@@ -36,7 +36,7 @@ flowchart LR
 
 ## Training
 
-The shipped checkpoint (`public/checkpoints/pretrained.json`) is produced headlessly by `npm run train:indoor`:
+The shipped checkpoint (`public/checkpoints/pretrained.bin`) is produced headlessly by `npm run train:indoor`. Training writes JSON; `npm run pack:checkpoint` packs it into the binary form the site loads (a JSON header, then the weights as float32, which decodes to exactly the same numbers at a third of the size):
 
 - **Behavior cloning.** A privileged frontier teacher (`src/sim/frontier.ts`) that can see the visited grid flies the curriculum, and the network learns to copy it from the observation alone.
 - **DAgger.** The network flies, the teacher labels every state it visits, and the aggregated data is retrained each round. The round kept scores best on held-out validation seeds, never the eval seeds.

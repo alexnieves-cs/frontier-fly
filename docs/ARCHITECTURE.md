@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (180 files, 33,441 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (184 files, 34,635 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -38,7 +38,7 @@ flowchart LR
 
 ## Training
 
-The shipped checkpoint (`public/checkpoints/pretrained.json`) is produced headlessly by `npm run train:indoor`:
+The shipped checkpoint (`public/checkpoints/pretrained.bin`) is produced headlessly by `npm run train:indoor`. Training writes JSON; `npm run pack:checkpoint` packs it into the binary form the site loads (a JSON header, then the weights as float32, which decodes to exactly the same numbers at a third of the size):
 
 - **Behavior cloning.** A privileged frontier teacher (`src/sim/frontier.ts`) that can see the visited grid flies the curriculum, and the network learns to copy it from the observation alone.
 - **DAgger.** The network flies, the teacher labels every state it visits, and the aggregated data is retrained each round. The round kept scores best on held-out validation seeds, never the eval seeds.
@@ -93,13 +93,14 @@ flowchart LR
   world_outdoor["world/outdoor"]
   world_outdoor_viz["world/outdoor/viz"]
   app -->|1| ui
-  eval -->|2| gen
-  eval -->|6| mission
-  eval -->|1| rl
-  eval -->|7| shared
-  eval -->|8| sim
+  eval -->|3| gen
+  eval -->|7| mission
+  eval -->|2| rl
+  eval -->|8| shared
+  eval -->|10| sim
   eval -->|2| train
   film -->|11| mission
+  film -->|1| rl
   film -->|3| targets
   film -->|2| ui
   film -->|5| viz
@@ -108,10 +109,10 @@ flowchart LR
   mission -->|1| gen
   mission -->|9| perception
   mission -->|4| rl
-  mission -->|16| shared
-  mission -->|11| sim
+  mission -->|17| shared
+  mission -->|15| sim
   mission -->|11| targets
-  mission -->|34| world_outdoor
+  mission -->|36| world_outdoor
   perception -->|6| shared
   perception -->|1| sim
   perception -->|6| targets
@@ -123,7 +124,7 @@ flowchart LR
   sim -->|1| eval
   sim -->|8| gen
   sim -->|1| rl
-  sim -->|34| shared
+  sim -->|35| shared
   targets -->|2| gen
   targets -->|6| shared
   train -->|1| eval
@@ -136,7 +137,7 @@ flowchart LR
   ui -->|3| app
   ui -->|1| gen
   ui -->|9| mission
-  ui -->|6| rl
+  ui -->|7| rl
   ui -->|11| shared
   ui -->|6| sim
   ui -->|1| targets
@@ -163,18 +164,18 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/eval` | 5 | 469 | `gen`, `mission`, `rl`, `shared`, `sim`, `train` | — | — |
-| `src/film` | 6 | 1,693 | `mission`, `targets`, `ui`, `viz` | Three.js | — |
-| `src/gen` | 7 | 1,347 | `shared` | — | — |
+| `src/eval` | 6 | 625 | `gen`, `mission`, `rl`, `shared`, `sim`, `train` | — | — |
+| `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
+| `src/gen` | 7 | 1,350 | `shared` | — | — |
 | `src/landing` | 1 | 150 | `film` | — | — |
-| `src/mission` | 40 | 9,082 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 41 | 9,332 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
-| `src/rl` | 12 | 2,862 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
+| `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 570 | — | — | — |
-| `src/sim` | 21 | 4,074 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
+| `src/sim` | 23 | 4,781 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 15 | 2,516 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |
+| `src/ui` | 15 | 2,517 | `app`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | — |
 | `src/ui/mission` | 4 | 1,743 | `mission` | — | — |
 | `src/viz` | 19 | 2,332 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 873 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
