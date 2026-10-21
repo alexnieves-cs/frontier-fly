@@ -92,6 +92,10 @@ jobs:
         with:
           name: px4-sitl
       - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
+      # PX4 runs its work queues as real-time threads when it may. Without that, the queue
+      # with the simulated baro, compass and battery can stall for seconds after arming, and
+      # PX4 fails safe. Root (as in the cloud container) has it; the runner user does not.
+      - run: sudo setcap cap_sys_nice+ep "$PX4_BUILD/bin/px4"
       - run: npx vite-node scripts/px4/export-plans.ts -- --set full --out test-results/px4/plans
       - name: Fly every plan (${{ matrix.sim }})
         env:
@@ -136,6 +140,10 @@ jobs:
         with:
           name: px4-sitl
       - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
+      # PX4 runs its work queues as real-time threads when it may. Without that, the queue
+      # with the simulated baro, compass and battery can stall for seconds after arming, and
+      # PX4 fails safe. Root (as in the cloud container) has it; the runner user does not.
+      - run: sudo setcap cap_sys_nice+ep "$PX4_BUILD/bin/px4"
       - run: npx vite-node scripts/px4/export-plans.ts -- --out test-results/px4/plans
       - name: PX4 flies the page in Chromium
         run: scripts/px4/run-browser-check.sh test-results/px4/plans/woods-4242-rtl.plan test-results/px4/browser

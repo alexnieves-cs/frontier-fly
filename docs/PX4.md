@@ -116,14 +116,14 @@ CI=1 scripts/px4/run-browser-check.sh test-results/px4/plans/woods-4242-rtl.plan
 npx vite-node scripts/px4/report.ts -- --sih test-results/px4/sih --bridge test-results/px4/bridge --browser test-results/px4/browser --write
 ```
 
-`PX4_SIM_SPEED_FACTOR` sets how much faster than real time the headless checks run. CI and the table above use 2. At 4, PX4's simulation modules went stale more often (see Limits).
+`PX4_SIM_SPEED_FACTOR` sets how much faster than real time the headless checks run. CI and the table above use 2.
 
 ## Limits
 
 - Only the pre-planned part of a mission is a plan. Confirming a contact, entering a building and searching indoors are decided in flight by frontier-fly's own autonomy, not by PX4.
 - The bridge vehicle is a rigid body with first-order motors and linear drag. It has no blade flapping, no ground effect, no battery model and no wind gusts. Collisions with trees and buildings are measured (closest tree) but not simulated. PX4 is never told about obstacles.
 - PX4's GNSS here has no multipath or dropouts, so the estimator has an easy time. The fault bench in [SAFETY_CASE.md](SAFETY_CASE.md) covers degraded sensors with frontier-fly's own failsafe, not with PX4's.
-- On GitHub's runners, PX4's own simulation modules sometimes stop publishing for a few seconds, and PX4 then raises a failsafe the plan did not cause. SIH has twice lost its simulated barometer and compass about a second after takeoff, which made PX4 terminate the flight (`No valid data from Baro 0`). PX4's battery simulator, which runs with every external simulator, has gone stale the same way (`Battery unhealthy`) with frontier-fly in Node and in the browser. In the cloud container it happened once, to the battery simulator at 4x, and not in about 20 runs at 2x or real time, including runs with every core kept busy. The cause is not known yet. A failed flight prints PX4's messages and warnings to help find it.
+- PX4 SITL needs real-time thread priority to run reliably. Without it, the work queue that runs PX4's simulated barometer, compass and battery can stall for a few seconds after arming, and PX4 then fails safe (`No valid data from Baro 0`, `Battery unhealthy`). This showed up only on GitHub's runners at first, because PX4 there ran as an ordinary user, and it reproduced in the cloud container once real-time priority was taken away. CI now gives the PX4 binary that right (`setcap cap_sys_nice+ep`). If you run the checks yourself as an ordinary user, do the same or run PX4 as root.
 - The checks pin PX4 to v1.15.4. A newer PX4 may change defaults such as the return height.
 - ArduPilot is not flown yet. Its `.plan` and `.waypoints` exports are checked only against QGroundControl's loaders ([QGC_EXPORT.md](QGC_EXPORT.md)).
 
