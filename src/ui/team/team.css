@@ -1,0 +1,24 @@
+/* Drone team page. Layout pieces on top of the race page styles (src/ui/race/race.css). */
+
+.team-maps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.team-map { margin: 0; display: flex; flex-direction: column; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.team-map figcaption { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.team-map canvas { display: block; width: 100%; aspect-ratio: 1 / 1; }
+
+.team-deck { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; margin-top: 12px; }
+.team-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; min-width: 0; }
+.team-readouts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.team-readouts div { display: flex; flex-direction: column; gap: 2px; }
+.team-readouts b { font: 650 18px var(--film-mono); font-variant-numeric: tabular-nums; }
+.team-legend { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; }
+.team-legend li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.team-legend i { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.team-ref { margin: 12px 0 0; font-size: 13px; }
+.team-chart { display: block; width: 100%; height: 200px; margin-top: 8px; }
+
+@media (max-width: 860px) {
+  .team-maps, .team-deck { grid-template-columns: minmax(0, 1fr); }
+  .team-readouts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .team .race-controls { padding: 12px; }
+  .team .ctl-actions { margin-left: 0; }
+}

@@ -15,6 +15,7 @@ import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pil
 import { parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { InferPolicy } from '../../src/rl/infer';
 import { RNG } from '../../src/shared/rng';
+import { bootstrapCi } from './stats';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
 import { frontierAction } from '../../src/sim/frontier';
@@ -201,19 +202,7 @@ function arg(name: string, fallback: string): string {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1]! : fallback;
 }
 
-/** Bootstrap 95% interval of the mean, deterministic. */
-export function bootstrapCi(xs: number[], resamples = 2000): [number, number] {
-  if (!xs.length) return [0, 0];
-  const rng = new RNG(7, 'bootstrap');
-  const means: number[] = [];
-  for (let b = 0; b < resamples; b++) {
-    let sum = 0;
-    for (let i = 0; i < xs.length; i++) sum += xs[Math.floor(rng.next() * xs.length)]!;
-    means.push(sum / xs.length);
-  }
-  means.sort((a, b) => a - b);
-  return [means[Math.floor(resamples * 0.025)]!, means[Math.floor(resamples * 0.975)]!];
-}
+export { bootstrapCi };
 
 export function summarizeStudy(rows: Result[]) {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);

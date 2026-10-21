@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (216 files, 41,883 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (225 files, 43,449 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -85,6 +85,7 @@ flowchart LR
   shared["shared"]
   sim["sim"]
   targets["targets"]
+  team["team"]
   train["train"]
   ui["ui"]
   ui_mission["ui/mission"]
@@ -128,6 +129,10 @@ flowchart LR
   sim -->|35| shared
   targets -->|2| gen
   targets -->|6| shared
+  team -->|2| eval
+  team -->|3| gen
+  team -->|11| shared
+  team -->|6| sim
   train -->|1| eval
   train -->|1| gen
   train -->|8| rl
@@ -140,9 +145,10 @@ flowchart LR
   ui -->|1| gen
   ui -->|9| mission
   ui -->|11| rl
-  ui -->|24| shared
+  ui -->|28| shared
   ui -->|14| sim
   ui -->|1| targets
+  ui -->|4| team
   ui -->|3| viz
   ui -->|2| workers
   ui -->|2| world_outdoor
@@ -169,15 +175,16 @@ flowchart LR
 | `src/eval` | 10 | 1,446 | `gen`, `mission`, `rl`, `shared`, `sim`, `train`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,694 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,350 | `shared` | — | — |
-| `src/landing` | 1 | 151 | `film` | — | — |
+| `src/landing` | 1 | 152 | `film` | — | — |
 | `src/mission` | 57 | 13,601 | `gen`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/rl` | 12 | 2,938 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 5 | 570 | — | — | — |
-| `src/sim` | 23 | 4,820 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
+| `src/sim` | 23 | 4,840 | `eval`, `gen`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,270 | `gen`, `shared` | Three.js | — |
+| `src/team` | 6 | 1,019 | `eval`, `gen`, `shared`, `sim` | — | — |
 | `src/train` | 4 | 1,053 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 26 | 4,328 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
+| `src/ui` | 29 | 4,854 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 5 | 2,050 | `mission` | — | — |
 | `src/viz` | 19 | 2,332 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 873 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
@@ -212,3 +219,4 @@ Each page is its own Vite entry. The production build also loads `coi-servicewor
 | `outdoor.html` | `src/world/outdoor/viz/page.ts` | `world/outdoor/viz` |
 | `race.html` | `src/ui/race/main.ts` | `ui` |
 | `sim.html` | `src/main.ts` | `app` |
+| `team.html` | `src/ui/team/main.ts` | `ui` |

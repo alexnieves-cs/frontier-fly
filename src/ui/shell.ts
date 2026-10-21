@@ -8,6 +8,7 @@ export function shell(): string {
       <nav class="page-links" aria-label="Other pages">
         <a href="./index.html">Home</a>
         <a href="./race.html">Pilot race</a>
+        <a href="./team.html">Drone team</a>
         <a href="./demo.html">Mission demo</a>
         <a href="./film.html">Mission film</a>
         <a href="./outdoor.html">Outdoor</a>
