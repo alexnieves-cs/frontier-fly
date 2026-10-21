@@ -14,10 +14,12 @@ const LABEL = {
   plannerMomentum: 'Planner + momentum',
   plannerBrake: 'Planner, braking filter',
   plannerBrakeMomentum: 'Planner, braking filter + momentum',
+  plannerTrack: 'Planner + quad tracker',
+  plannerBrakeTrack: 'Planner, braking filter + quad tracker',
   policy: 'Policy',
   guarded: 'Guarded policy',
 };
-const COLORS = { planner: '#8a8f98', plannerMomentum: '#1f6fd1', plannerBrake: '#d08a3a', plannerBrakeMomentum: '#2a9d55', policy: '#d93a3a', guarded: '#7a4fc9' };
+const COLORS = { planner: '#8a8f98', plannerMomentum: '#1f6fd1', plannerBrake: '#d08a3a', plannerBrakeMomentum: '#2a9d55', plannerTrack: '#0f9fa8', plannerBrakeTrack: '#9a6b12', policy: '#d93a3a', guarded: '#7a4fc9' };
 
 function text(x, y, s, anchor = 'middle', size = 11) {
   return `<text x="${x}" y="${y}" font-size="${size}" text-anchor="${anchor}" fill="#555" font-family="sans-serif">${s}</text>`;
@@ -94,6 +96,8 @@ export function speedSection(study) {
   const qb5 = c('quad', 'plannerBrake', hi);
   const qm4 = c('quad', 'plannerBrakeMomentum', 4);
   const qb4 = c('quad', 'plannerBrake', 4);
+  const qt2 = c('quad', 'plannerBrakeTrack', lo);
+  const qt5 = c('quad', 'plannerBrakeTrack', hi);
   const qg2 = c('quad', 'guarded', lo);
   const qg5 = c('quad', 'guarded', hi);
   const save = (a, b) => `${Math.round((1 - b.energyWh / a.energyWh) * 100)}%`;
@@ -101,7 +105,12 @@ export function speedSection(study) {
     `- **On the kinematic drone, speed is the lever.** The planner covers ${pct(p2.coverage)} (${ci(p2.coverageCi)}) at ${lo} m/s and ${pct(p5.coverage)} (${ci(p5.coverageCi)}) at ${hi} m/s, with no collisions at any speed. Half the building is flown after ${Math.round(p2.halfS)} s at ${lo} m/s and ${Math.round(p5.halfS)} s at ${hi} m/s. This is the flight-time limit the map-prediction null result pointed to: choosing better frontiers barely matters, flying them faster does.`,
     `- **Momentum-aware goal choice saves energy, not coverage.** Scoring each frontier by how far the drone would have to swing round to reach it leaves coverage where it was (${pct(m2.coverage)} at ${lo} m/s, ${pct(m5.coverage)} at ${hi} m/s) and uses ${save(p2, m2)} less energy at ${lo} m/s and ${save(p5, m5)} less at ${hi} m/s, because the drone brakes and re-accelerates less. Energy is metered with the mission battery model for a 1.2 kg quadrotor, which charges for acceleration and gives nothing back on braking.`,
     `- **The guarded policy also gains from speed; the raw policy does not.** With the lidar guard it covers ${pct(g2.coverage)} at ${lo} m/s and ${pct(g5.coverage)} at ${hi} m/s, at ${g5.collisionsPerEpisode.toFixed(1)} collisions per episode. Without the guard it falls from ${pct(r2.coverage)} to ${pct(r5.coverage)}, and most episodes end early at the collision limit, which is why its energy falls. It was trained at ${lo} m/s and never saw these speeds.`,
-    `- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers ${pct(qb2.coverage)} at ${lo} m/s and ${pct(qb5.coverage)} at ${hi} m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: ${pct(qm4.coverage)} against ${pct(qb4.coverage)} at 4 m/s. A path tracker that sets a speed for each corner within the airframe's acceleration and starts each turn early did no better on the tuning buildings (44–47% at 2–4 m/s, against 44–46% for the planner with momentum), so it is not shipped.`,
+    `- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers ${pct(qb2.coverage)} at ${lo} m/s and ${pct(qb5.coverage)} at ${hi} m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: ${pct(qm4.coverage)} against ${pct(qb4.coverage)} at 4 m/s.`,
+    ...(qt2
+      ? [
+          `- **A quad-aware tracker recovers part of the gap and nearly all the collisions** (\`SensorPlannerOptions.tracker\`, src/sim/tracker.ts). It ramps the command at the airframe's acceleration, slows for corners and for the U-turn at the end of each sweep lane, and caps the yaw rate while the drone faces its direction of travel. On the tuning buildings the last part mattered most: the env's command is body-frame velocity, so a drone yawing at full rate through a U-turn asks for a velocity that keeps rotating under it, and with the quadrotor's lag its sweep lanes broke up into loops. With the braking filter it covers ${pct(qt2.coverage)} (${ci(qt2.coverageCi)}) at ${lo} m/s against ${pct(qb2.coverage)} without it, at ${qt2.collisionsPerEpisode.toFixed(2)} collisions per episode against ${qb2.collisionsPerEpisode.toFixed(2)}, and ${pct(qt5.coverage)} at ${hi} m/s. A higher cap still does not pay: the U-turns between 0.5 m lanes limit the quadrotor to about 1 m/s whatever the cruise speed, and it stays well short of the kinematic drone. An earlier tracker with only the corner speeds and the ramp did no better than the planner.`,
+        ]
+      : []),
     `- **The guarded policy is the exception on the quadrotor.** It covers ${pct(qg2.coverage)} at ${lo} m/s and ${pct(qg5.coverage)} at ${hi} m/s, more than any planner, but at ${qg5.collisionsPerEpisode.toFixed(1)} collisions per episode. It pushes into corners the planners slow down for.`,
   ].join('\n');
   return {

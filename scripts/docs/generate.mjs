@@ -156,6 +156,8 @@ const PILOT_LABELS = {
   teacher: 'Oracle teacher (floor plan)',
   classical: 'Sensor-only planner',
   classicalBrake: 'Sensor-only planner, braking filter',
+  classicalTrack: 'Sensor-only planner + quad tracker',
+  classicalBrakeTrack: 'Sensor-only planner, braking filter + quad tracker',
   classicalClimb: 'Sensor-only planner, takes shafts',
   classicalPredict: 'Sensor-only planner + learned map prediction',
   classicalOracleGain: 'Sensor-only planner + true hidden gain (reference)',
@@ -274,7 +276,7 @@ function ablationTables(ab) {
 function reportInline(study, bench) {
   const out = {};
   const keys = ['R_TEACHER_HARD', 'R_PLANNER_HARD', 'R_POLICY_HARD', 'R_GUARD_HARD', 'R_POLICY_COLL', 'R_GUARD_COLL', 'R_PLANNER_QUAD', 'R_POLICY_QUAD', 'R_TEACHER_QUAD'];
-  const keys3 = ['R_Q_PLANNER', 'R_Q_PLANNER_COLL', 'R_Q_PLANNER_BRAKE', 'R_Q_PLANNER_BRAKE_COLL', 'R_Q_GUARD', 'R_Q_GUARD_COLL', 'R_Q_GUARD_BRAKE', 'R_Q_GUARD_BRAKE_COLL'];
+  const keys3 = ['R_Q_PLANNER', 'R_Q_PLANNER_COLL', 'R_Q_PLANNER_BRAKE', 'R_Q_PLANNER_BRAKE_COLL', 'R_Q_GUARD', 'R_Q_GUARD_COLL', 'R_Q_GUARD_BRAKE', 'R_Q_GUARD_BRAKE_COLL', 'R_Q_TRACK', 'R_Q_TRACK_COLL', 'R_Q_BRAKE_TRACK', 'R_Q_BRAKE_TRACK_CI', 'R_Q_BRAKE_TRACK_COLL', 'R_Q_BRAKE_TRACK_EPS'];
   const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
   const keys5 = ['R_CLIMB_FLOORS', 'R_CLIMB_FLOORS_CI', 'R_PLANNER_FLOORS', 'R_PLANNER_FLOORS_CI', 'R_CLIMB_REACHED', 'R_CLIMB_COLL', 'R_PRED_HARD', 'R_PRED_HARD_CI', 'R_ORACLEGAIN_HARD', 'R_PRED_FLOORS', 'R_ORACLEGAIN_FLOORS', 'R_PLANNER_FLOORS_N'];
   const keys6 = ['R_MP_R2', 'R_MP_BASE_R2', 'R_MP_MAE', 'R_MP_BASE_MAE', 'R_MP_TRAIN', 'R_MP_VAL'];
@@ -329,6 +331,15 @@ function reportInline(study, bench) {
       out.R_Q_GUARD_COLL = c('quad', 'guarded').collisionsPerEpisode.toFixed(1);
       out.R_Q_GUARD_BRAKE = pct(guardBrake.coverage);
       out.R_Q_GUARD_BRAKE_COLL = guardBrake.collisionsPerEpisode.toFixed(1);
+    }
+    const track = c('quad', 'classicalBrakeTrack');
+    if (track) {
+      out.R_Q_TRACK = pct(c('quad', 'classicalTrack').coverage);
+      out.R_Q_TRACK_COLL = c('quad', 'classicalTrack').collisionsPerEpisode.toFixed(1);
+      out.R_Q_BRAKE_TRACK = pct(track.coverage);
+      out.R_Q_BRAKE_TRACK_CI = ci(track.coverageCi);
+      out.R_Q_BRAKE_TRACK_COLL = track.collisionsPerEpisode.toFixed(2);
+      out.R_Q_BRAKE_TRACK_EPS = `${track.episodesWithCollision} of ${track.episodes}`;
     }
   }
   if (bench) {

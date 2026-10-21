@@ -55,7 +55,7 @@ The **browser pilot** is what the live demo flies when you pick **Policy**: obse
 
 ## Coverage study on fresh buildings
 
-Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `e23988e` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
+Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `cec50bc` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
 
 The **oracle teacher** reads the true floor plan; it is the DAgger teacher the policy imitates, so it bounds what imitation can reach. The **sensor-only planner** (`src/sim/sensorPlanner.ts`) plans frontier routes on the drone's own lidar map and filters every velocity through the lidar ring. The **lidar guard** wraps the policy's action with that same filter and holds 1.15 m above the floor. [REPORT.md](REPORT.md) discusses what these numbers mean.
 
@@ -111,6 +111,8 @@ The **oracle teacher** reads the true floor plan; it is the DAgger teacher the p
 | Hard, quadrotor dynamics + noise | day | Oracle teacher (floor plan) | 22.7% (20.7–25.0) | 17.00 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Sensor-only planner | 43.6% (40.9–46.3) | 6.67 | 28/30 |
 | Hard, quadrotor dynamics + noise | day | Sensor-only planner, braking filter | 42.1% (39.6–44.7) | 1.17 | 19/30 |
+| Hard, quadrotor dynamics + noise | day | Sensor-only planner + quad tracker | 48.0% (45.3–50.6) | 3.00 | 24/30 |
+| Hard, quadrotor dynamics + noise | day | Sensor-only planner, braking filter + quad tracker | 46.9% (44.7–49.4) | 0.03 | 1/30 |
 | Hard, quadrotor dynamics + noise | day | Policy | 27.0% (23.1–30.4) | 15.30 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Policy + lidar guard | 31.5% (29.3–33.7) | 14.50 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Policy + braking guard | 33.6% (31.8–35.3) | 2.07 | 19/30 |
@@ -119,6 +121,8 @@ The **oracle teacher** reads the true floor plan; it is the DAgger teacher the p
 | Hard, quadrotor dynamics + noise | night-dark | Oracle teacher (floor plan) | 22.7% (20.7–25.0) | 17.00 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner | 44.2% (41.5–47.0) | 5.97 | 26/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner, braking filter | 41.7% (39.2–44.2) | 1.30 | 22/30 |
+| Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner + quad tracker | 47.3% (44.9–49.7) | 3.30 | 26/30 |
+| Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner, braking filter + quad tracker | 46.7% (44.3–48.9) | 0.03 | 1/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy | 27.8% (24.8–30.7) | 15.27 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy + lidar guard | 32.4% (30.2–34.5) | 13.67 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy + braking guard | 34.0% (32.2–35.7) | 2.57 | 24/30 |

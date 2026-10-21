@@ -135,7 +135,7 @@ function summarize(rows: Result[]) {
 
 if (process.argv.includes('--merge')) {
   const outPath = arg('out', 'docs/speed-study.json');
-  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== outPath);
+  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => a.endsWith('.jsonl'));
   const rows: Result[] = files.flatMap((f) =>
     readFileSync(f, 'utf8')
       .split('\n')

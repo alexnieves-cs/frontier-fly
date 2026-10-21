@@ -62,7 +62,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 
 ### Coverage on fresh buildings
 
-Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `e23988e` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
+Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `cec50bc` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
 
 | Pilot | Hard, day | Hard, night (no lights) | Hard collisions per episode | Two floors | Quadrotor + noise | Quad collisions per episode |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -116,6 +116,8 @@ Every pilot flies the same 30 fresh buildings per condition, from `scripts/study
 | Hard, quadrotor dynamics + noise | day | Oracle teacher (floor plan) | 22.7% (20.7–25.0) | 17.00 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Sensor-only planner | 43.6% (40.9–46.3) | 6.67 | 28/30 |
 | Hard, quadrotor dynamics + noise | day | Sensor-only planner, braking filter | 42.1% (39.6–44.7) | 1.17 | 19/30 |
+| Hard, quadrotor dynamics + noise | day | Sensor-only planner + quad tracker | 48.0% (45.3–50.6) | 3.00 | 24/30 |
+| Hard, quadrotor dynamics + noise | day | Sensor-only planner, braking filter + quad tracker | 46.9% (44.7–49.4) | 0.03 | 1/30 |
 | Hard, quadrotor dynamics + noise | day | Policy | 27.0% (23.1–30.4) | 15.30 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Policy + lidar guard | 31.5% (29.3–33.7) | 14.50 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Policy + braking guard | 33.6% (31.8–35.3) | 2.07 | 19/30 |
@@ -124,6 +126,8 @@ Every pilot flies the same 30 fresh buildings per condition, from `scripts/study
 | Hard, quadrotor dynamics + noise | night-dark | Oracle teacher (floor plan) | 22.7% (20.7–25.0) | 17.00 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner | 44.2% (41.5–47.0) | 5.97 | 26/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner, braking filter | 41.7% (39.2–44.2) | 1.30 | 22/30 |
+| Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner + quad tracker | 47.3% (44.9–49.7) | 3.30 | 26/30 |
+| Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner, braking filter + quad tracker | 46.7% (44.3–48.9) | 0.03 | 1/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy | 27.8% (24.8–30.7) | 15.27 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy + lidar guard | 32.4% (30.2–34.5) | 13.67 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy + braking guard | 34.0% (32.2–35.7) | 2.57 | 24/30 |
@@ -179,7 +183,8 @@ The quadrotor condition flies the same pilots on rigid-body dynamics with random
 
 - **The planner** with the kinematic filter covers 43.6% at 6.7 collisions per episode. With the braking filter it covers 42.1% at 1.2.
 - **The guarded policy** covers 31.5% at 14.5 collisions per episode with the kinematic guard, and 33.6% at 2.1 with the braking guard. Fewer crashes leave it more of the episode to explore.
-- **The coverage gap to the kinematic airframe is physical.** On the tuning buildings the quadrotor flies about 13% less distance in the same episode, because it accelerates at about 4 m/s² rather than instantly within the lag. The remainder comes from latency and noise, which slow every approach.
+- **The quad-aware tracker** (`SensorPlannerOptions.tracker`, src/sim/tracker.ts) shapes the planner's command into one the airframe can fly: it ramps the command at the airframe's acceleration, slows for corners and for the U-turn at the end of each sweep lane, and caps the yaw rate while facing the direction of travel. With the braking filter the planner then covers 46.9% (44.7–49.4%) at 0.03 collisions per episode, touching anything in 1 of 30 day episodes; without the filter it covers 48.0% at 3.0. On the tuning buildings the yaw cap did most of the work. The env's command is body-frame velocity, so a drone yawing at full rate through a U-turn asks for a world velocity that keeps rotating under it, and with the quadrotor's lag its sweep lanes broke up into loops. The default controller and the trained checkpoints are unchanged; the tracker is opt-in.
+- **Most of the coverage gap to the kinematic airframe is physical.** The planner covers by sweeping lanes one 0.5 m voxel apart, and the U-turn between two lanes has a 0.25 m radius, which the quadrotor (about 4 m/s² of acceleration at its 0.4 rad tilt limit) can only take at about 1 m/s. The kinematic drone takes it at cruise speed. On the tuning buildings the quadrotor also flies about 13% less distance in the same episode, and latency and noise slow every approach.
 
 On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the policy and the planner on the 1.2 kg quadrotor with the braking filter as the indoor shield: 7 of 180 quadrotor flights touched anything.
 
@@ -197,7 +202,8 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 - **On the kinematic drone, speed is the lever.** The planner covers 65.5% (62.2–68.7%) at 2 m/s and 84.4% (81.3–87.3%) at 5 m/s, with no collisions at any speed. Half the building is flown after 89 s at 2 m/s and 60 s at 5 m/s. This is the flight-time limit the map-prediction null result pointed to: choosing better frontiers barely matters, flying them faster does.
 - **Momentum-aware goal choice saves energy, not coverage.** Scoring each frontier by how far the drone would have to swing round to reach it leaves coverage where it was (65.6% at 2 m/s, 84.1% at 5 m/s) and uses 7% less energy at 2 m/s and 21% less at 5 m/s, because the drone brakes and re-accelerates less. Energy is metered with the mission battery model for a 1.2 kg quadrotor, which charges for acceleration and gives nothing back on braking.
 - **The guarded policy also gains from speed; the raw policy does not.** With the lidar guard it covers 60.8% at 2 m/s and 79.8% at 5 m/s, at 3.4 collisions per episode. Without the guard it falls from 60.7% to 32.0%, and most episodes end early at the collision limit, which is why its energy falls. It was trained at 2 m/s and never saw these speeds.
-- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers 42.1% at 2 m/s and 33.6% at 5 m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: 41.3% against 36.9% at 4 m/s. A path tracker that sets a speed for each corner within the airframe's acceleration and starts each turn early did no better on the tuning buildings (44–47% at 2–4 m/s, against 44–46% for the planner with momentum), so it is not shipped.
+- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers 42.1% at 2 m/s and 33.6% at 5 m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: 41.3% against 36.9% at 4 m/s.
+- **A quad-aware tracker recovers part of the gap and nearly all the collisions** (`SensorPlannerOptions.tracker`, src/sim/tracker.ts). It ramps the command at the airframe's acceleration, slows for corners and for the U-turn at the end of each sweep lane, and caps the yaw rate while the drone faces its direction of travel. On the tuning buildings the last part mattered most: the env's command is body-frame velocity, so a drone yawing at full rate through a U-turn asks for a velocity that keeps rotating under it, and with the quadrotor's lag its sweep lanes broke up into loops. With the braking filter it covers 46.9% (44.7–49.4%) at 2 m/s against 42.1% without it, at 0.03 collisions per episode against 1.17, and 44.5% at 5 m/s. A higher cap still does not pay: the U-turns between 0.5 m lanes limit the quadrotor to about 1 m/s whatever the cruise speed, and it stays well short of the kinematic drone. An earlier tracker with only the corner speeds and the ramp did no better than the planner.
 - **The guarded policy is the exception on the quadrotor.** It covers 33.6% at 2 m/s and 46.9% at 5 m/s, more than any planner, but at 8.8 collisions per episode. It pushes into corners the planners slow down for.
 
 | Airframe | Pilot | 2 m/s | 3 m/s | 4 m/s | 5 m/s | Energy, Wh (2 → 5 m/s) |
@@ -210,6 +216,8 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 | Quadrotor | Planner + momentum | 45.7% (7.0) | 41.2% (13.1) | 38.8% (14.6) | 39.1% (14.7) | 5.15 → 4.57 |
 | Quadrotor | Planner, braking filter | 42.1% (1.2) | 38.0% (2.3) | 36.9% (2.6) | 33.6% (2.1) | 5.18 → 5.36 |
 | Quadrotor | Planner, braking filter + momentum | 43.7% (1.2) | 42.0% (1.8) | 41.3% (2.5) | 39.8% (2.8) | 5.14 → 5.30 |
+| Quadrotor | Planner + quad tracker | 48.0% (3.0) | 45.0% (6.1) | 45.3% (5.9) | 43.9% (6.6) | 5.03 → 5.11 |
+| Quadrotor | Planner, braking filter + quad tracker | 46.9% (0.0) | 45.4% (0.3) | 43.5% (0.4) | 44.5% (0.2) | 5.04 → 5.09 |
 | Quadrotor | Policy | 27.0% (15.3) | 25.0% (17.0) | 20.4% (17.0) | 20.7% (17.0) | 3.84 → 1.62 |
 | Quadrotor | Guarded policy | 33.6% (2.1) | 39.4% (6.0) | 44.3% (7.8) | 46.9% (8.8) | 5.02 → 5.11 |
 
