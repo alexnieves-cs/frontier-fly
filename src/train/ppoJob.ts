@@ -279,7 +279,7 @@ export interface SeqEvalResult {
   steps: number;
 }
 
-let evalEnvs: ExplorerEnv[] = [];
+const evalEnvs: ExplorerEnv[] = [];
 
 /** Deterministic coverage episodes (eval protocol), run in lockstep so inference is batched. */
 const seqEval: JobFn = (ctx, raw) => {
