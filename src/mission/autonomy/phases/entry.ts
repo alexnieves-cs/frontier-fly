@@ -69,7 +69,7 @@ export abstract class EntryPhases extends SearchPhases {
 
   protected startInspect(): void {
     const v = this.visit!;
-    const steps = planInspection(v.b, this.vehicle.pos, this.physics, this.air);
+    const steps = planInspection(v.b, this.vehicle.pos, this.physics, this.air, this.options.search !== undefined);
     this.log('action', `Inspecting the ${v.b.label} envelope from ${steps.filter((s) => s.dwell > 0).length} viewpoints.`);
     const wps: Waypoint[] = steps.map((s) => ({
       pos: s.pos,

@@ -23,7 +23,7 @@ import type {
   V3,
 } from '../contracts';
 import { ConfirmTracker, type ConfirmTrack } from '../planner/confirm';
-import { cruiseAglFor, planCoverage, type CoveragePlan } from '../planner/coverage';
+import { cameraFootprint, cruiseAglFor, planCoverage, type CoveragePlan } from '../planner/coverage';
 import {
   type Airspace,
   airspaceFor,
@@ -33,11 +33,13 @@ import {
   segmentClear,
   sub,
 } from '../planner/geometry';
+import { GIMBAL_RANGE_SCALE } from '../perception';
 import { type ActingPolicy, toLocal } from '../planner/indoor';
 import { QuadVehicle } from '../quadVehicle';
 import { createFailsafe, type Failsafe, type HealthVerdict } from '../failsafe';
 import { FaultInjector } from '../faults';
 import { createSafetyMonitor } from '../safety';
+import { SarSearch } from '../sar/search';
 import {
   INDOOR_LIMITS,
   OUTDOOR_LIMITS,
@@ -73,6 +75,8 @@ export abstract class RunnerBase implements MissionRunner {
   protected readonly monitor: SafetyMonitor;
   protected readonly tracker: ConfirmTracker;
   protected readonly coverage: CoveragePlan;
+  /** Probability-of-area search, when the mission flies one instead of lanes. */
+  protected readonly sar: SarSearch | null;
   protected readonly policy: ActingPolicy | null;
   /** Reference mode: indoor exploration and paths read the true floor plan. */
   protected readonly oracle: boolean;
@@ -169,18 +173,33 @@ export abstract class RunnerBase implements MissionRunner {
         ? new QuadVehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor)
         : new Vehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor);
     this.monitor = createSafetyMonitor(mission, world);
-    this.tracker = new ConfirmTracker(mission);
-    this.coverage = planCoverage(mission, world, { agl: this.agl });
+    // Outdoor views come from the gimbal lens, which resolves GIMBAL_RANGE_SCALE times farther.
+    this.tracker = new ConfirmTracker(mission, { outdoorRangeScale: GIMBAL_RANGE_SCALE });
+    const search = options.search;
+    const spacing = search?.mode === 'lanes' ? search.laneSpacingM : undefined;
+    // planCoverage spaces lanes by camera footprint and overlap; a requested spacing maps onto the overlap.
+    const overlap = spacing ? 1 - spacing / (2 * cameraFootprint(this.agl)) : undefined;
+    this.coverage = planCoverage(mission, world, { agl: this.agl, overlap });
+    this.sar =
+      search?.mode === 'probability' && mission.missionType === 'find_person' ? new SarSearch(world, this.air, this.agl, search) : null;
     const p = options.policy as ActingPolicy | undefined;
     this.oracle = options.indoor === 'oracle';
     this.policy = p && typeof p.actWith === 'function' && options.indoor !== 'frontier' && !this.oracle ? p : null;
     if (options.indoor === 'policy' && !this.policy)
       this.log('warn', 'Policy explorer requested without a policy. Using frontier exploration.');
     this.phases.push({ phase: 'preflight', tStart: 0, tEnd: 0 });
-    this.log(
-      'info',
-      `${mission.name}: ${mission.missionType.replace('_', ' ')}, entry policy ${mission.entryPolicy}, ${this.coverage.lanes.length} coverage lanes at ${fmt(this.agl, 0)} m AGL, ${fmt(this.coverage.laneSpacing)} m apart.`,
-    );
+    if (this.sar) {
+      const [lx, ly] = this.sar.prior.ipp;
+      this.log(
+        'info',
+        `${mission.name}: find person, entry policy ${mission.entryPolicy}, probability search at ${fmt(this.agl, 0)} m AGL from the last known point (${fmt(lx)}, ${fmt(ly)}). ${fmt((1 - this.sar.prior.rest) * 100, 0)}% of the prior is within aerial reach.`,
+      );
+    } else {
+      this.log(
+        'info',
+        `${mission.name}: ${mission.missionType.replace('_', ' ')}, entry policy ${mission.entryPolicy}, ${this.coverage.lanes.length} coverage lanes at ${fmt(this.agl, 0)} m AGL, ${fmt(this.coverage.laneSpacing)} m apart.`,
+      );
+    }
     if (this.agl < 11) this.log('warn', `Altitude band caps cruise at ${fmt(this.agl)} m AGL, close to the canopy.`);
     this.job = this.holdJob('preflight', 1, () => this.startCoverage());
     this.recordTrack();

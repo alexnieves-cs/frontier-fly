@@ -122,6 +122,7 @@ class Runner extends IndoorPhases {
       indoorExplorer: this.policyClean ? 'policy' : this.frontierRan ? (this.oracle ? 'oracle' : 'frontier') : null,
       log: this.logs.slice(),
       faults: this.faults ? this.faults.transitions().slice() : [],
+      ...(this.sar ? { search: { pos: this.sar.history.slice(), reachable: 1 - this.sar.prior.rest, replans: this.sar.replans } } : {}),
     };
   }
 

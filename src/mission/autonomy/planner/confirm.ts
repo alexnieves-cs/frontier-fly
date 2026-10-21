@@ -19,6 +19,11 @@ export interface ConfirmOptions {
   maxRange?: number;
   /** Contacts within this distance of a track estimate join it, meters. */
   associateM?: number;
+  /**
+   * Range gain for outdoor tracks (no building), whose views come from the
+   * gimbal lens. Their views count out to maxRange times this. Default 1.
+   */
+  outdoorRangeScale?: number;
 }
 
 export interface ConfirmView {
@@ -82,6 +87,7 @@ export class ConfirmTracker {
   readonly minSeparation: number;
   readonly maxRange: number;
   readonly associateM: number;
+  readonly outdoorRangeScale: number;
   private readonly classes: Set<TargetClass>;
   private nextId = 0;
 
@@ -93,6 +99,7 @@ export class ConfirmTracker {
     this.minSeparation = ((options.minSeparationDeg ?? 25) * Math.PI) / 180;
     this.maxRange = options.maxRange ?? 9;
     this.associateM = options.associateM ?? 1.5;
+    this.outdoorRangeScale = options.outdoorRangeScale ?? 1;
     this.classes = targetClasses(mission);
   }
 
@@ -144,7 +151,8 @@ export class ConfirmTracker {
     // Running mean of the estimate.
     const w = 1 / track.frames;
     for (let i = 0; i < 3; i++) track.estimate[i] = track.estimate[i]! * (1 - w) + contact.estimate[i]! * w;
-    if (contact.range <= this.maxRange) {
+    const maxRange = track.buildingId === null ? this.maxRange * this.outdoorRangeScale : this.maxRange;
+    if (contact.range <= maxRange) {
       const angle = Math.atan2(contact.bearing[1], contact.bearing[0]);
       const near = track.views.find((v) => angleDiff(v.angle, angle) < this.minSeparation);
       if (near) {
