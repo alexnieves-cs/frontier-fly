@@ -5,7 +5,7 @@
  * Usage: npx vite-node scripts/study/rl-finetune.ts -- label=path [label=path ...] [--out docs/rl-finetune.json]
  *        [--logs id:path,id:path]   (train:ppo logs whose validation lines become the learning curves)
  *        [--shipped label]   (the arm that ships; default the last)
- *        [--recipes recipes.json]   ({ id: { label, flags } } for those runs)
+ *        [--recipes recipes.json]   ({ id: { label, flags, offset? } } for those runs; offset shifts a continued run's updates)
  *
  * The first checkpoint is the baseline. Sets (none of them used to pick checkpoints):
  *  - protocol: the fixed coverage eval (stage 0 seeds 101/202/303/404, stage 3 4242/5150/6160), day and night-dark
@@ -33,7 +33,7 @@ const logs = (flag('logs') ?? '').split(',').filter(Boolean).map((x) => {
   const at = x.indexOf(':');
   return { id: x.slice(0, at), path: x.slice(at + 1) };
 });
-const recipes = flag('recipes') ? (JSON.parse(readFileSync(flag('recipes')!, 'utf8')) as Record<string, { label: string; flags: string }>) : {};
+const recipes = flag('recipes') ? (JSON.parse(readFileSync(flag('recipes')!, 'utf8')) as Record<string, { label: string; flags: string; offset?: number }>) : {};
 const arms = args.filter((a, i) => a.includes('=') && !args[i - 1]?.startsWith('--')).map((a) => {
   const [label, path] = a.split('=');
   return { label: label!, path: path! };
@@ -152,7 +152,11 @@ async function main() {
     selection: 'checkpoints picked on the tuning block 66001-66299 only',
     hardPooled: pooled,
     cells: table,
-    runs: logs.map(({ id, path }) => ({ id, ...recipes[id], curve: curveOf(readFileSync(path, 'utf8')) })),
+    runs: logs.map(({ id, path }) => {
+      const r = recipes[id] ?? { label: id, flags: '' };
+      const offset = r.offset ?? 0;
+      return { id, label: r.label, flags: r.flags, curve: curveOf(readFileSync(path, 'utf8')).map((p) => ({ ...p, update: p.update + offset })) };
+    }),
   };
   writeFileSync(outPath, JSON.stringify(doc, null, 1) + '\n');
   for (const row of table) {

@@ -5,11 +5,16 @@
  * the learner on tfjs-node when it is installed.
  *
  * Usage: npm run train:ppo -- --out /tmp/ppo.bin [--init public/checkpoints/pretrained.bin]
- *          [--mem 0] [--updates 200] [--steps-per-env 256] [--seq-len 16] [--envs 8]
- *          [--lr 3e-5] [--critic-lr 3e-4] [--clip 0.1] [--epochs 3] [--seq-batch 32]
- *          [--bc 1:0.1] [--ppo 1] [--log-std -1.6] [--critic-warmup 8] [--imitate 0]
- *          [--eval-every 10] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
+ *          [--mem 0] [--updates 400] [--steps-per-env 512] [--seq-len 16] [--envs 8]
+ *          [--lr 1e-5] [--critic-lr 3e-4] [--clip 0.1] [--epochs 3] [--seq-batch 32]
+ *          [--bc 0.05] [--ppo 1] [--log-std -2.3] [--critic-warmup 8] [--imitate 0]
+ *          [--eval-every 20] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
  *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|report]
+ *
+ * The defaults are the recipe of the shipped checkpoint's first 400 updates;
+ * it then ran 400 more with --init on that run's best checkpoint and --seed 47
+ * (docs/REPORT.md, "Fine-tuning on its own flights"). --bc a:b anneals the BC
+ * weight linearly over the PPO updates.
  *
  * --imitate N runs N rounds of on-policy imitation (BC on the teacher's labels
  * of the student's own states, i.e. DAgger with beta 0) before PPO; with --mem
@@ -137,8 +142,8 @@ async function main() {
   if (mismatch) throw new Error(mismatch);
   const memDim = num('mem', init.memDim ?? 0);
   const policy = MemPolicy.fromCheckpoint(init, memDim, num('seed', 23));
-  const trainer = new SeqPpoTrainer(policy, PRIV_DIM, { lr: num('lr', 3e-5), criticLr: num('critic-lr', 3e-4), seed: num('seed', 23) });
-  const logStd = num('log-std', -1.6);
+  const trainer = new SeqPpoTrainer(policy, PRIV_DIM, { lr: num('lr', 1e-5), criticLr: num('critic-lr', 3e-4), seed: num('seed', 23) });
+  const logStd = num('log-std', -2.3);
   trainer.setLogStd(new Array(ACT_DIM).fill(logStd));
   console.log(`backend ${backend}, ${workers} workers x ${envs} envs, mem ${memDim}, init ${arg('init') ?? 'shipped'}`);
 
@@ -146,15 +151,15 @@ async function main() {
   let best = { label: 'init', score: await evaluate(pool, workers, policy, tune), weights: policy.getWeights() };
   console.log(`init ${fmt(best.score)}  (${((Date.now() - started) / 1000).toFixed(0)} s)`);
 
-  const T = num('steps-per-env', 256);
+  const T = num('steps-per-env', 512);
   const L = num('seq-len', 16);
   const imitate = num('imitate', 0);
   const warmup = num('critic-warmup', 8);
-  const updates = num('updates', 200);
-  const evalEvery = num('eval-every', 10);
+  const updates = num('updates', 400);
+  const evalEvery = num('eval-every', 20);
   const rewardScale = num('reward-scale', 0.1);
   const stageMix = (arg('stage-mix') ?? '0.2,0.1,0.2,0.5').split(',').map(Number);
-  const bc = schedule('bc', '1:0.1');
+  const bc = schedule('bc', '0.05');
   const ppoCoef = num('ppo', 1);
   const total = imitate + warmup + updates;
   let resetEnvs = true;

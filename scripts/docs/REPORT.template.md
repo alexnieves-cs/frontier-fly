@@ -159,6 +159,28 @@ These runs use the default recipe without weight averaging, so the full arm is n
 
 {{CURVES_FIGURE}}
 
+### Fine-tuning on its own flights
+
+The DAgger policy only ever learned to copy its teacher. Here it learns from its own flights with PPO, starting from the DAgger weights. Three changes made PPO work where the anchored fine-tune above did not:
+
+- **Scale and a privileged critic.** Rollouts run on every core, 32 environments at about 11,000 steps a second, in the same episodes the policy is evaluated in (2400 steps, 16-collision limit, a quarter of them in the dark). A 400-update run is 3.3 million steps and takes about 45 minutes on four CPU cores. The critic is a separate network that also sees what the policy cannot: true coverage so far, the true distance to the nearest unflown voxel, the teacher's action, the collision budget used and the voxels left. It only shapes the advantages and never ships.
+- **Little exploration noise.** The policy's action noise is cut to a standard deviation of 0.1 (pre-tanh). At 0.2 the sampled flights crash into the 16-collision limit, and PPO learns from wrecks.
+- **A small imitation term on a replay, or none.** The teacher labels every state the policy reaches, and a BC term on a reservoir of those labels (weight 0.05) keeps the policy near the teacher where PPO has no signal. Imitating only the current batch, or imitating without PPO at all, wrecks the policy within 20 updates: on its own states the teacher's labels pull toward walls the student cannot see the way the teacher does.
+
+{{RL_NOTE}}
+
+{{RL_TABLE}}
+
+The fine-tuned policy covers {{R_RL_HARD}} of the hard buildings against {{R_RL_BASE_HARD}} for the DAgger checkpoint it started from, a paired change of {{R_RL_DELTA}} points (95% interval {{R_RL_CI}}) over {{R_RL_N}} flights, and collides {{R_RL_COLL}} times per episode instead of {{R_RL_BASE_COLL}}. On the coverage study's hard buildings it covers {{R_RL_STUDY_DAY}} by day and {{R_RL_STUDY_NIGHT}} at night, more than the oracle teacher it imitated. The teacher is a greedy nearest-frontier rule; PPO optimizes coverage over the whole episode and learns to stop wasting steps on it.
+
+The runs behind it, with hard coverage on the tuning block (66001–66299, the only seeds used to pick checkpoints):
+
+{{RL_RUNS_TABLE}}
+
+{{RL_CURVES_FIGURE}}
+
+{{RL_MEMORY_NOTE}}
+
 ## Outdoor search for a lost person
 
 Before this work the drone searched outdoors with a boustrophedon lawnmower: parallel lanes over the whole area at a fixed spacing, then every building it had found. That is the right plan when nothing is known about where the person is. A lost-person search almost always knows something: where they were last seen, and how lost people tend to move. This section replaces the lanes with a search that flies where the person is most likely to be, and measures it against the lanes on worlds it was never tuned on.
