@@ -31,7 +31,10 @@ trap cleanup EXIT
 node "$HERE/bridge.mjs" > "$OUT_DIR/$id.bridge.log" 2>&1 &
 pids+=($!)
 
-(cd "$ROOT" && PX4_LIVE=1 npx playwright test tests/e2e/px4.spec.ts -g "flies the browser" --project=chromium --no-deps) \
+# Playwright empties its output folder when it starts, and the default one,
+# test-results/, may hold this run's plans and logs, so give it its own.
+(cd "$ROOT" && PX4_LIVE=1 npx playwright test tests/e2e/px4.spec.ts -g "flies the browser" --project=chromium --no-deps \
+  --output "$OUT_DIR/playwright") \
   > "$OUT_DIR/$id.playwright.log" 2>&1 &
 pw=$!
 

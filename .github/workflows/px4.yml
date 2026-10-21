@@ -26,7 +26,6 @@ concurrency:
 env:
   PX4_VERSION: v1.15.4
   PX4_BUILD: ${{ github.workspace }}/px4-sitl
-  PX4_SIM_SPEED_FACTOR: 4
 
 jobs:
   build-px4:
@@ -71,7 +70,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sim: [sih, bridge]
+        include:
+          - sim: sih
+            speed: 4
+          # At 4x, PX4's own battery simulator once went stale for 5 s of PX4 time during a
+          # bridge run and PX4 raised a battery failsafe; 2x has not.
+          - sim: bridge
+            speed: 2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -89,6 +94,8 @@ jobs:
       - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
       - run: npx vite-node scripts/px4/export-plans.ts -- --set full --out test-results/px4/plans
       - name: Fly every plan (${{ matrix.sim }})
+        env:
+          PX4_SIM_SPEED_FACTOR: ${{ matrix.speed }}
         run: scripts/px4/run-check.sh test-results/px4/plans test-results/px4/${{ matrix.sim }} ${{ matrix.sim }}
       - if: always()
         run: npx vite-node scripts/px4/report.ts -- --${{ matrix.sim }} test-results/px4/${{ matrix.sim }} --summary "$GITHUB_STEP_SUMMARY"
