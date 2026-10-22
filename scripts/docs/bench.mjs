@@ -67,13 +67,14 @@ export function benchSection(root) {
     String(i + 1),
     r.baseline ? `${r.name} (baseline)` : `[${r.name}](../${r.path})`,
     `**${pct(r.score)}**`,
+    r.footprintScore === undefined ? '—' : pct(r.footprintScore),
     ...tasks.map((t) => (r.tasks[t.id] ? pct(r.tasks[t.id].coverage) : '—')),
     `${Math.round(r.safeShare * 100)}%`,
     `\`${r.commit}\``,
   ]);
   return {
     BENCH_TEAM: teamBoard(root),
-    BENCH_BOARD: table(['#', 'Pilot', 'Score', ...tasks.map((t) => t.id), 'Flights that touched nothing', 'Commit'], board),
+    BENCH_BOARD: table(['#', 'Pilot', 'Score', 'Footprint score', ...tasks.map((t) => t.id), 'Flights that touched nothing', 'Commit'], board),
     BENCH_TASKS: table(
       ['Task', 'Buildings', 'Airframe', 'Lighting', 'Speed cap'],
       tasks.map((t) => [`\`${t.id}\``, t.label, t.dynamics === 'quad' ? 'Quadrotor, randomized' : 'Kinematic', t.lighting === 'day' ? 'Day' : 'Lights off', `${t.speedH} m/s`]),

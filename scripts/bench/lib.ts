@@ -26,6 +26,7 @@ export function summarize(episodes: BenchEpisode[]) {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const tasks: Record<string, unknown> = {};
   const covs: number[] = [];
+  const fps: number[] = [];
   for (const t of BENCH_TASKS) {
     const rs = episodes.filter((e) => e.task === t.id);
     if (!rs.length) continue;
@@ -40,9 +41,24 @@ export function summarize(episodes: BenchEpisode[]) {
       safeFlights: rs.filter((r) => r.collisions <= SAFE_COLLISIONS).length,
       energyWh: mean(rs.map((r) => r.energyWh)),
       halfS: half.length ? mean(half) : null,
+      ...footprintStats(rs, mean),
     };
+    if (rs.every((r) => r.footprint !== undefined)) fps.push(mean(rs.map((r) => r.footprint)));
   }
-  return { score: mean(covs), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), tasks };
+  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), tasks };
+}
+
+/** Footprint columns of a task (absent on results written before the footprint metric existed). */
+function footprintStats(rs: BenchEpisode[], mean: (xs: number[]) => number) {
+  if (!rs.every((r) => r.footprint !== undefined)) return {};
+  const fp = rs.map((r) => r.footprint);
+  const half = rs.filter((r) => r.footprintHalfS !== null).map((r) => r.footprintHalfS!);
+  return {
+    footprint: mean(fp),
+    footprintCi: bootstrapCi(fp),
+    area: { flown: mean(rs.map((r) => r.area.flown)), footprint: mean(rs.map((r) => r.area.footprint)) },
+    footprintHalfS: half.length ? mean(half) : null,
+  };
 }
 
 let planSet: PlanSet | null = null;
