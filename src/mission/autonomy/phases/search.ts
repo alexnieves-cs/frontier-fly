@@ -220,8 +220,11 @@ export abstract class SearchPhases extends RunnerBase {
    */
   protected ownClear(scope: ClearScope, category: 'person' | 'object'): ClearReport {
     const where = scope === 'outdoor' ? null : scope;
+    // A track keeps the building of its first contact, and one first seen from outside has none: place
+    // those by where the track's estimate now is, so a person confirmed through a window still blocks.
+    const buildingOf = (t: ConfirmTrack) => t.buildingId ?? buildingAt(this.world, t.estimate, CONTACT_FOOTPRINT_MARGIN_M);
     const blocking = this.tracker.tracks.filter(
-      (t) => t.buildingId === where && (t.status === 'open' || t.status === 'confirmed') && (category === 'person') === (t.classId === 'person'),
+      (t) => buildingOf(t) === where && (t.status === 'open' || t.status === 'confirmed') && (category === 'person') === (t.classId === 'person'),
     ).length;
     if (scope === 'outdoor') {
       const r = this.outdoorLook.report(category);
