@@ -776,6 +776,60 @@ function localizationTables(loc) {
   };
 }
 
+/**
+ * Real-data check (scripts/study/intel-lab.ts): the pose estimator on the Intel Research Lab log,
+ * against the published scores on the same relations.
+ */
+function intelLabSection(intel) {
+  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN'];
+  if (!intel) return Object.fromEntries(keys.map((k) => [k, k.startsWith('R_') ? 'not measured' : '_Not measured yet. `npm run study:intel` writes `docs/intel-lab.json`._']));
+  const arm = (id) => intel.arms.find((a) => a.id === id);
+  const m = (v) => `${v.toFixed(3)} m`;
+  const pm = (s, d = 3) => `${s.mean.toFixed(d)} ± ${s.std.toFixed(d)}`;
+  // Published on the same relations: Kümmerle et al. 2009 (Table 1, Intel) and Hess et al. 2016 (Tables II and III).
+  const published = [
+    ['Scan matching (Kümmerle et al. 2009)', '0.220 ± 0.296', '1.7 ± 4.8', '0.136 ± 0.277', '25.8 ± 170.9', '1.168'],
+    ['Rao-Blackwellized particle filter, GMapping (Kümmerle et al. 2009)', '0.070 ± 0.083', '3.0 ± 5.3', '0.011 ± 0.034', '36.7 ± 187.7', '0.698'],
+    ['Graph-based SLAM (Kümmerle et al. 2009)', '0.031 ± 0.026', '1.3 ± 4.7', '0.002 ± 0.004', '24.0 ± 166.1', '0.229'],
+    ['Graph FLIRT (as quoted by Hess et al. 2016)', '0.02 ± 0.02', '0.3 ± 0.3', '—', '—', '—'],
+    ['Cartographer (Hess et al. 2016)', '0.0229 ± 0.0239', '0.453 ± 1.335', '0.0011 ± 0.0040', '1.986 ± 23.988', '—'],
+  ].map(([name, ...v]) => [`${name}, published`, ...v]);
+  const ours = ['odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-scan']
+    .map(arm)
+    .filter(Boolean)
+    .map((a) => [`**${a.label}**, this repository`, pm(a.error.transAbs), pm(a.error.rotAbs, 2), pm(a.error.transSq, 3), pm(a.error.rotSq, 1), a.error.transAbs.max.toFixed(3)]);
+  const split = ['odom', 'fused', 'adapted'].map(arm).filter(Boolean).map((a) => [
+    a.label,
+    `${a.quantiles.transMedian.toFixed(3)} m / ${a.quantiles.rotMedian.toFixed(2)}°`,
+    `${a.quantiles.transP90.toFixed(3)} m / ${a.quantiles.rotP90.toFixed(2)}°`,
+    `${m(a.local.transAbs.mean)} (${a.local.n})`,
+    `${m(a.loops.transAbs.mean)} (${a.loops.n})`,
+    `${m(a.heldOut.transAbs.mean)} / ${a.heldOut.rotAbs.mean.toFixed(2)}° (${a.heldOut.n})`,
+    a.stats ? `${fmt(a.msPerSweep, 2)} ms` : '—',
+  ]);
+  const f = arm('fused');
+  const ad = arm('adapted');
+  const od = arm('odom');
+  return {
+    INTEL_TABLE: table(['Method', 'Translation, abs (m)', 'Rotation, abs (°)', 'Translation, squared (m²)', 'Rotation, squared (°²)', 'Worst relation (m)'], [...published, ...ours]),
+    INTEL_SPLIT_TABLE: table(['This repository', 'Median relation error', '90th percentile', 'Relations under 10 s apart', 'Relations 10 s or more apart', 'Held out (both sweeps after the dev part)', 'CPU per sweep'], split),
+    R_INTEL_SHIPPED: `${m(f.error.transAbs.mean)} and ${f.error.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_ADAPTED: m(ad.error.transAbs.mean),
+    R_INTEL_ADAPTED_ROT: `${ad.error.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_ODOM: m(od.error.transAbs.mean),
+    R_INTEL_LOCAL: m(ad.local.transAbs.mean),
+    R_INTEL_ODOM_LOCAL: m(od.local.transAbs.mean),
+    R_INTEL_LOOPS: m(ad.loops.transAbs.mean),
+    R_INTEL_MEDIAN: m(ad.quantiles.transMedian),
+    R_INTEL_HELD: `${m(ad.heldOut.transAbs.mean)} and ${ad.heldOut.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_MS: `${fmt(ad.msPerSweep, 1)} ms`,
+    R_INTEL_COMMIT: intel.commit,
+    R_INTEL_SWEEPS: fmt(intel.dataset.sweeps),
+    R_INTEL_RELS: fmt(intel.dataset.relations),
+    R_INTEL_MIN: `${Math.round(intel.dataset.durationSec / 60)} minutes`,
+  };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Fault bench: docs/fault-bench.json into the safety case.
 
@@ -870,6 +924,7 @@ const values = {
   ...benchSection(ROOT),
   ...visionSection(readJson('docs/vision-detector.json'), readJson('docs/vision-bench.json')).values,
   ...localizationTables(readJson('docs/localization.json')),
+  ...intelLabSection(readJson('docs/intel-lab.json')),
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json')]),
 };
