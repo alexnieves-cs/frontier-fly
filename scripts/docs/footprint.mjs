@@ -22,6 +22,7 @@ const PANELS = [
 const FIG_PILOTS = [
   { id: 'teacher', label: 'Oracle teacher', color: '#8a8f98' },
   { id: 'classical', label: 'Sensor-only planner', color: '#1f6fd1' },
+  { id: 'classicalPredict', label: 'Planner + learned map prediction', color: '#7a4fc9' },
   { id: 'classicalBrakeTrack', label: 'Planner, braking + quad tracker', color: '#0f9fa8' },
   { id: 'guarded', label: 'Policy + lidar guard', color: '#d93a3a' },
 ];
@@ -98,12 +99,6 @@ const SPEED_LABELS = {
   guarded: 'Guarded policy',
 };
 
-/** Rank of a pilot in a condition by one metric (1 = best). */
-function rankBy(cells, pilot, key) {
-  const sorted = [...cells].sort((a, b) => key(b) - key(a));
-  return sorted.findIndex((c) => c.pilot === pilot) + 1;
-}
-
 export function footprintSection(study, speed) {
   const none = '_Not measured yet. Run `npm run study:coverage`._';
   const empty = { values: { FOOTPRINT_NOTE: none, FOOTPRINT_TABLE: '', FOOTPRINT_FINDINGS: '', FOOTPRINT_FIGURE: '', FOOTPRINT_SPEED_TABLE: '', FOOTPRINT_RADII: '' }, files: {} };
@@ -133,43 +128,75 @@ export function footprintSection(study, speed) {
     }
   }
 
-  // Findings: computed sentences, so the prose cannot drift from the JSON.
+  // Findings: computed sentences, so the prose cannot drift from the JSON. Wording that depends on
+  // the outcome (does a gap shrink, does an interval overlap) is chosen from the numbers too.
   const fp = (c) => c.footprintStats.footprint[head];
+  const fpCi = (c) => c.footprintStats.footprintCi;
+  const has = (...cs) => cs.every((c) => c?.footprintStats);
+  const pts = (v) => `${(v * 100).toFixed(1)} points`;
   const findings = [];
-  const hardCells = study.cells.filter((c) => c.condition === 'hard' && c.lighting === 'day' && c.footprintStats);
-  const quadCells = study.cells.filter((c) => c.condition === 'quad' && c.lighting === 'day' && c.footprintStats);
   const kin = cell('hard', 'classical');
   const quadPlan = cell('quad', 'classical');
   const quadTrack = cell('quad', 'classicalBrakeTrack');
-  const teacher = cell('hard', 'teacher');
-  const guarded = cell('hard', 'guarded');
-  const qGuarded = cell('quad', 'guarded');
-  if (kin?.footprintStats && quadPlan?.footprintStats) {
+  if (has(kin, quadPlan)) {
     const gapFlown = kin.coverage - quadPlan.coverage;
     const gapFp = fp(kin) - fp(quadPlan);
+    const share = gapFlown > 0 ? 1 - gapFp / gapFlown : 0;
+    const verdict =
+      share >= 0.5
+        ? `Most of the flown-coverage gap (${Math.round(share * 100)}%) came from the metric rewarding lanes 0.5 m apart.`
+        : share >= 0.2
+          ? `About ${Math.round(share * 100)}% of the flown-coverage gap came from the metric; the rest is the quadrotor seeing less of the building.`
+          : 'So the gap is not an artifact of the metric: the quadrotor sees less of the building, it does not just fly fewer lanes. The lane U-turn explains why it flies fewer voxels, not why it covers less.';
     findings.push(
-      `- **The quadrotor gap shrinks but does not close.** On the hard buildings the sensor-only planner flies through ${pct(kin.coverage)} of the building on the kinematic drone and ${pct(quadPlan.coverage)} on the quadrotor, a gap of ${(gapFlown * 100).toFixed(1)} points. Inside a ${head} m footprint the two cover ${pct(fp(kin))} and ${pct(fp(quadPlan))}, a gap of ${(gapFp * 100).toFixed(1)} points: ${gapFp < gapFlown ? `${Math.round((1 - gapFp / gapFlown) * 100)}% of the flown-coverage gap came from the metric rewarding lanes 0.5 m apart, the rest is the quadrotor seeing less` : 'the gap is not an artifact of the metric'}.` +
-        (quadTrack?.footprintStats ? ` With the braking filter and quad tracker the quadrotor reaches ${pct(fp(quadTrack))} (${ci(quadTrack.footprintStats.footprintCi)}).` : ''),
+      `- **The quadrotor's gap is real.** On the hard buildings the sensor-only planner flies through ${pct(kin.coverage)} on the kinematic drone and ${pct(quadPlan.coverage)} on the quadrotor, a gap of ${pts(gapFlown)}. Inside the ${head} m footprint the two cover ${pct(fp(kin))} and ${pct(fp(quadPlan))}, a gap of ${pts(gapFp)}. ${verdict}` +
+        (has(quadTrack) ? ` With the braking filter and quad tracker the quadrotor reaches ${pct(fp(quadTrack))} (${ci(fpCi(quadTrack))}), at ${quadTrack.collisionsPerEpisode.toFixed(2)} collisions per episode.` : ''),
     );
   }
+  const pred = cell('hard', 'classicalPredict');
+  const gain = cell('hard', 'classicalOracleGain');
+  if (has(kin, pred, gain)) {
+    const k = kin.footprintStats;
+    const p = pred.footprintStats;
+    const clear = fpCi(pred)[0] > fpCi(kin)[1];
+    findings.push(
+      `- **Map prediction is no longer a null result.** By flown coverage the learned map prediction covers ${pct(pred.coverage)} against ${pct(kin.coverage)} for the planner without it, inside the noise. By footprint it covers ${pct(fp(pred))} (${ci(fpCi(pred))}) against ${pct(fp(kin))} (${ci(fpCi(kin))})${clear ? ', with the intervals apart' : ', with the intervals overlapping'}, and it has half the building in view after ${sec(p.half.footprint)} instead of ${sec(k.half.footprint)} (area under the curve ${p.area.footprint.toFixed(2)} against ${k.area.footprint.toFixed(2)}). The true hidden gain does about as well (${pct(fp(gain))}, half after ${sec(gain.footprintStats.half.footprint)}). Preferring frontiers that open onto unseen space pays off in what the drone sees, and soon, even though it does not change which voxels it flies.`,
+    );
+  }
+  const hardCells = study.cells.filter((c) => c.condition === 'hard' && c.lighting === 'day' && c.footprintStats);
   if (hardCells.length) {
     const byFlown = [...hardCells].sort((a, b) => b.coverage - a.coverage).map((c) => c.pilot);
     const byFp = [...hardCells].sort((a, b) => fp(b) - fp(a)).map((c) => c.pilot);
-    const moved = byFp.filter((p, i) => byFlown.indexOf(p) !== i);
     findings.push(
-      `- **Ranking on the hard buildings, ${moved.length ? 'with changes' : 'unchanged'}.** By flown coverage: ${byFlown.map((p) => LABELS[p] ?? p).join(' > ')}. By ${head} m footprint: ${byFp.map((p) => LABELS[p] ?? p).join(' > ')}.` +
-        (teacher?.footprintStats && guarded?.footprintStats ? ` The oracle teacher reaches ${pct(fp(teacher))} and the guarded policy ${pct(fp(guarded))}.` : ''),
+      `- **Ranking on the hard buildings, by day.** By flown coverage: ${byFlown.map((p) => LABELS[p] ?? p).join(' > ')}. By ${head} m footprint: ${byFp.map((p) => LABELS[p] ?? p).join(' > ')}.`,
     );
   }
-  if (quadCells.length && qGuarded?.footprintStats && quadTrack?.footprintStats) {
+  const quadCells = study.cells.filter((c) => c.condition === 'quad' && c.lighting === 'day' && c.footprintStats);
+  const qHeur = cell('quad', 'heuristic');
+  if (quadCells.length && has(qHeur)) {
+    const order = [...quadCells].sort((a, b) => fp(b) - fp(a));
+    const learned = quadCells.filter((c) => ['policy', 'guarded', 'guardedBrake'].includes(c.pilot));
+    const beats = learned.filter((c) => fp(qHeur) > fp(c));
     findings.push(
-      `- **On the quadrotor the order is** ${[...quadCells].sort((a, b) => fp(b) - fp(a)).map((c) => `${LABELS[c.pilot] ?? c.pilot} ${pct(fp(c))}`).join(', ')}. The guarded policy ranks ${rankBy(quadCells, 'guarded', fp)} of ${quadCells.length} by footprint against ${rankBy(quadCells, 'guarded', (c) => c.coverage)} by flown coverage, at ${qGuarded.collisionsPerEpisode.toFixed(1)} collisions per episode against ${quadTrack.collisionsPerEpisode.toFixed(2)} for the tracked planner.`,
+      `- **On the quadrotor, by footprint:** ${order.map((c) => `${LABELS[c.pilot] ?? c.pilot} ${pct(fp(c))}`).join(', ')}.` +
+        (beats.length
+          ? ` The lidar heuristic, which flies the fewest voxels (${pct(qHeur.coverage)}), sees more than ${beats.map((c) => (LABELS[c.pilot] ?? c.pilot).toLowerCase()).join(' and ')}, with ${qHeur.collisionsPerEpisode.toFixed(2)} collisions per episode: it keeps moving through open space, and the ring sees the rooms it passes.`
+          : ''),
     );
   }
-  if (kin?.footprintStats) {
+  const fl = cell('floors', 'classical');
+  const climb = cell('floors', 'classicalClimb');
+  if (has(fl, climb)) {
+    findings.push(
+      `- **On multi-floor buildings the footprint shows what climbing is for.** A pilot that stays on the ground floor sees little more than it flies (${pct(fl.coverage)} flown, ${pct(fp(fl))} footprint for the planner): the ring looks along one floor, and the other floors count in the denominator. The planner that takes shafts flies ${pct(climb.coverage)} but sees ${pct(fp(climb))} (${ci(fpCi(climb))}).`,
+    );
+  }
+  if (has(kin)) {
     const f = kin.footprintStats;
+    const easy = cell('easy', 'classical');
     findings.push(
-      `- **Footprint coverage rises faster than flown coverage.** The kinematic planner has half the building inside its footprint after ${sec(f.half.footprint)} and flown after ${sec(f.half.flown)}; the normalized area under the curve is ${f.area.footprint.toFixed(2)} against ${f.area.flown.toFixed(2)}. At the lidar's 8 m range nearly everything is seen (${pct(f.footprint['8'] ?? 0)}), so that radius no longer separates pilots; ${head} m does.`,
+      `- **Footprint coverage rises much faster than flown coverage.** The kinematic planner has half the hard building in view after ${sec(f.half.footprint)} and flown after ${sec(f.half.flown)}; the area under the curve is ${f.area.footprint.toFixed(2)} against ${f.area.flown.toFixed(2)}. At the lidar's 8 m range nearly everything is seen (${pct(f.footprint['8'] ?? 0)}), so that radius no longer separates pilots; ${head} m still does.` +
+        (has(easy) ? ` One-room buildings saturate under any radius (${pct(fp(easy))}), so the easy condition says nothing here.` : ''),
     );
   }
 
@@ -194,7 +221,7 @@ export function footprintSection(study, speed) {
         rows,
       ),
       FOOTPRINT_FINDINGS: findings.join('\n'),
-      FOOTPRINT_FIGURE: '![Mean coverage over time, footprint and flown, for four pilots on the kinematic drone and the quadrotor](report/coverage-time.svg)',
+      FOOTPRINT_FIGURE: '![Mean coverage over time, footprint and flown, for five pilots on the kinematic drone and the quadrotor](report/coverage-time.svg)',
       FOOTPRINT_SPEED_TABLE: speedRows.length
         ? table(['Airframe', 'Pilot', ...speed.speeds.map((v) => `${v} m/s, flown / footprint`)], speedRows)
         : '_Run `npm run study:speed`._',

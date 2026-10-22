@@ -216,6 +216,27 @@ export async function runJob(
   return { ...job, coverage, collisions, steps, floorsReached: floors.size, floors: spec.floors.length, ...fp.finish(coverage) };
 }
 
+/**
+ * Shard of the i-th job. Jobs cycle through pilots, and some pilots (map prediction) are several
+ * times slower than others, so a plain `i % of` can hand one shard all of them. A fixed shuffle
+ * spreads them out; which shard runs a job never changes its result.
+ */
+const shardOrder = new Map<number, number[]>();
+function shardOf(i: number, of: number): number {
+  const n = jobs().length;
+  let order = shardOrder.get(of);
+  if (!order) {
+    const rng = new RNG(1, 'study-shards');
+    order = Array.from({ length: n }, (_, k) => k % of);
+    for (let k = n - 1; k > 0; k--) {
+      const j = rng.int(k + 1);
+      [order[k], order[j]] = [order[j]!, order[k]!];
+    }
+    shardOrder.set(of, order);
+  }
+  return order[i % n]!;
+}
+
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1]! : fallback;
@@ -286,7 +307,7 @@ if (MAIN && process.argv.includes('--merge')) {
   const pilots = arg('pilots', '').split(',').filter(Boolean);
   const mine = jobs()
     .filter((j) => (!conditions.length || conditions.includes(j.condition)) && (!pilots.length || pilots.includes(j.pilot)))
-    .filter((_, i) => i % of === shard);
+    .filter((_, i) => shardOf(i, of) === shard);
   const lines: string[] = [];
   const t0 = Date.now();
   for (let i = 0; i < mine.length; i++) {
