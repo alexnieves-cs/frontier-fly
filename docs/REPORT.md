@@ -349,7 +349,20 @@ Same episodes as the coverage study (`scripts/study/coverage-study.ts` at `d4d4d
 
 The speed study scored the same way, flown / footprint at each speed cap:
 
-_Run `npm run study:speed`._
+| Airframe | Pilot | 2 m/s, flown / footprint | 3 m/s, flown / footprint | 4 m/s, flown / footprint | 5 m/s, flown / footprint |
+| --- | --- | --- | --- | --- | --- |
+| Kinematic | Planner | 65.5% / **91.3%** | 79.3% / **97.0%** | 83.3% / **98.7%** | 84.4% / **98.7%** |
+| Kinematic | Planner + momentum | 65.6% / **91.2%** | 79.4% / **96.4%** | 82.2% / **96.7%** | 84.1% / **97.4%** |
+| Kinematic | Policy | 80.0% / **96.3%** | 71.6% / **96.6%** | 44.5% / **85.8%** | 33.1% / **79.7%** |
+| Kinematic | Guarded policy | 77.1% / **95.4%** | 80.4% / **98.3%** | 83.3% / **97.8%** | 86.4% / **99.7%** |
+| Quadrotor | Planner | 43.6% / **69.4%** | 40.6% / **66.7%** | 37.4% / **63.1%** | 36.3% / **59.1%** |
+| Quadrotor | Planner + momentum | 45.7% / **73.4%** | 41.2% / **65.7%** | 38.8% / **64.5%** | 39.1% / **66.5%** |
+| Quadrotor | Planner, braking filter | 42.1% / **69.0%** | 38.0% / **62.9%** | 36.9% / **63.7%** | 33.6% / **60.3%** |
+| Quadrotor | Planner, braking filter + momentum | 43.7% / **70.9%** | 42.0% / **67.7%** | 41.3% / **67.6%** | 39.8% / **66.3%** |
+| Quadrotor | Planner + quad tracker | 48.0% / **72.3%** | 45.0% / **68.9%** | 45.3% / **71.4%** | 43.9% / **71.4%** |
+| Quadrotor | Planner, braking filter + quad tracker | 46.9% / **72.1%** | 45.4% / **75.1%** | 43.5% / **70.4%** | 44.5% / **72.7%** |
+| Quadrotor | Policy | 34.5% / **71.5%** | 28.6% / **72.0%** | 25.7% / **66.3%** | 25.5% / **71.5%** |
+| Quadrotor | Guarded policy | 41.4% / **77.0%** | 48.6% / **86.8%** | 52.1% / **89.6%** | 52.1% / **84.6%** |
 
 ### Indoor localization
 

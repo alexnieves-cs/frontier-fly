@@ -8,13 +8,13 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 
 | # | Pilot | Score | Footprint score | room | hard | dark | fast | floors | quad | apartments | Flights that touched nothing | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **69.5%** | — | 95.1% | 74.3% | 73.3% | 84.0% | 39.9% | 40.3% | 79.4% | 64% | `9b9709b` |
-| 2 | Sensor-only planner + momentum (baseline) | **67.8%** | — | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 42.6% | 86.1% | 93% | `dc6f478` |
-| 3 | Sensor-only planner (baseline) | **67.5%** | — | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 41.1% | 85.5% | 94% | `dc6f478` |
-| 4 | Shipped policy (DAgger + PPO) (baseline) | **62.9%** | — | 95.1% | 79.0% | 78.1% | 41.5% | 41.5% | 32.5% | 72.8% | 20% | `9b9709b` |
-| 5 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.7%** | — | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 80.6% | 96% | `dc6f478` |
-| 6 | Frontier waypoint follower (baseline) | **28.6%** | — | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 34.6% | 0% | `dc6f478` |
-| 7 | Lidar wall-follower (baseline) | **17.0%** | — | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `dc6f478` |
+| 1 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **69.5%** | 85.3% | 95.1% | 74.3% | 73.3% | 84.0% | 39.9% | 40.3% | 79.4% | 64% | `20aa664` |
+| 2 | Sensor-only planner + momentum (baseline) | **67.8%** | 88.5% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 42.6% | 86.1% | 93% | `20aa664` |
+| 3 | Sensor-only planner (baseline) | **67.5%** | 87.0% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 41.1% | 85.5% | 94% | `20aa664` |
+| 4 | Shipped policy (DAgger + PPO) (baseline) | **62.9%** | 81.5% | 95.1% | 79.0% | 78.1% | 41.5% | 41.5% | 32.5% | 72.8% | 20% | `20aa664` |
+| 5 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.7%** | 83.5% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 80.6% | 96% | `20aa664` |
+| 6 | Frontier waypoint follower (baseline) | **28.6%** | 61.6% | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 34.6% | 0% | `20aa664` |
+| 7 | Lidar wall-follower (baseline) | **17.0%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `20aa664` |
 
 The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. The last-but-one column is the share of all 240 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
 
