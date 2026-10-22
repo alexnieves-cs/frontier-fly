@@ -833,6 +833,8 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Camera mission bench (reported) | 67101–67130 |
 | Tuning the pose estimator | Coverage buildings 7001–7012 (stage 3), mission worlds 9101–9116 for the closed-loop fixes |
 | Localization study (reported) | 60001+ (hard) and 62001+ (easy), 30 each |
+| Real floor plans ([REAL_PLANS.md](REAL_PLANS.md)) | 20 dev and 60 eval apartments; env seeds 74001+ and 75001+ (dev), 72001+ (reported) and 73001+ (matched generated controls) |
+| FrontierBench ([LEADERBOARD.md](LEADERBOARD.md)) | 81001+ (dev) and 82001+ (test); team track 83001+ and 83101+; apartments task 84001+ and 84101+ |
 | Real-data check (Intel Research Lab log) | Parameters picked on sweeps 0–2999 only; reported on the whole log and on the relations after sweep 2999 |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
@@ -847,6 +849,9 @@ npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: s
 npm run train:ppo -- --init public/checkpoints/pretrained.bin --out ppo.bin   # PPO fine-tune (see scripts/train-ppo.ts for the shipped recipe)
 vite-node scripts/study/rl-finetune.ts -- dagger=old.bin ppo=ppo.bin   # docs/rl-finetune.json
 npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
+npm run study:plans      # docs/plans-bench.json: real apartments against same-size generated buildings
+npm run bench:board      # bench/results/*.json: every FrontierBench baseline on the test split
+npm run bench:team -- --board   # bench/results/team/*.json: the baseline drone teams
 npm install --no-save @tensorflow/tfjs-node@4.22.0   # native TF.js for the camera scripts
 npm run study:vision     # docs/vision-bench.json: missions with the camera and the learned detector
 # Camera detector: scripts/vision/make-dataset.ts, train-detector.ts and eval-detector.ts (see their headers)
