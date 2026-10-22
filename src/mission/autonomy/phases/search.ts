@@ -1,4 +1,6 @@
-import type { ClearScope, V3 } from '../contracts';
+import type { ClearScope, DronePose, V3 } from '../contracts';
+import { buildingAt, placeContact } from '../perception';
+import type { ClearReport } from '../../../perception/seenEmpty';
 import { angleDiff, confirmViewpoints, requirementsMet, type ConfirmTrack } from '../planner/confirm';
 import { senseBuildings } from '../planner/coverage';
 import {
@@ -32,6 +34,14 @@ import { RunnerBase } from './base';
  * meters. The radius keeps the person inside the gimbal image with the nose pointed at them.
  * The last entry is cruise height, used when the low poses are blocked by trees.
  */
+/** Indoor confirm-clear: share of the known-free voxels on each floor the look estimate must cover. */
+export const CLEAR_MIN_LOOKED = 0.95;
+/** ...and a floor with fewer known-free voxels than this (a quarter of a small room) was never really searched. */
+export const CLEAR_MIN_FLOOR_VOXELS = 16;
+
+/** A contact placed this close outside a footprint still counts as in the building: range error at a window. */
+const CONTACT_FOOTPRINT_MARGIN_M = 0.5;
+
 export const OUTDOOR_CONFIRM_LOOKS: readonly { agl: number; radius: number }[] = [
   { agl: 7, radius: 3.5 },
   { agl: 9.5, radius: 4.5 },
@@ -200,35 +210,83 @@ export abstract class SearchPhases extends RunnerBase {
     return out;
   }
 
+  /**
+   * Confirm-clear from the drone's own evidence. A scope is clear when no contact of the category is
+   * still open or confirmed there, and the camera has looked at enough of it by the drone's own
+   * estimate: indoors, CLEAR_MIN_LOOKED of the known-free voxels on every floor of a map the
+   * explorer finished (not cut short by its time slot); outdoors, every ground cell of the site map.
+   * Nothing here knows where the targets are, so a person the detector missed is a false clear.
+   * `occupied` counts the contacts that block the scope; `seenEmpty` the looked-at cells or voxels.
+   */
+  protected ownClear(scope: ClearScope, category: 'person' | 'object'): ClearReport {
+    const where = scope === 'outdoor' ? null : scope;
+    // A track keeps the building of its first contact, and one first seen from outside has none: place
+    // those by where the track's estimate now is, so a person confirmed through a window still blocks.
+    const buildingOf = (t: ConfirmTrack) => t.buildingId ?? buildingAt(this.world, t.estimate, CONTACT_FOOTPRINT_MARGIN_M);
+    const blocking = this.tracker.tracks.filter(
+      (t) => buildingOf(t) === where && (t.status === 'open' || t.status === 'confirmed') && (category === 'person') === (t.classId === 'person'),
+    ).length;
+    if (scope === 'outdoor') {
+      const r = this.outdoorLook.report(category);
+      return { ...r, occupied: blocking, status: blocking > 0 ? 'occupied' : r.status };
+    }
+    const v = this.visit?.b.id === scope ? this.visit : null;
+    if (!v) return { status: 'incomplete', seenEmpty: 0, occupied: blocking, unseen: 0, total: 0 };
+    let looked = 0;
+    let free = 0;
+    let enough = v.searchComplete;
+    if (v.sensing) {
+      for (const f of v.sensing.lookStats()) {
+        looked += f.looked;
+        free += f.free;
+        if (f.free < CLEAR_MIN_FLOOR_VOXELS || f.looked < CLEAR_MIN_LOOKED * f.free) enough = false;
+      }
+    } else if (v.vis) {
+      // Oracle reference: its own look estimate on the true floor plan.
+      free = v.vis.cells.length;
+      looked = Math.round(v.vis.coverage() * free);
+      if (looked < CLEAR_MIN_LOOKED * free) enough = false;
+    } else enough = false;
+    const status = blocking > 0 ? 'occupied' : enough ? 'clear' : 'incomplete';
+    return { status, seenEmpty: looked, occupied: blocking, unseen: free - looked, total: free };
+  }
+
   protected declareIfClear(scope: ClearScope): boolean {
     const reports = this.sweptCategories().map((c) => ({
       c,
-      r: this.source.clearStatus(scope, c),
+      r: this.ownClear(scope, c),
     }));
     const label = scope === 'outdoor' ? 'Outdoor area' : (this.world.buildings.find((b) => b.id === scope)?.label ?? scope);
     if (reports.every(({ r }) => r.status === 'clear')) {
       this.declaredClear.push({ scope, tSec: this.t });
       const r = reports[0]!.r;
-      this.log('action', `${label} confirmed clear (${r.seenEmpty}/${r.total} cells seen empty).`);
+      this.log('action', `${label} confirmed clear (${r.seenEmpty}/${r.total} cells looked at, no open contacts).`);
       return true;
     }
     const bad = reports.find(({ r }) => r.status !== 'clear')!;
     if (bad.r.status === 'occupied') {
-      this.log('warn', `${label} not clear: ${bad.r.occupied} cell(s) occupied for ${bad.c}.`);
+      this.log('warn', `${label} not clear: ${bad.r.occupied} ${bad.c} contact(s) still open or confirmed there.`);
     } else {
-      this.log('warn', `${label} incomplete: ${bad.r.unseen} of ${bad.r.total} cells unseen for ${bad.c}. Not declaring clear.`);
+      const floors = scope === 'outdoor' ? '' : (this.visit?.sensing?.lookStats().map((f) => `${f.looked}/${f.free}`).join(', ') ?? '');
+      const why = scope === 'outdoor' ? '' : this.visit?.searchComplete ? ` (per floor ${floors})` : ` (search cut short; per floor ${floors})`;
+      this.log('warn', `${label} incomplete: ${bad.r.seenEmpty} of ${bad.r.total} cells looked at for ${bad.c}${why}. Not declaring clear.`);
     }
     return false;
   }
 
   // ----------------------------------------------------------- detection
 
-  protected detect(): void {
-    const pose = this.vehicle.pose();
+  /**
+   * One camera frame. `sensed` is the true pose, and only the sensor models see it: the detector,
+   * building discovery and opening measurement render or ray-cast from it. Everything they report
+   * is placed with the drone's own pose (ownPose), as a real drone places what its camera sees.
+   */
+  protected detect(sensed: DronePose): void {
+    const pose = this.ownPose();
     // Building discovery by camera footprint and line of sight.
     // The probability search knows the buildings from the map and schedules them itself.
     if (!this.inside && !this.sar) {
-      for (const b of senseBuildings(pose.pos, this.world, this.physics, this.discovered)) {
+      for (const b of senseBuildings(sensed.pos, this.world, this.physics, this.discovered)) {
         this.discovered.add(b.id);
         this.pending.push(b);
         this.log('info', `${b.label} discovered ${fmt(centerDist(b, pose.pos), 0)} m away.`);
@@ -241,9 +299,11 @@ export abstract class SearchPhases extends RunnerBase {
     // Openings seen while near the building.
     const v = this.visit;
     if (v && (this.phase === 'approach' || this.phase === 'inspect') && !this.inside) {
-      for (const o of observeOpenings(pose.pos, pose.yaw, v.b, this.physics)) {
-        if (!v.observed.has(o.id)) {
-          v.observed.set(o.id, o);
+      for (const seen of observeOpenings(sensed.pos, sensed.yaw, v.b, this.physics)) {
+        const had = v.observed.has(seen.id);
+        const o = this.openingSensor.measure(seen, sensed, pose);
+        v.observed.set(o.id, o);
+        if (!had) {
           this.log(
             'info',
             `Observed opening ${o.id} (${o.kind.replace('_', ' ')}, ${fmt(o.width, 2)} x ${fmt(o.height, 2)} m) on ${v.b.label}.`,
@@ -251,16 +311,19 @@ export abstract class SearchPhases extends RunnerBase {
         }
       }
     }
-    if (v && this.inside && v.vis) v.vis.observe(toLocal(v.grid, pose.pos), pose.yaw);
+    // Oracle reference only: its visibility estimate runs on the true floor plan from the true pose.
+    if (v && this.inside && v.vis) v.vis.observe(toLocal(v.grid, sensed.pos), sensed.yaw);
+    // The drone's own record of where the camera has looked outdoors, for confirm-clear.
+    if (!this.inside) this.outdoorLook.observe(pose);
 
-    const obs = this.source.observe(pose, this.t);
-    if (this.sar && !this.inside) this.sar.observe(pose, obs.contacts, this.t);
-    for (const raw of obs.contacts) {
-      // Flying on the estimate, the drone places what it sees with its own pose.
-      const l = this.loc;
-      const c = l
-        ? { ...raw, estimate: toWorld(l.grid, l.toEstimateFrame(toLocal(l.grid, raw.estimate))), bearing: l.toEstimateDir(raw.bearing) }
-        : raw;
+    const obs = this.source.observe(sensed, this.t);
+    // Inside a building everything the camera sees is in it; outside, a contact belongs to the footprint it was placed in.
+    const placed = obs.contacts.map((raw) => {
+      const c = placeContact(raw, pose);
+      return { ...c, buildingId: this.inside ?? buildingAt(this.world, c.estimate, CONTACT_FOOTPRINT_MARGIN_M) };
+    });
+    if (this.sar && !this.inside) this.sar.observe(pose, placed, this.t);
+    for (const c of placed) {
       this.recent.push(c);
       if (this.recent.length > 60) this.recent.shift();
       this.tracker.ingest(c);

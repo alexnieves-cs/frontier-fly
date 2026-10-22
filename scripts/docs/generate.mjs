@@ -273,6 +273,39 @@ function ablationTables(ab) {
   };
 }
 
+/**
+ * Confirm-clear on the drone's own maps against the old ground-truth check, flown on the same seeds:
+ * docs/mission-bench.json (this code) and docs/mission-bench-control.json (the code before it).
+ */
+function confirmClearSection(mb, control) {
+  const keys = ['R_CC_FLIGHTS', 'R_CC_FC', 'R_CC_FC_CTRL', 'R_CC_OCC', 'R_CC_OCC_CTRL', 'R_CC_CLEAR', 'R_CC_CLEAR_CTRL', 'R_CC_ALL', 'R_CC_ALL_CTRL', 'R_CC_COMMIT_CTRL', 'R_CC_SEEDS', 'R_CC_COLL', 'R_CC_COLL_CTRL'];
+  const out = Object.fromEntries(keys.map((k) => [k, 'n/a']));
+  out.CONFIRM_CLEAR_TABLE = '_Not measured yet. Fly `npm run study:missions` on this code and on the code before it, on the same seeds._';
+  if (!mb?.modes.sensor?.['compound-occupied'] || !control?.modes.sensor?.['compound-occupied']) return out;
+  const modes = Object.keys(mb.modes).filter((m) => control.modes[m]);
+  const sum = (b, sc, f) => modes.reduce((a, m) => a + f(b.modes[m][sc]), 0);
+  const mean = (b, sc) => sum(b, sc, (s) => s.expectedOutcome) / modes.length;
+  out.R_CC_FLIGHTS = String(sum(mb, 'compound-occupied', (s) => s.flights));
+  out.R_CC_FC = String(sum(mb, 'all', (s) => s.falseClears));
+  out.R_CC_FC_CTRL = String(sum(control, 'all', (s) => s.falseClears));
+  out.R_CC_OCC = pct(mean(mb, 'compound-occupied'));
+  out.R_CC_OCC_CTRL = pct(mean(control, 'compound-occupied'));
+  out.R_CC_CLEAR = pct(mean(mb, 'compound-clear'));
+  out.R_CC_CLEAR_CTRL = pct(mean(control, 'compound-clear'));
+  out.R_CC_ALL = pct(mean(mb, 'all'));
+  out.R_CC_ALL_CTRL = pct(mean(control, 'all'));
+  out.R_CC_COMMIT_CTRL = control.commit;
+  out.R_CC_SEEDS = String(mb.seedsPerScenario);
+  out.R_CC_COLL = String(sum(mb, 'all', (s) => s.flightsWithCollision));
+  out.R_CC_COLL_CTRL = String(sum(control, 'all', (s) => s.flightsWithCollision));
+  const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
+  const cell = (b, m, sc) => `${pct(b.modes[m][sc].expectedOutcome)} (${ci(...b.modes[m][sc].expectedOutcomeCi)})`;
+  const scenarios = Object.keys(mb.modes.sensor).filter((k) => k !== 'all');
+  const rows = modes.map((m) => [m, ...[...scenarios, 'all'].flatMap((sc) => [`${cell(control, m, sc)} → ${cell(mb, m, sc)}`]), `${control.modes[m].all.falseClears} → ${mb.modes[m].all.falseClears}`]);
+  out.CONFIRM_CLEAR_TABLE = table(['Indoors', ...scenarios, 'All', 'False clears'], rows);
+  return out;
+}
+
 /** Numbers the report's prose quotes, so the prose cannot drift from the JSON. */
 function reportInline(study, bench) {
   const out = {};
@@ -579,8 +612,9 @@ function benchmarks() {
       `Each scenario's settings flown on ${missionBench.seedsPerScenario} fresh world seeds (${missionBench.seedBase}–${missionBench.seedBase + missionBench.seedsPerScenario - 1}) with each indoor explorer, from \`src/eval/missions.ts\` at \`${missionBench.commit}\`.`,
       'The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around.',
       'The sensor-only planner reads only the drone\'s own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode.',
+      '`compound-occupied` is the compound sweep with a person lying inside one building, so a sweep that declares that building clear is a false clear; its expected outcome is found.',
       'The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
-      'The estimated-pose rows fly the same explorers indoors on the drone\'s own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator\'s pose; the fly-through in and out stays on the true pose.',
+      'The estimated-pose rows fly the same explorers indoors on the drone\'s own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator\'s pose, and the estimate starts at the doorway from the aperture tracker.',
       'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
     ].join(' ');
     out.MISSION_LOC_TABLE = missionLocTable(missionBench, labels);
@@ -591,7 +625,7 @@ function benchmarks() {
   }
   const study = readJson('docs/study.json');
   Object.assign(out, studyTables(study));
-  out.README_MISSIONS = missionBench ? readmeMissions(missionBench) : out.MISSION_TABLE;
+  out.README_MISSIONS = missionBench ? readmeMissions(missionBench, readJson('docs/mission-bench-control.json')) : out.MISSION_TABLE;
   // The README leads with the large study (30 fresh buildings per condition, every pilot) and keeps
   // the small fixed protocol below it, so the headline number is the one with the tighter interval.
   if (study && bench) {
@@ -672,8 +706,8 @@ function missionLocTable(mb, labels) {
 }
 
 /** Mission outcome per scenario and indoor explorer, from the 30-world mission bench. */
-function readmeMissions(mb) {
-  const titles = { 'cabin-day': 'Woods to cabin: find the missing person', 'compound-clear': 'Compound search: confirm two buildings clear', 'backpack-night': 'Night search: find the lost backpack' };
+function readmeMissions(mb, control) {
+  const titles = { 'cabin-day': 'Woods to cabin: find the missing person', 'compound-clear': 'Compound search: confirm two buildings clear', 'backpack-night': 'Night search: find the lost backpack', 'compound-occupied': 'Compound search, a person inside one building' };
   const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
   const cell = (s) => `${pct(s.expectedOutcome)} (${ci(...s.expectedOutcomeCi)})`;
   const scenarios = Object.keys(mb.modes.sensor).filter((k) => k !== 'all');
@@ -694,6 +728,7 @@ function readmeMissions(mb) {
     `Share of ${mb.seedsPerScenario} fresh mission worlds per scenario (seeds ${mb.seedBase}–${mb.seedBase + mb.seedsPerScenario - 1}) where the mission ends with the expected outcome: found, or correctly cleared. Brackets are Wilson 95% intervals.`,
     `Across all ${flights} flights: ${touched} with a collision, ${falseClears} false clears, ${falseAlarms} false alarms. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
     `From \`npm run study:missions\` at \`${mb.commit}\`; per-scenario detail is in [BENCHMARKS.md](docs/BENCHMARKS.md).`,
+    ...(control ? [`No part of these missions reads ground truth. On the same seeds the code before that change, which still read it, scored ${pct(modes.reduce((a, m) => a + control.modes[m].all.expectedOutcome, 0) / modes.length)} across these explorers against ${pct(modes.reduce((a, m) => a + mb.modes[m].all.expectedOutcome, 0) / modes.length)} ([REPORT.md](docs/REPORT.md#confirm-clear-without-ground-truth)).`] : []),
   ].join('\n');
 }
 
@@ -944,7 +979,9 @@ const values = {
   ...localizationTables(readJson('docs/localization.json')),
   ...rl.values,
   ...intelLabSection(readJson('docs/intel-lab.json')),
-  ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')), GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
+  ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')),
+  ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
+  GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json'), readJson('docs/fault-bench-run4.json'), readJson('docs/fault-bench-run5.json'), readJson('docs/fault-bench-run6.json')]),
 };
 const header = '<!-- Generated by scripts/docs/generate.mjs. Edit the template in scripts/docs/, not this file. -->\n\n';

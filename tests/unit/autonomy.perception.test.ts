@@ -200,14 +200,14 @@ describe('perception source', () => {
     const runA = poses.map((pose, i) => a.observe(pose, i * 0.2));
     const runB = poses.map((pose, i) => b.observe(pose, i * 0.2));
     expect(JSON.stringify(runA)).toBe(JSON.stringify(runB));
-    expect(JSON.stringify(a.clearStatus('outdoor', 'person'))).toBe(JSON.stringify(b.clearStatus('outdoor', 'person')));
+    expect(JSON.stringify(a.truthClearStatus('outdoor', 'person'))).toBe(JSON.stringify(b.truthClearStatus('outdoor', 'person')));
   });
 
   it('confirm-clear: an indoor sweep clears an empty building and flags an occupied one', () => {
     const sweep = (world: MissionWorld) => {
       const source = createPerceptionSource(world);
       const building = world.buildings[0]!;
-      const before = source.clearStatus(building.id, 'person');
+      const before = source.truthClearStatus(building.id, 'person');
       const o = building.shell.origin;
       let t = 0;
       for (const cell of indoorCells(building.shell.spec)) {
@@ -217,7 +217,7 @@ describe('perception source', () => {
           source.observe({ pos: [cell.center[0] + o[0], cell.center[1] + o[1], o[2] + cell.floor * 3 + 1.4], yaw, vel: [0, 0, 0] }, (t += 0.2));
         }
       }
-      return { before, after: source.clearStatus(building.id, 'person'), objects: source.clearStatus(building.id, 'object') };
+      return { before, after: source.truthClearStatus(building.id, 'person'), objects: source.truthClearStatus(building.id, 'object') };
     };
     const empty = sweep(buildMissionWorld({ seed: 12, buildings: 1, targets: [] }));
     expect(empty.before.status).toBe('incomplete');
@@ -232,7 +232,7 @@ describe('perception source', () => {
 
   it('an unknown scope is incomplete and empty', () => {
     const source = createPerceptionSource(buildMissionWorld({ seed: 2, targets: [] }));
-    expect(source.clearStatus('bldg-99', 'person')).toEqual({ status: 'incomplete', seenEmpty: 0, occupied: 0, unseen: 0, total: 0 });
+    expect(source.truthClearStatus('bldg-99', 'person')).toEqual({ status: 'incomplete', seenEmpty: 0, occupied: 0, unseen: 0, total: 0 });
   });
 
   it('aerial sweep: finds an outdoor person, covers the woods, and stays within the frame budget', () => {
@@ -257,7 +257,7 @@ describe('perception source', () => {
     expect(truth.buildingId).toBeNull();
     const best = found.reduce((a, b) => (b.confidence > a.confidence ? b : a));
     expect(Math.hypot(best.estimate[0] - truth.world[0], best.estimate[1] - truth.world[1])).toBeLessThan(3);
-    const clear = source.clearStatus('outdoor', 'person');
+    const clear = source.truthClearStatus('outdoor', 'person');
     expect(clear.status).toBe('occupied');
     expect(clear.seenEmpty / clear.total).toBeGreaterThan(0.95);
   });

@@ -33,7 +33,7 @@ function fakeSource(truth: TruthTarget[], status: Record<string, ClearReport> = 
   return {
     id: 'fake-source',
     observe: (_pose, tSec) => ({ tSec, contacts: [] }),
-    clearStatus: (scope) => status[scope] ?? { status: 'incomplete', seenEmpty: 0, occupied: 0, unseen: 10, total: 10 },
+    truthClearStatus: (scope) => status[scope] ?? { status: 'incomplete', seenEmpty: 0, occupied: 0, unseen: 10, total: 10 },
     truthTargets: () => truth,
   };
 }

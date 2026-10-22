@@ -23,6 +23,7 @@ import { IndoorPhases } from './phases/indoor';
 import { DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
 import { DEFAULT_BATTERY } from './battery';
 import type { HealthInput } from './failsafe';
+import { RNG } from '../../shared/rng';
 
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
 /**
@@ -56,6 +57,10 @@ const CLIMB_CLEAR_HOME_M = 8;
 const LAND_SINK_M = 2;
 /** Height over the range-finder ground at which a landing cuts the motors, m. */
 const LAND_CUT_AGL = 0.4;
+/** RTK GNSS error with a fix (see stepGnss): 1-sigma horizontal and vertical, m, and correlation time, s. */
+const GNSS_SIGMA_H_M = 0.015;
+const GNSS_SIGMA_V_M = 0.025;
+const GNSS_TAU_S = 30;
 
 /**
  * Hierarchical mission runner. A fixed-tick phase machine over the planner
@@ -153,8 +158,10 @@ class Runner extends IndoorPhases {
     this.t = this.ticks * this.dt;
     this.advanceFaults();
 
-    // Navigation and the monitors work on the position the drone believes; with a GNSS fix
-    // that is the truth. The camera and the airframe always act at the true position.
+    this.stepGnss();
+    // Navigation and the monitors work on the position the drone believes: outdoors the GNSS
+    // reading, indoors the pose estimate (or the true pose in the reference arms). The camera and
+    // the airframe always act at the true position.
     this.believed(() => {
       this.checkSafety(this.vehicle.pos);
       if (!this.finished) this.checkHealth();
@@ -167,7 +174,11 @@ class Runner extends IndoorPhases {
     if (this.t + 1e-9 >= this.nextDetect) {
       this.nextDetect = this.t + DETECT_PERIOD;
       // No frames, no detections and no seen-empty cells (SAFETY_CASE.md H4).
-      if (this.faults?.cameraUp() ?? true) this.detect();
+      if (this.faults?.cameraUp() ?? true) {
+        // The camera renders from where the drone really is; what it saw is placed where the drone believes it is.
+        const sensed = this.vehicle.pose();
+        this.believed(() => this.detect(sensed));
+      }
     }
     if (this.finished) return;
 
@@ -181,7 +192,9 @@ class Runner extends IndoorPhases {
     const k = 1 - Math.exp(-this.dt / WIND_ESTIMATE_TAU);
     for (let i = 0; i < 3; i++) this.windEstimate[i] = this.windEstimate[i]! + (wind[i]! - this.windEstimate[i]!) * k;
     this.lastCollided = step.collided;
+    // Sensor models read the airframe's true state once it has moved; the planners read their output next tick.
     if (this.loc) this.loc.step(this.localTruth(), this.t);
+    this.aperture?.sense(this.vehicle.pos, this.vehicle.vel, this.vehicle.yaw, this.dt);
     if (step.collided) {
       const pos = this.vehicle.pos;
       this.collisions.push({
@@ -474,16 +487,35 @@ class Runner extends IndoorPhases {
     this.linkDown = down;
   }
 
+  /**
+   * Nominal GNSS error with a fix: a first-order Gauss-Markov process, GNSS_SIGMA_H_M horizontally and
+   * GNSS_SIGMA_V_M vertically with a GNSS_TAU_S correlation time, as an RTK receiver's fixed solution
+   * wanders. Drawn every tick from its own stream, so it never shifts another random draw.
+   */
+  private gnssNoise: V3 = [0, 0, 0];
+  private gnssRng: RNG | null = null;
+
+  protected stepGnss(): void {
+    this.gnssRng ??= new RNG(this.world.seed >>> 0, 'gnss-rtk');
+    const a = Math.exp(-this.dt / GNSS_TAU_S);
+    const b = Math.sqrt(1 - a * a);
+    const sig = [GNSS_SIGMA_H_M, GNSS_SIGMA_H_M, GNSS_SIGMA_V_M];
+    for (let i = 0; i < 3; i++) this.gnssNoise[i] = this.gnssNoise[i]! * a + sig[i]! * b * this.gnssRng.gaussian();
+  }
+
   /** Run `fn` with the vehicle at the position the drone believes it is at. */
   /** The true position while believed() runs on a GNSS estimate; the range finder measures from here. */
   private truePos: V3 | null = null;
   private gnssPadHoldLogged = false;
 
   protected believed<T>(fn: () => T): T {
-    const gnss = this.faults && !this.inside ? this.faults.gnss() : null;
-    if (!gnss || gnss.fix) return fn();
+    if (this.inside) return fn();
+    // With a fix, an RTK-grade receiver's few centimetres; without one, the dead-reckoning drift on top.
+    const lost = this.faults?.gnss();
+    const n = this.gnssNoise;
+    const d = lost && !lost.fix ? lost.errorM : null;
+    const e: V3 = d ? [n[0] + d[0], n[1] + d[1], n[2] + d[2]] : n;
     const truth = this.vehicle.pos;
-    const e = gnss.errorM;
     this.vehicle.pos = [truth[0] + e[0], truth[1] + e[1], truth[2] + e[2]];
     this.truePos = truth;
     try {

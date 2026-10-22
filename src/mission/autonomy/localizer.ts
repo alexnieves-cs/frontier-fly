@@ -64,18 +64,28 @@ export class Localizer {
     dark: boolean,
     start: LocalTruth,
     private readonly hook: LocSensorHook | null = null,
+    /**
+     * The pose the estimator starts from, the drone's own measurement (the aperture tracker at the
+     * doorway), with its 1-sigma. Without it, the start is `start` plus an error drawn at the
+     * ENTRY_SIGMA levels, for offline studies that have no tracker.
+     */
+    entry: { pos: V3; yaw: number; sigmaXY: number; sigmaYaw: number } | null = null,
   ) {
     const w = grid.w * grid.cs;
     const d = grid.d * grid.cs;
     this.est = new PoseEstimator(defaultEstimatorOptions({ x0: -2, y0: -2, x1: w + 2, y1: d + 2 }, grid.floors, grid.H));
     this.sensors = new LocSensors(world, seed, locNoise(dark));
-    const rng = new RNG(seed >>> 0, 'loc-entry');
-    this.est.reset(
-      [start.pos[0] + ENTRY_SIGMA_XY * rng.gaussian(), start.pos[1] + ENTRY_SIGMA_XY * rng.gaussian(), start.pos[2]],
-      start.yaw + ENTRY_SIGMA_YAW * rng.gaussian(),
-      ENTRY_SIGMA_XY,
-      ENTRY_SIGMA_YAW,
-    );
+    if (entry) {
+      this.est.reset([entry.pos[0], entry.pos[1], entry.pos[2]], entry.yaw, entry.sigmaXY, entry.sigmaYaw);
+    } else {
+      const rng = new RNG(seed >>> 0, 'loc-entry');
+      this.est.reset(
+        [start.pos[0] + ENTRY_SIGMA_XY * rng.gaussian(), start.pos[1] + ENTRY_SIGMA_XY * rng.gaussian(), start.pos[2]],
+        start.yaw + ENTRY_SIGMA_YAW * rng.gaussian(),
+        ENTRY_SIGMA_XY,
+        ENTRY_SIGMA_YAW,
+      );
+    }
     this.truth = start;
     this.current = this.est.estimate();
     this.lastZ = this.current.pos[2];

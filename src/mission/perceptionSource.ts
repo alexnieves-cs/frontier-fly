@@ -66,7 +66,7 @@ function cluster(contacts: Contact[]): Cluster[] {
 }
 
 /** Sweep frames along the plan at `agl`, then a low look-in loop around each nearby building. */
-function flyMission(mission: Mission, world: MissionWorld, agl: number, sampleM: number): { contacts: Contact[]; surveyed: Map<string, number>; clear: ReturnType<ReturnType<typeof createPerceptionSource>['clearStatus']> } {
+function flyMission(mission: Mission, world: MissionWorld, agl: number, sampleM: number): { contacts: Contact[]; surveyed: Map<string, number>; clear: ReturnType<ReturnType<typeof createPerceptionSource>['truthClearStatus']> } {
   const source = createPerceptionSource(world);
   const terrain = world.outdoor.terrain;
   const plan = planPath(mission);
@@ -146,7 +146,7 @@ function flyMission(mission: Mission, world: MissionWorld, agl: number, sampleM:
     }
     surveyed.set(building.id, count === 0 ? 0 : seen / count);
   }
-  return { contacts, surveyed, clear: source.clearStatus('outdoor', 'person') };
+  return { contacts, surveyed, clear: source.truthClearStatus('outdoor', 'person') };
 }
 
 function detectionFrom(item: Cluster, id: string, kind: TargetKind, label: string): Detection {

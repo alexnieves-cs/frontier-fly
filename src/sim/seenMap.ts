@@ -47,8 +47,12 @@ export class SeenMap {
   /** Voxels the drone can reach at flight altitude; markRing paints nothing else. */
   private flyable: Uint8Array | null = null;
 
-  reset(spec: BuildingSpec): void {
-    this.flyable = flightMap(spec).reachable;
+  /**
+   * `mask` replaces the flight-map mask: voxels the caller's own knowledge allows. Missions pass the
+   * building's footprint as measured from outside, so their maps never read the floor plan.
+   */
+  reset(spec: BuildingSpec, mask?: Uint8Array): void {
+    this.flyable = mask ?? flightMap(spec).reachable;
     const floor0 = spec.floors[0]!;
     this.vw = floor0.w * 2;
     this.vd = floor0.d * 2;

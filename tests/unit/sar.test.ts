@@ -226,6 +226,7 @@ describe('outdoor confirmation range', () => {
       range,
       bearing: [1, 0, -1] as [number, number, number],
       buildingId,
+      sensor: { eye: [0, 0, 0] as [number, number, number], ray: [1, 0, -1] as [number, number, number], range },
       truth: { targetId: 't', trueClass: 'person' as const, kind: 'tp' as const },
     });
     expect(tracker.ingest(contact(14, null))!.views.length).toBe(1);

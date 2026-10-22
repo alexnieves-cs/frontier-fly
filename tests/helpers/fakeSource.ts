@@ -1,17 +1,18 @@
 import type { ClearReport } from '../../src/perception/seenEmpty';
 import { indoorCells } from '../../src/perception/seenEmpty';
 import { fpvCameraFromDrone } from '../../src/perception/camera';
-import type { Contact, DronePose, LiveDetectionSource, MissionWorld, Observation, TruthTarget, V3 } from '../../src/mission/autonomy/contracts';
+import type { DronePose, LiveDetectionSource, MissionWorld, Observation, TruthTarget, V3 } from '../../src/mission/autonomy/contracts';
 import { hashSeed } from '../../src/shared/rng';
 import { resolveTarget } from '../../src/targets/motion';
 import type { TargetClass } from '../../src/targets/types';
+import { withSensorFrame, type RawContact } from '../../src/mission/autonomy/perception';
 import { initOutdoorPhysics, OutdoorPhysics } from '../../src/world/outdoor/physics';
 
 /**
  * Test-only detection source. Reveals truth targets that are in the camera
  * FOV, in range, and in line of sight (outdoor physics ray). Decoys report
  * their look-alike class at low confidence on some frames. Seen-empty cells
- * are tracked with the same FOV and ray test, so clearStatus is honest.
+ * are tracked with the same FOV and ray test, so truthClearStatus is honest.
  */
 
 export interface FakeSourceOptions {
@@ -88,7 +89,7 @@ export async function createFakeSource(world: MissionWorld, options: FakeSourceO
       frame += 1;
       const cam = fpvCameraFromDrone(pose.pos, pose.yaw, 16 / 9);
       const eye = cam.position as V3;
-      const contacts: Contact[] = [];
+      const contacts: RawContact[] = [];
       for (const it of items) {
         const r = visible(eye, cam, it.truth.world, range);
         if (r === null) continue;
@@ -132,9 +133,9 @@ export async function createFakeSource(world: MissionWorld, options: FakeSourceO
           if (visible(eye, cam, c.center, range) !== null) c.seen = true;
         }
       }
-      return { tSec, contacts };
+      return { tSec, contacts: contacts.map((c) => withSensorFrame(c, pose)) };
     },
-    clearStatus(scope, category): ClearReport {
+    truthClearStatus(scope, category): ClearReport {
       const occupied = items.filter((it) => it.truth.buildingId === (scope === 'outdoor' ? null : scope) && it.truth.category === category).length;
       if (scope === 'outdoor') {
         return { status: occupied ? 'occupied' : 'clear', seenEmpty: 1, occupied, unseen: 0, total: 1 };

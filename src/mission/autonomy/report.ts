@@ -179,7 +179,7 @@ export function buildReport(run: RunRecord, source: LiveDetectionSource, world?:
   let total = 0;
   const incomplete: string[] = [];
   for (const id of [...buildingIds].sort()) {
-    const r = source.clearStatus(id, 'person');
+    const r = source.truthClearStatus(id, 'person');
     perBuildingCoverage[id] = r.total > 0 ? (r.seenEmpty + r.occupied) / r.total : 0;
     resolved += r.seenEmpty + r.occupied;
     total += r.total;

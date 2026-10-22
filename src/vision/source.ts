@@ -1,5 +1,5 @@
 import type { Contact, DronePose, MissionWorld, V3 } from '../mission/autonomy/contracts';
-import { bboxRay, createPerceptionSource, type CameraContactSource, type PerceptionOptions } from '../mission/autonomy/perception';
+import { bboxRay, createPerceptionSource, type CameraContactSource, type PerceptionOptions, type RawContact } from '../mission/autonomy/perception';
 import type { CameraView } from '../perception/camera';
 import { RNG } from '../shared/rng';
 import type { FrameDetector, VisionDetection } from './detector';
@@ -107,13 +107,13 @@ export function visionContacts(world: MissionWorld, poses: HumanoidPoses, detect
   const minConfidence = opts.minConfidence ?? 0.3;
   return {
     id: 'vision',
-    contacts(view: CameraView, _pose: DronePose, tSec: number, frameNo: number): Contact[] {
+    contacts(view: CameraView, _pose: DronePose, tSec: number, frameNo: number): RawContact[] {
       const noiseSeed = (Math.imul(world.seed ^ 0x51ed27, 2654435761) ^ Math.imul(frameNo + 1, 40503)) >>> 0;
       const frame = scene.render(view, tSec, lighting, noiseSeed);
       const detections = detector.detect(frame);
       opts.onFrame?.(frame, detections);
       const eye = view.position;
-      const out: Contact[] = [];
+      const out: RawContact[] = [];
       detections.forEach((det, i) => {
         if (det.confidence < minConfidence) return;
         const measured = boxRange(frame, det.bbox);
