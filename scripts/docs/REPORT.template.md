@@ -113,14 +113,14 @@ The quadrotor condition flies the same pilots on rigid-body dynamics with random
 - **The planner** with the kinematic filter covers {{R_Q_PLANNER}} at {{R_Q_PLANNER_COLL}} collisions per episode. With the braking filter it covers {{R_Q_PLANNER_BRAKE}} at {{R_Q_PLANNER_BRAKE_COLL}}.
 - **The guarded policy** covers {{R_Q_GUARD}} at {{R_Q_GUARD_COLL}} collisions per episode with the kinematic guard, and {{R_Q_GUARD_BRAKE}} at {{R_Q_GUARD_BRAKE_COLL}} with the braking guard. Fewer crashes leave it more of the episode to explore.
 - **The quad-aware tracker** (`SensorPlannerOptions.tracker`, src/sim/tracker.ts) shapes the planner's command into one the airframe can fly: it ramps the command at the airframe's acceleration, slows for corners and for the U-turn at the end of each sweep lane, and caps the yaw rate while facing the direction of travel. With the braking filter the planner then covers {{R_Q_BRAKE_TRACK}} ({{R_Q_BRAKE_TRACK_CI}}) at {{R_Q_BRAKE_TRACK_COLL}} collisions per episode, touching anything in {{R_Q_BRAKE_TRACK_EPS}} day episodes; without the filter it covers {{R_Q_TRACK}} at {{R_Q_TRACK_COLL}}. On the tuning buildings the yaw cap did most of the work. The env's command is body-frame velocity, so a drone yawing at full rate through a U-turn asks for a world velocity that keeps rotating under it, and with the quadrotor's lag its sweep lanes broke up into loops. The default controller and the trained checkpoints are unchanged; the tracker is opt-in.
-- **Most of the coverage gap to the kinematic airframe is physical.** The planner covers by sweeping lanes one 0.5 m voxel apart, and the U-turn between two lanes has a 0.25 m radius, which the quadrotor (about 4 m/s² of acceleration at its 0.4 rad tilt limit) can only take at about 1 m/s. The kinematic drone takes it at cruise speed. On the tuning buildings the quadrotor also flies about 13% less distance in the same episode, and latency and noise slow every approach.
+- **The lane U-turn explains only part of the gap to the kinematic airframe.** The planner covers by sweeping lanes one 0.5 m voxel apart, and the U-turn between two lanes has a 0.25 m radius, which the quadrotor (about 4 m/s² of acceleration at its 0.4 rad tilt limit) can only take at about 1 m/s. The kinematic drone takes it at cruise speed. But scored by what its sensor saw rather than the voxels it flew ([below](#coverage-the-way-exploration-papers-measure-it)), the quadrotor's gap is as large as before, so it also sees less of the building. On the tuning buildings (`scripts/study/footprint-diag.ts`, 9101–9108) the quadrotor flies about 13% less distance in the same episode, and enters about two thirds of the rooms where the kinematic drone enters nearly all of them. Latency and noise slow every approach, and the shortfall is in reaching rooms, not in sweeping them.
 
 On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the policy and the planner on the 1.2 kg quadrotor with the braking filter as the indoor shield: {{R_MQ_COLL}} of {{R_MQ_ALL}} quadrotor flights touched anything.
 
 ### Climbing and map prediction
 
 - **Climbing** on {{R_PLANNER_FLOORS_N}} fresh multi-floor buildings: {{R_CLIMB_FLOORS}} ({{R_CLIMB_FLOORS_CI}}) against {{R_PLANNER_FLOORS}} ({{R_PLANNER_FLOORS_CI}}) for the same planner without it. The gain is modest because the step budget is shared. The drone gives up the slow tail of the first floor for the fast start of the next, and coverage of a whole building stays budget-limited.
-- **Map prediction** on hard buildings covers {{R_PRED_HARD}} ({{R_PRED_HARD_CI}}), and the oracle gain covers {{R_ORACLEGAIN_HARD}}. On multi-floor buildings the two cover {{R_PRED_FLOORS}} and {{R_ORACLEGAIN_FLOORS}}. Neither moves coverage outside the noise. The planner already prefers frontiers that border flown and blocked space, and in a 2400-step episode the drone is still finding new space when time runs out. Which frontier it takes next costs a few steps, not whole rooms. A learned gain is likely to matter where the goal is to see a target soon rather than to fly every voxel. That is not measured here.
+- **Map prediction** on hard buildings covers {{R_PRED_HARD}} ({{R_PRED_HARD_CI}}), and the oracle gain covers {{R_ORACLEGAIN_HARD}}. On multi-floor buildings the two cover {{R_PRED_FLOORS}} and {{R_ORACLEGAIN_FLOORS}}. Neither moves coverage outside the noise. The planner already prefers frontiers that border flown and blocked space, and in a 2400-step episode the drone is still finding new space when time runs out. Which frontier it takes next costs a few steps, not whole rooms. A learned gain is likely to matter where the goal is to see a target soon rather than to fly every voxel. The [sensor-footprint section](#coverage-the-way-exploration-papers-measure-it) measures that, and there map prediction is a clear gain.
 
 A geometry fix in this round changes the multi-floor numbers slightly for pilots that do not climb. Before it, on buildings with three or more floors, a slab opened over every shaft cell of the floor above it, while the physics kept some of those holes closed. The range finders could see through ceilings the drone could not fly through. Slabs and physics now open only where a shaft joins the two floors, and the ground-floor slab no longer has holes over shafts that lead up.
 
@@ -133,6 +133,27 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 {{SPEED_TABLE}}
 
 {{SPEED_FIGURE}}
+
+### Coverage the way exploration papers measure it
+
+Every coverage number above counts the 0.5 m voxels the drone's *center* flew through. That is a strict metric, and it rewards sweeping lanes one voxel apart, which is the U-turn the quadrotor cannot take at speed. Exploration papers usually score what the sensor observed instead. This section scores the same episodes both ways: **flown** as above, and **footprint**, the share of the reachable building that came within a sensor's view. The headline radius is 3 m, about where the detector's recall falls to half for the smallest search items (phone, radio); {{FOOTPRINT_RADII}} are tracked from the same rays. The radius was set from the detector model before any footprint number was computed, and no pilot or checkpoint was changed or chosen on it. Flown coverage stays the training reward, the checkpoint-selection metric and the FrontierBench score, so earlier numbers remain comparable; the footprint is reported beside it.
+
+{{FOOTPRINT_NOTE}}
+
+{{FOOTPRINT_FINDINGS}}
+
+{{FOOTPRINT_FIGURE}}
+
+<details>
+<summary>Every condition and pilot, flown and footprint</summary>
+
+{{FOOTPRINT_TABLE}}
+
+</details>
+
+The speed study scored the same way, flown / footprint at each speed cap:
+
+{{FOOTPRINT_SPEED_TABLE}}
 
 ### Indoor localization
 
@@ -383,6 +404,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **Confirm-clear is only as good as the look estimate.** A building is declared clear when at least 95% of the free voxels the drone mapped and can reach on each floor were looked at by its camera estimate, so up to 5% of a floor can go unlooked. Space the lidar never mapped (behind furniture taller than the ring, or under a table) is not counted, and the detector can still miss a person in looked-at space. The occupied sweep measures the result, on one target pose per world.
 - **The coverage study's policy and planner never fly on the estimate.** Only the mission bench does; the coverage numbers above are on the true pose.
 - **The localization sensors are idealized in places.** Each lidar sweep is instantaneous (no motion distortion), the flow sensor's errors are white plus a per-flight scale error, walls are perfectly flat and axis-aligned (which the Manhattan heading fix relies on), and nothing in the building moves. There is no loop closure: drift that enters the map stays in it.
+- **The footprint is an idealized sensor.** It is a 360° ring of perfect rays in the lidar plane: no field-of-view limit, no lighting, no motion blur, and nothing above or below the drone's altitude. A forward camera with a narrow field of view would score lower and would reward pilots that turn to look. It measures what came into view, not whether a target there would have been recognized.
 - **One simulator, one real log.** Everything here is measured in this repository's simulator; nothing has flown on hardware. The one real data the code has seen is the Intel Research Lab laser log, which only the pose estimator replays (above), and on it the estimator drifts metres over the 45-minute run because it has no loop closure.
 
 ## Seeds and protocol
@@ -415,7 +437,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 
 ```bash
 npm ci
-npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
+npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition, flown and footprint coverage
 npm run study:missions   # docs/mission-bench.json: each indoor explorer, airframe and pose source, 30 fresh worlds per scenario
 npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods

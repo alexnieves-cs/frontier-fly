@@ -13,6 +13,7 @@ import { rlSection } from './rl.mjs';
 import { sarSection } from './sar.mjs';
 import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
+import { footprintSection } from './footprint.mjs';
 import { benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
 
@@ -967,6 +968,7 @@ const rl = rlSection(readJson('docs/rl-finetune.json'));
 const sar = sarSection(readJson('docs/sar-bench.json'), readJson('docs/report/sar-belief.json'));
 const team = teamSection(readJson('docs/team-bench.json'));
 const speed = speedSection(readJson('docs/speed-study.json'));
+const footprint = footprintSection(readJson('docs/study.json'), readJson('docs/speed-study.json'));
 const values = {
   ...architecture(),
   ...benchmarks(),
@@ -974,6 +976,7 @@ const values = {
   ...sar.values,
   ...team.values,
   ...speed.values,
+  ...footprint.values,
   ...benchSection(ROOT),
   ...visionSection(readJson('docs/vision-detector.json'), readJson('docs/vision-bench.json')).values,
   ...localizationTables(readJson('docs/localization.json')),
@@ -996,6 +999,7 @@ const outputs = {
   ...team.files,
   ...speed.files,
   ...rl.files,
+  ...footprint.files,
 };
 let readme = read('README.md');
 readme = replaceBlock(readme, 'benchmarks', values.README_SUMMARY);

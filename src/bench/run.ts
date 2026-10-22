@@ -1,5 +1,6 @@
 /** One FrontierBench episode: the task's building and airframe, flown by a pilot. */
 import { evalEpisodeSetup } from '../eval/coverage';
+import { curveArea, EpisodeFootprint, FOOTPRINT_RADIUS, timeTo } from '../eval/footprint';
 import { sensorFrame } from '../eval/pilots';
 import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
@@ -19,6 +20,12 @@ export interface BenchEpisode {
   /** Seconds until half the building was flown, or null. */
   halfS: number | null;
   steps: number;
+  /** Share of the reachable volume inside the 3 m sensor footprint (eval/footprint.ts). Flown coverage stays the score. */
+  footprint: number;
+  /** Normalized area under the coverage-over-time curve, flown and footprint (1 = everything covered at once). */
+  area: { flown: number; footprint: number };
+  /** Seconds until half the building was inside the footprint, or null. */
+  footprintHalfS: number | null;
 }
 
 export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun, pilot: BenchPilot): BenchEpisode {
@@ -36,6 +43,8 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
   }
   pilot.reset({ speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics });
   let obs = env.reset(spec, envSeed, cfg);
+  const fp = new EpisodeFootprint();
+  fp.start(env, spec, cfg.maxSteps);
   let info = { coverage: 0, collisions: 0, energyWh: 0 };
   let halfS: number | null = null;
   let steps = 0;
@@ -45,7 +54,21 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
     info = s.info;
     steps = t + 1;
     if (halfS === null && info.coverage >= 0.5) halfS = steps / 20;
+    fp.step(env, steps, info.coverage);
     if (s.done) break;
   }
-  return { task: task.id, seed, ...(run.plan ? { plan: run.plan.record.id } : {}), coverage: info.coverage, collisions: info.collisions, energyWh: info.energyWh, halfS, steps };
+  const rec = fp.finish(info.coverage);
+  return {
+    task: task.id,
+    seed,
+    ...(run.plan ? { plan: run.plan.record.id } : {}),
+    coverage: info.coverage,
+    collisions: info.collisions,
+    energyWh: info.energyWh,
+    halfS,
+    steps,
+    footprint: rec.footprint[String(FOOTPRINT_RADIUS)]!,
+    area: { flown: curveArea(rec.curve.flown), footprint: curveArea(rec.curve.footprint) },
+    footprintHalfS: timeTo(rec.curve.footprint, 0.5, cfg.maxSteps / 20),
+  };
 }
