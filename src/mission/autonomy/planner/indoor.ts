@@ -918,7 +918,7 @@ export function sensorNav(grid: IndoorGrid, sensing: IndoorSensing): IndoorNav {
     },
     canView: (p, target) => {
       const f = floorOf(grid, p[2]);
-      if (sensorClearance(sensing, f, p[0], p[1]) < 2 * VOXEL) return false;
+      if (sensorClearance(sensing, f, p[0], p[1]) < VOXEL) return false;
       // The target itself may sit in a voxel the lidar never painted free (a person on the floor).
       return sensorLos(sensing, f, p[0], p[1], target[0], target[1], VOXEL);
     },
