@@ -60,6 +60,8 @@ function pageNames() {
     .sort((a, b) => (a === 'index.html' ? -1 : b === 'index.html' ? 1 : a.localeCompare(b)));
 }
 
+const ISOLATION_GRACE_MS = 10_000;
+
 async function checkPage(browser, url) {
   // Match the e2e device profile. With LANG=C, headless Chromium reports a locale Intl rejects.
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'en-US' });
@@ -77,7 +79,14 @@ async function checkPage(browser, url) {
   } catch {
     ready = false;
   }
-  const isolated = await page.evaluate(() => globalThis.crossOriginIsolated === true).catch(() => false);
+  // A light page can be ready before the service worker's reload lands; give isolation a moment to arrive
+  // (a check that throws mid-reload counts as not yet).
+  let isolated = false;
+  const until = Date.now() + ISOLATION_GRACE_MS;
+  while (ready && !isolated && Date.now() < until) {
+    isolated = await page.evaluate(() => globalThis.crossOriginIsolated === true).catch(() => false);
+    if (!isolated) await page.waitForTimeout(250);
+  }
   const ms = Date.now() - t0;
   await context.close();
   return { url, status, ready, isolated, ms, errors };

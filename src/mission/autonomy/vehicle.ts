@@ -32,6 +32,8 @@ export interface VehicleLimits {
   yawRate: number;
   /** Velocity lag time constant, s. */
   tau: number;
+  /** Quad only: the flight controller's tilt-vector limit, rad. Unset keeps the controller's default (23° per axis). */
+  maxTilt?: number;
 }
 
 export const OUTDOOR_LIMITS: VehicleLimits = {

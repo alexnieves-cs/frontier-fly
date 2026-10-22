@@ -60,6 +60,9 @@ import {
   scaleTo,
 } from './shared';
 
+/** Outdoor tilt limit, rad (40°). Indoors keeps the default 23° the close-in planners are tuned around. */
+const OUTDOOR_TILT_RAD = 0.7;
+
 /**
  * Runner state, the constructor and the motion primitives every phase builds on:
  * waypoint following, holds, the indoor shield and breadcrumb retracing. The
@@ -210,7 +213,12 @@ export abstract class RunnerBase implements MissionRunner {
   }
 
   protected limits(): VehicleLimits {
-    const base = this.baseLimits();
+    let base = this.baseLimits();
+    // Outdoors the airframe may lean to 40°, as PX4's MPC_TILTMAX_AIR allows 45°: the default 23° holds only
+    // about 5 m/s of wind on the 1.2 kg quad, 40° about 8 m/s. Scheduling it on the wind estimate left the
+    // first second of a wind front at 23°, when the drone was blown into walls; that schedule was needed only
+    // while the mixer dropped attitude authority at full thrust.
+    if (!this.inside) base = { ...base, maxTilt: OUTDOOR_TILT_RAD };
     const k = this.health?.speedScale ?? 1;
     return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
   }
@@ -430,10 +438,21 @@ export abstract class RunnerBase implements MissionRunner {
             continue;
           }
           const dir = sub(wp.pos, pos);
-          const vel = this.shielded(phase, scaleTo(dir, speed, this.limits()));
+          const want = scaleTo(dir, speed, this.limits());
+          const vel = this.shielded(phase, want);
           const moving = Math.hypot(vel[0], vel[1]) > 0.3;
-          // With a failed lidar arc, turn the middle of the healthy arc toward the direction of travel.
-          const yaw = wp.yaw !== undefined && wp.yaw !== null && d < 4 ? wp.yaw : moving ? Math.atan2(vel[1], vel[0]) - this.blindYawOffset() : null;
+          // With a failed lidar arc, turn the middle of the healthy arc toward the direction of travel. The
+          // wanted direction, not the shielded one: the shield treats the blind arc as blocked, so facing
+          // it the drone barely moves and would never turn to see where it is going.
+          const blind = this.blindYawOffset();
+          const yaw =
+            wp.yaw !== undefined && wp.yaw !== null && d < 4
+              ? wp.yaw
+              : blind !== 0 && Math.hypot(want[0], want[1]) > 0.1
+                ? Math.atan2(want[1], want[0]) - blind
+                : moving
+                  ? Math.atan2(vel[1], vel[0])
+                  : null;
           return { vel, yaw };
         }
         if (!called) {

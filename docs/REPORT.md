@@ -16,7 +16,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **A rendered camera and a learned detector can fly the same missions.** The drone now renders what its camera sees and a small network, trained here on CC0 people and procedural objects, finds targets in the pixels. On 180 fresh paired flights it meets the expected outcome in 90.6% (85–94%) of them against 96.7% (93–98%) for the analytic detector, with no false alarms or false clears. The gap is all at night: under the flashlight alone it confirms the backpack in 78.3% of flights against 93.3%.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² 0.94 against 0.45). Ranking frontiers by it leaves coverage unchanged (66.0% against 65.5% on hard buildings), and so does the true hidden gain (64.7%). In this environment coverage is limited by flight time, not by which frontier comes next.
 - **A team of drones is the lever coverage was waiting for.** On 30 fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches 29.5%, three search 79.1% and four 93.2%, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median 59 s; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
-- **The drone can estimate its own pose indoors.** An estimator that matches each lidar sweep against a map it builds itself, fused with the gyro and a downward optical-flow sensor, drifts 4.9 cm by day and 5.1 cm at night from its own map over about 200 m of flight in fresh hard buildings, and was 0.5 m off at some point in 0 of 60 flights. Dead reckoning on the same sensors drifts 1.86 m and 2.08 m. Displaced mid-flight, it noticed and re-acquired in 120 of 120 flights. Flown closed loop, with every indoor map, path and command on the estimate instead of the simulator's pose, whole missions meet the expected outcome in 91.1% of flights for the planner (vs 93.3% on the true pose) and 85.6% for the policy (vs 91.1%), with the estimate 7.6 cm from the drone's own map; daytime missions are unaffected and most of the gap is the night search.
+- **The drone can estimate its own pose indoors.** An estimator that matches each lidar sweep against a map it builds itself, fused with the gyro and a downward optical-flow sensor, drifts 4.9 cm by day and 5.1 cm at night from its own map over about 200 m of flight in fresh hard buildings, and was 0.5 m off at some point in 0 of 60 flights. Dead reckoning on the same sensors drifts 1.86 m and 2.08 m. Displaced mid-flight, it noticed and re-acquired in 120 of 120 flights. Flown closed loop, with every indoor map, path and command on the estimate instead of the simulator's pose, whole missions meet the expected outcome in 91.1% of flights for the planner (vs 93.3% on the true pose) and 85.6% for the policy (vs 91.1%), with the estimate 7.6 cm from the drone's own map; daytime missions are unaffected and most of the gap is the night search. On a real robot's laser log (Intel Research Lab) the same estimator tracks locally but, without loop closure, averages 1.169 m of relation error over a 45-minute run, against 0.22 m for a published 2009 scan matcher and 0.02–0.03 m for SLAM systems that close loops.
 
 ## Setup
 
@@ -62,7 +62,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 
 ### Coverage on fresh buildings
 
-Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `e23988e` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
+Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `cec50bc` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
 
 | Pilot | Hard, day | Hard, night (no lights) | Hard collisions per episode | Two floors | Quadrotor + noise | Quad collisions per episode |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -116,6 +116,8 @@ Every pilot flies the same 30 fresh buildings per condition, from `scripts/study
 | Hard, quadrotor dynamics + noise | day | Oracle teacher (floor plan) | 22.7% (20.7–25.0) | 17.00 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Sensor-only planner | 43.6% (40.9–46.3) | 6.67 | 28/30 |
 | Hard, quadrotor dynamics + noise | day | Sensor-only planner, braking filter | 42.1% (39.6–44.7) | 1.17 | 19/30 |
+| Hard, quadrotor dynamics + noise | day | Sensor-only planner + quad tracker | 48.0% (45.3–50.6) | 3.00 | 24/30 |
+| Hard, quadrotor dynamics + noise | day | Sensor-only planner, braking filter + quad tracker | 46.9% (44.7–49.4) | 0.03 | 1/30 |
 | Hard, quadrotor dynamics + noise | day | Policy | 27.0% (23.1–30.4) | 15.30 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Policy + lidar guard | 31.5% (29.3–33.7) | 14.50 | 30/30 |
 | Hard, quadrotor dynamics + noise | day | Policy + braking guard | 33.6% (31.8–35.3) | 2.07 | 19/30 |
@@ -124,6 +126,8 @@ Every pilot flies the same 30 fresh buildings per condition, from `scripts/study
 | Hard, quadrotor dynamics + noise | night-dark | Oracle teacher (floor plan) | 22.7% (20.7–25.0) | 17.00 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner | 44.2% (41.5–47.0) | 5.97 | 26/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner, braking filter | 41.7% (39.2–44.2) | 1.30 | 22/30 |
+| Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner + quad tracker | 47.3% (44.9–49.7) | 3.30 | 26/30 |
+| Hard, quadrotor dynamics + noise | night-dark | Sensor-only planner, braking filter + quad tracker | 46.7% (44.3–48.9) | 0.03 | 1/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy | 27.8% (24.8–30.7) | 15.27 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy + lidar guard | 32.4% (30.2–34.5) | 13.67 | 30/30 |
 | Hard, quadrotor dynamics + noise | night-dark | Policy + braking guard | 34.0% (32.2–35.7) | 2.57 | 24/30 |
@@ -179,7 +183,8 @@ The quadrotor condition flies the same pilots on rigid-body dynamics with random
 
 - **The planner** with the kinematic filter covers 43.6% at 6.7 collisions per episode. With the braking filter it covers 42.1% at 1.2.
 - **The guarded policy** covers 31.5% at 14.5 collisions per episode with the kinematic guard, and 33.6% at 2.1 with the braking guard. Fewer crashes leave it more of the episode to explore.
-- **The coverage gap to the kinematic airframe is physical.** On the tuning buildings the quadrotor flies about 13% less distance in the same episode, because it accelerates at about 4 m/s² rather than instantly within the lag. The remainder comes from latency and noise, which slow every approach.
+- **The quad-aware tracker** (`SensorPlannerOptions.tracker`, src/sim/tracker.ts) shapes the planner's command into one the airframe can fly: it ramps the command at the airframe's acceleration, slows for corners and for the U-turn at the end of each sweep lane, and caps the yaw rate while facing the direction of travel. With the braking filter the planner then covers 46.9% (44.7–49.4%) at 0.03 collisions per episode, touching anything in 1 of 30 day episodes; without the filter it covers 48.0% at 3.0. On the tuning buildings the yaw cap did most of the work. The env's command is body-frame velocity, so a drone yawing at full rate through a U-turn asks for a world velocity that keeps rotating under it, and with the quadrotor's lag its sweep lanes broke up into loops. The default controller and the trained checkpoints are unchanged; the tracker is opt-in.
+- **Most of the coverage gap to the kinematic airframe is physical.** The planner covers by sweeping lanes one 0.5 m voxel apart, and the U-turn between two lanes has a 0.25 m radius, which the quadrotor (about 4 m/s² of acceleration at its 0.4 rad tilt limit) can only take at about 1 m/s. The kinematic drone takes it at cruise speed. On the tuning buildings the quadrotor also flies about 13% less distance in the same episode, and latency and noise slow every approach.
 
 On whole missions, `policyQuad` and `sensorQuad` in the bench above fly the policy and the planner on the 1.2 kg quadrotor with the braking filter as the indoor shield: 7 of 180 quadrotor flights touched anything.
 
@@ -197,7 +202,8 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 - **On the kinematic drone, speed is the lever.** The planner covers 65.5% (62.2–68.7%) at 2 m/s and 84.4% (81.3–87.3%) at 5 m/s, with no collisions at any speed. Half the building is flown after 89 s at 2 m/s and 60 s at 5 m/s. This is the flight-time limit the map-prediction null result pointed to: choosing better frontiers barely matters, flying them faster does.
 - **Momentum-aware goal choice saves energy, not coverage.** Scoring each frontier by how far the drone would have to swing round to reach it leaves coverage where it was (65.6% at 2 m/s, 84.1% at 5 m/s) and uses 7% less energy at 2 m/s and 21% less at 5 m/s, because the drone brakes and re-accelerates less. Energy is metered with the mission battery model for a 1.2 kg quadrotor, which charges for acceleration and gives nothing back on braking.
 - **The guarded policy also gains from speed; the raw policy does not.** With the lidar guard it covers 60.8% at 2 m/s and 79.8% at 5 m/s, at 3.4 collisions per episode. Without the guard it falls from 60.7% to 32.0%, and most episodes end early at the collision limit, which is why its energy falls. It was trained at 2 m/s and never saw these speeds.
-- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers 42.1% at 2 m/s and 33.6% at 5 m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: 41.3% against 36.9% at 4 m/s. A path tracker that sets a speed for each corner within the airframe's acceleration and starts each turn early did no better on the tuning buildings (44–47% at 2–4 m/s, against 44–46% for the planner with momentum), so it is not shipped.
+- **On the quadrotor, a higher cap makes the planners worse.** With the braking filter the planner covers 42.1% at 2 m/s and 33.6% at 5 m/s, and energy barely moves: the airframe seldom reaches the cap. Indoors the quadrotor spends its time turning. It accelerates at about 3 m/s², so each change of direction costs most of a second, and a faster cruise only overshoots the next corner. On the tuning buildings, the kinematic drone with its lag slowed from 0.15 s to 0.5 s loses about as much coverage as the quadrotor does. Momentum-aware goal choice helps a little where the overshoot is worst: 41.3% against 36.9% at 4 m/s.
+- **A quad-aware tracker recovers part of the gap and nearly all the collisions** (`SensorPlannerOptions.tracker`, src/sim/tracker.ts). It ramps the command at the airframe's acceleration, slows for corners and for the U-turn at the end of each sweep lane, and caps the yaw rate while the drone faces its direction of travel. On the tuning buildings the last part mattered most: the env's command is body-frame velocity, so a drone yawing at full rate through a U-turn asks for a velocity that keeps rotating under it, and with the quadrotor's lag its sweep lanes broke up into loops. With the braking filter it covers 46.9% (44.7–49.4%) at 2 m/s against 42.1% without it, at 0.03 collisions per episode against 1.17, and 44.5% at 5 m/s. A higher cap still does not pay: the U-turns between 0.5 m lanes limit the quadrotor to about 1 m/s whatever the cruise speed, and it stays well short of the kinematic drone. An earlier tracker with only the corner speeds and the ramp did no better than the planner.
 - **The guarded policy is the exception on the quadrotor.** It covers 33.6% at 2 m/s and 46.9% at 5 m/s, more than any planner, but at 8.8 collisions per episode. It pushes into corners the planners slow down for.
 
 | Airframe | Pilot | 2 m/s | 3 m/s | 4 m/s | 5 m/s | Energy, Wh (2 → 5 m/s) |
@@ -210,6 +216,8 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 | Quadrotor | Planner + momentum | 45.7% (7.0) | 41.2% (13.1) | 38.8% (14.6) | 39.1% (14.7) | 5.15 → 4.57 |
 | Quadrotor | Planner, braking filter | 42.1% (1.2) | 38.0% (2.3) | 36.9% (2.6) | 33.6% (2.1) | 5.18 → 5.36 |
 | Quadrotor | Planner, braking filter + momentum | 43.7% (1.2) | 42.0% (1.8) | 41.3% (2.5) | 39.8% (2.8) | 5.14 → 5.30 |
+| Quadrotor | Planner + quad tracker | 48.0% (3.0) | 45.0% (6.1) | 45.3% (5.9) | 43.9% (6.6) | 5.03 → 5.11 |
+| Quadrotor | Planner, braking filter + quad tracker | 46.9% (0.0) | 45.4% (0.3) | 43.5% (0.4) | 44.5% (0.2) | 5.04 → 5.09 |
 | Quadrotor | Policy | 27.0% (15.3) | 25.0% (17.0) | 20.4% (17.0) | 20.7% (17.0) | 3.84 → 1.62 |
 | Quadrotor | Guarded policy | 33.6% (2.1) | 39.4% (6.0) | 44.3% (7.8) | 46.9% (8.8) | 5.02 → 5.11 |
 
@@ -282,6 +290,44 @@ Closing the loop found faults that replaying logged flights could not, all fixed
 - **Detections were placed with the true pose.** The camera model places a contact from the true pose, while the drone planned its re-views in the estimate's frame, so night re-views aimed 15–25 cm off the target. Contacts are now re-placed with the estimate. This fix came after a first full bench run, which it changed only in the estimated-pose arms (sensor planner at night: 73% to 80%).
 - **A gyro read once per tick misses the turn.** The quadrotor's body rate sampled at the end of each 50 ms tick differs from its mean over the tick while the heading controller is turning, and the estimator, trusting it, drifted 15° in heading on quadrotor flights. A real IMU is read far faster than the control loop and its rate is integrated over the tick; the localizer now feeds the tick's heading change, and the quadrotor's heading error dropped to under 1°.
 - **A sweep through the slab founded the next floor's map.** Climbing a shaft, the drone's estimated floor changes as it passes the slab, and the first sweep on the new floor founds that floor's map. Taken at slab height, that sweep sees the edge of the hole, not the rooms above, and nothing later matched it: the estimate coasted on odometry until it called itself lost. Sweeps within 35 cm of an upper slab are now neither matched nor mapped. It showed up after the slab geometry changed (a slab is now open only where a shaft joins two floors). It appeared on a tuning world and in a third full bench run, where the sensor planner's compound sweep ended aborted in 8 of 30 worlds. The fix was found on the tuning world, and the bench above is the fourth run.
+
+### Real data: Intel Research Lab
+
+Everything above is simulated. To check the estimator on a real robot's data, `scripts/study/intel-lab.ts` replays the Intel Research Lab log, a standard SLAM dataset: 45 minutes of a wheeled robot driving loops around an office floor in Seattle, 13,631 sweeps of a 180° SICK LMS laser, with wheel odometry ([data/intel-lab/README.md](../data/intel-lab/README.md) has the source and licenses). It is scored the way the published results on this log are: with the 2,984 manually verified relations of the Freiburg SLAM benchmark (Kümmerle et al., *On measuring the accuracy of SLAM algorithms*, Autonomous Robots 2009). Each relation says where the robot was at one sweep in the frame of another; the error of a trajectory is the difference between its own displacement and the relation's, split into translation and rotation, averaged over relations. About 40% of the relations join the same place visited minutes apart, so they measure loop closure as much as tracking.
+
+The estimator is the one the drone flies, unchanged; only the inputs are adapted. The 180 beams of a sweep fill the front half of its 360-slot ring at 1° each (the back half reads as misses; the drone's own lidar has 90 beams all round), the odometry's heading change stands in for the gyro, its step for the optical flow, and the change of that step for the accelerometer. Height sensors read a flat floor. The robot is not a drone, so the shipped parameters (20 cm map cells, the noise of a flow sensor, the drone's 8 m lidar range) are not its parameters either. The *adapted* arm changes two of them, to 10 cm cells and wheel-odometry noise, picked from a 24-point grid on the first 3,000 sweeps of the log only; the *held-out* column scores relations whose sweeps both come later. The score turned out to depend strongly on where the map grid's corner sits, a sign of how close to failure the estimator runs on this log, so every arm is run at five sub-cell shifts of the grid and the table gives the mean over them and, in brackets, the lowest and highest mean. Published rows are quoted from the papers, not rerun.
+
+| Method | Translation, abs (m) | Rotation, abs (°) | Translation, squared (m²) | Rotation, squared (°²) | Worst relation (m) |
+| --- | --- | --- | --- | --- | --- |
+| Scan matching (Kümmerle et al. 2009), published | 0.220 ± 0.296 | 1.7 ± 4.8 | 0.136 ± 0.277 | 25.8 ± 170.9 | 1.168 |
+| Rao-Blackwellized particle filter, GMapping (Kümmerle et al. 2009), published | 0.070 ± 0.083 | 3.0 ± 5.3 | 0.011 ± 0.034 | 36.7 ± 187.7 | 0.698 |
+| Graph-based SLAM (Kümmerle et al. 2009), published | 0.031 ± 0.026 | 1.3 ± 4.7 | 0.002 ± 0.004 | 24.0 ± 166.1 | 0.229 |
+| Graph FLIRT (as quoted by Hess et al. 2016), published | 0.02 ± 0.02 | 0.3 ± 0.3 | — | — | — |
+| Cartographer (Hess et al. 2016), published | 0.0229 ± 0.0239 | 0.453 ± 1.335 | 0.0011 ± 0.0040 | 1.986 ± 23.988 | — |
+| **Raw wheel odometry (no lidar)**, this repository | 7.370 ± 14.349 | 39.17 ± 53.79 | 260.218 ± 781.300 | 4427.4 ± 7488.8 | 70.022 |
+| **Shipped drone estimator, as is (20 cm cells, flow-sensor noise), lidar cut to 8 m**, this repository | 2.885 ± 4.942 (0.821–7.332) | 15.30 ± 27.42 (3.48–42.59) | 47.419 ± 106.437 | 1519.5 ± 3197.2 | 43.564 |
+| **Same estimator, 10 cm cells and wheel-odometry noise (picked on the dev sweeps)**, this repository | 1.169 ± 3.589 (0.584–1.850) | 4.39 ± 12.51 (1.53–7.37) | 17.069 ± 64.505 | 245.6 ± 982.3 | 29.603 |
+| **Adapted, without the Manhattan heading fix**, this repository | 0.587 ± 1.794 (0.133–1.808) | 2.80 ± 6.86 (1.23–8.39) | 7.628 ± 28.532 | 151.2 ± 612.0 | 31.401 |
+| **Adapted, scan matching only (no odometry between sweeps)**, this repository | 8.127 ± 11.851 (6.453–10.374) | 40.31 ± 58.59 (28.85–44.71) | 212.029 ± 422.660 | 5139.3 ± 9225.6 | 70.208 |
+
+| This repository | Median relation error | 90th percentile | Relations under 10 s apart | Relations 10 s or more apart | Held out (both sweeps after the dev part) | CPU per sweep |
+| --- | --- | --- | --- | --- | --- | --- |
+| Raw wheel odometry (no lidar) | 0.050 m / 2.49° | 20.104 m / 128.00° | 0.023 m (1770) | 18.082 m (1214) | 5.172 m / 15.63° (1662) | — |
+| Shipped drone estimator, as is (20 cm cells, flow-sensor noise), lidar cut to 8 m | 0.059 m / 1.15° | 9.790 m / 46.99° | 0.101 m (1770) | 6.944 m (1214) | 1.473 m / 8.18° (1662) | 2.39 ms |
+| Same estimator, 10 cm cells and wheel-odometry noise (picked on the dev sweeps) | 0.031 m / 0.78° | 2.879 m / 4.85° | 0.068 m (1770) | 2.773 m (1214) | 1.188 m / 4.72° (1662) | 10.19 ms |
+| Adapted, without the Manhattan heading fix | 0.034 m / 0.83° | 0.667 m / 4.15° | 0.055 m (1770) | 1.363 m (1214) | 0.574 m / 3.07° (1662) | 7.91 ms |
+
+From `npm run study:intel` at `761faf5`; per-relation errors are in `docs/intel-lab.json`.
+
+**What the numbers say.**
+
+- **The estimator does not reach the published methods on this log.** With the dev-picked parameters it averages 1.169 m of translational error (0.584 m to 1.850 m across grid shifts) against 0.220 m for the scan matcher Kümmerle et al. ran in 2009, and 0.02–0.03 m for the graph-based methods and Cartographer, which close loops. As shipped for the drone it averages 2.885 m and 15.30° (0.821 m to 7.332 m). Raw wheel odometry scores 7.370 m.
+- **Locally it tracks; the error is in the loops.** The median relation is 0.031 m off. On relations under 10 s apart the adapted estimator is 0.068 m off, against 0.023 m for the wheel odometry alone: over a second or two, good wheel odometry beats it. On relations between visits minutes apart it is 2.773 m off. It has no loop closure: it keeps one map and matches every sweep against it, so drift that has entered the map stays, and coming back to a place mapped before the drift, a sweep can match the old, misaligned walls and the pose jumps. Matching only against the last 40 m of travel (a rolling local map, tried at one grid position) cut the short-relation error from 7 to 4 cm but nearly doubled the loop error, and was dropped.
+- **The Manhattan heading fix is the assumption that breaks.** In the simulator every wall runs along the building's axes, and the estimator snaps its heading to the dominant wall direction. Turned off, the adapted estimator averages 0.587 m and 2.80° (0.133 m to 1.808 m across grid shifts, so its best run, 0.133 m, is better than the 2009 scan matcher and its worst is not). On the dev sweeps the fix still helped slightly, so it stays on in the adapted arm; this ablation was looked at after the full-log result and is reported as one, not as the result.
+- **Scan matching alone fails here.** Without the odometry between sweeps it averages 8.127 m: a 180° sweep that sees one corridor wall, or a room crowded with people and furniture, does not pin the pose on its own, and nothing carries the estimate through it.
+- **It is fast.** 10.2 ms of CPU per sweep with 10 cm cells, about 20 times faster than the robot recorded them.
+
+What this does and does not show: the estimator's inputs, map and matcher run on real laser data without changes and track a real robot locally, but on a 45-minute run with many loops it drifts metres, as a filter without loop closure does. The drone's flights indoors are a few minutes in buildings a few rooms across, where the simulator says drift stays near 5 cm; this log is a harder regime than any building the drone searches, and the drone's own sensors (a flow camera and an IMU instead of wheels) are not tested by it at all.
 
 ### Ablations
 
@@ -583,7 +629,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **Localization is closed loop only inside buildings.** In the estimated-pose arms the drone starts each visit from the doorway with a 10 cm, 1.7° pose error and flies the visit on its estimate, but the fly-through in and out still servoes on the true pose (standing in for tracking the opening it can see), outdoor flight uses the true pose (standing in for GNSS), and the perception source places detections with the true pose. Each would add error the bench does not count.
 - **The coverage study's policy and planner never fly on the estimate.** Only the mission bench does; the coverage numbers above are on the true pose.
 - **The localization sensors are idealized in places.** Each lidar sweep is instantaneous (no motion distortion), the flow sensor's errors are white plus a per-flight scale error, walls are perfectly flat and axis-aligned (which the Manhattan heading fix relies on), and nothing in the building moves. There is no loop closure: drift that enters the map stays in it.
-- **One simulator.** Everything here is measured in this repository's simulator; nothing has flown on hardware.
+- **One simulator, one real log.** Everything here is measured in this repository's simulator; nothing has flown on hardware. The one real data the code has seen is the Intel Research Lab laser log, which only the pose estimator replays (above), and on it the estimator drifts metres over the 45-minute run because it has no loop closure.
 
 ## Seeds and protocol
 
@@ -605,6 +651,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Camera mission bench (reported) | 67101–67130 |
 | Tuning the pose estimator | Coverage buildings 7001–7012 (stage 3), mission worlds 9101–9116 for the closed-loop fixes |
 | Localization study (reported) | 60001+ (hard) and 62001+ (easy), 30 each |
+| Real-data check (Intel Research Lab log) | Parameters picked on sweeps 0–2999 only; reported on the whole log and on the relations after sweep 2999 |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce
@@ -620,6 +667,7 @@ npm install --no-save @tensorflow/tfjs-node@4.22.0   # native TF.js for the came
 npm run study:vision     # docs/vision-bench.json: missions with the camera and the learned detector
 # Camera detector: scripts/vision/make-dataset.ts, train-detector.ts and eval-detector.ts (see their headers)
 npm run study:loc        # docs/localization.json: pose estimator arms over 120 fresh flights
+npm run study:intel      # docs/intel-lab.json: the same estimator on the real Intel Research Lab log (data/intel-lab/)
 vite-node scripts/study/gallery.ts          # docs/report/*.svg
 # Ablations: one train:indoor run per arm, then scripts/study/ablations.ts (see its header)
 npm run docs             # re-render this page, BENCHMARKS.md and the README

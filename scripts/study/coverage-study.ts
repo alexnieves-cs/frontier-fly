@@ -1,8 +1,8 @@
 // Coverage study: every pilot on 30 fresh buildings per condition, with 95% confidence intervals.
 //
 //   npm run study:coverage                 # all shards in parallel, then merge into docs/study.json
-//   vite-node scripts/study/coverage-study.ts -- --shard 0 --of 4 --out /tmp/s0.jsonl [--conditions hard] [--pilots policy,guarded]
-//   vite-node scripts/study/coverage-study.ts -- --merge /tmp/s0.jsonl ... --out docs/study.json
+//   STUDY_ENTRY=coverage-study vite-node scripts/study/coverage-study.ts -- --shard 0 --of 4 --out /tmp/s0.jsonl [--conditions hard] [--pilots policy,guarded]
+//   STUDY_ENTRY=coverage-study vite-node scripts/study/coverage-study.ts -- --merge /tmp/s0.jsonl ... --out docs/study.json
 //
 // Seeds 20001+, 30001+, 40001+ and 50001+ are drawn only here. Training draws curriculum seeds,
 // checkpoints are selected on 9001-9166, and the sensor planner and policy guard were tuned on
@@ -49,6 +49,8 @@ export const PILOTS = [
   'teacher',
   'classical',
   'classicalBrake',
+  'classicalTrack',
+  'classicalBrakeTrack',
   'classicalClimb',
   'classicalPredict',
   'classicalOracleGain',
@@ -66,6 +68,8 @@ export type PilotId = (typeof PILOTS)[number];
  */
 export const PILOT_CONDITIONS: Partial<Record<PilotId, string[]>> = {
   classicalBrake: ['quad'],
+  classicalTrack: ['quad'],
+  classicalBrakeTrack: ['quad'],
   guardedBrake: ['quad'],
   classicalClimb: ['floors'],
   classicalPredict: ['hard', 'floors'],
@@ -154,6 +158,11 @@ export async function startEpisode(
     const p = classicalPilot({ braking: QUAD_BRAKING });
     p.reset();
     act = p.act;
+  } else if (job.pilot === 'classicalTrack' || job.pilot === 'classicalBrakeTrack') {
+    // Quad-aware trajectory tracking (sim/tracker.ts), defaults tuned on 9101-9108.
+    const p = classicalPilot({ tracker: {}, ...(job.pilot === 'classicalBrakeTrack' ? { braking: QUAD_BRAKING } : {}) });
+    p.reset();
+    act = p.act;
   } else if (job.pilot === 'classicalClimb') {
     const p = climbingPilot({}, { floorSteps: (CLIMB_FLOOR_SHARE * cfg.maxSteps) / spec.floors.length });
     p.reset();
@@ -234,12 +243,13 @@ export function summarizeStudy(rows: Result[]) {
   return cells;
 }
 
-// Other studies import this module; only run the CLI when it is the entry script.
-const MAIN = process.argv.some((a) => a.endsWith('coverage-study.ts'));
+// Other studies import this module; only run the CLI when it is the entry script. vite-node drops the
+// script path from process.argv, so the launchers (parallel.mjs, ablations.ts) name it in STUDY_ENTRY.
+const MAIN = process.env.STUDY_ENTRY === 'coverage-study' || process.argv.some((a) => a.endsWith('coverage-study.ts'));
 
 if (MAIN && process.argv.includes('--merge')) {
   const outPath = arg('out', 'docs/study.json');
-  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== outPath);
+  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => a.endsWith('.jsonl'));
   const rows: Result[] = files.flatMap((f) =>
     readFileSync(f, 'utf8')
       .split('\n')

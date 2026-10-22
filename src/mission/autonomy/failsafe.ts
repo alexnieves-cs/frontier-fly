@@ -164,6 +164,9 @@ export interface FailsafeConfig {
   /** Wind (on the estimator's short average) that ends the mission at once, m/s. */
   windSevereMps: number;
   windSevereSec: number;
+  /** Severe wind stays latched until the short estimate is this far under `windSevereMps` for `windSevereClearSec`. */
+  windSevereHysteresisMps: number;
+  windSevereClearSec: number;
   /** Returning in wind and closing less than `windProgressM` on home in this long: land where it is. */
   windNoProgressSec: number;
   windProgressM: number;
@@ -201,6 +204,8 @@ export const DEFAULT_FAILSAFE: FailsafeConfig = {
   windAvgSec: 20,
   windSevereMps: 6,
   windSevereSec: 2,
+  windSevereHysteresisMps: 2,
+  windSevereClearSec: 5,
   windNoProgressSec: 30,
   windProgressM: 3,
 };
@@ -254,6 +259,11 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
   let windHighSince: number | null = null;
   let windMean: [number, number] | null = null;
   let windSevereSince: number | null = null;
+  // Severe wind latches until the short estimate stays under `windSevereMps - windSevereHysteresisMps` for
+  // `windSevereClearSec`: gusts dip the estimate under the limit, and dropping back to the low mission path
+  // for a moment in 8 m/s is how the drone gets blown into trees.
+  let windSevereLatched = false;
+  let windCalmSince: number | null = null;
   let windProgress: { t: number; d: number } | null = null;
   let flaggedSince: number | null = null;
   let silentCounts: Int32Array | null = null;
@@ -493,9 +503,16 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
         } else windHighSince = null;
         // Strong wind can't wait for the mean: well over the limit on the short average, climb clear and go home now.
         const now = Math.hypot(w[0], w[1]);
-        if (now >= cfg.windSevereMps) {
+        if (windSevereLatched) {
+          if (now < cfg.windSevereMps - cfg.windSevereHysteresisMps) {
+            windCalmSince ??= tSec;
+            if (tSec - windCalmSince >= cfg.windSevereClearSec) windSevereLatched = false;
+          } else windCalmSince = null;
+        }
+        if (now >= cfg.windSevereMps || windSevereLatched) {
           windSevereSince ??= tSec;
-          if (tSec - windSevereSince >= cfg.windSevereSec - 1e-9) {
+          if (windSevereLatched || tSec - windSevereSince >= cfg.windSevereSec - 1e-9) {
+            windSevereLatched = true;
             flags.add('wind_limit');
             flags.add('wind_severe');
             emit('wind-severe', tSec, 'wind', 'return_home', `Wind ${fmt(now)} m/s, well over the ${fmt(cfg.windLimitMps, 0)} m/s limit. Climbing clear and returning home.`);
@@ -506,7 +523,8 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
         // hover until the pack runs out.
         if (flags.has('wind_limit') && (input.phase === 'return_home' || input.phase === 'recover') && input.homeDistM !== undefined) {
           const d = input.homeDistM;
-          if (!windProgress || d < windProgress.d - cfg.windProgressM) windProgress = { t: tSec, d };
+          // Over the pad there is nothing left to close.
+          if (!windProgress || d < windProgress.d - cfg.windProgressM || d < cfg.windProgressM * 2) windProgress = { t: tSec, d };
           else if (tSec - windProgress.t >= cfg.windNoProgressSec - 1e-9) {
             emit('wind-headway', tSec, 'wind', 'land', `No headway home in ${fmt(cfg.windNoProgressSec, 0)} s against ${fmt(speed)} m/s mean wind. Landing here.`);
             offer('land', 'No headway home in wind');
