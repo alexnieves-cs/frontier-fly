@@ -536,8 +536,12 @@ class Runner extends IndoorPhases {
     // the altitude loop holds a few centimetres low in wind, and a stricter test never hands back.
     const below = cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2] > CLIMB_CLEAR_TOL_M;
     if (!gnss && !below) return cmd;
-    const near = nearest < 15 && below;
-    return { vel: [near ? away[0] * 0.5 : 0, near ? away[1] * 0.5 : 0, vz], yaw: null };
+    // Back away and climb only where the way is open: away from the building's middle can be into a tree,
+    // and straight up next to a wall can be under the eaves.
+    const step = (d: V3): boolean => segmentClear(this.physics, pos, [pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]]);
+    const near = nearest < 15 && below && step([away[0] * 1.5, away[1] * 1.5, 0]);
+    const up = vz > 0 && step([0, 0, 1.5]) ? vz : 0;
+    return { vel: [near ? away[0] * 0.5 : 0, near ? away[1] * 0.5 : 0, up], yaw: null };
   }
 
   /** ESC telemetry: achieved over commanded thrust per motor, with a little measurement noise. */
