@@ -121,7 +121,8 @@ flowchart LR
   Obs --> Pol["Policy MLP<br/>1088 → 512 → 256 → 4"]
   Pol -- "vx, vy, vz, yaw rate" --> Sim
   Teacher["Privileged frontier teacher<br/>sees the explored map"] -- "labels" --> IL["BC + DAgger<br/>headless, npm run train:indoor"]
-  IL -- "shipped weights" --> Pol
+  IL -- "starting weights" --> FT["PPO fine-tune<br/>headless, npm run train:ppo"]
+  FT -- "shipped weights" --> Pol
   Sim -. "rollouts (SharedArrayBuffer)" .-> PPO["Optional PPO in the tab<br/>TF.js worker, Train button"]
   PPO -. "session weights" .-> Pol
   Sim --> Det["Camera detector<br/>people · objects · decoys"]
@@ -164,13 +165,15 @@ npm run build      # typecheck and production bundle in dist/
 | `npm run test:e2e` | Headless Chrome checks and screenshots |
 | `npm run bench` | Coverage and throughput, written to `docs/benchmarks.json` |
 | `npm run media` | Record the demo clips into `docs/media/` (needs ffmpeg) |
-| `npm run study:coverage` / `npm run study:missions` | Every pilot on fresh buildings, and three indoor explorers on fresh mission worlds, with 95% intervals |
-| `npm run study:faults` | Fly 17 fault scenarios (sensor, motor, battery, link, GNSS, wind) on fresh mission worlds, written to `docs/fault-bench.json` |
+| `npm run study:coverage` / `npm run study:missions` | Every pilot on fresh buildings, and the indoor explorers on fresh mission worlds, with 95% intervals |
+| `npm run study:faults` | Fly the fault scenarios (sensor, motor, battery, link, GNSS, wind) on fresh mission worlds, written to `docs/fault-bench.json` |
+| `npm run study:<name>` | The other studies behind [REPORT.md](docs/REPORT.md): `speed`, `team`, `plans`, `sar`, `vision`, `loc`, `intel` |
 | `npm run docs` | Regenerate `docs/ARCHITECTURE.md`, `docs/BENCHMARKS.md`, `docs/REPORT.md`, `docs/SAFETY_CASE.md`, `docs/LEADERBOARD.md`, and the README tables |
-| `npm run bench:score -- --pilot <id or file>` | Score a pilot on FrontierBench ([LEADERBOARD.md](docs/LEADERBOARD.md) says how to submit one) |
+| `npm run bench:score -- --pilot <id or file>` | Score a pilot on FrontierBench ([LEADERBOARD.md](docs/LEADERBOARD.md) says how to submit one); `npm run bench:team` does the same for a drone team |
 | `npm run check:pages` | Serve `dist/` the way GitHub Pages does and check every page loads |
 | `npm run eval:coverage` | Coverage table vs targets for the shipped checkpoint |
 | `npm run train:indoor -- --out ckpt.json` | BC + DAgger on every core, kept by held-out validation |
+| `npm run train:ppo` | Fine-tune a checkpoint with PPO on its own flights (how the shipped weights were made) |
 
 <details>
 <summary>Controls and URL parameters</summary>
@@ -218,12 +221,17 @@ These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/fron
 
 ## Roadmap
 
-Being built now, each in its own track:
+Landed, each with its own study in [REPORT.md](docs/REPORT.md):
 
-- **Indoor localization**: maps and planners on an estimated pose (scan matching plus inertial odometry) instead of the true one. The same estimator is also replayed on a real robot's laser log (the Intel Research Lab dataset) and scored against published SLAM results: it tracks locally but drifts metres over the 45-minute run without loop closure ([report](docs/REPORT.md#real-data-intel-research-lab)).
-- **Search by probability**: outdoor search planned on a lost-person probability map, updated by what the camera saw.
-- **Faults and a safety case**: missions under lidar dropout, weak motors, battery sag, wind and lost links, with a hazard-to-test table.
-- **Live pilot race and policy inspector**, and **QGroundControl plan export** from the mission editor.
+- **Indoor localization.** Missions can fly on an estimated pose (scan matching plus inertial odometry) instead of the true one. The same estimator is also replayed on a real robot's laser log, the Intel Research Lab dataset ([report](docs/REPORT.md#real-data-intel-research-lab)).
+- **Search by probability** outdoors, **faults and a safety case** ([SAFETY_CASE.md](docs/SAFETY_CASE.md)), **QGroundControl export** ([QGC_EXPORT.md](docs/QGC_EXPORT.md)) and **PX4 in the loop** ([PX4.md](docs/PX4.md)).
+- **Drone teams** sharing maps over a radio that walls weaken ([live](https://alexnieves-cs.github.io/frontier-fly/team.html)), **speed and energy** metering, **search by sight** with a rendered camera and a learned detector, **real floor plans** ([REAL_PLANS.md](docs/REAL_PLANS.md)), a policy **fine-tuned with PPO** on its own flights, and the **FrontierBench** leaderboard with a team track ([LEADERBOARD.md](docs/LEADERBOARD.md)).
+
+Next:
+
+- Loop closure for the localizer, which tracks locally on the real log but drifts over its 45 minutes.
+- Train the policy on quadrotor dynamics. So far it has only been trained on the kinematic airframe.
+- Let a FrontierBench team entry fly its own pilot. Today every team drone runs the sensor-only planner.
 
 Out of scope: anything that pursues, tracks for harm, or strikes. The drone searches, inspects and confirms clear, and nothing else.
 
