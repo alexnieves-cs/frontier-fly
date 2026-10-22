@@ -277,7 +277,7 @@ function ablationTables(ab) {
  * docs/mission-bench.json (this code) and docs/mission-bench-control.json (the code before it).
  */
 function confirmClearSection(mb, control) {
-  const keys = ['R_CC_FLIGHTS', 'R_CC_FC', 'R_CC_FC_CTRL', 'R_CC_OCC', 'R_CC_OCC_CTRL', 'R_CC_CLEAR', 'R_CC_CLEAR_CTRL', 'R_CC_ALL', 'R_CC_ALL_CTRL', 'R_CC_COMMIT_CTRL', 'R_CC_SEEDS'];
+  const keys = ['R_CC_FLIGHTS', 'R_CC_FC', 'R_CC_FC_CTRL', 'R_CC_OCC', 'R_CC_OCC_CTRL', 'R_CC_CLEAR', 'R_CC_CLEAR_CTRL', 'R_CC_ALL', 'R_CC_ALL_CTRL', 'R_CC_COMMIT_CTRL', 'R_CC_SEEDS', 'R_CC_COLL', 'R_CC_COLL_CTRL'];
   const out = Object.fromEntries(keys.map((k) => [k, 'n/a']));
   out.CONFIRM_CLEAR_TABLE = '_Not measured yet. Fly `npm run study:missions` on this code and on the code before it, on the same seeds._';
   if (!mb?.modes.sensor?.['compound-occupied'] || !control?.modes.sensor?.['compound-occupied']) return out;
@@ -295,6 +295,8 @@ function confirmClearSection(mb, control) {
   out.R_CC_ALL_CTRL = pct(mean(control, 'all'));
   out.R_CC_COMMIT_CTRL = control.commit;
   out.R_CC_SEEDS = String(mb.seedsPerScenario);
+  out.R_CC_COLL = String(sum(mb, 'all', (s) => s.flightsWithCollision));
+  out.R_CC_COLL_CTRL = String(sum(control, 'all', (s) => s.flightsWithCollision));
   const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
   const cell = (b, m, sc) => `${pct(b.modes[m][sc].expectedOutcome)} (${ci(...b.modes[m][sc].expectedOutcomeCi)})`;
   const scenarios = Object.keys(mb.modes.sensor).filter((k) => k !== 'all');
