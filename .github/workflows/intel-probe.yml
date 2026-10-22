@@ -1,0 +1,32 @@
+name: intel-probe
+# Temporary: checks which hosts serve the Intel Research Lab log from GitHub's runners.
+on:
+  push:
+    branches: [claude/project-thread-whem5k]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: probe
+        run: |
+          mkdir -p out && cd out
+          get() { echo "== $1"; curl -sSL -m 60 -o "$2" -w "%{http_code} %{size_download} %{url_effective}\n" "$1" || true; }
+          get "https://dspace.mit.edu/handle/1721.1/62287?show=full" dspace_full.html
+          get "https://dspace.mit.edu/handle/1721.1/62287" dspace.html
+          grep -o 'href="[^"]*bitstream[^"]*"' dspace.html | sort -u || true
+          grep -io 'creativecommons[^"]*' dspace_full.html | sort -u || true
+          for p in datasets/intel.relations datasets/intel.clf datasets.php; do
+            get "http://ais.informatik.uni-freiburg.de/slamevaluation/$p" "fr_$(basename $p)"
+            get "https://web.archive.org/web/2019id_/http://ais.informatik.uni-freiburg.de/slamevaluation/$p" "wa_$(basename $p)"
+          done
+          get "http://www2.informatik.uni-freiburg.de/~stachnis/datasets/datasets/intel-lab/intel.gfs.log.gz" fr_intel.gfs.log.gz
+          get "https://web.archive.org/web/2019id_/http://www2.informatik.uni-freiburg.de/~stachnis/datasets/datasets/intel-lab/intel.gfs.log.gz" wa_intel.gfs.log.gz
+          ls -la
+          for f in dspace*.html; do echo "--- $f"; sed -e 's/<[^>]*>/ /g' $f | tr -s ' \n' | grep -i -m 20 "intel\|rights\|licen\|bitstream\|\.gz\|\.log" ; done
+          for f in fr_* wa_*; do echo "--- $f"; head -c 400 "$f" | strings | head -5; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: intel-probe
+          path: out
