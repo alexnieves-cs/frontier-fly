@@ -218,7 +218,7 @@ These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/fron
 
 Being built now, each in its own track:
 
-- **Indoor localization**: maps and planners on an estimated pose (scan matching plus inertial odometry) instead of the true one.
+- **Indoor localization**: maps and planners on an estimated pose (scan matching plus inertial odometry) instead of the true one. The same estimator is also replayed on a real robot's laser log (the Intel Research Lab dataset) and scored against published SLAM results: it tracks locally but drifts metres over the 45-minute run without loop closure ([report](docs/REPORT.md#real-data-intel-research-lab)).
 - **Search by probability**: outdoor search planned on a lost-person probability map, updated by what the camera saw.
 - **Faults and a safety case**: missions under lidar dropout, weak motors, battery sag, wind and lost links, with a hazard-to-test table.
 - **Live pilot race and policy inspector**, and **QGroundControl plan export** from the mission editor.
