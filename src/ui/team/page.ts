@@ -5,8 +5,8 @@ import { TEAM_CONDITIONS, teamEpisodeSetup, type TeamCondition } from '../../tea
 import { TeamSim, type Comms, type Role } from '../../team/run';
 import { CoverageChart } from '../race/chart';
 import { DRONE_COLORS, TeamMap } from './draw';
+import { siteNavLinks } from '../siteNav';
 
-const REPO = 'https://github.com/alexnieves-cs/frontier-fly';
 const EVAL_SEED_BASE: Record<string, number> = { hard: 70001, large: 71001 };
 const SPEEDS = [
   { id: '1', label: '1×', rate: 20 },
@@ -82,14 +82,7 @@ function markup(): string {
   <div class="race team">
     <header class="race-top">
       <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true"></span>frontier-fly</a>
-      <nav class="race-nav" aria-label="Pages">
-        <a href="./index.html">Home</a>
-        <a href="./race.html">Race</a>
-        <a href="./team.html" aria-current="page">Team</a>
-        <a href="./demo.html">Missions</a>
-        <a href="./sim.html">Sim</a>
-        <a href="${REPO}" rel="noopener">GitHub</a>
-      </nav>
+      <nav class="race-nav" aria-label="Pages">${siteNavLinks('team')}</nav>
     </header>
 
     <section class="race-intro">

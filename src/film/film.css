@@ -137,8 +137,28 @@ html, body { margin: 0; height: 100%; background: #05080b; color: var(--film-ink
 .film-picker a[aria-current="true"] { color: var(--film-ink); border-color: var(--film-line); background: #10202a; }
 .film-picker a:hover, .film-link:hover { color: var(--film-ink); }
 
+.film-select { display: none; max-width: 40vw; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--film-line); background: #10202a; color: var(--film-ink); font: 500 14px var(--film-font); }
+.film-link { white-space: nowrap; }
+.film-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
 @media (max-width: 900px) {
   .film-picker { display: none; }
+  .film-select { display: block; }
+}
+@media (max-width: 640px) {
+  .film-controls { gap: 10px; padding: 0 12px; }
+  .film-play { min-width: 64px; }
+  .film-scrub { min-width: 0; }
+  .film-select { max-width: 32vw; }
+  .film-link { padding: 7px 4px; }
+  .film-link:not(:last-child) { display: none; }
+}
+@media (max-width: 640px) and (orientation: portrait) {
+  .film-root:not(.film-embed):not(.film-recording)::after {
+    content: "Turn your phone sideways for a bigger picture";
+    position: fixed; left: 0; right: 0; bottom: 88px; text-align: center;
+    font: 500 13px var(--film-font); color: var(--film-muted);
+  }
 }
 
 /* Embedded in another page (the landing hero): fits its container, no controls bar. */

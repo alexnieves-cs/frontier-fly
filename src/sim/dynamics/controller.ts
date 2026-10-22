@@ -54,6 +54,8 @@ export class AngleController {
   /** Give up collective before roll and pitch when the motors saturate. Off keeps the mixer the checkpoints were trained on. */
   private attitudeFirst = false;
   private readonly rp = new Float64Array(4);
+  private velKi = 0;
+  private readonly velI = new Float64Array(2);
 
   setParams(p: DynParams): void {
     this.mass = p.mass > 1e-6 ? p.mass : 1e-6;
@@ -67,6 +69,21 @@ export class AngleController {
 
   reset(): void {
     this.integZ = 0;
+    this.velI[0] = 0;
+    this.velI[1] = 0;
+  }
+
+  /**
+   * Integral gain on the horizontal velocity error, rad of tilt per (m/s·s), as PX4's MPC_XY_VEL_I. Off (0)
+   * the velocity loop is P only, the loop every checkpoint was trained on; in a steady wind that leaves the
+   * drone drifting downwind at the speed whose error buys the tilt. Acts only with a tilt limit set.
+   */
+  setVelocityIntegral(ki: number): void {
+    this.velKi = ki;
+    if (ki <= 0) {
+      this.velI[0] = 0;
+      this.velI[1] = 0;
+    }
   }
 
   /**
@@ -123,12 +140,33 @@ export class AngleController {
     if (this.tiltNorm) {
       // A set tilt limit bounds the tilt vector, as PX4 does: clamping each axis alone lets roll and pitch
       // together lean the airframe ~40% past it, where the collective can no longer hold height.
-      pitchDes = VEL_KP * (vxCmd - vxB);
-      rollDes = -VEL_KP * (vyCmd - vyB);
+      const exB = vxCmd - vxB;
+      const eyB = vyCmd - vyB;
+      // The integral lives in the world frame, where a steady wind is steady, and turns into the body frame.
+      const ix = this.velI[0] * cy + this.velI[1] * sy;
+      const iy = -this.velI[0] * sy + this.velI[1] * cy;
+      pitchDes = VEL_KP * exB + ix;
+      rollDes = -(VEL_KP * eyB + iy);
       const n = Math.hypot(pitchDes, rollDes);
       if (n > this.maxTilt) {
         pitchDes *= this.maxTilt / n;
         rollDes *= this.maxTilt / n;
+      }
+      if (this.velKi > 0) {
+        // Anti-windup: hold the integral while the tilt limit clips, unless the error unwinds it.
+        const exW = exB * cy - eyB * sy;
+        const eyW = exB * sy + eyB * cy;
+        const dx = this.velKi * exW * dt;
+        const dy = this.velKi * eyW * dt;
+        if (n <= this.maxTilt || dx * this.velI[0] + dy * this.velI[1] < 0) {
+          this.velI[0] += dx;
+          this.velI[1] += dy;
+          const m = Math.hypot(this.velI[0], this.velI[1]);
+          if (m > this.maxTilt) {
+            this.velI[0] *= this.maxTilt / m;
+            this.velI[1] *= this.maxTilt / m;
+          }
+        }
       }
     } else {
       pitchDes = clamp(VEL_KP * (vxCmd - vxB), -MAX_TILT, MAX_TILT);
