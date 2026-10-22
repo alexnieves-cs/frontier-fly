@@ -1,32 +1,36 @@
 name: intel-probe
-# Temporary: checks the Intel Research Lab files' formats from GitHub's runners.
+# Temporary: GitHub's runners can reach the Freiburg benchmark host, the dev
+# container can't. Runs scripts/loc/fetch-intel.sh and commits the vendored
+# copies (CC BY) to this branch, and prints the published result tables.
 on:
   push:
     branches: [claude/project-thread-whem5k]
+    paths: [.github/workflows/intel-probe.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  probe:
+  fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: probe
+      - uses: actions/checkout@v4
+      - run: bash scripts/loc/fetch-intel.sh
+      - name: check relation timestamps against the log
         run: |
-          mkdir -p out && cd out
-          B=http://ais.informatik.uni-freiburg.de/slamevaluation
-          curl -sSL -o intel.clf $B/datasets/intel.clf
-          curl -sSL -o intel.relations $B/datasets/intel.relations
-          curl -sSL -o datasets.php $B/datasets.php
-          curl -sSL -o index.php $B/ || true
-          sha256sum intel.clf intel.relations
-          echo "--- clf types"; awk '{print $1}' intel.clf | sort | uniq -c
-          echo "--- clf comments"; grep '^#' intel.clf | head -20
-          echo "--- first FLASER"; grep -m2 '^FLASER' intel.clf | cut -c1-200; grep -m1 '^FLASER' intel.clf | awk '{print NF; for(i=NF-9;i<=NF;i++) printf "%s ", $i; print ""}'
-          echo "--- first ODOM"; grep -m3 '^ODOM' intel.clf
-          echo "--- last FLASER tail"; grep '^FLASER' intel.clf | tail -1 | awk '{for(i=NF-9;i<=NF;i++) printf "%s ", $i; print ""}'
-          echo "--- max range values"; grep '^FLASER' intel.clf | awk '{for(i=3;i<3+$2;i++) c[$i]++} END{for(k in c) if (k+0>=40) print k, c[k]}' | sort -n | tail -5
-          echo "--- relations"; head -5 intel.relations; wc -l intel.relations
-          echo "--- datasets.php"; sed -e 's/<[^>]*>/ /g' datasets.php | tr -s ' \n' | head -c 4000
-          echo; echo "--- index"; sed -e 's/<[^>]*>/ /g' index.php | tr -s ' \n' | head -c 4000
-          for u in 3c239670-27ce-4f11-8686-fdc3f0e48825 6edc81dc-3d77-4f15-8e23-f3b336f85ebf; do
-            echo "--- bitstream $u"; curl -sSL "https://dspace.mit.edu/server/api/core/bitstreams/$u" | head -c 800; echo
+          zcat data/intel-lab/intel.flaser.gz | awk '{print $(NF-2)}' > /tmp/ts
+          awk '{print $1; print $2}' data/intel-lab/intel.relations | sort -u > /tmp/rt
+          echo "relation stamps: $(wc -l < /tmp/rt), found exactly in log: $(grep -cxFf /tmp/rt /tmp/ts)"
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/intel-lab
+          git commit -m "Vendor the Intel Research Lab log and relations (CC BY), fetched by scripts/loc/fetch-intel.sh" || true
+          git push
+      - name: published tables
+        run: |
+          sudo apt-get install -y -qq poppler-utils >/dev/null 2>&1 || true
+          for u in https://www.diva-portal.org/smash/get/diva2:459937/FULLTEXT02.pdf https://research.google.com/pubs/archive/45466.pdf; do
+            echo "=== $u"; curl -fsSL -A "Mozilla/5.0" -o p.pdf "$u" || continue
+            pdftotext -layout p.pdf p.txt
+            grep -n -i -B3 -A14 "intel" p.txt | head -220
           done
