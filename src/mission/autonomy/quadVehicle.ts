@@ -10,6 +10,8 @@ import { Vehicle, type ImuReading, type StepOptions, type VehicleCommand, type V
 
 /** Physics rate inside one mission tick, Hz (the coverage env's quad runs at the same rate). */
 const PHYSICS_HZ = 400;
+/** Velocity-loop integral gain outdoors, rad of tilt per (m/s·s); swept 0.5, 1 and 2 on the fault dev seeds. */
+const VEL_KI = 1;
 
 /**
  * The mission airframe as a quadrotor: the 1.2 kg quad the battery model
@@ -82,6 +84,8 @@ export class QuadVehicle extends Vehicle {
     const ctrl = this.dyn.controller;
     ctrl.setLimits(limits.speedH, limits.speedV, limits.yawRate, this.params.inertia[0] / defaultDynParams().inertia[0], limits.maxTilt);
     ctrl.setAttitudeFirst(true);
+    // The outdoor loop, with its tilt limit, gets PX4's velocity integral; indoors stays P only.
+    ctrl.setVelocityIntegral(limits.maxTilt !== undefined ? VEL_KI : 0);
     const w = opts.wind;
     this.dyn.wind[0] = w ? w[0] : 0;
     this.dyn.wind[1] = w ? w[1] : 0;

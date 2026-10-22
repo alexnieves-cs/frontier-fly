@@ -12,9 +12,9 @@ import { wilson } from './missions';
 export const FAULT_SEEDS_PER_SCENARIO = 20;
 // Fresh seeds, used by no other study and never for tuning. Failsafe development used 9101-9116.
 // Runs 1 and 2 flew 9800-9819 (docs/fault-bench-run1.json, -run2.json); run 3 flew 77001-77020 (-run3.json).
-// Run 4 flew 77101-77120 (-run4.json). Each later run moves to a block none of them touched; development
-// since run 4 uses 78001-78030.
-export const FAULT_SEED_BASE = 77201;
+// Runs 4 and 5 flew 77101-77120 and 77201-77220 (-run4.json, -run5.json). Each later run moves to a block
+// none of them touched; development since run 4 uses 78001-78030.
+export const FAULT_SEED_BASE = 77301;
 
 const FAILSAFE_KINDS: ReadonlySet<string> = new Set<HealthEventKind>([
   'comms_loss',

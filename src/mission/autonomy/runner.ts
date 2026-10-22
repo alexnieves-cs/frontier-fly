@@ -541,6 +541,9 @@ class Runner extends IndoorPhases {
     const step = (d: V3): boolean => segmentClear(this.physics, pos, [pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]]);
     const near = nearest < 15 && below && step([away[0] * 1.5, away[1] * 1.5, 0]);
     const up = vz > 0 && step([0, 0, 1.5]) ? vz : 0;
+    // Boxed in, under eaves or branches with no open way back: leave the flight to the job, whose route
+    // was planned around them, rather than hover where the wind or the drift carries the drone.
+    if (!near && up === 0) return cmd;
     return { vel: [near ? away[0] * 0.5 : 0, near ? away[1] * 0.5 : 0, up], yaw: null };
   }
 
