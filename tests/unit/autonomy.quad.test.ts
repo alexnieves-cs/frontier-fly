@@ -40,8 +40,8 @@ describe('quad mission vehicle', () => {
     expect(Math.abs(q.pos[2] - start[2]!)).toBeLessThan(0.2);
   });
 
-  it('holds position in an 8 m/s wind with the outdoor tilt limit, and keeps its tilt inside it', () => {
-    // Outdoors the runner sets a 40° tilt limit (phases/base.ts limits()), which also turns on the velocity
+  it('holds position in strong wind with the outdoor tilt limit, and keeps its tilt inside it', () => {
+    // Outdoors the runner sets a tilt limit (phases/base.ts limits()), which also turns on the velocity
     // integral. The default 23° per axis holds only about 5 m/s on the 1.2 kg airframe.
     const drift = (limits: typeof OUTDOOR_LIMITS, wind: V3) => {
       const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
@@ -64,6 +64,12 @@ describe('quad mission vehicle', () => {
     }
     // Below the limit the velocity integral takes out the downwind drift a P-only loop needs to lean.
     expect(drift(windy, [6, 0, 0]).speed).toBeLessThan(0.1);
+    // 40° can't hold 10 m/s (gusts on the bench's 8 m/s wind); the 55° outdoor limit can.
+    expect(drift(windy, [10, 0, 0]).speed).toBeGreaterThan(1);
+    const r = drift({ ...OUTDOOR_LIMITS, maxTilt: 0.96 }, [10, 0, 0]);
+    expect(r.speed).toBeLessThan(0.5);
+    expect(r.tilt).toBeLessThan(0.96 + 0.05);
+    expect(r.vz).toBeLessThan(0.2);
   });
 
   it('keeps attitude control when a fast stop meets a full-thrust climb', () => {
