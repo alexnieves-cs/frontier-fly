@@ -10,8 +10,10 @@ import {
   MISSION_SEED_BASE,
   MISSION_SEEDS_PER_SCENARIO,
   missionBenchReport,
+  MISSION_MODES,
   missionJobs,
   type MissionFlight,
+  type MissionMode,
 } from '../../src/eval/missions';
 
 function arg(name: string, fallback: string): string {
@@ -20,6 +22,10 @@ function arg(name: string, fallback: string): string {
 }
 
 const seeds = Number(arg('seeds', String(MISSION_SEEDS_PER_SCENARIO)));
+const base = Number(arg('base', String(MISSION_SEED_BASE)));
+// Comma lists, for tuning runs: --modes sensor,sensorLoc --scenarios compound-clear
+const modes = arg('modes', MISSION_MODES.join(',')).split(',') as MissionMode[];
+const scenarioArg = arg('scenarios', '');
 
 if (process.argv.includes('--merge')) {
   const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== arg('out', ''));
@@ -31,13 +37,13 @@ if (process.argv.includes('--merge')) {
   );
   const commit = execSync('git rev-parse --short HEAD').toString().trim();
   const out = arg('out', 'docs/mission-bench.json');
-  writeFileSync(out, `${JSON.stringify(missionBenchReport(flights, commit, seeds, MISSION_SEED_BASE), null, 2)}\n`);
+  writeFileSync(out, `${JSON.stringify(missionBenchReport(flights, commit, seeds, base), null, 2)}\n`);
   console.log(`wrote ${out} from ${flights.length} flights`);
 } else if (process.argv.includes('--shard')) {
   const shard = Number(arg('shard', '0'));
   const of = Number(arg('of', '1'));
   const out = arg('out', `missions-${shard}.jsonl`);
-  const mine = missionJobs(seeds).filter((_, i) => i % of === shard);
+  const mine = missionJobs(seeds, base, modes, scenarioArg ? scenarioArg.split(',') : undefined).filter((_, i) => i % of === shard);
   const lines: string[] = [];
   const t0 = Date.now();
   for (let i = 0; i < mine.length; i++) {

@@ -6,11 +6,30 @@ import { SHIPPED_CHECKPOINT_PATH } from '../rl/checkpoint';
 import { buildReport } from '../mission/autonomy/report';
 import type { LiveDetectionSource, MissionWorld, RunnerOptions, RunRecord } from '../mission/autonomy/contracts';
 import { runMission } from '../mission/autonomy/runner';
-import { SCENARIOS } from '../mission/autonomy/scenarios';
+import { SCENARIOS, type Scenario } from '../mission/autonomy/scenarios';
 import { createPerceptionSource } from '../mission/autonomy/perception';
 import { buildMissionWorld, missionForWorld } from '../mission/autonomy/world';
 
 export const MISSION_SEEDS_PER_SCENARIO = 30;
+
+/**
+ * Bench-only: the compound sweep with a person inside the second building. The demo's sweep has
+ * nobody inside, so it can never declare a building clear wrongly; this one can, if the drone calls
+ * the building clear without having seen the person. The expected outcome is that it finds them.
+ */
+export const OCCUPIED_SWEEP: Scenario = (() => {
+  const sweep = SCENARIOS.find((s) => s.id === 'compound-clear')!;
+  return {
+    ...sweep,
+    id: 'compound-occupied' as unknown as Scenario['id'],
+    title: 'Sweep a compound with someone inside',
+    world: { ...sweep.world, targets: [{ classId: 'person', state: 'lying', where: 'indoor', building: 1 }] },
+    expect: { outcome: 'found', findClass: 'person', entryDecision: 'approved', landedHome: true },
+  };
+})();
+
+/** Every scenario the mission bench flies. */
+export const BENCH_SCENARIOS: readonly Scenario[] = [...SCENARIOS, OCCUPIED_SWEEP];
 // Fresh seeds. 9100-9129 were the previous bench and 9101-9116 tuned the night re-views, so neither is
 // reused; the showcase seeds are 20, 37 and 17.
 export const MISSION_SEED_BASE = 9600;
@@ -97,10 +116,16 @@ export interface MissionJob {
   indoor: MissionMode;
 }
 
-export function missionJobs(seeds = MISSION_SEEDS_PER_SCENARIO, base = MISSION_SEED_BASE): MissionJob[] {
+export function missionJobs(
+  seeds = MISSION_SEEDS_PER_SCENARIO,
+  base = MISSION_SEED_BASE,
+  modes: readonly MissionMode[] = MISSION_MODES,
+  scenarios: readonly string[] = BENCH_SCENARIOS.map((s) => s.id),
+): MissionJob[] {
   const out: MissionJob[] = [];
-  for (const scenario of SCENARIOS) {
-    for (let i = 0; i < seeds; i++) for (const indoor of MISSION_MODES) out.push({ scenario: scenario.id, seed: base + i, indoor });
+  for (const scenario of BENCH_SCENARIOS) {
+    if (!scenarios.includes(scenario.id)) continue;
+    for (let i = 0; i < seeds; i++) for (const indoor of modes) out.push({ scenario: scenario.id, seed: base + i, indoor });
   }
   return out;
 }
@@ -115,7 +140,7 @@ export async function flyMission(
   makeSource: SourceFactory = (world) => createPerceptionSource(world),
   onRun?: (run: Awaited<ReturnType<typeof runMission>>) => void,
 ): Promise<MissionFlight> {
-  const scenario = SCENARIOS.find((s) => s.id === job.scenario)!;
+  const scenario = BENCH_SCENARIOS.find((s) => s.id === job.scenario)!;
   const world = buildMissionWorld({ ...scenario.world, seed: job.seed });
   const mission = missionForWorld(world, scenario.mission);
   const source = makeSource(world);
@@ -222,7 +247,7 @@ export function missionBenchReport(flights: MissionFlight[], commit: string, see
   const by = (indoor: MissionMode, scenario?: string) =>
     summarizeMissions(flights.filter((f) => f.indoor === indoor && (!scenario || f.scenario === scenario)));
   const modes = Object.fromEntries(
-    MISSION_MODES.map((m) => [m, { all: by(m), ...Object.fromEntries(SCENARIOS.map((s) => [s.id, by(m, s.id)])) }]),
+    MISSION_MODES.map((m) => [m, { all: by(m), ...Object.fromEntries(BENCH_SCENARIOS.map((s) => [s.id, by(m, s.id)])) }]),
   );
   return { schema: 2, commit, seedsPerScenario, seedBase, modes, flights };
 }
