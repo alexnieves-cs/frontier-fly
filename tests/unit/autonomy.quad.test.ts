@@ -77,7 +77,7 @@ describe('quad mission vehicle', () => {
     // velocity loop leaned the whole 55° each way and circled the point at 1 m/s, never inside the
     // 0.12 m stop tolerance: compound sweeps hung at a building's standoff until the time ran out.
     for (const maxTilt of [0.7, 0.96]) {
-      const limits = { ...OUTDOOR_LIMITS, maxTilt, shapeTilt: true };
+      const limits = { ...OUTDOOR_LIMITS, maxTilt, gentleStops: true };
       const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
       const target: V3 = [q.pos[0] + 1.5, q.pos[1], q.pos[2]];
       let worst = 0;

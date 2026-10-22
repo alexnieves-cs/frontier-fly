@@ -18,13 +18,6 @@ const MAX_TILT = 0.4;
  */
 const MAX_RATE = 4;
 const MOTOR_MAX = 1100;
-/**
- * Tilt rate, rad/s, the tilt-limited velocity loop plans its lean around: half of MAX_RATE. With a
- * 55° limit a plain P loop banged between full leans, the rate cap made every reversal late, and the
- * drone circled a stop point at 1 m/s instead of settling (compound sweeps ran out of time). The
- * mission turns it off in wind (phases/base.ts limits()): on, strong-wind flights lost gust authority.
- */
-const TILT_PLAN_RATE = 2;
 const AZ_LIM = 8;
 
 function clamp(x: number, lo: number, hi: number): number {
@@ -62,7 +55,6 @@ export class AngleController {
   private attitudeFirst = false;
   private readonly rp = new Float64Array(4);
   private velKi = 0;
-  private shapeTilt = false;
   private readonly velI = new Float64Array(2);
 
   setParams(p: DynParams): void {
@@ -86,11 +78,6 @@ export class AngleController {
    * the velocity loop is P only, the loop every checkpoint was trained on; in a steady wind that leaves the
    * drone drifting downwind at the speed whose error buys the tilt. Acts only with a tilt limit set.
    */
-  /** Square-root shaping of the tilt-limited velocity loop (see TILT_PLAN_RATE). Acts only with a tilt limit set. */
-  setTiltShaping(on: boolean): void {
-    this.shapeTilt = on;
-  }
-
   setVelocityIntegral(ki: number): void {
     this.velKi = ki;
     if (ki <= 0) {
@@ -158,12 +145,8 @@ export class AngleController {
       // The integral lives in the world frame, where a steady wind is steady, and turns into the body frame.
       const ix = this.velI[0] * cy + this.velI[1] * sy;
       const iy = -this.velI[0] * sy + this.velI[1] * cy;
-      // Square-root shaping (ArduPilot's sqrt_controller): no more lean than the rate cap can take
-      // back out before the error is gone. Small errors keep the full P gain. Off in wind, where gusts need it.
-      const e = Math.hypot(exB, eyB);
-      const kp = this.shapeTilt && e > 1e-9 ? Math.min(VEL_KP, Math.sqrt((2 * TILT_PLAN_RATE * e) / GRAVITY) / e) : VEL_KP;
-      pitchDes = kp * exB + ix;
-      rollDes = -(kp * eyB + iy);
+      pitchDes = VEL_KP * exB + ix;
+      rollDes = -(VEL_KP * eyB + iy);
       const n = Math.hypot(pitchDes, rollDes);
       if (n > this.maxTilt) {
         pitchDes *= this.maxTilt / n;

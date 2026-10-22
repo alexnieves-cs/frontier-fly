@@ -233,11 +233,18 @@ export abstract class RunnerBase implements MissionRunner {
     // The limit is fixed rather than scheduled on the wind estimate: the estimate lags a wind front by a second
     // or two, and that is when the drone is blown into walls. Fly-throughs keep 40° unless it is windy.
     const windy = Math.hypot(this.windEstimate[0], this.windEstimate[1]) >= 3;
-    // In calm air the velocity loop shapes its lean so it settles on stop points; in wind it keeps full gain for gusts.
     if (!this.inside)
-      base = { ...base, maxTilt: this.phase === 'fly_through' && !windy ? FLY_THROUGH_TILT_RAD : OUTDOOR_TILT_RAD, shapeTilt: !windy };
+      base = { ...base, maxTilt: this.phase === 'fly_through' && !windy ? FLY_THROUGH_TILT_RAD : OUTDOOR_TILT_RAD, gentleStops: this.gentleStops(windy) };
     const k = this.health?.speedScale ?? 1;
     return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
+  }
+
+  /**
+   * Building approach and inspection in calm air, with no fault flagged: slow moves there keep to 40°
+   * (quadVehicle.ts). Wind, failsafe responses (which may need every degree of lean) and other phases keep 55°.
+   */
+  private gentleStops(windy: boolean): boolean {
+    return !windy && !this.health?.flags.size && (this.phase === 'approach' || this.phase === 'inspect');
   }
 
   private baseLimits(): VehicleLimits {
