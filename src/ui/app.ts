@@ -5,7 +5,7 @@ import { OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { MetricsPayload } from '../shared/messages';
 import type { BuildingSpec, CameraMode, DroneState, LightingState, QualityPreset, SensorMode } from '../shared/types';
-import { checkpointMismatch, parseCheckpoint, SHIPPED_CHECKPOINT_URL, saveCheckpointIdb, loadCheckpointIdb, type Checkpoint } from '../rl/checkpoint';
+import { actorOnly, checkpointMismatch, parseCheckpoint, SHIPPED_POLICY_URL, saveCheckpointIdb, loadCheckpointIdb, type Checkpoint } from '../rl/checkpoint';
 import type { InferPolicy } from '../rl/infer';
 import type { RunningNorm } from '../rl/normalize';
 import { makeDroneState } from '../sim/drone';
@@ -74,6 +74,8 @@ class Session {
   private norm: RunningNorm | null = null;
   /** True when the checkpoint was trained on raw observations (identity stats; no ±5 clip). */
   private rawObs = false;
+  /** The loaded checkpoint had no value head; saves and downloads leave it out too. */
+  private actorOnly = false;
   private pool: TrainPool | null = null;
   private training = false;
   private paused = false;
@@ -531,7 +533,7 @@ class Session {
 
   private async loadShipped(): Promise<void> {
     try {
-      const response = await fetch(SHIPPED_CHECKPOINT_URL);
+      const response = await fetch(SHIPPED_POLICY_URL);
       if (!response.ok) return;
       this.applyCheckpoint(parseCheckpoint(await response.arrayBuffer()), false);
     } catch {
@@ -553,6 +555,7 @@ class Session {
     this.policy = policy;
     this.norm = norm;
     this.rawObs = rawObs;
+    this.actorOnly = checkpoint.actorOnly === true;
     if (this.pilot !== 'keys') this.pilot = 'policy';
     if (announce) this.q('#link').textContent = `CKPT S${checkpoint.stage}`;
   }
@@ -564,7 +567,8 @@ class Session {
 
   private currentCheckpoint(): Checkpoint | null {
     if (!this.policy || !this.norm) return null;
-    return checkpointFrom(this.policy, this.norm, this.stageNumber());
+    const checkpoint = checkpointFrom(this.policy, this.norm, this.stageNumber());
+    return this.actorOnly ? actorOnly(checkpoint) : checkpoint;
   }
 
   private async idbSave(): Promise<void> {
