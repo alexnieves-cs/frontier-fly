@@ -16,7 +16,7 @@ import {
   toLocal,
   toWorld,
 } from '../planner/indoor';
-import { Localizer } from '../localizer';
+import { ENTRY_SIGMA_XY, ENTRY_SIGMA_YAW, Localizer } from '../localizer';
 import { QuadVehicle } from '../quadVehicle';
 import { type VehicleCommand } from '../vehicle';
 import {
@@ -58,6 +58,7 @@ export abstract class IndoorPhases extends EntryPhases {
     };
     const lidar = shellLidar(v.grid, (...a) => this.physics.cast(...a));
     if (this.options.localization === 'estimated') this.startLocalization(lighting, lidar);
+    this.aperture = null;
     v.sensing = new IndoorSensing(v.grid, this.loc ? this.loc.frameLidar(lidar) : lidar, lighting, this.world.seed);
     v.sensing.lastNewVoxelSec = this.t;
     if (this.vehicle instanceof QuadVehicle) v.sensing.braking = this.vehicle.braking;
@@ -89,7 +90,11 @@ export abstract class IndoorPhases extends EntryPhases {
     let h = this.world.seed >>> 0;
     for (const ch of v.b.id) h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
     const dark = nightFactor(lighting) > 0.5 && !lighting.interiorLightsOn;
-    this.loc = new Localizer(v.grid, lidar, h, dark, this.localTruth(), this.options.locFault ?? null);
+    // The estimator starts from the aperture tracker's last reading: where the drone measured itself
+    // against the opening it crossed, in the building frame the opening was measured in.
+    const a = this.aperture!;
+    const entry = { pos: toLocal(v.grid, a.pos), yaw: a.yaw, sigmaXY: ENTRY_SIGMA_XY, sigmaYaw: ENTRY_SIGMA_YAW };
+    this.loc = new Localizer(v.grid, lidar, h, dark, this.localTruth(), this.options.locFault ?? null, entry);
     this.log('info', `Flying ${v.b.label} on the estimated pose (lidar scan matching, IMU and optical flow).`);
   }
 
@@ -178,6 +183,7 @@ export abstract class IndoorPhases extends EntryPhases {
         }
         const cmd = se.act(local, this.navVel, this.navYaw, this.t);
         if (se.exhausted) {
+          v.searchComplete = !wrapping;
           v.sensorJob = null;
           this.explorationDone();
           return { vel: [0, 0, 0] };
@@ -211,6 +217,7 @@ export abstract class IndoorPhases extends EntryPhases {
     const local = toLocal(v.grid, this.vehicle.pos);
     const goal = v.explorer.next(local);
     if (!goal) {
+      v.searchComplete = true;
       this.explorationDone();
       return;
     }
@@ -245,6 +252,7 @@ export abstract class IndoorPhases extends EntryPhases {
         v.pass = 1;
         v.exploreStart = this.t;
         this.log('action', `Second, closer pass through ${v.b.label}.`);
+        v.searchComplete = false;
         if (v.vis) {
           v.vis = new IndoorVisibility(v.grid, 3.5);
           v.explorer = new FrontierExplorer(v.grid, v.vis, 2.5);
@@ -301,12 +309,14 @@ export abstract class IndoorPhases extends EntryPhases {
     const v = this.visit!;
     // The fly-through servoes on the opening in view: the estimate's job ends at its start.
     this.endLocalization();
+    this.trackAperture();
     const ft = new FlyThrough(v.axis!, 'out');
     this.setPhase('exit');
     this.setJob(
       this.flyThroughJob(ft, (ok) => {
         if (ok) {
           this.inside = null;
+          this.aperture = null;
           this.log('action', `Outside ${v.b.label}.`);
           if (after === 'rth' || this.returning) this.startReturnOutside();
           else this.leaveBuilding();

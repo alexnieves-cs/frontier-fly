@@ -5,6 +5,7 @@ import { FlyThrough } from '../planner/flythrough';
 import { buildingBox, legBetween } from '../planner/geometry';
 import { indoorGrid, oracleNav } from '../planner/indoor';
 import { planInspection } from '../planner/inspect';
+import { ApertureSensor } from '../openingSensor';
 import { type VehicleCommand } from '../vehicle';
 import {
   type Job,
@@ -39,6 +40,7 @@ export abstract class EntryPhases extends SearchPhases {
       explorer: null,
       sensing: null,
       nav: oracleNav(grid),
+      searchComplete: false,
       sensorJob: null,
       exploreStart: 0,
       pass: 0,
@@ -199,7 +201,8 @@ export abstract class EntryPhases extends SearchPhases {
 
   protected goEnter(cand: EntryCandidate): void {
     const v = this.visit!;
-    const opening = v.b.shell.openings.find((o) => o.id === cand.openingId)!;
+    // The opening as measured from outside: the plan, its margins and the crossing line all come from it.
+    const opening = v.observed.get(cand.openingId)!;
     v.opening = opening;
     v.axis = passageAxis(opening);
     v.aborts = 0;
@@ -230,8 +233,23 @@ export abstract class EntryPhases extends SearchPhases {
     );
   }
 
+  /**
+   * Lock the aperture tracker on the opening for a crossing. The sensor model is handed the real
+   * opening, as the lidar is handed the real walls; the controller only ever sees its readings.
+   */
+  protected trackAperture(): void {
+    const v = this.visit!;
+    const real = v.b.shell.openings.find((o) => o.id === v.opening!.id)!;
+    let h = (this.world.seed ^ 0x5bd1e995) >>> 0;
+    h = Math.imul(h ^ (v.opening!.id + 1), 0x01000193) >>> 0;
+    h = Math.imul(h ^ (v.aborts + 1), 0x01000193) >>> 0;
+    h = Math.imul(h ^ this.entries.length, 0x01000193) >>> 0;
+    this.aperture = new ApertureSensor(real, v.opening!, h);
+  }
+
   protected crossIn(): void {
     const v = this.visit!;
+    this.trackAperture();
     const ft = new FlyThrough(v.axis!, 'in');
     this.setPhase('fly_through');
     this.setJob(
@@ -265,11 +283,16 @@ export abstract class EntryPhases extends SearchPhases {
       phase: this.phase === 'exit' ? 'exit' : 'fly_through',
       plan: () => [ft.start, ft.end],
       tick: (): VehicleCommand => {
-        const s = ft.step(this.vehicle.pos, this.vehicle.vel, this.lastCollided);
+        // The crossing flies on the aperture tracker; until its first reading, hold.
+        const a = this.aperture;
+        if (!a?.hasReading) return { vel: [0, 0, 0] };
+        const s = ft.step(a.pos, a.vel, this.lastCollided);
         if ((s.state === 'done' || s.state === 'aborted') && !called) {
           called = true;
           onDone(s.state === 'done');
         }
+        // Velocities and the heading are commanded in the frame the opening was measured in, which is the
+        // flight controller's own: they go to the airframe as they are.
         return s.cmd;
       },
     };

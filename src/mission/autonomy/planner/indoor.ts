@@ -28,7 +28,7 @@ import {
   type SensorFrame,
   type SensorGrid,
 } from '../../../sim/sensorPlanner';
-import { markVisited, sense } from '../../../sim/sensors';
+import { sense } from '../../../sim/sensors';
 import type { PhysicsWorld } from '../../../sim/world';
 import type { MissionBuilding, V3 } from '../contracts';
 import type { OutdoorPhysics } from '../../../world/outdoor/physics';
@@ -568,11 +568,31 @@ export class IndoorSensing implements SensorGrid {
     this.shaftObsDown = new Float64Array(grid.floors * this.vw * this.vd * 3);
     this.rng = new RNG(seed >>> 0, 'indoor-policy');
     this.noise = new SensorNoise(zeroNoise(), this.rng.fork('noise'));
-    this.seenMap.reset(grid.spec);
+    // The seen-free map may paint any voxel inside the outer wall ring, not just the floor plan's
+    // reachable ones: the drone knows its footprint from outside, not which voxels it can fly.
+    const inside = new Uint8Array(grid.floors * this.vw * this.vd);
+    for (let i = 0; i < inside.length; i++) {
+      const x = i % this.vw;
+      const y = Math.floor(i / this.vw) % this.vd;
+      inside[i] = x >= 2 && y >= 2 && x < this.vw - 2 && y < this.vd - 2 ? 1 : 0;
+    }
+    this.seenMap.reset(grid.spec, inside);
   }
 
   get seen(): Uint8Array {
     return this.seenMap.data;
+  }
+
+  /** Mark the voxel the drone is in, by its own pose, as flown. True when it is new. */
+  private markFlown(local: V3): boolean {
+    const vx = Math.floor(local[0] / VOXEL);
+    const vy = Math.floor(local[1] / VOXEL);
+    const f = Math.floor(local[2] / this.grid.H);
+    if (vx < 0 || vy < 0 || vx >= this.vw || vy >= this.vd || f < 0 || f >= this.grid.floors) return false;
+    const k = f * this.vw * this.vd + vy * this.vw + vx;
+    if (this.visited[k]) return false;
+    this.visited[k] = 1;
+    return true;
   }
 
   get occupied(): Uint8Array {
@@ -590,7 +610,7 @@ export class IndoorSensing implements SensorGrid {
 
   /** Sense from a local pose: marks flown and seen-free voxels and writes obs and lidar (meters). */
   sense(local: V3, vel: V3, yaw: number, tSec: number): Float32Array {
-    if (markVisited(this.grid.spec, this.visited, local[0], local[1], local[2])) {
+    if (this.markFlown(local)) {
       this.visitedCount += 1;
       this.lastNewVoxelSec = tSec;
       this.stall = 0;
@@ -766,6 +786,49 @@ export class IndoorSensing implements SensorGrid {
       if (this.looked[i]) seen += 1;
     }
     return free ? seen / free : 0;
+  }
+
+  /**
+   * Per floor: the known-free voxels connected to where the drone flew, and how many of them the look
+   * estimate covers. Confirm-clear reads it. Free voxels the drone can't get to through its own map
+   * (slivers the lidar painted through a gap in a wall) are left out, like the space it never saw:
+   * whether every reachable space was found is the explorer's job, which ends only with no frontier left.
+   */
+  lookStats(): { free: number; looked: number }[] {
+    const { vw, vd } = this;
+    const per = vw * vd;
+    // A flown voxel the lidar later marked as wall (the pose estimate drifted) seeds nothing, or the fill would leak through that wall.
+    const free = (k: number) => !this.occupied[k] && (this.visited[k] || this.seen[k]);
+    const reach = new Uint8Array(this.visited.length);
+    const queue: number[] = [];
+    for (let k = 0; k < this.visited.length; k++) {
+      if (this.visited[k] && !this.occupied[k]) {
+        reach[k] = 1;
+        queue.push(k);
+      }
+    }
+    for (let i = 0; i < queue.length; i++) {
+      const k = queue[i]!;
+      const x = k % vw;
+      const y = Math.floor(k / vw) % vd;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= vw || ny >= vd) continue;
+        const n = k + dy * vw + dx;
+        if (reach[n] || !free(n)) continue;
+        reach[n] = 1;
+        queue.push(n);
+      }
+    }
+    const out = Array.from({ length: this.grid.floors }, () => ({ free: 0, looked: 0 }));
+    for (let k = 0; k < reach.length; k++) {
+      if (!reach[k]) continue;
+      const f = out[Math.floor(k / per)]!;
+      f.free += 1;
+      if (this.looked[k]) f.looked += 1;
+    }
+    return out;
   }
 
   /** True when the last observation's frontier search found nothing to fly to on this floor. */

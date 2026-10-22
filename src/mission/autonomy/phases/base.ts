@@ -7,6 +7,7 @@ import type {
   BatteryModel,
   ConfirmedContact,
   Contact,
+  DronePose,
   EntryCandidate,
   EntryRecord,
   LiveDetectionSource,
@@ -33,7 +34,8 @@ import {
   segmentClear,
   sub,
 } from '../planner/geometry';
-import { GIMBAL_RANGE_SCALE } from '../perception';
+import { GIMBAL_RANGE_SCALE, OutdoorLook } from '../perception';
+import { type ApertureSensor, OpeningSensor } from '../openingSensor';
 import { type ActingPolicy, toLocal, toWorld } from '../planner/indoor';
 import type { LocalTruth, Localizer, LocVisitRecord } from '../localizer';
 import { QuadVehicle } from '../quadVehicle';
@@ -157,6 +159,11 @@ export abstract class RunnerBase implements MissionRunner {
   protected landedHome = false;
   /** The visit's pose estimator while the drone flies a building on it (localization 'estimated'). */
   protected loc: Localizer | null = null;
+  /** Opening measurements during inspection, and the aperture tracker during a fly-through. */
+  protected readonly openingSensor: OpeningSensor;
+  protected aperture: ApertureSensor | null = null;
+  /** Where the camera has looked outdoors, by the drone's own pose: outdoor confirm-clear evidence. */
+  protected readonly outdoorLook: OutdoorLook;
   protected readonly locVisits: LocVisitRecord[] = [];
 
   constructor(
@@ -173,6 +180,8 @@ export abstract class RunnerBase implements MissionRunner {
     this.faults = options.faults ? new FaultInjector(options.faults.plan, options.faults.seed ?? world.seed) : null;
     this.failsafe = createFailsafe();
     this.escNoise = new RNG(world.seed >>> 0, 'esc-telemetry');
+    this.openingSensor = new OpeningSensor(world.seed);
+    this.outdoorLook = new OutdoorLook(world);
     this.battery = this.faults ? this.faults.wrapBattery(createBattery()) : createBattery();
     this.batteryStart = this.battery.remainingPct();
     this.vehicle =
@@ -239,6 +248,16 @@ export abstract class RunnerBase implements MissionRunner {
     const l = this.loc;
     if (!l) return this.vehicle.pos;
     return toWorld(l.grid, l.pos);
+  }
+
+  /**
+   * The pose the drone believes it has: indoors the estimate (true pose in the reference arms), during a
+   * fly-through the aperture tracker's reading, outdoors the vehicle position as believed() presents it.
+   */
+  protected ownPose(): DronePose {
+    if (this.aperture?.hasReading && (this.phase === 'fly_through' || this.phase === 'exit') && !this.loc)
+      return { pos: this.aperture.pos, yaw: this.aperture.yaw, vel: this.aperture.vel };
+    return { pos: this.navPos, yaw: this.navYaw, vel: this.navVel };
   }
 
   protected get navVel(): V3 {

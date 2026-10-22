@@ -108,6 +108,14 @@ export interface Contact {
   /** Viewing direction, unit, world frame. Multi-view confirmation uses it. */
   bearing: V3;
   buildingId: string | null;
+  /**
+   * What the camera measured, in the drone's heading frame (x along the nose, y to the left, z up):
+   * the camera's offset from the drone, the unit ray through the box centre, and the range. This is
+   * all a real drone gets from a detection; the runner places the contact with its own pose
+   * (perception.ts placeContact). `estimate`, `range` and `bearing` above are the sensor's
+   * world-frame view of the same measurement, for tools without a pose of their own.
+   */
+  sensor: { eye: V3; ray: V3; range: number };
   /** Ground truth for scoring only. Planners must not read it. */
   truth: { targetId: string; trueClass: TargetClass; kind: 'tp' | 'fp' | 'confused' };
 }
@@ -132,8 +140,11 @@ export interface LiveDetectionSource {
   readonly id: string;
   /** Run the camera detector from this pose. Also updates seen-empty maps. */
   observe(pose: DronePose, tSec: number): Observation;
-  /** Confirm-clear status for a scope. Unseen cells keep a scope incomplete. */
-  clearStatus(scope: ClearScope, category: 'person' | 'object'): ClearReport;
+  /**
+   * Ground-truth confirm-clear status for a scope, for scoring only: it knows where the targets are.
+   * The mission decides clear from its own look estimate (phases/search.ts ownClear) and never calls it.
+   */
+  truthClearStatus(scope: ClearScope, category: 'person' | 'object'): ClearReport;
   /** Ground truth, for the report only. */
   truthTargets(): TruthTarget[];
 }

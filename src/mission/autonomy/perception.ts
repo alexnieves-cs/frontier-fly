@@ -100,6 +100,68 @@ export function gimbalFootprint(aglM: number, category: 'person' | 'object' = 'p
   return { halfAlongM: along, halfAcrossM: across };
 }
 
+/** A contact as a detector model produces it, before its measurement is put in the drone's frame. */
+export type RawContact = Omit<Contact, 'sensor'>;
+
+/**
+ * The measurement behind a world-frame contact, in the heading frame of the pose it was taken from
+ * (x along the nose, y left, z up). Detector models work in the world frame because the simulator
+ * renders there; this is the step that turns their output into what the drone's camera reports.
+ */
+export function withSensorFrame(c: RawContact, pose: DronePose): Contact {
+  const cy = Math.cos(pose.yaw);
+  const sy = Math.sin(pose.yaw);
+  const toBody = (v: V3): V3 => [cy * v[0] + sy * v[1], -sy * v[0] + cy * v[1], v[2]];
+  const eye: V3 = [
+    c.estimate[0] - c.bearing[0] * c.range - pose.pos[0],
+    c.estimate[1] - c.bearing[1] * c.range - pose.pos[1],
+    c.estimate[2] - c.bearing[2] * c.range - pose.pos[2],
+  ];
+  return { ...c, sensor: { eye: toBody(eye), ray: toBody(c.bearing), range: c.range } };
+}
+
+/**
+ * Place a contact with the drone's own pose: the camera's measurement turned by the heading the
+ * drone believes it has and added to the position it believes it is at. This is the only way the
+ * mission turns a detection into a position.
+ */
+export function placeContact(c: Contact, pose: { pos: V3; yaw: number }): Contact {
+  const cy = Math.cos(pose.yaw);
+  const sy = Math.sin(pose.yaw);
+  const toWorld = (v: V3): V3 => [cy * v[0] - sy * v[1], sy * v[0] + cy * v[1], v[2]];
+  const eye = toWorld(c.sensor.eye);
+  const ray = toWorld(c.sensor.ray);
+  const r = c.sensor.range;
+  return {
+    ...c,
+    estimate: [pose.pos[0] + eye[0] + ray[0] * r, pose.pos[1] + eye[1] + ray[1] * r, pose.pos[2] + eye[2] + ray[2] * r],
+    bearing: ray,
+    range: r,
+  };
+}
+
+/**
+ * The building whose footprint (site map), grown by `margin` m, holds a point, or null. The mission
+ * assigns contacts to buildings with it from where it placed them.
+ */
+export function buildingAt(world: MissionWorld, p: V3, margin = 0): string | null {
+  for (const b of world.buildings) {
+    const xs = b.footprint.map((q) => q.x);
+    const ys = b.footprint.map((q) => q.y);
+    const z0 = b.shell.origin[2];
+    if (
+      p[0] >= Math.min(...xs) - margin &&
+      p[0] <= Math.max(...xs) + margin &&
+      p[1] >= Math.min(...ys) - margin &&
+      p[1] <= Math.max(...ys) + margin &&
+      p[2] >= z0 - 0.3 &&
+      p[2] <= z0 + b.heightM + 0.3
+    )
+      return b.id;
+  }
+  return null;
+}
+
 /**
  * A detector that looks at pixels (src/vision). When set, it replaces the
  * analytic detector for contacts; seen-empty maps and truth stay as they are.
@@ -107,7 +169,7 @@ export function gimbalFootprint(aglM: number, category: 'person' | 'object' = 'p
 export interface CameraContactSource {
   readonly id: string;
   /** Contacts from one frame of the world-frame camera `view`. `frame` counts observe() calls. */
-  contacts(view: CameraView, pose: DronePose, tSec: number, frame: number): Contact[];
+  contacts(view: CameraView, pose: DronePose, tSec: number, frame: number): RawContact[];
 }
 
 export interface PerceptionOptions {
@@ -414,18 +476,11 @@ function sumReports(reports: ClearReport[]): ClearReport {
 }
 
 /**
- * Real camera perception over a MissionWorld. Each observe() is one frame of
- * the simulated detector (src/perception), occluded by shell walls, slabs,
- * the roof, trees, and buildings, and lit by the world's lighting. The same
- * world seed and frame sequence always return the same contacts.
+ * The site as the camera models need it: tree and building boxes binned for
+ * occlusion, which camera a pose uses, and the ground it can resolve. All of
+ * it is the site map (terrain, footprints, vegetation), none of it targets.
  */
-export function createPerceptionSource(world: MissionWorld, opts: PerceptionOptions = {}): LiveDetectionSource {
-  const rangeNoise = opts.rangeNoise ?? 0.05;
-  const useGimbal = opts.gimbal ?? true;
-  const views = world.buildings.map((building, index) => buildingView(building, index));
-  const tiles = outdoorTiles(world);
-  const tileIndex = new Map<string, Tile>();
-  for (const tile of tiles) tileIndex.set(`${tile.minX / TILE_M}:${tile.minY / TILE_M}`, tile);
+function siteGeometry(world: MissionWorld, useGimbal: boolean) {
   const trees = new Map<string, TreeBoxes[]>();
   for (const tree of world.outdoor.trees) {
     const key = `${Math.floor(tree.x / TREE_BIN_M)}:${Math.floor(tree.y / TREE_BIN_M)}`;
@@ -433,24 +488,15 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
     list.push(treeBoxes(tree));
     trees.set(key, list);
   }
-  const buildingBoxes: Aabb[] = views.map((view) => ({
-    min: [view.box.minX, view.box.minY, view.box.minZ],
-    max: [view.box.maxX, view.box.maxY, view.box.maxZ],
-  }));
-  let frame = 0;
-  const outdoorGate: Gate = { pos: null, yaw: 0, gimbal: false };
-  let lastT = 0;
-
-  const lightingFor = (lights: ArrayLike<number>): DetectRequest['lighting'] => ({
-    timeOfDay: world.timeOfDay,
-    interiorLightsOn: lights,
-    flashlightOn: world.flashlightOn,
-    sensorMode: world.sensorMode,
+  const boxes = world.buildings.map((building) => {
+    const xs = building.footprint.map((p) => p.x);
+    const ys = building.footprint.map((p) => p.y);
+    const z = building.shell.origin[2];
+    return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys), minZ: z, maxZ: z + building.heightM };
   });
-  const noLights = new Uint8Array(0);
-
-  const insideOf = (p: V3): BuildingView | null =>
-    views.find((view) => p[0] >= view.box.minX && p[0] <= view.box.maxX && p[1] >= view.box.minY && p[1] <= view.box.maxY && p[2] >= view.box.minZ - 0.2 && p[2] <= view.box.maxZ) ?? null;
+  const buildingBoxes: Aabb[] = boxes.map((box) => ({ min: [box.minX, box.minY, box.minZ], max: [box.maxX, box.maxY, box.maxZ] }));
+  const insideOf = (p: V3): boolean =>
+    boxes.some((box) => p[0] >= box.minX && p[0] <= box.maxX && p[1] >= box.minY && p[1] <= box.maxY && p[2] >= box.minZ - 0.2 && p[2] <= box.maxZ);
 
   const cameraFor = (pose: DronePose): { view: CameraView; gimbal: boolean; agl: number } => {
     const pos = pose.pos;
@@ -493,6 +539,36 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
     return out;
   };
 
+  return { buildingBoxes, insideOf, cameraFor, groundReach, treesIn };
+}
+
+/**
+ * Real camera perception over a MissionWorld. Each observe() is one frame of
+ * the simulated detector (src/perception), occluded by shell walls, slabs,
+ * the roof, trees, and buildings, and lit by the world's lighting. The same
+ * world seed and frame sequence always return the same contacts.
+ */
+export function createPerceptionSource(world: MissionWorld, opts: PerceptionOptions = {}): LiveDetectionSource {
+  const rangeNoise = opts.rangeNoise ?? 0.05;
+  const useGimbal = opts.gimbal ?? true;
+  const views = world.buildings.map((building, index) => buildingView(building, index));
+  const tiles = outdoorTiles(world);
+  const tileIndex = new Map<string, Tile>();
+  for (const tile of tiles) tileIndex.set(`${tile.minX / TILE_M}:${tile.minY / TILE_M}`, tile);
+  let frame = 0;
+  const outdoorGate: Gate = { pos: null, yaw: 0, gimbal: false };
+  let lastT = 0;
+
+  const lightingFor = (lights: ArrayLike<number>): DetectRequest['lighting'] => ({
+    timeOfDay: world.timeOfDay,
+    interiorLightsOn: lights,
+    flashlightOn: world.flashlightOn,
+    sensorMode: world.sensorMode,
+  });
+  const noLights = new Uint8Array(0);
+
+  const { buildingBoxes, insideOf, cameraFor, groundReach, treesIn } = siteGeometry(world, useGimbal);
+
   const toContacts = (
     detections: Detection[],
     view: CameraView,
@@ -500,7 +576,7 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
     buildingId: string | null,
     seed: number,
     tSec: number,
-  ): Contact[] => {
+  ): RawContact[] => {
     const eye = add3(view.position, origin);
     return detections.map((det) => {
       const ray = bboxRay(view, det.bbox);
@@ -524,11 +600,11 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
 
   const camera = opts.camera ?? null;
 
-  const observeAnalytic = (pose: DronePose, tSec: number, view: CameraView, gimbal: boolean, agl: number): Observation => {
+  const observeAnalytic = (pose: DronePose, tSec: number, view: CameraView, gimbal: boolean, agl: number): { tSec: number; contacts: RawContact[] } => {
     const rangeScale = gimbal ? GIMBAL_RANGE_SCALE : 1;
     const reach = RESOLVE_DISTANCE.person * rangeScale;
     const cameraSpeed = Math.hypot(pose.vel[0], pose.vel[1], pose.vel[2]);
-    const contacts: Contact[] = [];
+    const contacts: RawContact[] = [];
     const camPos = view.position;
 
     for (const b of views) {
@@ -598,12 +674,12 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
       lastT = tSec;
       const { view, gimbal, agl } = cameraFor(pose);
       const observation = observeAnalytic(pose, tSec, view, gimbal, agl);
-      if (!camera) return observation;
+      if (!camera) return { tSec, contacts: observation.contacts.map((c) => withSensorFrame(c, pose)) };
       const contacts = camera.contacts(view, pose, tSec, frame);
       contacts.sort((a, b) => b.confidence - a.confidence || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-      return { tSec, contacts };
+      return { tSec, contacts: contacts.map((c) => withSensorFrame(c, pose)) };
     },
-    clearStatus(scope: ClearScope, category: 'person' | 'object'): ClearReport {
+    truthClearStatus(scope: ClearScope, category: 'person' | 'object'): ClearReport {
       if (scope === 'outdoor') {
         const targets = resolveScene(world.outdoorScene.targets, lastT);
         return sumReports(tiles.map((tile) => (category === 'person' ? tile.person : tile.object).report(tile.keys, targets)));
@@ -626,4 +702,63 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
       return out;
     },
   };
+}
+
+/**
+ * Where the camera has looked outdoors, by the drone's own reckoning: the
+ * outdoor confirm-clear evidence. It marks the site-map ground cells that fall
+ * inside the camera's resolved footprint from the pose the drone believes it
+ * has, with a line of sight past the canopy and buildings of the site map and
+ * enough light, at the same camera and gate rules the detector frames use. It
+ * knows nothing about targets: a cell counts as looked at whether or not
+ * anyone stood in it, so a person the detector missed is a false clear, as it
+ * would be in the field.
+ */
+export class OutdoorLook {
+  private readonly tiles: Tile[];
+  private readonly tileIndex = new Map<string, Tile>();
+  private readonly site: ReturnType<typeof siteGeometry>;
+  private readonly gate: Gate = { pos: null, yaw: 0, gimbal: false };
+  private readonly lighting: DetectRequest['lighting'];
+
+  constructor(world: MissionWorld, opts: { gimbal?: boolean } = {}) {
+    this.tiles = outdoorTiles(world);
+    for (const tile of this.tiles) this.tileIndex.set(`${tile.minX / TILE_M}:${tile.minY / TILE_M}`, tile);
+    this.site = siteGeometry(world, opts.gimbal ?? true);
+    this.lighting = { timeOfDay: world.timeOfDay, interiorLightsOn: new Uint8Array(0), flashlightOn: world.flashlightOn, sensorMode: world.sensorMode };
+  }
+
+  observe(pose: DronePose): void {
+    const { view, gimbal, agl } = this.site.cameraFor(pose);
+    const camPos = view.position;
+    if (this.site.insideOf(camPos)) return;
+    if (!passGate(this.gate, camPos, pose.yaw, gimbal, SEEN_REFRESH.outdoorM)) return;
+    const rangeScale = gimbal ? GIMBAL_RANGE_SCALE : 1;
+    const reach = RESOLVE_DISTANCE.person * rangeScale;
+    const ground = this.site.groundReach(view, gimbal, agl, pose.yaw, reach);
+    const blockers = [
+      ...this.site.treesIn(ground, !gimbal),
+      ...this.site.buildingBoxes.filter(
+        (box) => box.max[0] > ground.minX - 3 && box.min[0] < ground.maxX + 3 && box.max[1] > ground.minY - 3 && box.min[1] < ground.maxY + 3,
+      ),
+    ];
+    for (let ty = Math.floor(ground.minY / TILE_M); ty <= Math.floor(ground.maxY / TILE_M); ty++) {
+      for (let tx = Math.floor(ground.minX / TILE_M); tx <= Math.floor(ground.maxX / TILE_M); tx++) {
+        const tile = this.tileIndex.get(`${tx}:${ty}`);
+        if (!tile) continue;
+        if (!gimbal) {
+          const cx = (tile.minX + tile.maxX) / 2 - camPos[0];
+          const cy = (tile.minY + tile.maxY) / 2 - camPos[1];
+          if (cx * view.forward[0] + cy * view.forward[1] < -TILE_M) continue;
+        }
+        tile.person.observe(view, [], this.lighting, blockers, rangeScale);
+        tile.object.observe(view, [], this.lighting, blockers, rangeScale);
+      }
+    }
+  }
+
+  /** Cells looked at over all ground cells of the site; `occupied` is left to the caller's tracks. */
+  report(category: 'person' | 'object'): ClearReport {
+    return sumReports(this.tiles.map((tile) => (category === 'person' ? tile.person : tile.object).report(tile.keys, [])));
+  }
 }

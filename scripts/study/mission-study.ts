@@ -28,7 +28,9 @@ const modes = arg('modes', MISSION_MODES.join(',')).split(',') as MissionMode[];
 const scenarioArg = arg('scenarios', '');
 
 if (process.argv.includes('--merge')) {
-  const files = process.argv.slice(process.argv.indexOf('--merge') + 1).filter((a) => !a.startsWith('--') && a !== arg('out', ''));
+  // Shard files are the bare arguments after --merge; every other --flag takes one value.
+  const rest = process.argv.slice(process.argv.indexOf('--merge') + 1);
+  const files = rest.filter((a, i) => !a.startsWith('--') && !(i > 0 && rest[i - 1]!.startsWith('--')));
   const flights: MissionFlight[] = files.flatMap((f) =>
     readFileSync(f, 'utf8')
       .split('\n')

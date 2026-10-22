@@ -252,6 +252,7 @@ function contact(estimate: V3, angleDeg: number, confidence: number, t: number):
     range: 3,
     bearing: [Math.cos(a), Math.sin(a), 0],
     buildingId: 'bldg-0',
+    sensor: { eye: [0, 0, 0], ray: [Math.cos(a), Math.sin(a), 0], range: 3 },
     truth: { targetId: 'x', trueClass: 'person', kind: 'tp' },
   };
 }

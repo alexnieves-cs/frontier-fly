@@ -1,5 +1,5 @@
 /** Constants, job/visit shapes and small helpers shared by the mission runner phases. */
-import type { Opening } from '../../../world/outdoor/types';
+import type { MeasuredOpening } from '../openingSensor';
 import type {
   EntryCandidate,
   MissionBuilding,
@@ -67,11 +67,11 @@ export interface Visit {
   box: BuildingBox;
   grid: IndoorGrid;
   standoff: Standoff | null;
-  observed: Map<number, Opening>;
+  observed: Map<number, MeasuredOpening>;
   ranked: EntryCandidate[];
   candIdx: number;
   denied: number;
-  opening: Opening | null;
+  opening: MeasuredOpening | null;
   axis: PassageAxis | null;
   aborts: number;
   /** Oracle mode only: camera-visibility estimate and planner on the true floor plan. */
@@ -81,6 +81,8 @@ export interface Visit {
   sensing: IndoorSensing | null;
   /** Path and viewpoint queries: sensor maps, or the floor plan in oracle mode. */
   nav: IndoorNav;
+  /** The explorer ran out of places to sweep and look, rather than out of time. Confirm-clear needs it. */
+  searchComplete: boolean;
   /** The running sensor-explorer job, so a confirmation can hand control back. */
   sensorJob: Job | null;
   exploreStart: number;
