@@ -10,7 +10,7 @@ import type {
 } from '../../mission/autonomy/contracts';
 import { buildReport } from '../../mission/autonomy/report';
 import { policyFromFile, type NormalizedPolicy } from '../../mission/autonomy/policy';
-import { SHIPPED_CHECKPOINT_URL } from '../../rl/checkpoint';
+import { SHIPPED_POLICY_URL } from '../../rl/checkpoint';
 import { createMissionRunner } from '../../mission/autonomy/runner';
 import {
   DEFAULT_SCENARIO,
@@ -82,7 +82,7 @@ let shipped: Promise<NormalizedPolicy | null> | null = null;
 
 /** The shipped checkpoint, or null when it cannot be fetched. */
 function shippedPolicy(): Promise<NormalizedPolicy | null> {
-  shipped ??= fetch(SHIPPED_CHECKPOINT_URL)
+  shipped ??= fetch(SHIPPED_POLICY_URL)
     .then(async (response) => (response.ok ? policyFromFile(await response.arrayBuffer()) : null))
     .catch(() => null);
   return shipped;

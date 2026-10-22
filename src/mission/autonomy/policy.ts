@@ -1,6 +1,6 @@
 import { ACT_DIM, HIDDEN, OBS_DIM } from '../../shared/constants';
 import { parseCheckpoint, type Checkpoint } from '../../rl/checkpoint';
-import { InferPolicy, type ActResult } from '../../rl/infer';
+import { InferPolicy, weightShapes, type ActResult } from '../../rl/infer';
 import { RunningNorm } from '../../rl/normalize';
 import type { RNG } from '../../shared/rng';
 import type { ActingPolicy } from './planner/indoor';
@@ -24,7 +24,14 @@ export class NormalizedPolicy implements ActingPolicy {
 export function policyFromCheckpoint(checkpoint: Checkpoint): NormalizedPolicy {
   const hidden = checkpoint.hidden.length === 2 ? checkpoint.hidden : [...HIDDEN];
   const policy = new InferPolicy(checkpoint.obsDim || OBS_DIM, checkpoint.actDim || ACT_DIM, hidden, 1);
-  policy.setWeights(checkpoint.weights.map((row) => Float32Array.from(row).buffer));
+  const weights = checkpoint.weights.map((row) => Float32Array.from(row).buffer);
+  // An actor-only file leaves out the value head, which acting never reads: zeros stand in for it.
+  if (checkpoint.actorOnly) {
+    for (const shape of weightShapes(policy.obsDim, policy.actDim, hidden).slice(weights.length)) {
+      weights.push(new Float32Array(shape.reduce((a, b) => a * b, 1)).buffer);
+    }
+  }
+  policy.setWeights(weights);
   const norm = new RunningNorm(policy.obsDim);
   if (checkpoint.obsMean.length === policy.obsDim) {
     norm.load({

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { evalCoverage, formatCoverageTable, mean, TARGETS } from '../../src/eval/coverage';
-import { checkpointMismatch, parseCheckpoint, SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
+import { actorOnly, checkpointMismatch, parseCheckpoint, serializeCheckpointBinary, SHIPPED_CHECKPOINT_PATH, SHIPPED_POLICY_PATH } from '../../src/rl/checkpoint';
+import { policyFromFile } from '../../src/mission/autonomy/policy';
 import { InferPolicy } from '../../src/rl/infer';
 import { ACT_DIM, OBS_DIM } from '../../src/shared/constants';
 import { RNG } from '../../src/shared/rng';
@@ -31,4 +32,15 @@ describe('shipped checkpoint', () => {
     expect(mean(report.stage0Night) / day0).toBeGreaterThanOrEqual(TARGETS.nightToDay);
     expect(mean(report.stage3Night) / day3).toBeGreaterThanOrEqual(TARGETS.nightToDay);
   }, 300_000);
+
+  it('ships an actor-only copy for the pages, packed from this checkpoint', () => {
+    // Out of date: `npm run pack:policy` after replacing pretrained.bin.
+    const packed = serializeCheckpointBinary(actorOnly(shipped));
+    expect(Buffer.from(readFileSync(SHIPPED_POLICY_PATH)).equals(Buffer.from(packed))).toBe(true);
+    // And it acts exactly like the full file.
+    const full = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
+    const lean = policyFromFile(readFileSync(SHIPPED_POLICY_PATH));
+    const obs = new Float32Array(shipped.obsDim).map((_, i) => Math.sin(i * 0.37));
+    expect(lean.actWith(obs, 1, new RNG(3), true).action).toEqual(full.actWith(obs, 1, new RNG(3), true).action);
+  });
 });

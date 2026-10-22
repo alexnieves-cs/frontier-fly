@@ -24,9 +24,13 @@ export interface Checkpoint {
   stage: number;
   /** GRU memory size (src/rl/memPolicy.ts); absent or 0 for the feed-forward policy. Adds 4 weight arrays. */
   memDim?: number;
+  /** Only the policy's 7 arrays, without the value head: enough to fly, not to train. */
+  actorOnly?: boolean;
 }
 
 const WEIGHT_BUFFERS = 13;
+/** The policy's arrays (w1 to logStd); the value head follows them. */
+const ACTOR_BUFFERS = 7;
 /** Extra arrays of a checkpoint with a GRU memory. */
 const MEM_WEIGHT_BUFFERS = 4;
 /** "FFW1": frontier-fly weights, format 1. */
@@ -35,6 +39,12 @@ const MAGIC = [0x46, 0x46, 0x57, 0x31];
 /** The shipped checkpoint, relative to the site root (browser) or under public/ (Node). */
 export const SHIPPED_CHECKPOINT_URL = 'checkpoints/pretrained.bin';
 export const SHIPPED_CHECKPOINT_PATH = `public/${SHIPPED_CHECKPOINT_URL}`;
+/**
+ * The shipped checkpoint without its value head, which only training reads: the
+ * pages that fly the policy load this, half the size. `npm run pack:policy` writes it.
+ */
+export const SHIPPED_POLICY_URL = 'checkpoints/policy.bin';
+export const SHIPPED_POLICY_PATH = `public/${SHIPPED_POLICY_URL}`;
 const DB_NAME = 'frontier-fly';
 const STORE = 'checkpoints';
 const DB_VERSION = 1;
@@ -72,6 +82,12 @@ export function serializeCheckpointBinary(c: Checkpoint): Uint8Array {
   let k = 0;
   for (const w of weights) for (const v of w) view.setFloat32(4 * k++, v, true);
   return out;
+}
+
+/** The checkpoint without its value head (see `actorOnly`). */
+export function actorOnly(c: Checkpoint): Checkpoint {
+  if (c.memDim) throw new Error('actorOnly: checkpoints with a GRU memory are not supported');
+  return { ...c, weights: c.weights.slice(0, ACTOR_BUFFERS), actorOnly: true };
 }
 
 /** The file contents to write for a path: packed binary for `.bin`, JSON otherwise. */
@@ -128,7 +144,9 @@ function fromRaw(raw: unknown): Checkpoint {
   const hidden = numList(o.hidden, 'hidden');
   const weights = numMatrix(o.weights, 'weights');
   const memDim = o.memDim === undefined ? 0 : num(o.memDim, 'memDim');
-  const expected = WEIGHT_BUFFERS + (memDim > 0 ? MEM_WEIGHT_BUFFERS : 0);
+  const actor = o.actorOnly === true;
+  if (actor && memDim > 0) throw new Error('invalid checkpoint: actorOnly with a GRU memory');
+  const expected = actor ? ACTOR_BUFFERS : WEIGHT_BUFFERS + (memDim > 0 ? MEM_WEIGHT_BUFFERS : 0);
   if (weights.length !== expected) {
     throw new Error(`invalid checkpoint: expected ${expected} weight arrays`);
   }
@@ -145,6 +163,7 @@ function fromRaw(raw: unknown): Checkpoint {
     rewVar: num(o.rewVar, 'rewVar'),
     stage: num(o.stage, 'stage'),
     ...(memDim > 0 ? { memDim } : {}),
+    ...(actor ? { actorOnly: true } : {}),
   };
 }
 
