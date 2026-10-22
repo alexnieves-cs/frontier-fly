@@ -12,6 +12,9 @@ import { Vehicle, type ImuReading, type StepOptions, type VehicleCommand, type V
 const PHYSICS_HZ = 400;
 /** Velocity-loop integral gain outdoors, rad of tilt per (m/s·s); swept 0.5, 1 and 2 on the fault dev seeds. */
 const VEL_KI = 1;
+/** Commanded horizontal speed under which a calm-air move counts as precise, m/s, and its tilt limit, rad (40°). */
+const PRECISE_SPEED = 0.5;
+const PRECISE_TILT_RAD = 0.7;
 
 /**
  * The mission airframe as a quadrotor: the 1.2 kg quad the battery model
@@ -82,7 +85,12 @@ export class QuadVehicle extends Vehicle {
 
   override step(cmd: VehicleCommand, dt: number, limits: VehicleLimits, opts: StepOptions = {}): VehicleStep {
     const ctrl = this.dyn.controller;
-    ctrl.setLimits(limits.speedH, limits.speedV, limits.yawRate, this.params.inertia[0] / defaultDynParams().inertia[0], limits.maxTilt);
+    // Slow, precise moves around a building in calm air keep to 40°: at the full 55° the loop banged between
+    // leans the rate cap could not reverse in time and circled a stop point at 1 m/s instead of settling
+    // (compound sweeps hung at a standoff until the time ran out). Cruise, wind and failsafes keep the full limit.
+    const precise = limits.gentleStops === true && Math.hypot(cmd.vel[0], cmd.vel[1]) < PRECISE_SPEED;
+    const maxTilt = precise && limits.maxTilt !== undefined ? Math.min(limits.maxTilt, PRECISE_TILT_RAD) : limits.maxTilt;
+    ctrl.setLimits(limits.speedH, limits.speedV, limits.yawRate, this.params.inertia[0] / defaultDynParams().inertia[0], maxTilt);
     ctrl.setAttitudeFirst(true);
     // The outdoor loop, with its tilt limit, gets PX4's velocity integral; indoors stays P only.
     ctrl.setVelocityIntegral(limits.maxTilt !== undefined ? VEL_KI : 0);
