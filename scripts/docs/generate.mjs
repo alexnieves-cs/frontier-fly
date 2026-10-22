@@ -781,7 +781,7 @@ function localizationTables(loc) {
  * against the published scores on the same relations.
  */
 function intelLabSection(intel) {
-  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN'];
+  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_NOMAN', 'R_INTEL_NOMAN_BEST', 'R_INTEL_NOMAN_RANGE', 'R_INTEL_ADAPTED_RANGE', 'R_INTEL_SHIPPED_RANGE', 'R_INTEL_NOMAN_LOCAL', 'R_INTEL_SCAN', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN'];
   if (!intel) return Object.fromEntries(keys.map((k) => [k, k.startsWith('R_') ? 'not measured' : '_Not measured yet. `npm run study:intel` writes `docs/intel-lab.json`._']));
   const arm = (id) => intel.arms.find((a) => a.id === id);
   const m = (v) => `${v.toFixed(3)} m`;
@@ -797,8 +797,15 @@ function intelLabSection(intel) {
   const ours = ['odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-scan']
     .map(arm)
     .filter(Boolean)
-    .map((a) => [`**${a.label}**, this repository`, pm(a.error.transAbs), pm(a.error.rotAbs, 2), pm(a.error.transSq, 3), pm(a.error.rotSq, 1), a.error.transAbs.max.toFixed(3)]);
-  const split = ['odom', 'fused', 'adapted'].map(arm).filter(Boolean).map((a) => [
+    .map((a) => [
+      `**${a.label}**, this repository`,
+      a.offsets > 1 ? `${pm(a.error.transAbs)} (${a.transRange[0].toFixed(3)}–${a.transRange[1].toFixed(3)})` : pm(a.error.transAbs),
+      a.offsets > 1 ? `${pm(a.error.rotAbs, 2)} (${a.rotRange[0].toFixed(2)}–${a.rotRange[1].toFixed(2)})` : pm(a.error.rotAbs, 2),
+      pm(a.error.transSq, 3),
+      pm(a.error.rotSq, 1),
+      a.error.transAbs.max.toFixed(3),
+    ]);
+  const split = ['odom', 'fused', 'adapted', 'adapted-noManhattan'].map(arm).filter(Boolean).map((a) => [
     a.label,
     `${a.quantiles.transMedian.toFixed(3)} m / ${a.quantiles.rotMedian.toFixed(2)}°`,
     `${a.quantiles.transP90.toFixed(3)} m / ${a.quantiles.rotP90.toFixed(2)}°`,
@@ -810,7 +817,16 @@ function intelLabSection(intel) {
   const f = arm('fused');
   const ad = arm('adapted');
   const od = arm('odom');
+  const nm = arm('adapted-noManhattan');
+  const range = (a) => `${m(a.transRange[0])} to ${m(a.transRange[1])}`;
   return {
+    R_INTEL_NOMAN: `${m(nm.error.transAbs.mean)} and ${nm.error.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_NOMAN_BEST: m(nm.transRange[0]),
+    R_INTEL_NOMAN_RANGE: range(nm),
+    R_INTEL_ADAPTED_RANGE: range(ad),
+    R_INTEL_SHIPPED_RANGE: range(f),
+    R_INTEL_NOMAN_LOCAL: m(nm.local.transAbs.mean),
+    R_INTEL_SCAN: m(arm('adapted-scan').error.transAbs.mean),
     INTEL_TABLE: table(['Method', 'Translation, abs (m)', 'Rotation, abs (°)', 'Translation, squared (m²)', 'Rotation, squared (°²)', 'Worst relation (m)'], [...published, ...ours]),
     INTEL_SPLIT_TABLE: table(['This repository', 'Median relation error', '90th percentile', 'Relations under 10 s apart', 'Relations 10 s or more apart', 'Held out (both sweeps after the dev part)', 'CPU per sweep'], split),
     R_INTEL_SHIPPED: `${m(f.error.transAbs.mean)} and ${f.error.rotAbs.mean.toFixed(2)}°`,
