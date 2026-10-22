@@ -72,6 +72,27 @@ describe('quad mission vehicle', () => {
     expect(r.vz).toBeLessThan(0.2);
   });
 
+  it('settles on a stop point under the 55° outdoor limit', () => {
+    // The waypoint follower's stop loop (phases/base.ts followJob) on a point 1.5 m off. A full-gain
+    // velocity loop leaned the whole 55° each way and circled the point at 1 m/s, never inside the
+    // 0.12 m stop tolerance: compound sweeps hung at a building's standoff until the time ran out.
+    for (const maxTilt of [0.7, 0.96]) {
+      const limits = { ...OUTDOOR_LIMITS, maxTilt, shapeTilt: true };
+      const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
+      const target: V3 = [q.pos[0] + 1.5, q.pos[1], q.pos[2]];
+      let worst = 0;
+      for (let i = 0; i < 200; i++) {
+        const off = [target[0] - q.pos[0], target[1] - q.pos[1], target[2] - q.pos[2]];
+        const d = Math.hypot(off[0]!, off[1]!, off[2]!);
+        const speed = Math.min(1.6 * d + 0.03, Math.sqrt(4 * d));
+        const k = d > 1e-9 ? speed / d : 0;
+        q.step({ vel: [off[0]! * k, off[1]! * k, off[2]! * k], yaw: null }, 0.05, limits);
+        if (i >= 100) worst = Math.max(worst, d, Math.hypot(q.vel[0], q.vel[1], q.vel[2]));
+      }
+      expect(worst).toBeLessThan(0.12);
+    }
+  });
+
   it('keeps attitude control when a fast stop meets a full-thrust climb', () => {
     // The GNSS-loss climb: setting off, then asked to stop and climb at once. A mixer that
     // keeps the collective and drops the differential loses the attitude, and the airframe runs off.

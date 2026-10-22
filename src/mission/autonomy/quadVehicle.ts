@@ -86,6 +86,7 @@ export class QuadVehicle extends Vehicle {
     ctrl.setAttitudeFirst(true);
     // The outdoor loop, with its tilt limit, gets PX4's velocity integral; indoors stays P only.
     ctrl.setVelocityIntegral(limits.maxTilt !== undefined ? VEL_KI : 0);
+    ctrl.setTiltShaping(limits.shapeTilt === true);
     const w = opts.wind;
     this.dyn.wind[0] = w ? w[0] : 0;
     this.dyn.wind[1] = w ? w[1] : 0;
