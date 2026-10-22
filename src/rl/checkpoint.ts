@@ -22,9 +22,13 @@ export interface Checkpoint {
   obsCount: number;
   rewVar: number;
   stage: number;
+  /** GRU memory size (src/rl/memPolicy.ts); absent or 0 for the feed-forward policy. Adds 4 weight arrays. */
+  memDim?: number;
 }
 
 const WEIGHT_BUFFERS = 13;
+/** Extra arrays of a checkpoint with a GRU memory. */
+const MEM_WEIGHT_BUFFERS = 4;
 /** "FFW1": frontier-fly weights, format 1. */
 const MAGIC = [0x46, 0x46, 0x57, 0x31];
 
@@ -123,8 +127,10 @@ function fromRaw(raw: unknown): Checkpoint {
   const o = raw as Record<string, unknown>;
   const hidden = numList(o.hidden, 'hidden');
   const weights = numMatrix(o.weights, 'weights');
-  if (weights.length !== WEIGHT_BUFFERS) {
-    throw new Error(`invalid checkpoint: expected ${WEIGHT_BUFFERS} weight arrays`);
+  const memDim = o.memDim === undefined ? 0 : num(o.memDim, 'memDim');
+  const expected = WEIGHT_BUFFERS + (memDim > 0 ? MEM_WEIGHT_BUFFERS : 0);
+  if (weights.length !== expected) {
+    throw new Error(`invalid checkpoint: expected ${expected} weight arrays`);
   }
   return {
     version: num(o.version, 'version'),
@@ -138,6 +144,7 @@ function fromRaw(raw: unknown): Checkpoint {
     obsCount: num(o.obsCount, 'obsCount'),
     rewVar: num(o.rewVar, 'rewVar'),
     stage: num(o.stage, 'stage'),
+    ...(memDim > 0 ? { memDim } : {}),
   };
 }
 

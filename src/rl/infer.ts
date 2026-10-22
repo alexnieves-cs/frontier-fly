@@ -87,7 +87,7 @@ export interface ActResult {
 }
 
 /** [in, out] row-major -> [out, in] so the dot product scans contiguous weights. */
-function transpose(weight: Float32Array, rows: number, cols: number): Float32Array {
+export function transpose(weight: Float32Array, rows: number, cols: number): Float32Array {
   const out = new Float32Array(weight.length);
   for (let r = 0; r < rows; r++) {
     const src = r * cols;
@@ -96,7 +96,7 @@ function transpose(weight: Float32Array, rows: number, cols: number): Float32Arr
   return out;
 }
 
-function linear(
+export function linear(
   x: Float32Array,
   n: number,
   inDim: number,
@@ -128,7 +128,7 @@ function linear(
   return y;
 }
 
-function gaussianLogp(u: number, mean: number, std: number, logStd: number): number {
+export function gaussianLogp(u: number, mean: number, std: number, logStd: number): number {
   const z = (u - mean) / std;
   return -0.5 * z * z - logStd - 0.5 * LOG_2PI;
 }

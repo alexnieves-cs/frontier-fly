@@ -6,8 +6,8 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 
 - **Nothing the mission flies indoors reads the floor plan any more.** Before this work, the mission's indoor planner, its viewpoint checks and its exit routes all read the building's true cell grid. They now run on a map the drone builds from its lidar, its up and down range finders, and its own estimate of where the camera has looked. The floor-plan planner is kept only as an *oracle* reference.
 - **Missions did not get worse without the floor plan.** On {{R_M_FLIGHTS}} fresh mission worlds per explorer, the sensor-only explorer meets the expected outcome in {{R_M_SENSOR}} of flights, the oracle planner in {{R_M_ORACLE}}, and the policy with the sensor-only fallback in {{R_M_POLICY}}; the intervals overlap. {{R_M_COLL}} of the {{R_M_ALL}} flights touched anything. No flight declared a building clear while a target was inside it, and none confirmed a decoy.
-- **A classical sensor-only planner is the stronger indoor coverage pilot.** On 30 fresh hard buildings it covers {{R_PLANNER_HARD}} with no collisions. The learned policy covers {{R_POLICY_HARD}} and averages {{R_POLICY_COLL}} collisions per episode; under a lidar guard it keeps its coverage ({{R_GUARD_HARD}}) at {{R_GUARD_COLL}} collisions per episode. The oracle teacher it imitates covers {{R_TEACHER_HARD}}.
-- **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps and an anchored PPO fine-tune change little. DAgger adds 11 points over behavior cloning.
+- **After fine-tuning on its own flights, the learned policy is the stronger indoor coverage pilot, and the planner the safer one.** On 30 fresh hard buildings the sensor-only planner covers {{R_PLANNER_HARD}} with no collisions. The learned policy covers {{R_POLICY_HARD}} and averages {{R_POLICY_COLL}} collisions per episode; under a lidar guard it covers {{R_GUARD_HARD}} at {{R_GUARD_COLL}} collisions per episode. The oracle teacher it imitates covers {{R_TEACHER_HARD}}.
+- **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps change little. DAgger adds 11 points over behavior cloning, and PPO on the policy's own flights adds {{R_RL_DELTA}} more on {{R_RL_N}} held-out hard flights ({{R_RL_BASE_HARD}} to {{R_RL_HARD}}).
 - **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: {{R_SAR_POA_MEAN}} restricted mean time against {{R_SAR_LANES_MEAN}} over {{R_SAR_SEEDS}} fresh daytime scenes, a paired difference of {{R_SAR_D_LANES}}. Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only {{R_SAR_D_SW}}, and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time ({{R_SAR_UNI_D_SW}} against the sweep-width lanes).
 - **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage ({{R_PLANNER_QUAD}} for the planner, {{R_POLICY_QUAD}} for the policy, {{R_TEACHER_QUAD}} for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from {{R_Q_PLANNER_COLL}} to {{R_Q_PLANNER_BRAKE_COLL}} per episode and the guarded policy's from {{R_Q_GUARD_COLL}} to {{R_Q_GUARD_BRAKE_COLL}}. Whole missions flown on the quadrotor meet the expected outcome in {{R_MQ_SENSOR}} (planner) and {{R_MQ_POLICY}} (policy) of flights.
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in {{R_CLIMB_REACHED}} fresh multi-floor buildings and covers {{R_CLIMB_FLOORS}} of them against {{R_PLANNER_FLOORS}} without climbing, with {{R_CLIMB_COLL}} collisions per episode. The policy and the teacher still stay on the ground floor.
@@ -36,7 +36,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 
 ## Methods
 
-**Policy.** A 512×256 MLP maps the 1088-float observation to `[vx, vy, vz, yawRate]`. It is trained by behavior cloning on the oracle teacher, then DAgger: the policy flies, the teacher labels every state it reaches, and the round kept is the one that scores best on held-out validation buildings (seeds 9001–9166), never the evaluation seeds. An anchored PPO fine-tune is implemented and tested in the ablations.
+**Policy.** A 512×256 MLP maps the 1088-float observation to `[vx, vy, vz, yawRate]`. It is trained by behavior cloning on the oracle teacher, then DAgger: the policy flies, the teacher labels every state it reaches, and the round kept is the one that scores best on held-out validation buildings (seeds 9001–9166), never the evaluation seeds. The shipped weights then fine-tune with PPO on the policy's own flights, with a critic that sees privileged state and a small imitation term (see [Fine-tuning on its own flights](#fine-tuning-on-its-own-flights)); that checkpoint is picked on its own tuning block, 66001–66299.
 
 **Sensor-only planner.** Dijkstra over voxels the drone has flown or seen free and not occupied, with a cost for passing near unknown or occupied space. The goal is the frontier voxel with the best distance minus a bonus for unknown neighbours, kept with hysteresis and banned after 60 steps without progress. It flies a pure-pursuit point on the path at constant speed and 1.2 m above the floor, between the 0.9 m and 1.4 m furniture heights so the lidar ring sees the taller pieces. Every command passes a lidar velocity filter: along each ray with a return, the approach speed is capped so the drone can stop before the surface.
 
@@ -174,12 +174,36 @@ What the ablations show, on day coverage without the guard:
 - **The navigation block carries the most information.** Without the frontier waypoint and its distance (observation 52–63) the policy drops to 47.2%, the largest loss of any arm, and its validation curve starts lowest.
 - **Local maps matter for safety as much as for coverage.** Without them the policy loses 7 points by day and 12 at night, and collides about twice as often as the full policy.
 - **Coarse maps add little.** Removing them costs about 3 points by day and nothing measurable at night; the intervals overlap with the full policy's.
-- **Anchored PPO does not help.** It scores slightly below the DAgger checkpoint it starts from on validation and on the study buildings, consistent with the earlier failed PPO attempts.
+- **Anchored PPO does not help.** It scores slightly below the DAgger checkpoint it starts from on validation and on the study buildings, consistent with the earlier failed PPO attempts. The recipe in the next section, which does help, differs in scale, noise and critic.
 - **Validation is noisy from round to round.** Each run's best round is round 3, and later rounds can drop by 30 points (round 5 of the full run scores 44%), which is why the round is picked on validation and why the shipped checkpoint averages rounds.
 
 These runs use the default recipe without weight averaging, so the full arm is not the shipped checkpoint; it lands within a point of it on the same buildings.
 
 {{CURVES_FIGURE}}
+
+### Fine-tuning on its own flights
+
+The DAgger policy only ever learned to copy its teacher. Here it learns from its own flights with PPO, starting from the DAgger weights. Three changes made PPO work where the anchored fine-tune above did not:
+
+- **Scale and a privileged critic.** Rollouts run on every core, 32 environments at about 11,000 steps a second, in the same episodes the policy is evaluated in (2400 steps, 16-collision limit, a quarter of them in the dark). A 400-update run is 3.3 million steps and takes about 45 minutes on four CPU cores. The critic is a separate network that also sees what the policy cannot: true coverage so far, the true distance to the nearest unflown voxel, the teacher's action, the collision budget used and the voxels left. It only shapes the advantages and never ships.
+- **Little exploration noise.** The policy's action noise is cut to a standard deviation of 0.1 (pre-tanh). At 0.2 the sampled flights crash into the 16-collision limit, and PPO learns from wrecks.
+- **A small imitation term on a replay, or none.** The teacher labels every state the policy reaches, and a BC term on a reservoir of those labels (weight 0.05) keeps the policy near the teacher where PPO has no signal. Imitating only the current batch, or imitating without PPO at all, wrecks the policy within 20 updates: on its own states the teacher's labels pull toward walls the student cannot see the way the teacher does.
+
+{{RL_NOTE}}
+
+{{RL_TABLE}}
+
+The fine-tuned policy covers {{R_RL_HARD}} of the hard buildings against {{R_RL_BASE_HARD}} for the DAgger checkpoint it started from, a paired change of {{R_RL_DELTA}} points (95% interval {{R_RL_CI}}) over {{R_RL_N}} flights, and collides {{R_RL_COLL}} times per episode instead of {{R_RL_BASE_COLL}}. On the coverage study's hard buildings it covers {{R_RL_STUDY_DAY}} by day and {{R_RL_STUDY_NIGHT}} at night, more than the oracle teacher it imitated. The teacher is a greedy nearest-frontier rule and PPO optimizes coverage over the whole episode; this report does not measure where the extra coverage comes from.
+
+The runs behind it, with hard coverage on the tuning block (66001–66299, the only seeds used to pick checkpoints):
+
+{{RL_RUNS_TABLE}}
+
+{{RL_CURVES_FIGURE}}
+
+**Memory did not help.** The same recipe with a small recurrent memory (a 64-unit GRU feeding the second layer, starting from zero so it changes nothing at first) reaches 72.2% on the held-out hard flights after 260 updates, against 72.4% for the feed-forward run at the same point, with fewer collisions (2.0 against 2.9 per flight). It trains about three times slower, so the shipped policy has no memory. Both runs are in the table above.
+
+Every bench in this report that flies the policy was re-run once with the new weights: the coverage study, the speed study, the mission bench, the real-floor-plan bench and the camera bench. The ablation runs above and the FrontierBench baseline in [BENCHMARKS.md](BENCHMARKS.md) keep the DAgger policy they were measured with.
 
 ## Outdoor search for a lost person
 
@@ -315,10 +339,10 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 
 ## Negative results and limitations
 
-- **Imitation is bounded by its teacher and adds little over a classical planner here.** The policy imitates an oracle that sees the floor plan, yet on fresh hard buildings it does not beat a planner that sees only lidar. The teacher's advantage is information, not skill, and the policy cannot inherit it.
+- **Imitation alone is bounded by its teacher.** The DAgger policy imitates an oracle that sees the floor plan, yet on fresh hard buildings it did not beat a planner that sees only lidar. Only PPO on its own flights took it past both, and it still collides where the planner does not.
 - **The policy collides; the guard is what makes it safe.** A teacher that never collides gives no examples of recovering from near-contacts. The guard removes most collisions without retraining.
 - **Only the planner climbs.** The teacher and the policy still chase ground-floor frontiers on multi-floor buildings. The planner's floor share is a fixed rule, not a plan over the whole building.
-- **The policy was never trained on the quadrotor.** The braking guard makes the policy safe on it, but its coverage there is well below the planner's. Training on the quadrotor, or a policy that outputs attitude rather than velocity, is not attempted.
+- **The policy was never trained on the quadrotor.** The braking guard keeps its collisions down and it now covers about as much there as the braking planner, but it still collides several times per flight where the planner rarely does. Training on the quadrotor, or a policy that outputs attitude rather than velocity, is not attempted.
 - **The braking model is fitted, not derived.** Its two constants come from simulated stopping tests on the randomized airframes. A heavier airframe, a stronger wind or a slower controller needs them measured again.
 - **Night confirmation is near the detector's ceiling.** Under the flashlight alone the per-frame confidence barely clears the 0.8 threshold, so confirmation needs several clean bearings. A target boxed in by furniture can leave too few.
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
@@ -339,6 +363,8 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | --- | --- |
 | Training | Curriculum seeds drawn by the world pool, excluding every seed below |
 | Checkpoint selection | 9001–9166 (coverage validation buildings) |
+| Picking the PPO fine-tune | 66001–66299 (stage 3 and 0, day and night) |
+| PPO fine-tune comparison (reported) | 68001–68299, with the protocol seeds and coverage study buildings |
 | Tuning the sensor planner and guard | Coverage buildings 9101–9108 |
 | Tuning the mission explorer and re-views | Mission worlds 9101–9116 and the three showcase seeds |
 | Coverage study (reported) | 20001+, 30001+, 40001+, 50001+ (30 each) |
@@ -364,6 +390,8 @@ npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per 
 npm run study:missions   # docs/mission-bench.json: each indoor explorer, airframe and pose source, 30 fresh worlds per scenario
 npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods
+npm run train:ppo -- --init public/checkpoints/pretrained.bin --out ppo.bin   # PPO fine-tune (see scripts/train-ppo.ts for the shipped recipe)
+vite-node scripts/study/rl-finetune.ts -- dagger=old.bin ppo=ppo.bin   # docs/rl-finetune.json
 npm run study:speed      # docs/speed-study.json: coverage and energy at speed caps of 2 to 5 m/s
 npm install --no-save @tensorflow/tfjs-node@4.22.0   # native TF.js for the camera scripts
 npm run study:vision     # docs/vision-bench.json: missions with the camera and the learned detector
