@@ -300,6 +300,7 @@ class Runner extends IndoorPhases {
     let moveCheckAt = -Infinity;
     let moveOpen = false;
     let movingLogged = false;
+    let gnssHoldLogged = false;
     this.setJob({
       phase: 'land',
       plan: () => [target],
@@ -329,6 +330,16 @@ class Runner extends IndoorPhases {
           else c.vel[2] = Math.max(c.vel[2]!, 0);
         }
         if (!aligned && !c.touched) c.vel[2] = Math.max(c.vel[2]!, 0);
+        // Over the pad on dead reckoning, the pad may be metres away and the column below may be trees or
+        // a roof. Hold height until the fix is back; the failsafe lands after gnssLandSec if it never is.
+        if (reason === 'home' && this.health?.flags.has('gnss_lost') && !c.touched) {
+          if (!gnssHoldLogged) {
+            gnssHoldLogged = true;
+            this.log('warn', 'Over the pad on dead reckoning. Holding height until the GNSS fix is back.');
+          }
+          c.vel[2] = Math.max(c.vel[2]!, 0);
+          aligned = false;
+        }
         for (let i = 0; i < 2; i++) {
           trim[i] = Math.max(-LAND_TRIM_MAX, Math.min(LAND_TRIM_MAX, trim[i]! + (target[i]! - pos[i]!) * LAND_TRIM_KI * this.dt));
           c.vel[i] = c.vel[i]! + trim[i]!;
@@ -466,6 +477,7 @@ class Runner extends IndoorPhases {
   /** Run `fn` with the vehicle at the position the drone believes it is at. */
   /** The true position while believed() runs on a GNSS estimate; the range finder measures from here. */
   private truePos: V3 | null = null;
+  private gnssPadHoldLogged = false;
 
   protected believed<T>(fn: () => T): T {
     const gnss = this.faults && !this.inside ? this.faults.gnss() : null;
@@ -497,6 +509,15 @@ class Runner extends IndoorPhases {
     // turns a landing into a climb-descend cycle that never ends.
     const atHome = Math.hypot(pos[0] - this.world.home[0], pos[1] - this.world.home[1]) < CLIMB_CLEAR_HOME_M;
     const severe = flags?.has('wind_severe') && !atHome;
+    // Home on dead reckoning: the descent over the pad would put the drone down metres from it, among
+    // trees. Hold at cruise height over the believed pad until the fix is back.
+    if (flags?.has('gnss_lost') && this.returning && this.phase === 'return_home' && atHome && !this.inside) {
+      if (!this.gnssPadHoldLogged) {
+        this.gnssPadHoldLogged = true;
+        this.log('warn', 'Over the pad on dead reckoning. Holding at cruise height until the GNSS fix is back.');
+      }
+      return { ...cmd, vel: [cmd.vel[0]!, cmd.vel[1]!, Math.max(cmd.vel[2]!, 0)] };
+    }
     if (!(gnss || severe) || this.inside || this.phase === 'land' || this.phase === 'done') return cmd;
     const vz = Math.max(0, Math.min(1.2, cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2]));
     let away: [number, number] = [0, 0];

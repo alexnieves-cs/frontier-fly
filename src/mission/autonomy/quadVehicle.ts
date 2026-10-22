@@ -81,6 +81,7 @@ export class QuadVehicle extends Vehicle {
   override step(cmd: VehicleCommand, dt: number, limits: VehicleLimits, opts: StepOptions = {}): VehicleStep {
     const ctrl = this.dyn.controller;
     ctrl.setLimits(limits.speedH, limits.speedV, limits.yawRate, this.params.inertia[0] / defaultDynParams().inertia[0], limits.maxTilt);
+    ctrl.setAttitudeFirst(true);
     const w = opts.wind;
     this.dyn.wind[0] = w ? w[0] : 0;
     this.dyn.wind[1] = w ? w[1] : 0;
