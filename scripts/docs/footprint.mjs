@@ -168,7 +168,13 @@ export function footprintSection(study, speed) {
     const byFlown = [...hardCells].sort((a, b) => b.coverage - a.coverage).map((c) => c.pilot);
     const byFp = [...hardCells].sort((a, b) => fp(b) - fp(a)).map((c) => c.pilot);
     findings.push(
-      `- **Ranking on the hard buildings, by day.** By flown coverage: ${byFlown.map((p) => LABELS[p] ?? p).join(' > ')}. By ${head} m footprint: ${byFp.map((p) => LABELS[p] ?? p).join(' > ')}.`,
+      `- **Ranking on the hard buildings, by day.** By flown coverage: ${byFlown.map((p) => LABELS[p] ?? p).join(' > ')}. By ${head} m footprint: ${byFp.map((p) => LABELS[p] ?? p).join(' > ')}.` +
+        (() => {
+          const topFlown = cell('hard', byFlown[0]);
+          const topFp = cell('hard', byFp[0]);
+          if (topFlown === topFp) return '';
+          return ` ${LABELS[topFlown.pilot]} flies the most (${pct(topFlown.coverage)}) but ${(LABELS[topFp.pilot] ?? topFp.pilot).toLowerCase()} sees the most: ${pct(fp(topFp))} against ${pct(fp(topFlown))}, half the building in view after ${sec(topFp.footprintStats.half.footprint)} against ${sec(topFlown.footprintStats.half.footprint)}, with ${topFp.collisionsPerEpisode.toFixed(2)} collisions per episode against ${topFlown.collisionsPerEpisode.toFixed(2)}.`;
+        })(),
     );
   }
   const quadCells = study.cells.filter((c) => c.condition === 'quad' && c.lighting === 'day' && c.footprintStats);
@@ -178,7 +184,7 @@ export function footprintSection(study, speed) {
     const learned = quadCells.filter((c) => ['policy', 'guarded', 'guardedBrake'].includes(c.pilot));
     const beats = learned.filter((c) => fp(qHeur) > fp(c));
     findings.push(
-      `- **On the quadrotor, by footprint:** ${order.map((c) => `${LABELS[c.pilot] ?? c.pilot} ${pct(fp(c))}`).join(', ')}.` +
+      `- **On the quadrotor, by footprint:** ${order.map((c) => `${LABELS[c.pilot] ?? c.pilot} ${pct(fp(c))}`).join(', ')}. The leader has ${order[0].collisionsPerEpisode.toFixed(2)} collisions per episode${has(quadTrack) && order[0] !== quadTrack ? `; the planner with braking and the quad tracker has ${quadTrack.collisionsPerEpisode.toFixed(2)}` : ''}.` +
         (beats.length
           ? ` The lidar heuristic, which flies the fewest voxels (${pct(qHeur.coverage)}), sees more than ${beats.map((c) => (LABELS[c.pilot] ?? c.pilot).toLowerCase()).join(' and ')}, with ${qHeur.collisionsPerEpisode.toFixed(2)} collisions per episode: it keeps moving through open space, and the ring sees the rooms it passes.`
           : ''),
