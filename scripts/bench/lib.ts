@@ -14,7 +14,7 @@ import { bootstrapCi, loadPolicy } from '../study/common';
 export async function loadPilot(id: string): Promise<{ make: () => Promise<BenchPilot>; source: string }> {
   if (id === 'policy' || id === 'guarded') {
     const policy = loadPolicy(SHIPPED_CHECKPOINT_PATH);
-    const name = id === 'policy' ? 'Shipped policy (DAgger)' : 'Shipped policy under the lidar guard';
+    const name = id === 'policy' ? 'Shipped policy (DAgger + PPO)' : 'Shipped policy (DAgger + PPO) under the lidar guard';
     return { make: async () => policyPilot(name, policy, id === 'guarded'), source: `baseline:${id}` };
   }
   if (BASELINES[id]) return { make: async () => BASELINES[id]!(), source: `baseline:${id}` };
