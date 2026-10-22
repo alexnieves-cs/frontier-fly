@@ -116,14 +116,37 @@ function loadMap(loader: THREE.TextureLoader, url: string, srgb: boolean): Promi
   });
 }
 
+type PbrSet = Record<'wall' | 'floor' | 'concrete' | 'door', PbrMaps>;
+
+/** Sets requested ahead of the scene that needs them, by base URL; each is handed out once. */
+const prefetched = new Map<string, Promise<PbrSet>>();
+
+/** Start downloading a set now, for a later loadPbrSet with the same base (a page busy with other work first). */
+export function prefetchPbrSet(base: string): void {
+  if (prefetched.has(base)) return;
+  const set = fetchPbrSet(base);
+  set.catch(() => {});
+  prefetched.set(base, set);
+}
+
 /** CC0 ambientCG maps. Callers keep the canvas textures if a file is missing. */
-export async function loadPbrSet(base: string): Promise<Record<'wall' | 'floor' | 'concrete' | 'door', PbrMaps>> {
+export function loadPbrSet(base: string): Promise<PbrSet> {
+  const early = prefetched.get(base);
+  if (!early) return fetchPbrSet(base);
+  prefetched.delete(base);
+  return early;
+}
+
+async function fetchPbrSet(base: string): Promise<PbrSet> {
   const loader = new THREE.TextureLoader();
-  const trio = async (name: string): Promise<PbrMaps> => ({
-    color: await loadMap(loader, `${base}${name}_color.jpg`, true),
-    rough: await loadMap(loader, `${base}${name}_rough.jpg`, false),
-    normal: await loadMap(loader, `${base}${name}_normal.jpg`, false),
-  });
+  const trio = async (name: string): Promise<PbrMaps> => {
+    const [color, rough, normal] = await Promise.all([
+      loadMap(loader, `${base}${name}_color.jpg`, true),
+      loadMap(loader, `${base}${name}_rough.jpg`, false),
+      loadMap(loader, `${base}${name}_normal.jpg`, false),
+    ]);
+    return { color, rough, normal };
+  };
   const [wall, floor, concrete, door] = await Promise.all([
     trio('plaster'),
     trio('floor'),

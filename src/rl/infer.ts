@@ -74,6 +74,16 @@ export function weightShapes(obsDim: number, actDim: number, hidden: readonly nu
   ];
 }
 
+/**
+ * A checkpoint's weight arrays as setWeights buffers. An actor-only checkpoint
+ * (src/rl/checkpoint.ts) leaves out the value head, which acting never reads: zeros stand in for it.
+ */
+export function actingWeights(weights: readonly (readonly number[])[], obsDim: number, actDim: number, hidden: readonly number[]): ArrayBuffer[] {
+  const out = weights.map((row) => Float32Array.from(row).buffer);
+  for (const shape of weightShapes(obsDim, actDim, hidden).slice(out.length)) out.push(new Float32Array(numel(shape)).buffer);
+  return out;
+}
+
 function numel(shape: readonly number[]): number {
   let n = 1;
   for (const d of shape) n *= d;
@@ -87,7 +97,7 @@ export interface ActResult {
 }
 
 /** [in, out] row-major -> [out, in] so the dot product scans contiguous weights. */
-function transpose(weight: Float32Array, rows: number, cols: number): Float32Array {
+export function transpose(weight: Float32Array, rows: number, cols: number): Float32Array {
   const out = new Float32Array(weight.length);
   for (let r = 0; r < rows; r++) {
     const src = r * cols;
@@ -96,7 +106,7 @@ function transpose(weight: Float32Array, rows: number, cols: number): Float32Arr
   return out;
 }
 
-function linear(
+export function linear(
   x: Float32Array,
   n: number,
   inDim: number,
@@ -128,7 +138,7 @@ function linear(
   return y;
 }
 
-function gaussianLogp(u: number, mean: number, std: number, logStd: number): number {
+export function gaussianLogp(u: number, mean: number, std: number, logStd: number): number {
   const z = (u - mean) / std;
   return -0.5 * z * z - logStd - 0.5 * LOG_2PI;
 }

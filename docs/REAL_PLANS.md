@@ -6,22 +6,24 @@ Every number elsewhere in this repository comes from buildings the generator mad
 
 ## Result
 
-On real apartments the planners hold up and the learned policy does not. The sensor-only planner covers 85.5% of a real apartment, 8 points less than on a generated building of the same size. The policy covers 54.5%, 36 points less than on the same-size generated buildings, and 135 of its 180 real-apartment flights end at the 16-collision limit (36 of 180 on the generated controls). The lidar guard removes almost all of those collisions and recovers 15 points, but the guarded policy still trails the planner by 16 points.
+On real apartments the planners hold up better than the learned policy. The sensor-only planner covers 85.5% of a real apartment, 8 points less than on a generated building of the same size. The policy (the PPO fine-tuned checkpoint, see [REPORT.md](REPORT.md#fine-tuning-on-its-own-flights)) covers 74.3%, 20 points less than on the same-size generated buildings, and 101 of its 180 real-apartment flights end at the 16-collision limit (6 of 180 on the generated controls). The lidar guard removes almost all of those collisions and recovers 6 points, and the guarded policy trails the planner by 5 points.
 
 | Pilot | Real, day (95% CI) | Real, night | Collisions | Generated, same size, day (95% CI) | Collisions | Real − generated, paired (95% CI) |
 | --- | --- | --- | --- | --- | --- | --- |
 | Teacher (privileged frontier planner) | 88.0% (84.8–91.0) | 88.0% | 0.8 | 83.6% (76.5–90.7) | 0.1 | +4.4 (-3.0 to +12.2) |
 | Sensor-only planner | 85.5% (82.3–88.4) | 85.7% | 0.0 | 93.8% (92.8–94.6) | 0.0 | -8.3 (-11.0 to -5.8) |
-| Learned policy | 54.5% (49.8–59.3) | 57.2% | 15.2 | 90.1% (87.0–92.7) | 7.7 | -35.6 (-40.6 to -30.7) |
-| Policy + lidar guard | 69.1% (64.7–73.2) | 71.9% | 0.6 | 88.7% (84.6–92.1) | 0.1 | -19.7 (-24.7 to -14.1) |
+| Learned policy | 74.3% (69.3–79.0) | 72.6% | 14.1 | 94.8% (94.0–95.2) | 4.1 | -20.5 (-25.4 to -15.8) |
+| Policy + lidar guard | 80.7% (76.9–84.1) | 81.5% | 0.6 | 94.4% (93.3–95.2) | 0.2 | -13.7 (-17.0 to -10.6) |
 | Waypoint follower | 34.6% (28.3–41.5) | 34.6% | 5.8 | 43.1% (36.9–49.7) | 2.2 | -8.5 (-16.8 to -0.1) |
 | Lidar heuristic | 9.9% (8.0–11.9) | 11.0% | 0.5 | 26.1% (23.8–28.4) | 0.0 | -16.2 (-19.0 to -13.4) |
 
 Coverage is the share of reachable 0.5 m voxels flown within 2,400 steps (the stage-3 protocol). Each of the 60 apartments is flown three times per lighting with different env seeds, and so is its generated control. Collisions are per flight, day. Intervals are bootstrap intervals over apartments (each apartment's mean over its three flights); the last column pairs each apartment with its own generated control. Night uses the `night-dark` preset. The teacher and the waypoint follower read the true map, so their night numbers equal their day numbers.
 
-Against the targets: the policy misses the 60% hard-building coverage goal on real apartments (54.5%, interval 49.8–59.3%); the guarded policy meets it (69.1%). Night is 105% of day for the policy and 104% for the guarded policy, so the night-to-day target holds.
+Against the targets: the policy meets the 60% hard-building coverage goal on real apartments (74.3%, interval 69.3–79.0%), and so does the guarded policy (80.7%). Night is 98% of day for the policy and 101% for the guarded policy, so the night-to-day target holds.
 
-One flight per apartment was not enough. The first run, with one flight each, put the policy at 60.4% on one seed block and 52.3% on another; the three-flight means per repeat are 52.3%, 55.4% and 55.7%. The numbers above are from the three-flight run only.
+Before the PPO fine-tune, the DAgger policy covered 54.5% (49.8–59.3%) of the real apartments and 69.1% under the guard, and missed the 60% goal. That policy was measured the same way; the table above was re-run once with the new checkpoint.
+
+One flight per apartment was not enough. With the DAgger policy, the first run, with one flight each, put it at 60.4% on one seed block and 52.3% on another; the three-flight means per repeat were 52.3%, 55.4% and 55.7%. The numbers above are from the three-flight run only.
 
 ### Why real apartments are harder
 

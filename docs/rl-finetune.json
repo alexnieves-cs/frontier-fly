@@ -1,0 +1,1359 @@
+{
+ "schema": 1,
+ "commit": "820e541",
+ "baseline": "dagger",
+ "shipped": "ppo800",
+ "arms": [
+  {
+   "label": "dagger",
+   "checkpoint": "public/checkpoints/pretrained.bin"
+  },
+  {
+   "label": "ppo",
+   "checkpoint": "/tmp/claude-0/runs/f.bin"
+  },
+  {
+   "label": "ppoSeed2",
+   "checkpoint": "/tmp/claude-0/runs/h.bin"
+  },
+  {
+   "label": "ppo260",
+   "checkpoint": "/tmp/claude-0/runs/f.u260.bin"
+  },
+  {
+   "label": "gru260",
+   "checkpoint": "/tmp/claude-0/runs/g.u260.bin"
+  },
+  {
+   "label": "ppo800",
+   "checkpoint": "/tmp/claude-0/runs/k.bin"
+  }
+ ],
+ "selection": "checkpoints picked on the tuning block 66001-66299 only",
+ "hardPooled": {
+  "episodes": 106,
+  "dagger": {
+   "coverage": 0.6102374507869197,
+   "collisionsPerEpisode": 5.566037735849057
+  },
+  "ppo": {
+   "coverage": 0.7518937778100426,
+   "collisionsPerEpisode": 2.339622641509434,
+   "deltaVsBase": 0.14165632702312247,
+   "deltaCi": [
+    0.12081637113668232,
+    0.16451341067181463
+   ]
+  },
+  "ppoSeed2": {
+   "coverage": 0.7510824856499423,
+   "collisionsPerEpisode": 2.7547169811320753,
+   "deltaVsBase": 0.14084503486302274,
+   "deltaCi": [
+    0.11968883305476818,
+    0.16362355164924997
+   ]
+  },
+  "ppo260": {
+   "coverage": 0.7239102559244099,
+   "collisionsPerEpisode": 2.858490566037736,
+   "deltaVsBase": 0.11367280513749,
+   "deltaCi": [
+    0.09203113040206684,
+    0.13868240074998037
+   ]
+  },
+  "gru260": {
+   "coverage": 0.7215102832818401,
+   "collisionsPerEpisode": 2.018867924528302,
+   "deltaVsBase": 0.11127283249492029,
+   "deltaCi": [
+    0.09034750185985709,
+    0.1329891251212931
+   ]
+  },
+  "ppo800": {
+   "coverage": 0.8075106743792105,
+   "collisionsPerEpisode": 3.330188679245283,
+   "deltaVsBase": 0.1972732235922905,
+   "deltaCi": [
+    0.1771310657283807,
+    0.21913471482807045
+   ]
+  }
+ },
+ "cells": [
+  {
+   "set": "protocol",
+   "stage": 0,
+   "lighting": "day",
+   "episodes": 4,
+   "dagger": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0
+   },
+   "ppo": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 4,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 1.25,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "gru260": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "set": "protocol",
+   "stage": 3,
+   "lighting": "day",
+   "episodes": 3,
+   "dagger": {
+    "coverage": 0.67267225651372,
+    "collisionsPerEpisode": 8.666666666666666
+   },
+   "ppo": {
+    "coverage": 0.7861742008083472,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0.11350194429462723,
+    "deltaCi": [
+     0.0692567567567568,
+     0.14015151515151514
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.8184722971308336,
+    "collisionsPerEpisode": 0.3333333333333333,
+    "deltaVsBase": 0.14580004061711374,
+    "deltaCi": [
+     0.13344594594594594,
+     0.15243902439024382
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.7147638214711386,
+    "collisionsPerEpisode": 1.6666666666666667,
+    "deltaVsBase": 0.042091564957418615,
+    "deltaCi": [
+     -0.010135135135135087,
+     0.13262195121951215
+    ]
+   },
+   "gru260": {
+    "coverage": 0.8029637175978639,
+    "collisionsPerEpisode": 1.3333333333333333,
+    "deltaVsBase": 0.13029146108414402,
+    "deltaCi": [
+     0.09121621621621623,
+     0.16856060606060608
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.8610715760106005,
+    "collisionsPerEpisode": 0.6666666666666666,
+    "deltaVsBase": 0.1883993194968805,
+    "deltaCi": [
+     0.14786585365853655,
+     0.21969696969696972
+    ]
+   }
+  },
+  {
+   "set": "study",
+   "stage": 3,
+   "lighting": "day",
+   "episodes": 30,
+   "dagger": {
+    "coverage": 0.6073523123768687,
+    "collisionsPerEpisode": 6.366666666666666
+   },
+   "ppo": {
+    "coverage": 0.7523210737874673,
+    "collisionsPerEpisode": 2.066666666666667,
+    "deltaVsBase": 0.14496876141059822,
+    "deltaCi": [
+     0.10959368525019787,
+     0.19284847953167814
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.7506105241035603,
+    "collisionsPerEpisode": 2.6333333333333333,
+    "deltaVsBase": 0.14325821172669148,
+    "deltaCi": [
+     0.11070977088992313,
+     0.18704150746038667
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.725003646762639,
+    "collisionsPerEpisode": 2.533333333333333,
+    "deltaVsBase": 0.11765133438577001,
+    "deltaCi": [
+     0.08310746736764951,
+     0.1597814502074096
+    ]
+   },
+   "gru260": {
+    "coverage": 0.7145966492300798,
+    "collisionsPerEpisode": 2.9,
+    "deltaVsBase": 0.10724433685321107,
+    "deltaCi": [
+     0.07935960497313574,
+     0.139799048702348
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.7995653074318988,
+    "collisionsPerEpisode": 3.433333333333333,
+    "deltaVsBase": 0.1922129950550299,
+    "deltaCi": [
+     0.15530955881556882,
+     0.2369374252711151
+    ]
+   }
+  },
+  {
+   "set": "protocol",
+   "stage": 0,
+   "lighting": "night-dark",
+   "episodes": 4,
+   "dagger": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 1.75
+   },
+   "ppo": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 2.5,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "gru260": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "set": "protocol",
+   "stage": 3,
+   "lighting": "night-dark",
+   "episodes": 3,
+   "dagger": {
+    "coverage": 0.6735878062097574,
+    "collisionsPerEpisode": 0.3333333333333333
+   },
+   "ppo": {
+    "coverage": 0.8121579173408442,
+    "collisionsPerEpisode": 0.3333333333333333,
+    "deltaVsBase": 0.13857011113108672,
+    "deltaCi": [
+     0.05335365853658536,
+     0.24242424242424232
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.8006827503778723,
+    "collisionsPerEpisode": 1.6666666666666667,
+    "deltaVsBase": 0.12709494416811487,
+    "deltaCi": [
+     0.038851351351351315,
+     0.21590909090909083
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.8115578161309868,
+    "collisionsPerEpisode": 6.333333333333333,
+    "deltaVsBase": 0.1379700099212294,
+    "deltaCi": [
+     0.08231707317073167,
+     0.2234848484848484
+    ]
+   },
+   "gru260": {
+    "coverage": 0.791171437512901,
+    "collisionsPerEpisode": 0.3333333333333333,
+    "deltaVsBase": 0.11758363130314349,
+    "deltaCi": [
+     0.06707317073170738,
+     0.18939393939393934
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.8772768056304642,
+    "collisionsPerEpisode": 1,
+    "deltaVsBase": 0.20368899942070673,
+    "deltaCi": [
+     0.1402439024390244,
+     0.26136363636363635
+    ]
+   }
+  },
+  {
+   "set": "study",
+   "stage": 3,
+   "lighting": "night-dark",
+   "episodes": 30,
+   "dagger": {
+    "coverage": 0.5964887424760449,
+    "collisionsPerEpisode": 5.566666666666666
+   },
+   "ppo": {
+    "coverage": 0.7413233796619412,
+    "collisionsPerEpisode": 2.7666666666666666,
+    "deltaVsBase": 0.14483463718589637,
+    "deltaCi": [
+     0.09847308333806597,
+     0.1963722254477878
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.7413211168539278,
+    "collisionsPerEpisode": 2.6,
+    "deltaVsBase": 0.1448323743778829,
+    "deltaCi": [
+     0.09901480074675882,
+     0.19743568140671705
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.712465980693714,
+    "collisionsPerEpisode": 2.7666666666666666,
+    "deltaVsBase": 0.11597723821766914,
+    "deltaCi": [
+     0.07216244442073248,
+     0.17015525385957905
+    ]
+   },
+   "gru260": {
+    "coverage": 0.7125334753930825,
+    "collisionsPerEpisode": 1.4666666666666666,
+    "deltaVsBase": 0.11604473291703771,
+    "deltaCi": [
+     0.07601631073033739,
+     0.1676037294098321
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.7998060531796906,
+    "collisionsPerEpisode": 2.9,
+    "deltaVsBase": 0.20331731070364575,
+    "deltaCi": [
+     0.159614697614025,
+     0.260319871174563
+    ]
+   }
+  },
+  {
+   "set": "study",
+   "stage": 0,
+   "lighting": "day",
+   "episodes": 30,
+   "dagger": {
+    "coverage": 0.9402777777777781,
+    "collisionsPerEpisode": 0.1
+   },
+   "ppo": {
+    "coverage": 0.9430555555555559,
+    "collisionsPerEpisode": 2.9,
+    "deltaVsBase": 0.0027777777777777753,
+    "deltaCi": [
+     -0.025,
+     0.033333333333333326
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.9513888888888892,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0.011111111111111108,
+    "deltaCi": [
+     0,
+     0.033333333333333326
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.9465277777777781,
+    "collisionsPerEpisode": 0.7666666666666667,
+    "deltaVsBase": 0.00625,
+    "deltaCi": [
+     -0.014583333333333327,
+     0.033333333333333326
+    ]
+   },
+   "gru260": {
+    "coverage": 0.9513888888888892,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0.011111111111111108,
+    "deltaCi": [
+     0,
+     0.033333333333333326
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.9513888888888892,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0.011111111111111108,
+    "deltaCi": [
+     0,
+     0.033333333333333326
+    ]
+   }
+  },
+  {
+   "set": "report",
+   "stage": 3,
+   "lighting": "day",
+   "episodes": 32,
+   "dagger": {
+    "coverage": 0.6274310603414701,
+    "collisionsPerEpisode": 4.25
+   },
+   "ppo": {
+    "coverage": 0.7499139610071641,
+    "collisionsPerEpisode": 2.21875,
+    "deltaVsBase": 0.1224829006656939,
+    "deltaCi": [
+     0.09848994630749952,
+     0.15036771438954222
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.7510862716992756,
+    "collisionsPerEpisode": 2.8125,
+    "deltaVsBase": 0.12365521135780522,
+    "deltaCi": [
+     0.09638393997627806,
+     0.1588923034341394
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.7250245012746573,
+    "collisionsPerEpisode": 2.90625,
+    "deltaVsBase": 0.09759344093318716,
+    "deltaCi": [
+     0.07041326811181768,
+     0.12820224056677135
+    ]
+   },
+   "gru260": {
+    "coverage": 0.7180475099571574,
+    "collisionsPerEpisode": 1.6875,
+    "deltaVsBase": 0.090616449615687,
+    "deltaCi": [
+     0.04624683813091858,
+     0.13217458834364615
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.8075097325550026,
+    "collisionsPerEpisode": 3.46875,
+    "deltaVsBase": 0.1800786722135322,
+    "deltaCi": [
+     0.15490287363793437,
+     0.20979357653991465
+    ]
+   }
+  },
+  {
+   "set": "report",
+   "stage": 3,
+   "lighting": "night-dark",
+   "episodes": 8,
+   "dagger": {
+    "coverage": 0.5566705023410753,
+    "collisionsPerEpisode": 8.625
+   },
+   "ppo": {
+    "coverage": 0.7623954672131756,
+    "collisionsPerEpisode": 3.875,
+    "deltaVsBase": 0.2057249648721003,
+    "deltaCi": [
+     0.12396829486673235,
+     0.3124111327236327
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.7455710516582912,
+    "collisionsPerEpisode": 4.875,
+    "deltaVsBase": 0.188900549317216,
+    "deltaCi": [
+     0.10255462442962443,
+     0.3055515086765087
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.7288311688376792,
+    "collisionsPerEpisode": 3.375,
+    "deltaVsBase": 0.17216066649660394,
+    "deltaCi": [
+     0.06402682867526618,
+     0.300208580482018
+    ]
+   },
+   "gru260": {
+    "coverage": 0.7382825631523549,
+    "collisionsPerEpisode": 3,
+    "deltaVsBase": 0.18161206081127956,
+    "deltaCi": [
+     0.0836512217371592,
+     0.2904085497835497
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.8199542598956662,
+    "collisionsPerEpisode": 5.875,
+    "deltaVsBase": 0.2632837575545909,
+    "deltaCi": [
+     0.19524814993564993,
+     0.3567891349141349
+    ]
+   }
+  },
+  {
+   "set": "report",
+   "stage": 0,
+   "lighting": "day",
+   "episodes": 6,
+   "dagger": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 0
+   },
+   "ppo": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 2.8333333333333335,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 0.5,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "gru260": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "set": "report",
+   "stage": 0,
+   "lighting": "night-dark",
+   "episodes": 2,
+   "dagger": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0
+   },
+   "ppo": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 3,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppoSeed2": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo260": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "gru260": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "ppo800": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   }
+  }
+ ],
+ "runs": [
+  {
+   "id": "noise02",
+   "label": "Noise 0.2, BC 1→0.1 on the fresh batch (stopped)",
+   "flags": "--log-std -1.6 --bc 1:0.1 --lr 3e-5 --steps-per-env 256 --replay 0",
+   "curve": [
+    {
+     "update": 0,
+     "small": 0.951,
+     "large": 0.601,
+     "collisions": 5.08,
+     "score": 0.741
+    },
+    {
+     "update": 20,
+     "small": 0.951,
+     "large": 0.583,
+     "collisions": 6.08,
+     "score": 0.73
+    },
+    {
+     "update": 40,
+     "small": 0.951,
+     "large": 0.5429999999999999,
+     "collisions": 7.65,
+     "score": 0.706
+    }
+   ]
+  },
+  {
+   "id": "bcOnly",
+   "label": "Imitation only: BC replay, no PPO",
+   "flags": "--ppo 0 --bc 1 --updates 60",
+   "curve": [
+    {
+     "update": 0,
+     "small": 0.951,
+     "large": 0.601,
+     "collisions": 5.08,
+     "score": 0.741
+    },
+    {
+     "update": 20,
+     "small": 0.8009999999999999,
+     "large": 0.302,
+     "collisions": 16.2,
+     "score": 0.502
+    },
+    {
+     "update": 40,
+     "small": 0.938,
+     "large": 0.452,
+     "collisions": 12.57,
+     "score": 0.647
+    },
+    {
+     "update": 60,
+     "small": 0.935,
+     "large": 0.493,
+     "collisions": 11.47,
+     "score": 0.67
+    }
+   ]
+  },
+  {
+   "id": "ppoNoBc",
+   "label": "PPO without the BC term",
+   "flags": "--bc 0 --updates 60",
+   "curve": [
+    {
+     "update": 0,
+     "small": 0.951,
+     "large": 0.601,
+     "collisions": 5.08,
+     "score": 0.741
+    },
+    {
+     "update": 20,
+     "small": 0.951,
+     "large": 0.622,
+     "collisions": 3.77,
+     "score": 0.754
+    },
+    {
+     "update": 40,
+     "small": 0.951,
+     "large": 0.623,
+     "collisions": 5.55,
+     "score": 0.755
+    },
+    {
+     "update": 60,
+     "small": 0.951,
+     "large": 0.635,
+     "collisions": 3.52,
+     "score": 0.762
+    }
+   ]
+  },
+  {
+   "id": "ppo",
+   "label": "PPO + BC replay (default recipe)",
+   "flags": "(defaults)",
+   "curve": [
+    {
+     "update": 0,
+     "small": 0.951,
+     "large": 0.601,
+     "collisions": 5.08,
+     "score": 0.741
+    },
+    {
+     "update": 20,
+     "small": 0.951,
+     "large": 0.639,
+     "collisions": 2.55,
+     "score": 0.764
+    },
+    {
+     "update": 40,
+     "small": 0.951,
+     "large": 0.631,
+     "collisions": 3.33,
+     "score": 0.759
+    },
+    {
+     "update": 60,
+     "small": 0.951,
+     "large": 0.65,
+     "collisions": 2.73,
+     "score": 0.77
+    },
+    {
+     "update": 80,
+     "small": 0.951,
+     "large": 0.616,
+     "collisions": 3.83,
+     "score": 0.75
+    },
+    {
+     "update": 100,
+     "small": 0.951,
+     "large": 0.627,
+     "collisions": 1.98,
+     "score": 0.757
+    },
+    {
+     "update": 120,
+     "small": 0.951,
+     "large": 0.662,
+     "collisions": 2.67,
+     "score": 0.778
+    },
+    {
+     "update": 140,
+     "small": 0.951,
+     "large": 0.644,
+     "collisions": 5.35,
+     "score": 0.767
+    },
+    {
+     "update": 160,
+     "small": 0.951,
+     "large": 0.6629999999999999,
+     "collisions": 3.77,
+     "score": 0.778
+    },
+    {
+     "update": 180,
+     "small": 0.951,
+     "large": 0.675,
+     "collisions": 4.6,
+     "score": 0.785
+    },
+    {
+     "update": 200,
+     "small": 0.951,
+     "large": 0.6559999999999999,
+     "collisions": 3.92,
+     "score": 0.774
+    },
+    {
+     "update": 220,
+     "small": 0.951,
+     "large": 0.695,
+     "collisions": 2.92,
+     "score": 0.7979999999999999
+    },
+    {
+     "update": 240,
+     "small": 0.951,
+     "large": 0.6759999999999999,
+     "collisions": 4.03,
+     "score": 0.7859999999999999
+    },
+    {
+     "update": 260,
+     "small": 0.951,
+     "large": 0.6970000000000001,
+     "collisions": 4.03,
+     "score": 0.799
+    },
+    {
+     "update": 280,
+     "small": 0.929,
+     "large": 0.7020000000000001,
+     "collisions": 2.05,
+     "score": 0.7929999999999999
+    },
+    {
+     "update": 300,
+     "small": 0.951,
+     "large": 0.654,
+     "collisions": 9.13,
+     "score": 0.773
+    },
+    {
+     "update": 320,
+     "small": 0.951,
+     "large": 0.67,
+     "collisions": 3.67,
+     "score": 0.782
+    },
+    {
+     "update": 340,
+     "small": 0.951,
+     "large": 0.7240000000000001,
+     "collisions": 2.67,
+     "score": 0.815
+    },
+    {
+     "update": 360,
+     "small": 0.951,
+     "large": 0.7170000000000001,
+     "collisions": 2.5,
+     "score": 0.8109999999999999
+    },
+    {
+     "update": 380,
+     "small": 0.951,
+     "large": 0.725,
+     "collisions": 1.75,
+     "score": 0.816
+    },
+    {
+     "update": 400,
+     "small": 0.951,
+     "large": 0.713,
+     "collisions": 4.03,
+     "score": 0.8079999999999999
+    }
+   ]
+  },
+  {
+   "id": "ppoSeed2",
+   "label": "Default recipe, second seed",
+   "flags": "--seed 31",
+   "curve": [
+    {
+     "update": 0,
+     "small": 0.951,
+     "large": 0.601,
+     "collisions": 5.08,
+     "score": 0.741
+    },
+    {
+     "update": 20,
+     "small": 0.951,
+     "large": 0.6409999999999999,
+     "collisions": 2.55,
+     "score": 0.765
+    },
+    {
+     "update": 40,
+     "small": 0.951,
+     "large": 0.636,
+     "collisions": 4.38,
+     "score": 0.762
+    },
+    {
+     "update": 60,
+     "small": 0.951,
+     "large": 0.6629999999999999,
+     "collisions": 3.13,
+     "score": 0.778
+    },
+    {
+     "update": 80,
+     "small": 0.951,
+     "large": 0.63,
+     "collisions": 3.98,
+     "score": 0.758
+    },
+    {
+     "update": 100,
+     "small": 0.951,
+     "large": 0.66,
+     "collisions": 3.27,
+     "score": 0.777
+    },
+    {
+     "update": 120,
+     "small": 0.951,
+     "large": 0.6659999999999999,
+     "collisions": 2.6,
+     "score": 0.78
+    },
+    {
+     "update": 140,
+     "small": 0.951,
+     "large": 0.6579999999999999,
+     "collisions": 2.52,
+     "score": 0.775
+    },
+    {
+     "update": 160,
+     "small": 0.951,
+     "large": 0.682,
+     "collisions": 6.72,
+     "score": 0.79
+    },
+    {
+     "update": 180,
+     "small": 0.951,
+     "large": 0.68,
+     "collisions": 2.75,
+     "score": 0.7879999999999999
+    },
+    {
+     "update": 200,
+     "small": 0.951,
+     "large": 0.685,
+     "collisions": 3.92,
+     "score": 0.792
+    },
+    {
+     "update": 220,
+     "small": 0.951,
+     "large": 0.679,
+     "collisions": 5.38,
+     "score": 0.7879999999999999
+    },
+    {
+     "update": 240,
+     "small": 0.951,
+     "large": 0.6859999999999999,
+     "collisions": 3.58,
+     "score": 0.792
+    },
+    {
+     "update": 260,
+     "small": 0.951,
+     "large": 0.688,
+     "collisions": 2.6,
+     "score": 0.794
+    },
+    {
+     "update": 280,
+     "small": 0.951,
+     "large": 0.675,
+     "collisions": 5.53,
+     "score": 0.7859999999999999
+    },
+    {
+     "update": 300,
+     "small": 0.951,
+     "large": 0.662,
+     "collisions": 7.8,
+     "score": 0.778
+    },
+    {
+     "update": 320,
+     "small": 0.951,
+     "large": 0.624,
+     "collisions": 12.88,
+     "score": 0.755
+    },
+    {
+     "update": 340,
+     "small": 0.951,
+     "large": 0.706,
+     "collisions": 3.95,
+     "score": 0.804
+    },
+    {
+     "update": 360,
+     "small": 0.951,
+     "large": 0.713,
+     "collisions": 3.65,
+     "score": 0.809
+    },
+    {
+     "update": 380,
+     "small": 0.951,
+     "large": 0.736,
+     "collisions": 3.48,
+     "score": 0.8220000000000001
+    },
+    {
+     "update": 400,
+     "small": 0.951,
+     "large": 0.725,
+     "collisions": 4.42,
+     "score": 0.816
+    }
+   ]
+  },
+  {
+   "id": "gru",
+   "label": "Default recipe + GRU memory (stopped at 260)",
+   "flags": "--mem 64",
+   "curve": [
+    {
+     "update": 0,
+     "small": 0.951,
+     "large": 0.601,
+     "collisions": 5.08,
+     "score": 0.741
+    },
+    {
+     "update": 20,
+     "small": 0.951,
+     "large": 0.624,
+     "collisions": 2.77,
+     "score": 0.755
+    },
+    {
+     "update": 40,
+     "small": 0.951,
+     "large": 0.644,
+     "collisions": 2.9,
+     "score": 0.767
+    },
+    {
+     "update": 60,
+     "small": 0.951,
+     "large": 0.644,
+     "collisions": 2.63,
+     "score": 0.767
+    },
+    {
+     "update": 80,
+     "small": 0.951,
+     "large": 0.638,
+     "collisions": 3.25,
+     "score": 0.763
+    },
+    {
+     "update": 100,
+     "small": 0.951,
+     "large": 0.63,
+     "collisions": 5.95,
+     "score": 0.759
+    },
+    {
+     "update": 120,
+     "small": 0.951,
+     "large": 0.5760000000000001,
+     "collisions": 10.35,
+     "score": 0.726
+    },
+    {
+     "update": 140,
+     "small": 0.951,
+     "large": 0.638,
+     "collisions": 5.17,
+     "score": 0.764
+    },
+    {
+     "update": 160,
+     "small": 0.951,
+     "large": 0.654,
+     "collisions": 3.92,
+     "score": 0.773
+    },
+    {
+     "update": 180,
+     "small": 0.951,
+     "large": 0.68,
+     "collisions": 2.63,
+     "score": 0.789
+    },
+    {
+     "update": 200,
+     "small": 0.951,
+     "large": 0.6859999999999999,
+     "collisions": 2.3,
+     "score": 0.792
+    },
+    {
+     "update": 220,
+     "small": 0.951,
+     "large": 0.677,
+     "collisions": 2.8,
+     "score": 0.787
+    },
+    {
+     "update": 240,
+     "small": 0.951,
+     "large": 0.6829999999999999,
+     "collisions": 3.17,
+     "score": 0.7909999999999999
+    },
+    {
+     "update": 260,
+     "small": 0.951,
+     "large": 0.685,
+     "collisions": 2,
+     "score": 0.7909999999999999
+    }
+   ]
+  },
+  {
+   "id": "ppo800",
+   "label": "400 more updates (shipped)",
+   "flags": "--init <default recipe's best> --seed 47",
+   "curve": [
+    {
+     "update": 400,
+     "small": 0.951,
+     "large": 0.725,
+     "collisions": 1.75,
+     "score": 0.816
+    },
+    {
+     "update": 420,
+     "small": 0.951,
+     "large": 0.7190000000000001,
+     "collisions": 4.33,
+     "score": 0.812
+    },
+    {
+     "update": 440,
+     "small": 0.951,
+     "large": 0.727,
+     "collisions": 2.1,
+     "score": 0.8170000000000001
+    },
+    {
+     "update": 460,
+     "small": 0.951,
+     "large": 0.728,
+     "collisions": 2.75,
+     "score": 0.8170000000000001
+    },
+    {
+     "update": 480,
+     "small": 0.951,
+     "large": 0.733,
+     "collisions": 2.6,
+     "score": 0.82
+    },
+    {
+     "update": 500,
+     "small": 0.951,
+     "large": 0.6940000000000001,
+     "collisions": 7.63,
+     "score": 0.797
+    },
+    {
+     "update": 520,
+     "small": 0.951,
+     "large": 0.7170000000000001,
+     "collisions": 5.38,
+     "score": 0.8109999999999999
+    },
+    {
+     "update": 540,
+     "small": 0.951,
+     "large": 0.738,
+     "collisions": 3.92,
+     "score": 0.823
+    },
+    {
+     "update": 560,
+     "small": 0.951,
+     "large": 0.755,
+     "collisions": 2.88,
+     "score": 0.8340000000000001
+    },
+    {
+     "update": 580,
+     "small": 0.951,
+     "large": 0.767,
+     "collisions": 2.48,
+     "score": 0.841
+    },
+    {
+     "update": 600,
+     "small": 0.951,
+     "large": 0.752,
+     "collisions": 2.17,
+     "score": 0.8320000000000001
+    },
+    {
+     "update": 620,
+     "small": 0.951,
+     "large": 0.762,
+     "collisions": 3.15,
+     "score": 0.8370000000000001
+    },
+    {
+     "update": 640,
+     "small": 0.951,
+     "large": 0.764,
+     "collisions": 2.85,
+     "score": 0.8390000000000001
+    },
+    {
+     "update": 660,
+     "small": 0.951,
+     "large": 0.7440000000000001,
+     "collisions": 4.1,
+     "score": 0.8270000000000001
+    },
+    {
+     "update": 680,
+     "small": 0.951,
+     "large": 0.767,
+     "collisions": 2.83,
+     "score": 0.841
+    },
+    {
+     "update": 700,
+     "small": 0.951,
+     "large": 0.735,
+     "collisions": 4.78,
+     "score": 0.8220000000000001
+    },
+    {
+     "update": 720,
+     "small": 0.951,
+     "large": 0.741,
+     "collisions": 5.22,
+     "score": 0.825
+    },
+    {
+     "update": 740,
+     "small": 0.951,
+     "large": 0.777,
+     "collisions": 2.85,
+     "score": 0.847
+    },
+    {
+     "update": 760,
+     "small": 0.951,
+     "large": 0.7809999999999999,
+     "collisions": 3.38,
+     "score": 0.8490000000000001
+    },
+    {
+     "update": 780,
+     "small": 0.951,
+     "large": 0.7509999999999999,
+     "collisions": 7.88,
+     "score": 0.831
+    },
+    {
+     "update": 800,
+     "small": 0.951,
+     "large": 0.75,
+     "collisions": 7.05,
+     "score": 0.831
+    }
+   ]
+  }
+ ]
+}

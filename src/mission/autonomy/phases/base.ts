@@ -62,8 +62,13 @@ import {
   scaleTo,
 } from './shared';
 
-/** Outdoor tilt limit, rad (40°). Indoors keeps the default 23° the close-in planners are tuned around. */
-const OUTDOOR_TILT_RAD = 0.7;
+/**
+ * Outdoor tilt limit, rad (55°). The 1.2 kg quad has a thrust-to-weight of 2.5, so 55° leaves 30% of thrust
+ * for altitude and attitude. Indoors keeps the default 23° the close-in planners are tuned around.
+ */
+const OUTDOOR_TILT_RAD = 0.96;
+/** Tilt limit flying through an opening in calm air, rad (40°): the fly-through servo was tuned below it. */
+const FLY_THROUGH_TILT_RAD = 0.7;
 
 /**
  * Runner state, the constructor and the motion primitives every phase builds on:
@@ -223,11 +228,12 @@ export abstract class RunnerBase implements MissionRunner {
 
   protected limits(): VehicleLimits {
     let base = this.baseLimits();
-    // Outdoors the airframe may lean to 40°, as PX4's MPC_TILTMAX_AIR allows 45°: the default 23° holds only
-    // about 5 m/s of wind on the 1.2 kg quad, 40° about 8 m/s. Scheduling it on the wind estimate left the
-    // first second of a wind front at 23°, when the drone was blown into walls; that schedule was needed only
-    // while the mixer dropped attitude authority at full thrust.
-    if (!this.inside) base = { ...base, maxTilt: OUTDOOR_TILT_RAD };
+    // Outdoors the airframe may lean to 55° (PX4's MPC_TILTMAX_AIR allows up to 89°). The default 23° holds
+    // about 5 m/s of wind on the 1.2 kg quad and 40° about 8 m/s, so at 40° an 8 m/s wind left no headway home.
+    // The limit is fixed rather than scheduled on the wind estimate: the estimate lags a wind front by a second
+    // or two, and that is when the drone is blown into walls. Fly-throughs keep 40° unless it is windy.
+    const windy = Math.hypot(this.windEstimate[0], this.windEstimate[1]) >= 3;
+    if (!this.inside) base = { ...base, maxTilt: this.phase === 'fly_through' && !windy ? FLY_THROUGH_TILT_RAD : OUTDOOR_TILT_RAD };
     const k = this.health?.speedScale ?? 1;
     return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
   }

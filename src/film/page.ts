@@ -6,12 +6,13 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { policyFromFile, type NormalizedPolicy } from '../mission/autonomy/policy';
-import { SHIPPED_CHECKPOINT_URL } from '../rl/checkpoint';
+import { SHIPPED_POLICY_URL } from '../rl/checkpoint';
 import { DEFAULT_SCENARIO, isScenarioId, SCENARIOS, type ScenarioId } from '../mission/autonomy/scenarios';
 import { buildTimeline, Director, FILM_FPS, type FilmFrame } from './director';
 import { recordFlight, sampleFlight, type FlightLog } from './flight';
 import { FilmOverlay } from './overlay';
 import { FilmScene } from './scene';
+import { prefetchPbrSet } from '../viz/textures';
 
 /** Width and height the film is composed at. The stage scales to fit the window. */
 const STAGE_W = 1920;
@@ -62,7 +63,7 @@ declare global {
 
 async function shippedPolicy(): Promise<NormalizedPolicy | null> {
   try {
-    const response = await fetch(SHIPPED_CHECKPOINT_URL);
+    const response = await fetch(SHIPPED_POLICY_URL);
     return response.ok ? policyFromFile(await response.arrayBuffer()) : null;
   } catch {
     return null;
@@ -138,6 +139,8 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   if (embed) new ResizeObserver(fit).observe(root);
   else window.addEventListener('resize', fit);
   status('flying', loading.textContent);
+  // The interior textures download while the mission flies headless; the scene picks them up when it builds.
+  prefetchPbrSet(`${import.meta.env.BASE_URL}textures/`);
 
   try {
     const indoor = params.get('indoor') === 'frontier' ? null : await shippedPolicy();
