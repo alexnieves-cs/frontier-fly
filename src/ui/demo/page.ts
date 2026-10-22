@@ -38,6 +38,7 @@ import {
 import { DemoMap, isNight } from './map';
 import { CameraInset, loadVisionKit } from './camera';
 import { createVisionSource } from '../../vision/source';
+import { siteNavLinks } from '../siteNav';
 
 export type Speed = 1 | 4 | 16 | 'max';
 export type Detector = 'analytic' | 'camera';
@@ -613,13 +614,7 @@ function markup(): string {
           <h1>Autonomous search and rescue</h1>
         </div>
       </div>
-      <nav class="nav" aria-label="Pages">
-        <a href="./index.html">Home</a>
-        <a href="./sim.html">Indoor sim</a>
-        <a href="./outdoor.html">Outdoor world</a>
-        <a href="./mission.html">Mission editor</a>
-        <a href="./demo.html" aria-current="page">Autonomous missions</a>
-      </nav>
+      <nav class="nav" aria-label="Pages">${siteNavLinks('demo')}</nav>
     </header>
     <main class="layout">
       <section class="rail" aria-label="Scenario">

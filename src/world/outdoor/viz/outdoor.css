@@ -12,22 +12,29 @@
 
 * { box-sizing: border-box; }
 html, body, #app { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+#app { display: flex; flex-direction: column; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 
 .topbar {
-  height: 52px;
+  flex: none;
+  min-height: 52px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
-  padding: 0 14px;
+  gap: 4px 14px;
+  padding: 6px 14px;
+  --site-nav-fg: var(--muted);
+  --site-nav-active: var(--text);
+  --site-nav-accent: var(--cyan);
   border-bottom: 1px solid var(--line);
   background: #08140f;
 }
-.brand { display: flex; flex-direction: column; min-width: 180px; }
+.brand { display: flex; flex-direction: column; }
 .brand strong { letter-spacing: 0.04em; }
-.brand span, .hud span { color: var(--muted); font-size: 12px; }
-.topbar a { color: var(--cyan); text-decoration: none; }
+.brand h1 { margin: 0; font-size: 12px; font-weight: 400; color: var(--muted); }
+.hud span { color: var(--muted); font-size: 12px; }
+.controls a { color: var(--cyan); text-decoration: none; }
 .controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .controls input {
   width: 88px;
@@ -44,7 +51,7 @@ button { cursor: pointer; }
 }
 .controls button[data-on="1"], .cam button[data-on="1"] { border-color: var(--cyan); color: var(--cyan); }
 
-.stage { position: relative; height: calc(100% - 52px); }
+.stage { position: relative; flex: 1; min-height: 0; }
 #view { width: 100%; height: 100%; display: block; }
 #map {
   position: absolute;
@@ -81,4 +88,18 @@ body[data-shot="map"] #map {
   display: grid;
   place-items: center;
   background: rgba(7, 20, 15, 0.72);
+}
+
+@media (max-width: 1000px) {
+  .topbar .site-nav { order: 3; flex: 1 0 100%; }
+}
+@media (max-width: 720px) {
+  .topbar { padding: 6px 12px; }
+  .controls { gap: 6px; }
+  #map { width: 132px; height: 132px; }
+  .hud { min-width: 0; font-size: 12px; padding: 8px 10px; gap: 2px; }
+}
+/* No keyboard on touch screens, so drop the key hints. */
+@media (hover: none) {
+  .hud .keys { display: none; }
 }

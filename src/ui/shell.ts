@@ -1,19 +1,13 @@
 /** Markup for the indoor sim page and small DOM helpers. */
 
+import { siteNavLinks } from './siteNav';
+
 export function shell(): string {
   return `
   <div class="shell" id="shell">
     <header class="topbar">
-      <div class="brand"><div class="mark"></div><div><h1>DRONE SIM</h1><p>FRONTIER-FLY</p></div></div>
-      <nav class="page-links" aria-label="Other pages">
-        <a href="./index.html">Home</a>
-        <a href="./race.html">Pilot race</a>
-        <a href="./team.html">Drone team</a>
-        <a href="./demo.html">Mission demo</a>
-        <a href="./film.html">Mission film</a>
-        <a href="./outdoor.html">Outdoor</a>
-        <a href="./mission.html">Editor</a>
-      </nav>
+      <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>DRONE SIM</h1><p>FRONTIER-FLY</p></div></div>
+      <nav class="page-links" aria-label="Pages">${siteNavLinks('sim')}</nav>
       <div class="tabs" role="toolbar" aria-label="View shortcuts">
         <span class="tabs-label">VIEW</span>
         <button type="button" data-act="tab" data-cam="chase" class="active">SIMULATION</button>
@@ -30,7 +24,7 @@ export function shell(): string {
         <span class="pill" id="backend">WEBGL2</span>
       </div>
     </header>
-    <div class="workspace">
+    <main class="workspace">
       <aside class="rail">
         <div class="group">
           <p class="kicker">ENVIRONMENT</p>
@@ -41,7 +35,7 @@ export function shell(): string {
             <button type="button" data-act="flash">Flash</button>
           </div>
           <div class="row"><span>Time</span></div>
-          <input id="tod" class="slider" type="range" min="0" max="24" step="0.1" value="13" />
+          <input id="tod" aria-label="Time of day" class="slider" type="range" min="0" max="24" step="0.1" value="13" />
         </div>
         <div class="group">
           <p class="kicker">CAMERA</p>
@@ -71,9 +65,9 @@ export function shell(): string {
         </div>
         <div class="group">
           <p class="kicker">RUN</p>
-          <div class="row"><span>Seed</span><input id="seed" class="field" style="width:88px" value="42" /></div>
+          <div class="row"><span>Seed</span><input id="seed" aria-label="Building seed" inputmode="numeric" class="field" style="width:88px" value="42" /></div>
           <div class="row"><span>Stage</span>
-            <select id="stage" class="field" style="width:88px">
+            <select id="stage" aria-label="Curriculum stage" class="field" style="width:88px">
               <option value="auto">auto</option>
               <option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
             </select>
@@ -90,7 +84,7 @@ export function shell(): string {
             <button type="button" class="text-btn" data-act="save">Download</button>
             <button type="button" class="text-btn" data-act="idb-save">Save local</button>
             <button type="button" class="text-btn" data-act="idb-load">Load local</button>
-            <input id="file" type="file" accept=".json,.bin,application/json,application/octet-stream" />
+            <input id="file" type="file" aria-label="Load a checkpoint file" accept=".json,.bin,application/json,application/octet-stream" />
             <div class="seg">
               <button type="button" data-act="quality" data-quality="low">Low</button>
               <button type="button" data-act="quality" data-quality="high">High</button>
@@ -101,7 +95,7 @@ export function shell(): string {
       </aside>
       <section class="stage-col">
         <div class="stage-wrap" id="stage-wrap">
-          <canvas id="view"></canvas>
+          <canvas id="view" role="img" aria-label="3D view of the drone in the building"></canvas>
           <canvas id="hud"></canvas>
           <div class="readout" id="readout"></div>
           <p class="error" id="boot-note">Spinning up the building…</p>
@@ -109,7 +103,7 @@ export function shell(): string {
         <div class="bottom">
           <section class="panel">
             <div class="panel-head"><h2>EXPLORATION MAP</h2><span class="live" id="cov-num">0%</span></div>
-            <canvas class="map-canvas" id="map" width="480" height="180"></canvas>
+            <canvas class="map-canvas" id="map" role="img" aria-label="Exploration map" width="480" height="180"></canvas>
             <div class="legend"><span><i class="swatch" style="background:#1ad6b0"></i>Explored</span><span><i class="swatch" style="background:#ff8a3d"></i>Frontier</span><span><i class="swatch" style="background:#c47b3a"></i>Shaft</span></div>
           </section>
           <section class="panel">
@@ -128,7 +122,7 @@ export function shell(): string {
               <button type="button" class="text-btn" data-act="replay" data-which="latest">Latest</button>
               <button type="button" class="text-btn" data-act="replay" data-which="best">Best</button>
               <button type="button" class="text-btn" data-act="replay" data-which="worst">Worst</button>
-              <input id="scrub" class="slider" type="range" min="0" max="1" value="0" />
+              <input id="scrub" aria-label="Replay position" class="slider" type="range" min="0" max="1" value="0" />
               <button type="button" class="text-btn" data-act="speed" data-speed="1">1×</button>
               <button type="button" class="text-btn" data-act="speed" data-speed="4">4×</button>
               <button type="button" class="text-btn" data-act="speed" data-speed="16">16×</button>
@@ -139,7 +133,7 @@ export function shell(): string {
       </section>
       <aside class="side">
         <div class="pip-wrap">
-          <canvas id="pip"></canvas>
+          <canvas id="pip" role="img" aria-label="Drone camera feed"></canvas>
           <canvas id="pip-hud"></canvas>
           <span class="pip-tag">FPV FEED</span>
         </div>
@@ -159,7 +153,7 @@ export function shell(): string {
           <canvas class="heat-canvas" id="heat" width="300" height="220"></canvas>
         </section>
       </aside>
-    </div>
+    </main>
   </div>`;
 }
 
