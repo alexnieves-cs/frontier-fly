@@ -1,5 +1,6 @@
 import '../world/outdoor/viz/outdoor.css';
 import './px4.css';
+import { REPO_URL, siteNav } from '../ui/siteNav';
 import { buildMissionWorld } from '../mission/autonomy/world';
 import { woodsSampleMission } from '../mission/outdoorWorld';
 import { buildFlightPlan, exportStem, type FlightPlan } from '../mission/export/flightPlan';
@@ -184,18 +185,18 @@ function set(root: ParentNode, selector: string, text: string): void {
 function markup(seed: number, url: string): string {
   return `
     <header class="topbar">
-      <div class="brand"><strong>frontier-fly</strong><span>PX4 in the loop</span></div>
-      <a href="./mission.html">mission editor</a>
-      <a href="https://github.com/alexnieves-cs/frontier-fly/blob/main/docs/PX4.md">how it works</a>
+      <div class="brand"><strong>frontier-fly</strong><h1>PX4 in the loop</h1></div>
+      ${siteNav('px4')}
       <div class="controls">
+        <a href="${REPO_URL}/blob/main/docs/PX4.md" rel="noopener">how it works</a>
         <span class="muted">woods seed ${seed}</span>
         <span class="muted" id="plan-summary"></span>
         <button id="download" type="button" data-testid="px4-download">Download .plan</button>
       </div>
     </header>
-    <div class="stage">
-      <canvas id="view"></canvas>
-      <canvas id="map" width="240" height="240"></canvas>
+    <main class="stage">
+      <canvas id="view" role="img" aria-label="3D view of the drone over the woods"></canvas>
+      <canvas id="map" width="240" height="240" role="img" aria-label="Top-down map with the mission route"></canvas>
       <div class="cam">
         <button id="cam-chase" type="button" data-on="1">chase</button>
         <button id="cam-fpv" type="button">FPV</button>
@@ -223,8 +224,8 @@ function markup(seed: number, url: string): string {
         </ol>
         <p class="muted">Relay: <code>${escapeHtml(url)}</code>. Simulators and practice fields only.</p>
       </aside>
-      <div class="boot" id="boot">generating the woods…</div>
-    </div>
+      <div class="boot" id="boot" role="status">generating the woods…</div>
+    </main>
   `;
 }
 

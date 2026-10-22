@@ -1,5 +1,4 @@
 .topbar .muted, .help .muted { color: var(--muted); font-size: 12px; }
-.topbar a { white-space: nowrap; }
 #download {
   background: #143024;
   border: 1px solid var(--cyan);
@@ -44,8 +43,17 @@
 .help li { margin: 4px 0; }
 .help code { background: #10241c; border-radius: 4px; padding: 1px 4px; font-size: 12.5px; }
 
+.controls a { white-space: nowrap; font-size: 13px; }
+
+/* Phones: the setup steps move below the view instead of covering it. */
 @media (max-width: 720px) {
-  .topbar { overflow-x: auto; }
+  html, body, #app { height: auto; }
   .topbar .muted { display: none; }
-  #map { width: 150px; height: 150px; }
+  .stage { flex: none; height: 62vh; }
+  .help {
+    position: absolute; left: 0; right: 0; top: 100%; transform: none;
+    width: auto; max-height: none; margin: 12px; overflow: visible;
+  }
+  .px4-hud { min-width: 0; }
+  .px4-hud #link { max-width: 180px; }
 }

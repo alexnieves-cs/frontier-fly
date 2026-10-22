@@ -107,6 +107,13 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   root.classList.add('film-root');
   if (recording) root.classList.add('film-recording');
   if (embed) root.classList.add('film-embed');
+  if (!embed) {
+    // The title is drawn into the overlay; this gives the page a heading for screen readers.
+    const heading = document.createElement('h1');
+    heading.className = 'film-sr';
+    heading.textContent = `Mission film: ${SCENARIOS.find((s) => s.id === scenario)?.title ?? scenario}`;
+    root.appendChild(heading);
+  }
   const stage = document.createElement('div');
   stage.className = 'film-stage';
   stage.style.width = `${STAGE_W}px`;
@@ -123,6 +130,8 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     const s = recording ? renderScale : embed ? embedScale(root) : Math.min(window.innerWidth / STAGE_W, (window.innerHeight - 64) / STAGE_H);
     // An embedded stage is centred on the container (see .film-embed in film.css).
     stage.style.transform = embed ? `translate(-50%, -50%) scale(${s})` : `scale(${s})`;
+    // On a tall screen (a phone held upright) centre the film in the space above the controls.
+    if (!embed && !recording) stage.style.marginTop = `${Math.max(0, (window.innerHeight - 64 - STAGE_H * s) / 2)}px`;
     root.style.setProperty('--stage-scale', String(s));
   };
   fit();
@@ -260,6 +269,7 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
   scrub.max = String(timeline.length - 1);
   scrub.value = '0';
   scrub.className = 'film-scrub';
+  scrub.setAttribute('aria-label', 'Mission time');
   bar.appendChild(scrub);
   const picker = document.createElement('div');
   picker.className = 'film-picker';
@@ -271,11 +281,23 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
     picker.appendChild(a);
   }
   bar.appendChild(picker);
+  // Narrow screens hide the picker links; a select takes their place.
+  const select = document.createElement('select');
+  select.className = 'film-select';
+  select.setAttribute('aria-label', 'Scenario');
+  for (const s of SCENARIOS) select.add(new Option(s.title, s.id, false, s.id === scenario));
+  select.addEventListener('change', () => location.assign(`?scenario=${select.value}`));
+  bar.appendChild(select);
   const back = document.createElement('a');
   back.href = `demo.html?scenario=${scenario}`;
   back.className = 'film-link';
   back.textContent = 'Open in the mission console';
   bar.appendChild(back);
+  const home = document.createElement('a');
+  home.href = './index.html';
+  home.className = 'film-link';
+  home.textContent = 'Home';
+  bar.appendChild(home);
   void log;
 
   let playing = true;

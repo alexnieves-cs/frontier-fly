@@ -22,19 +22,21 @@ button { cursor: pointer; }
 .shell {
   height: 100%;
   display: grid;
-  grid-template-rows: 52px 1fr;
-  min-width: 1100px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .topbar {
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 0 16px;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  min-height: 52px;
+  padding: 6px 16px;
   border-bottom: 1px solid var(--line);
   background: #08131e;
 }
-.brand { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+.brand { display: flex; align-items: center; gap: 10px; }
 .mark {
   width: 28px; height: 28px; border-radius: 8px;
   background: radial-gradient(circle at 30% 30%, #e8fff8, #1aa88a 45%, #08332c);
@@ -42,16 +44,17 @@ button { cursor: pointer; }
 }
 .brand h1 { font-size: 14px; letter-spacing: 0.14em; margin: 0; font-weight: 700; }
 .brand p { margin: 0; color: var(--muted); font-size: 10px; letter-spacing: 0.08em; }
-.page-links { display: flex; gap: 2px; }
+.page-links { display: flex; gap: 0; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .page-links a {
   color: var(--blue);
   text-decoration: none;
   font-size: 13px;
-  padding: 6px 8px;
+  padding: 7px 7px;
   border-radius: 6px;
   white-space: nowrap;
 }
 .page-links a:hover, .page-links a:focus-visible { text-decoration: underline; background: #0f2235; }
+.page-links a[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--cyan); }
 /* Camera and panel shortcuts: a compact segmented control, not page navigation. */
 .tabs {
   display: flex; align-items: center; gap: 2px; margin-right: auto;
@@ -75,7 +78,7 @@ button { cursor: pointer; }
 
 .workspace {
   display: grid;
-  grid-template-columns: 248px 1fr 320px;
+  grid-template-columns: 248px minmax(0, 1fr) 320px;
   min-height: 0;
 }
 .rail, .side {
@@ -163,7 +166,8 @@ button { cursor: pointer; }
 @keyframes attention { 50% { box-shadow: 0 0 0 6px rgba(62, 224, 197, 0.25); } }
 @media (prefers-reduced-motion: reduce) { .text-btn.attention { animation: none; } }
 .replay-row { display: flex; gap: 6px; align-items: center; }
-.replay-row input { flex: 1; }
+.replay-row input { flex: 1; min-width: 40px; }
+.replay-row .text-btn { padding: 5px 8px; }
 .error {
   position: absolute; inset: 12px auto auto 12px; max-width: 420px;
   background: #3a1420; color: #ffd5dd; padding: 10px 12px; border-radius: 8px;
@@ -171,3 +175,24 @@ button { cursor: pointer; }
 
 .uplot, .uplot * { font-family: ui-monospace, monospace !important; }
 .uplot .u-wrap { background: transparent; }
+
+/* Below desktop width: one column, the view first, and the page scrolls. */
+@media (max-width: 1100px) {
+  .status-pills #clock, .status-pills #backend { display: none; }
+}
+@media (max-width: 900px) {
+  html, body, #app, .shell { height: auto; }
+  .topbar { padding: 8px 12px; }
+  .page-links { order: 3; flex: 1 0 100%; }
+  .tabs { order: 4; max-width: 100%; overflow-x: auto; margin-right: 0; scrollbar-width: none; }
+  .tabs button { white-space: nowrap; }
+  .status-pills { margin-left: auto; }
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .stage-col { order: 1; grid-template-rows: min(62vh, 520px) auto; }
+  .rail { order: 2; }
+  .side { order: 3; }
+  .rail, .side { border: 0; border-top: 1px solid var(--line); overflow: visible; }
+  .bottom { grid-template-columns: minmax(0, 1fr); }
+  .replay-row { flex-wrap: wrap; }
+  .replay-row input { flex: 1 0 100%; order: 1; }
+}

@@ -1,4 +1,5 @@
 import './outdoor.css';
+import { siteNav } from '../../../ui/siteNav';
 import type { DynParams } from '../../../shared/types';
 import { makeDroneState, scaleAction } from '../../../sim/drone';
 import { KinematicDynamics } from '../../../sim/dynamics/kinematic';
@@ -216,16 +217,16 @@ function readSeed(input: HTMLInputElement): number {
 function markup(): string {
   return `
     <header class="topbar">
-      <div class="brand"><strong>frontier-fly</strong><span>outdoor world</span></div>
-      <a href="./sim.html">indoor sim</a>
+      <div class="brand"><strong>frontier-fly</strong><h1>Outdoor world</h1></div>
+      ${siteNav('outdoor')}
       <div class="controls">
         <label>seed <input id="seed" inputmode="numeric" /></label>
         <button id="regen" type="button">new world</button>
       </div>
     </header>
-    <div class="stage">
-      <canvas id="view"></canvas>
-      <canvas id="map" width="240" height="240"></canvas>
+    <main class="stage">
+      <canvas id="view" role="img" aria-label="3D view of the outdoor site"></canvas>
+      <canvas id="map" width="240" height="240" role="img" aria-label="Top-down map of the site"></canvas>
       <div class="cam">
         <button id="cam-fpv" type="button">1 FPV</button>
         <button id="cam-chase" type="button">2 chase</button>
@@ -236,10 +237,10 @@ function markup(): string {
         <span>fence <strong id="hud-fence">inside</strong></span>
         <span>lidar <strong id="hud-lidar">—</strong></span>
         <span id="hud-open"></span>
-        <span>WASD fly · QE yaw · Space/C up/down</span>
+        <span class="keys">WASD fly · QE yaw · Space/C up/down</span>
       </div>
-      <div class="boot" id="boot">generating terrain…</div>
-    </div>
+      <div class="boot" id="boot" role="status">generating terrain…</div>
+    </main>
   `;
 }
 

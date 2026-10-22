@@ -24,6 +24,7 @@ import { mockWorldProvider } from '../../mission/worldMock';
 import { createExportPanel } from './exportPanel';
 import { createLivePanel } from './livePanel';
 import { createMissionMap, type MapLayers, type MapSelection, type MapTool } from './map';
+import { siteNav } from '../siteNav';
 
 const STORAGE_KEY = 'frontier-fly.mission.draft';
 
@@ -125,8 +126,9 @@ export function mountMissionEditor(root: HTMLElement): void {
   const modes = el('div', { className: 'modes', attrs: { role: 'tablist' } });
   modes.append(planButton, runButton);
   const schema = el('p', { className: 'schema', testid: 'schema-version', text: `Schema v${MISSION_SCHEMA_VERSION}` });
-  const sim = el('a', { className: 'sim-link', text: 'Open sim', attrs: { href: './sim.html' } });
-  header.append(brand, modes, schema, el('span', { className: 'spacer' }), saveStatus, saveButton, sim);
+  const nav = el('div', { className: 'nav-slot' });
+  nav.innerHTML = siteNav('mission');
+  header.append(brand, modes, schema, el('span', { className: 'spacer' }), saveStatus, saveButton, nav);
 
   const nameInput = el('input', { attrs: { type: 'text', id: 'mission-name', maxlength: '80', autocomplete: 'off' }, testid: 'mission-name' });
   const seedInput = el('input', { attrs: { type: 'number', id: 'mission-seed', min: '0', step: '1' }, testid: 'mission-seed' });
@@ -220,7 +222,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   const linkField = el('input', {
     className: 'link',
     testid: 'mission-link',
-    attrs: { type: 'text', readonly: 'true', placeholder: 'Save to create a shareable link.' },
+    attrs: { type: 'text', readonly: 'true', placeholder: 'Save to create a shareable link.', 'aria-label': 'Shareable mission link' },
   });
   const planSide = el('div', { testid: 'plan-side' });
   planSide.append(
@@ -255,7 +257,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   planSide.append(exporter.element);
   const side = el('aside', { className: 'side' });
 
-  const workspace = el('div', { className: 'workspace' });
+  const workspace = el('main', { className: 'workspace' });
   workspace.append(rail, stage, side);
   root.replaceChildren(header, workspace);
 

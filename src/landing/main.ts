@@ -115,6 +115,7 @@ function markup(): string {
       <span>frontier-fly · civilian search, inspection, and confirm-clear only · MIT</span>
       <span class="foot-links">
         <a href="./mission.html">Mission editor</a>
+        <a href="./px4.html">PX4 in the loop</a>
         <a href="${REPO}/blob/main/docs/ARCHITECTURE.md" rel="noopener">Architecture</a>
         <a href="${REPO}" rel="noopener">Source</a>
       </span>
