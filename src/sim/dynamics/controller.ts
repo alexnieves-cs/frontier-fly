@@ -51,6 +51,9 @@ export class AngleController {
   private maxTilt = MAX_TILT;
   /** A tilt limit was set: clamp the tilt vector. The default keeps the per-axis clamp every checkpoint was trained on. */
   private tiltNorm = false;
+  /** Give up collective before roll and pitch when the motors saturate. Off keeps the mixer the checkpoints were trained on. */
+  private attitudeFirst = false;
+  private readonly rp = new Float64Array(4);
 
   setParams(p: DynParams): void {
     this.mass = p.mass > 1e-6 ? p.mass : 1e-6;
@@ -80,6 +83,15 @@ export class AngleController {
     this.gain = rateGain;
     this.tiltNorm = maxTilt !== undefined;
     this.maxTilt = maxTilt ?? MAX_TILT;
+  }
+
+  /**
+   * Mixer priority. On, a saturated mixer lowers (or raises) the collective to keep the full
+   * roll/pitch/yaw differential, as PX4's mixer does; off, it scales the differential down instead,
+   * which at full climb thrust leaves no attitude authority and the airframe runs away tilted.
+   */
+  setAttitudeFirst(on: boolean): void {
+    this.attitudeFirst = on;
   }
 
   compute(
@@ -164,6 +176,10 @@ export class AngleController {
   }
 
   private mix(thrust: number, tx: number, ty: number, tz: number, wCmd: Float32Array): void {
+    if (this.attitudeFirst) {
+      this.mixAttitudeFirst(thrust, tx, ty, tz, wCmd);
+      return;
+    }
     const inv4 = 0.25;
     const inv4a = inv4 / this.a;
     const inv4b = inv4 / this.b;
@@ -219,5 +235,46 @@ export class AngleController {
     wCmd[1] = Math.sqrt(Math.max(avg + d1, 0) / kf);
     wCmd[2] = Math.sqrt(Math.max(avg + d2, 0) / kf);
     wCmd[3] = Math.sqrt(Math.max(avg + d3, 0) / kf);
+  }
+  /**
+   * PX4's priority: roll and pitch first, moving the collective to make room for them, then yaw with
+   * whatever headroom is left. Yaw needs far more differential per unit torque than roll and pitch,
+   * so mixed alongside them it takes the motors' range a hard stop needs.
+   */
+  private mixAttitudeFirst(thrust: number, tx: number, ty: number, tz: number, wCmd: Float32Array): void {
+    const fMax = this.fMax;
+    const ka = 0.25 / this.a;
+    const kb = 0.25 / this.b;
+    const rp = this.rp;
+    rp[0] = (-tx - ty) * ka;
+    rp[1] = (-tx + ty) * ka;
+    rp[2] = (tx + ty) * ka;
+    rp[3] = (tx - ty) * ka;
+    let avg = Math.min(Math.max(thrust * 0.25, 0), fMax);
+    let hi = Math.max(rp[0], rp[1], rp[2], rp[3]);
+    let lo = Math.min(rp[0], rp[1], rp[2], rp[3]);
+    // Roll and pitch need more range than the motors have: keep the direction, scale the size.
+    if (hi - lo > fMax) {
+      const k = fMax / (hi - lo);
+      for (let i = 0; i < 4; i++) rp[i] = rp[i]! * k;
+      hi *= k;
+      lo *= k;
+    }
+    if (avg + hi > fMax) avg = fMax - hi;
+    if (avg + lo < 0) avg = -lo;
+    // Yaw, signs alternating by rotor spin direction, scaled into the room that is left.
+    let ys = 1;
+    for (let i = 0; i < 4; i++) {
+      const y = (i % 2 === 0 ? tz : -tz) * kb;
+      const f = avg + rp[i]!;
+      if (y > 1e-12) ys = Math.min(ys, (fMax - f) / y);
+      else if (y < -1e-12) ys = Math.min(ys, -f / y);
+    }
+    if (ys < 0) ys = 0;
+    const kf = this.kf;
+    for (let i = 0; i < 4; i++) {
+      const y = (i % 2 === 0 ? tz : -tz) * kb * ys;
+      wCmd[i] = Math.sqrt(Math.max(avg + rp[i]! + y, 0) / kf);
+    }
   }
 }
