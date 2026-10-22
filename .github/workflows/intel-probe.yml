@@ -1,5 +1,5 @@
 name: intel-probe
-# Temporary: checks which hosts serve the Intel Research Lab log from GitHub's runners.
+# Temporary: checks the Intel Research Lab files' formats from GitHub's runners.
 on:
   push:
     branches: [claude/project-thread-whem5k]
@@ -12,21 +12,21 @@ jobs:
       - name: probe
         run: |
           mkdir -p out && cd out
-          get() { echo "== $1"; curl -sSL -m 60 -o "$2" -w "%{http_code} %{size_download} %{url_effective}\n" "$1" || true; }
-          get "https://dspace.mit.edu/handle/1721.1/62287?show=full" dspace_full.html
-          get "https://dspace.mit.edu/handle/1721.1/62287" dspace.html
-          grep -o 'href="[^"]*bitstream[^"]*"' dspace.html | sort -u || true
-          grep -io 'creativecommons[^"]*' dspace_full.html | sort -u || true
-          for p in datasets/intel.relations datasets/intel.clf datasets.php; do
-            get "http://ais.informatik.uni-freiburg.de/slamevaluation/$p" "fr_$(basename $p)"
-            get "https://web.archive.org/web/2019id_/http://ais.informatik.uni-freiburg.de/slamevaluation/$p" "wa_$(basename $p)"
+          B=http://ais.informatik.uni-freiburg.de/slamevaluation
+          curl -sSL -o intel.clf $B/datasets/intel.clf
+          curl -sSL -o intel.relations $B/datasets/intel.relations
+          curl -sSL -o datasets.php $B/datasets.php
+          curl -sSL -o index.php $B/ || true
+          sha256sum intel.clf intel.relations
+          echo "--- clf types"; awk '{print $1}' intel.clf | sort | uniq -c
+          echo "--- clf comments"; grep '^#' intel.clf | head -20
+          echo "--- first FLASER"; grep -m2 '^FLASER' intel.clf | cut -c1-200; grep -m1 '^FLASER' intel.clf | awk '{print NF; for(i=NF-9;i<=NF;i++) printf "%s ", $i; print ""}'
+          echo "--- first ODOM"; grep -m3 '^ODOM' intel.clf
+          echo "--- last FLASER tail"; grep '^FLASER' intel.clf | tail -1 | awk '{for(i=NF-9;i<=NF;i++) printf "%s ", $i; print ""}'
+          echo "--- max range values"; grep '^FLASER' intel.clf | awk '{for(i=3;i<3+$2;i++) c[$i]++} END{for(k in c) if (k+0>=40) print k, c[k]}' | sort -n | tail -5
+          echo "--- relations"; head -5 intel.relations; wc -l intel.relations
+          echo "--- datasets.php"; sed -e 's/<[^>]*>/ /g' datasets.php | tr -s ' \n' | head -c 4000
+          echo; echo "--- index"; sed -e 's/<[^>]*>/ /g' index.php | tr -s ' \n' | head -c 4000
+          for u in 3c239670-27ce-4f11-8686-fdc3f0e48825 6edc81dc-3d77-4f15-8e23-f3b336f85ebf; do
+            echo "--- bitstream $u"; curl -sSL "https://dspace.mit.edu/server/api/core/bitstreams/$u" | head -c 800; echo
           done
-          get "http://www2.informatik.uni-freiburg.de/~stachnis/datasets/datasets/intel-lab/intel.gfs.log.gz" fr_intel.gfs.log.gz
-          get "https://web.archive.org/web/2019id_/http://www2.informatik.uni-freiburg.de/~stachnis/datasets/datasets/intel-lab/intel.gfs.log.gz" wa_intel.gfs.log.gz
-          ls -la
-          for f in dspace*.html; do echo "--- $f"; sed -e 's/<[^>]*>/ /g' $f | tr -s ' \n' | grep -i -m 20 "intel\|rights\|licen\|bitstream\|\.gz\|\.log" ; done
-          for f in fr_* wa_*; do echo "--- $f"; head -c 400 "$f" | strings | head -5; done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: intel-probe
-          path: out
