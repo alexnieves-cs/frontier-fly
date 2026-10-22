@@ -64,6 +64,22 @@ describe('quad mission vehicle', () => {
     }
   });
 
+  it('keeps attitude control when a fast stop meets a full-thrust climb', () => {
+    // The GNSS-loss climb: setting off, then asked to stop and climb at once. A mixer that
+    // keeps the collective and drops the differential loses the attitude, and the airframe runs off.
+    const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
+    // Recorded in a gnss-lost flight: from a hover, two ticks of a turn-and-go, then the climb.
+    for (let i = 0; i < 20; i++) q.step({ vel: [0, 0, 0], yaw: 0 }, 0.05, OUTDOOR_LIMITS);
+    for (let i = 0; i < 2; i++) q.step({ vel: [2.08, -1.39, -0.04], yaw: -0.588 }, 0.05, OUTDOOR_LIMITS);
+    let peak = 0;
+    for (let i = 0; i < 40; i++) {
+      q.step({ vel: [-0.5, 0, 1.2], yaw: null }, 0.05, OUTDOOR_LIMITS);
+      peak = Math.max(peak, horizontalSpeed(q));
+    }
+    expect(peak).toBeLessThan(3);
+    expect(Math.hypot(q.vel[0] + 0.5, q.vel[1])).toBeLessThan(0.3);
+  });
+
   it('stops within the braking model from indoor and outdoor speeds', () => {
     // MISSION_QUAD_BRAKING was fitted on the coverage env's micro quad; check it holds on the 1.2 kg airframe.
     for (const [limits, v0] of [

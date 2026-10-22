@@ -4,6 +4,9 @@ import type { BuildingShell, Corridor, Geofence, Terrain, TreeInstance, TreeKind
 import { containsPoint } from './geofence';
 import { sampleHeight } from './terrain';
 
+/** Radius around home kept free of every plant, so the drone takes off and lands on open ground. */
+const PAD_CLEAR_M = 2;
+
 export interface Aabb {
   minX: number;
   minY: number;
@@ -59,6 +62,8 @@ export function scatterForest(
       const tree = makeTree(terrain, px, py, kind, rng);
       if (lodOf(px, py, spawnX, spawnY) === 2 && rng.bool(0.25)) continue;
       if (blocked(tree, boxes, corridors)) continue;
+      // Corridors allow undergrowth, but not on the landing pad itself.
+      if (Math.hypot(px - spawnX, py - spawnY) < PAD_CLEAR_M + tree.canopyRadius) continue;
       tree.lod = lodOf(px, py, spawnX, spawnY);
       trees.push(tree);
     }
