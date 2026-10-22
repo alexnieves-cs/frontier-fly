@@ -16,6 +16,7 @@ import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { CELL } from '../../src/shared/constants';
 import type { BuildingSpec } from '../../src/shared/types';
 import { lightingPreset, type LightingPreset } from '../../src/sim/lighting';
+import { withoutCurve } from '../../src/eval/footprint';
 import { bootstrapCi, loadPolicy, runJob, type Job, type PilotId, type Result } from './coverage-study';
 
 export const PLAN_PILOTS: PilotId[] = ['teacher', 'classical', 'policy', 'guarded', 'waypoint', 'heuristic'];
@@ -223,7 +224,7 @@ if (process.argv.includes('--merge')) {
       setup.cfg.lighting = lightingPreset(job.lighting, nRooms);
     }
     const r = await runJob({ ...job, seed: setup.envSeed }, policy, setup);
-    lines.push(JSON.stringify({ ...r, plan: job.plan, rep: job.rep }));
+    lines.push(JSON.stringify({ ...withoutCurve(r), plan: job.plan, rep: job.rep }));
     if (i % 25 === 0) {
       writeFileSync(out, lines.join('\n') + '\n');
       console.log(`shard ${shard}: ${i + 1}/${mine.length} (${Math.round((Date.now() - t0) / 1000)} s)`);

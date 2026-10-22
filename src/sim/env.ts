@@ -296,6 +296,16 @@ export class ExplorerEnv implements Env {
     this.spec = null;
   }
 
+  /** The true geometry of the current episode, for evaluation-only sensors (eval/footprint.ts). Pilots must not read it. */
+  get world(): PhysicsWorld | null {
+    return this.physics;
+  }
+
+  /** Live drone position (not a copy). */
+  get position(): readonly [number, number, number] {
+    return this.state.pos;
+  }
+
   snapshot(): DroneState {
     return cloneDroneState(this.state);
   }

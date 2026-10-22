@@ -134,6 +134,27 @@ Every pilot above cruises at 2 m/s. This study raises the speed cap to 3, 4 and 
 
 {{SPEED_FIGURE}}
 
+### Coverage the way exploration papers measure it
+
+Every coverage number above counts the 0.5 m voxels the drone's *center* flew through. That is a strict metric, and it rewards sweeping lanes one voxel apart, which is the U-turn the quadrotor cannot take at speed. Exploration papers usually score what the sensor observed instead. This section scores the same episodes both ways: **flown** as above, and **footprint**, the share of the reachable building that came within a sensor's view. The headline radius is 3 m, about where the detector's recall falls to half for the smallest search items (phone, radio); {{FOOTPRINT_RADII}} are tracked from the same rays. The radius was set from the detector model before any footprint number was computed, and no pilot or checkpoint was changed or chosen on it. Flown coverage stays the training reward, the checkpoint-selection metric and the FrontierBench score, so earlier numbers remain comparable; the footprint is reported beside it.
+
+{{FOOTPRINT_NOTE}}
+
+{{FOOTPRINT_FINDINGS}}
+
+{{FOOTPRINT_FIGURE}}
+
+<details>
+<summary>Every condition and pilot, flown and footprint</summary>
+
+{{FOOTPRINT_TABLE}}
+
+</details>
+
+The speed study scored the same way, flown / footprint at each speed cap:
+
+{{FOOTPRINT_SPEED_TABLE}}
+
 ### Indoor localization
 
 {{LOC_NOTE}}
@@ -383,6 +404,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 - **Confirm-clear is only as good as the look estimate.** A building is declared clear when at least 95% of the free voxels the drone mapped and can reach on each floor were looked at by its camera estimate, so up to 5% of a floor can go unlooked. Space the lidar never mapped (behind furniture taller than the ring, or under a table) is not counted, and the detector can still miss a person in looked-at space. The occupied sweep measures the result, on one target pose per world.
 - **The coverage study's policy and planner never fly on the estimate.** Only the mission bench does; the coverage numbers above are on the true pose.
 - **The localization sensors are idealized in places.** Each lidar sweep is instantaneous (no motion distortion), the flow sensor's errors are white plus a per-flight scale error, walls are perfectly flat and axis-aligned (which the Manhattan heading fix relies on), and nothing in the building moves. There is no loop closure: drift that enters the map stays in it.
+- **The footprint is an idealized sensor.** It is a 360° ring of perfect rays in the lidar plane: no field-of-view limit, no lighting, no motion blur, and nothing above or below the drone's altitude. A forward camera with a narrow field of view would score lower and would reward pilots that turn to look. It measures what came into view, not whether a target there would have been recognized.
 - **One simulator, one real log.** Everything here is measured in this repository's simulator; nothing has flown on hardware. The one real data the code has seen is the Intel Research Lab laser log, which only the pose estimator replays (above), and on it the estimator drifts metres over the 45-minute run because it has no loop closure.
 
 ## Seeds and protocol
@@ -415,7 +437,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 
 ```bash
 npm ci
-npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition
+npm run study:coverage   # docs/study.json: every pilot, 30 fresh buildings per condition, flown and footprint coverage
 npm run study:missions   # docs/mission-bench.json: each indoor explorer, airframe and pose source, 30 fresh worlds per scenario
 npm run study:team       # docs/team-bench.json and docs/report/team-curves.svg: 1 to 4 drones and the team ablations
 npm run study:sar        # docs/sar-bench.json and docs/report/sar-belief.svg: six outdoor search methods

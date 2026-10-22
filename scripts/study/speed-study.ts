@@ -9,7 +9,8 @@
 // (scripts/study/speed-diag.ts).
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { evalEpisodeSetup } from '../../src/eval/coverage';
+import { evalEpisodeSetup, evalSteps } from '../../src/eval/coverage';
+import { EpisodeFootprint, FOOTPRINT_META, summarizeFootprint, withoutCurve, type FootprintRecord } from '../../src/eval/footprint';
 import { classicalPilot, guardedAction } from '../../src/eval/pilots';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { RNG } from '../../src/shared/rng';
@@ -42,7 +43,8 @@ interface Job {
   speed: number;
 }
 
-interface Result extends Job {
+interface Result extends Job, Partial<FootprintRecord> {
+  /** Flown coverage (the env's metric). */
   coverage: number;
   collisions: number;
   energyWh: number;
@@ -87,6 +89,8 @@ async function runJob(env: ExplorerEnv, job: Job, policy: (obs: Float32Array) =>
     act = p.act;
   }
   let obs = env.reset(spec, envSeed, cfg);
+  const fp = new EpisodeFootprint();
+  fp.start(env, spec, cfg.maxSteps);
   let info = { coverage: 0, collisions: 0, energyWh: 0 };
   let halfS: number | null = null;
   for (let t = 0; t < cfg.maxSteps; t++) {
@@ -94,9 +98,10 @@ async function runJob(env: ExplorerEnv, job: Job, policy: (obs: Float32Array) =>
     obs = s.obs;
     info = s.info;
     if (halfS === null && info.coverage >= 0.5) halfS = (t + 1) / 20;
+    fp.step(env, t + 1, info.coverage);
     if (s.done) break;
   }
-  return { ...job, coverage: info.coverage, collisions: info.collisions, energyWh: info.energyWh, halfS };
+  return { ...job, coverage: info.coverage, collisions: info.collisions, energyWh: info.energyWh, halfS, ...fp.finish(info.coverage) };
 }
 
 function arg(name: string, fallback: string): string {
@@ -115,6 +120,7 @@ function summarize(rows: Result[]) {
         const cov = rs.map((r) => r.coverage);
         const wh = rs.map((r) => r.energyWh);
         const half = rs.filter((r) => r.halfS !== null).map((r) => r.halfS!);
+        const fp = rs.every((r) => r.footprint && r.curve) ? { footprintStats: summarizeFootprint(rs as FootprintRecord[], evalSteps(c.stage) / 20, bootstrapCi) } : {};
         cells.push({
           condition: c.id,
           pilot,
@@ -128,6 +134,7 @@ function summarize(rows: Result[]) {
           coveragePerWh: mean(cov) / Math.max(1e-9, mean(wh)),
           reachedHalf: half.length,
           halfS: half.length ? mean(half) : null,
+          ...fp,
         });
       }
   return cells;
@@ -149,10 +156,11 @@ if (process.argv.includes('--merge')) {
     seedsPerCell: SPEED_SEEDS,
     speeds: SPEEDS,
     momentum: MOMENTUM,
+    footprint: FOOTPRINT_META,
     conditions: SPEED_CONDITIONS,
     pilots: SPEED_PILOTS,
     cells: summarize(rows),
-    episodes: rows,
+    episodes: rows.map(withoutCurve),
   };
   writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`wrote ${outPath} from ${rows.length} episodes`);

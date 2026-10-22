@@ -9,7 +9,8 @@
 // 9101-9108, so none of these buildings informed any choice being measured.
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { evalEpisodeSetup } from '../../src/eval/coverage';
+import { evalEpisodeSetup, evalSteps } from '../../src/eval/coverage';
+import { EpisodeFootprint, FOOTPRINT_META, summarizeFootprint, withoutCurve, type FootprintRecord } from '../../src/eval/footprint';
 import { OracleGain } from '../../src/eval/gainLabels';
 import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
@@ -89,7 +90,8 @@ export interface Job {
   pilot: PilotId;
 }
 
-export interface Result extends Job {
+export interface Result extends Job, Partial<FootprintRecord> {
+  /** Flown coverage: voxels the drone center passed through (the env's own metric). */
   coverage: number;
   collisions: number;
   steps: number;
@@ -193,6 +195,8 @@ export async function runJob(
   setup?: ReturnType<typeof evalEpisodeSetup>,
 ): Promise<Result> {
   const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy, setup);
+  const fp = new EpisodeFootprint();
+  fp.start(env, spec, cfg.maxSteps);
   let obs = first;
   let coverage = 0;
   let collisions = 0;
@@ -205,10 +209,11 @@ export async function runJob(
     collisions = step.info.collisions;
     floors.add(step.info.floor);
     steps = t + 1;
+    fp.step(env, steps, coverage);
     if (step.done) break;
   }
   env.dispose();
-  return { ...job, coverage, collisions, steps, floorsReached: floors.size, floors: spec.floors.length };
+  return { ...job, coverage, collisions, steps, floorsReached: floors.size, floors: spec.floors.length, ...fp.finish(coverage) };
 }
 
 function arg(name: string, fallback: string): string {
@@ -226,6 +231,7 @@ export function summarizeStudy(rows: Result[]) {
         const rs = rows.filter((r) => r.condition === c.id && r.lighting === lighting && r.pilot === pilot);
         if (!rs.length) continue;
         const cov = rs.map((r) => r.coverage);
+        const fp = rs.every((r) => r.footprint && r.curve) ? { footprintStats: summarizeFootprint(rs as FootprintRecord[], evalSteps(c.stage) / 20, bootstrapCi) } : {};
         cells.push({
           condition: c.id,
           lighting,
@@ -236,6 +242,7 @@ export function summarizeStudy(rows: Result[]) {
           collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
           episodesWithCollision: rs.filter((r) => r.collisions > 0).length,
           reachedAnotherFloor: rs.filter((r) => r.floorsReached > 1).length,
+          ...fp,
         });
       }
     }
@@ -261,10 +268,11 @@ if (MAIN && process.argv.includes('--merge')) {
     commit: execSync('git rev-parse --short HEAD').toString().trim(),
     checkpoint: arg('checkpoint', SHIPPED_CHECKPOINT_PATH),
     seedsPerCondition: SEEDS_PER_CONDITION,
+    footprint: FOOTPRINT_META,
     conditions: CONDITIONS,
     pilots: PILOTS,
     cells: summarizeStudy(rows),
-    episodes: rows,
+    episodes: rows.map(withoutCurve),
   };
   writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`wrote ${outPath} from ${rows.length} episodes`);
