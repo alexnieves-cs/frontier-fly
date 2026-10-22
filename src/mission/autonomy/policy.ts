@@ -1,6 +1,6 @@
 import { ACT_DIM, HIDDEN, OBS_DIM } from '../../shared/constants';
 import { parseCheckpoint, type Checkpoint } from '../../rl/checkpoint';
-import { InferPolicy, type ActResult } from '../../rl/infer';
+import { actingWeights, InferPolicy, type ActResult } from '../../rl/infer';
 import { RunningNorm } from '../../rl/normalize';
 import type { RNG } from '../../shared/rng';
 import type { ActingPolicy } from './planner/indoor';
@@ -24,7 +24,7 @@ export class NormalizedPolicy implements ActingPolicy {
 export function policyFromCheckpoint(checkpoint: Checkpoint): NormalizedPolicy {
   const hidden = checkpoint.hidden.length === 2 ? checkpoint.hidden : [...HIDDEN];
   const policy = new InferPolicy(checkpoint.obsDim || OBS_DIM, checkpoint.actDim || ACT_DIM, hidden, 1);
-  policy.setWeights(checkpoint.weights.map((row) => Float32Array.from(row).buffer));
+  policy.setWeights(actingWeights(checkpoint.weights, policy.obsDim, policy.actDim, hidden));
   const norm = new RunningNorm(policy.obsDim);
   if (checkpoint.obsMean.length === policy.obsDim) {
     norm.load({

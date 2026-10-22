@@ -74,6 +74,16 @@ export function weightShapes(obsDim: number, actDim: number, hidden: readonly nu
   ];
 }
 
+/**
+ * A checkpoint's weight arrays as setWeights buffers. An actor-only checkpoint
+ * (src/rl/checkpoint.ts) leaves out the value head, which acting never reads: zeros stand in for it.
+ */
+export function actingWeights(weights: readonly (readonly number[])[], obsDim: number, actDim: number, hidden: readonly number[]): ArrayBuffer[] {
+  const out = weights.map((row) => Float32Array.from(row).buffer);
+  for (const shape of weightShapes(obsDim, actDim, hidden).slice(out.length)) out.push(new Float32Array(numel(shape)).buffer);
+  return out;
+}
+
 function numel(shape: readonly number[]): number {
   let n = 1;
   for (const d of shape) n *= d;

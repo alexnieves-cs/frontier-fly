@@ -1,6 +1,6 @@
 import { ACT_DIM, HIDDEN, OBS_DIM, OBS_VERSION } from '../shared/constants';
 import { serializeCheckpoint, type Checkpoint } from '../rl/checkpoint';
-import { InferPolicy } from '../rl/infer';
+import { actingWeights, InferPolicy } from '../rl/infer';
 import { RunningNorm } from '../rl/normalize';
 
 /** Checkpoint <-> flyable policy for the sim page, and the file download. */
@@ -15,11 +15,7 @@ export interface LoadedPolicy {
 /** Build the inference policy and observation norm a checkpoint describes. Check checkpointMismatch first. */
 export function policyFromCheckpoint(checkpoint: Checkpoint): LoadedPolicy {
   const policy = new InferPolicy(checkpoint.obsDim || OBS_DIM, checkpoint.actDim || ACT_DIM, checkpoint.hidden.length === 2 ? checkpoint.hidden : HIDDEN, 1);
-  const buffers = checkpoint.weights.map((row) => {
-    const arr = Float32Array.from(row);
-    return arr.buffer;
-  });
-  policy.setWeights(buffers);
+  policy.setWeights(actingWeights(checkpoint.weights, policy.obsDim, policy.actDim, policy.hidden));
   const identity =
     checkpoint.obsMean.every((v) => v === 0) && checkpoint.obsVar.every((v) => v === 1);
   const norm = new RunningNorm(policy.obsDim);

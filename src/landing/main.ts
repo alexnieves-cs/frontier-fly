@@ -1,7 +1,7 @@
 import '../film/film.css';
 import './landing.css';
 import bench from '../../docs/benchmarks.json';
-import { startFilm, type FilmStatus } from '../film/page';
+import type { FilmStatus } from '../film/page';
 
 const REPO = 'https://github.com/alexnieves-cs/frontier-fly';
 const HERO_SCENARIO = 'cabin-day';
@@ -142,9 +142,12 @@ function start(root: HTMLElement): void {
       console.warn('Landing hero:', message);
     }
   };
-  // Let the landing markup paint before the headless flight takes the main thread.
+  // The film (three.js, the physics engine, the mission stack) is most of the page's code: load it after the
+  // landing markup paints, and let the markup paint before the headless flight takes the main thread.
   window.setTimeout(() => {
-    void startFilm(film, { embed: true, scenario: HERO_SCENARIO, onStatus });
+    import('../film/page')
+      .then(({ startFilm }) => startFilm(film, { embed: true, scenario: HERO_SCENARIO, onStatus }))
+      .catch((error: unknown) => onStatus('error', error instanceof Error ? error.message : String(error)));
   }, 120);
 }
 
