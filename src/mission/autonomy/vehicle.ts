@@ -34,6 +34,8 @@ export interface VehicleLimits {
   tau: number;
   /** Quad only: the flight controller's tilt-vector limit, rad. Unset keeps the controller's default (23° per axis). */
   maxTilt?: number;
+  /** Quad only, with maxTilt: slow, precise moves keep to a gentler lean (quadVehicle.ts PRECISE_TILT_RAD). */
+  gentleStops?: boolean;
 }
 
 export const OUTDOOR_LIMITS: VehicleLimits = {
