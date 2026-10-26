@@ -30,6 +30,11 @@ import { battery, copyLight, formatClock, modeLabel } from './readouts';
 import { ReplayBuffer, replayFrame, type StoredEpisode } from './replay';
 import { fitCanvas, must, shell } from './shell';
 
+/** True when this page can share memory with its rollout workers (cross-origin isolated). */
+function canTrainHere(): boolean {
+  return typeof SharedArrayBuffer !== 'undefined' && globalThis.crossOriginIsolated !== false;
+}
+
 export async function startApp(root: HTMLElement = document.querySelector('#app')!): Promise<void> {
   const launch = readLaunchParams();
   root.innerHTML = shell();
@@ -434,6 +439,15 @@ class Session {
       this.pool?.pause();
       this.training = false;
       this.syncButtons();
+      return;
+    }
+    if (!canTrainHere()) {
+      // Rollout workers share SharedArrayBuffers, which need a cross-origin isolated page. On GitHub Pages that
+      // isolation comes from coi-serviceworker, so a browser that blocks service workers cannot train.
+      const note = this.q('#train-note');
+      note.textContent =
+        'Training needs SharedArrayBuffer, which this browser has not enabled for the page. That usually means service workers are blocked, as in some private windows. Open the page in a normal window and reload once. Flying and replays still work.';
+      note.hidden = false;
       return;
     }
     this.playing = null;

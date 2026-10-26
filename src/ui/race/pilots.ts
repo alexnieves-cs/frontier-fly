@@ -36,7 +36,7 @@ export const PILOT_INFO: Record<RacePilot, PilotInfo> = {
   policy: {
     name: 'Learned policy',
     short: 'Policy',
-    knows: 'Lidar and its own maps. A 1088 → 256 → 128 → 4 network trained by imitation (DAgger).',
+    knows: 'Lidar and its own maps. A 1088 → 256 → 128 → 4 network trained by imitation (DAgger), then PPO on its own flights.',
     color: '#56e0ff',
     readsObs: true,
   },

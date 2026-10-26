@@ -19,6 +19,12 @@ describe('launch params', () => {
     expect(night.tod).toBe(22);
     expect(night.pilot).toBe('heuristic');
   });
+
+  it('flies the shipped policy on a first visit unless the URL picks a pilot', () => {
+    expect(readLaunchParams('').pilot).toBe('policy');
+    expect(readLaunchParams('?pilot=keys').pilot).toBe('keys');
+    expect(readLaunchParams('?pilot=heuristic').pilot).toBe('heuristic');
+  });
 });
 
 describe('replay', () => {

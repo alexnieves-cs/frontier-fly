@@ -6,7 +6,7 @@ export function shell(): string {
   return `
   <div class="shell" id="shell">
     <header class="topbar">
-      <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>DRONE SIM</h1><p>FRONTIER-FLY</p></div></div>
+      <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>frontier-fly</h1><p>INDOOR SIM</p></div></div>
       <nav class="page-links" aria-label="Pages">${siteNavLinks('sim')}</nav>
       <div class="tabs" role="toolbar" aria-label="View shortcuts">
         <span class="tabs-label">VIEW</span>
@@ -128,6 +128,7 @@ export function shell(): string {
               <button type="button" class="text-btn" data-act="speed" data-speed="16">16×</button>
               <span id="replay-label"></span>
             </div>
+            <p class="train-note" id="train-note" role="status" hidden></p>
           </section>
         </div>
       </section>

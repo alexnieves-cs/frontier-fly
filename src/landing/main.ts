@@ -35,6 +35,7 @@ function results() {
       { name: 'Waypoint follower (no learning)', value: dayMean(coverage.waypoint, hard), tone: 'base' },
       { name: 'Lidar heuristic', value: dayMean(coverage.heuristic, hard), tone: 'base' },
     ],
+    policyLeads: dayMean(coverage.policy, hard) > dayMean(coverage.teacher, hard),
     easy: dayMean(coverage.policy, easy),
     nightOverDay: mean(of('night-dark')) / mean(of('day')),
     measured: bench.measuredAt.slice(0, 10),
@@ -76,7 +77,8 @@ function markup(): string {
         <p class="pitch">
           A drone simulator and autopilot that sweeps the woods, finds the building, flies in through an opening it fits,
           and searches room by room. The indoor autopilot is a small network learned by imitation (behavior cloning + DAgger)
-          from a privileged planner. Physics, sensors, the policy, and the 3D replay above all run in the browser. No server.
+          from a privileged planner, then fine-tuned with PPO on its own flights. Physics, sensors, the policy, and the 3D
+          replay above all run in the browser. No server.
         </p>
       </div>
       <nav class="actions" aria-label="Start here">
@@ -106,7 +108,9 @@ function markup(): string {
       </div>
       <p class="results-foot">
         A small, deterministic eval: ${r.hardSeeds} hard and ${r.easySeeds} easy seeds, measured ${r.measured} at commit
-        <code>${r.commit}</code>. The policy still trails its teacher. Full tables and method in
+        <code>${r.commit}</code>. ${r.policyLeads ? 'The policy covers more than its teacher here, but collides more than the sensor-only planner.' : 'The policy still trails its teacher.'}
+        Results on 30 fresh buildings per condition, with intervals and collisions, are in
+        <a href="${REPO}/blob/main/docs/REPORT.md" rel="noopener">REPORT.md</a>; method and per-seed numbers in
         <a href="${REPO}/blob/main/docs/BENCHMARKS.md" rel="noopener">BENCHMARKS.md</a>.
       </p>
     </section>

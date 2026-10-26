@@ -120,7 +120,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   const runButton = el('button', { text: 'Run', testid: 'mode-run', attrs: { type: 'button', role: 'tab', 'aria-selected': 'false' } });
   const header = el('header', { className: 'top' });
   const titles = el('div');
-  titles.append(el('p', { className: 'eyebrow', text: 'Frontier Fly' }), el('h1', { text: 'Mission editor' }));
+  titles.append(el('p', { className: 'eyebrow', text: 'frontier-fly' }), el('h1', { text: 'Mission editor' }));
   const brand = el('div', { className: 'brand' });
   brand.append(el('span', { className: 'mark', attrs: { 'aria-hidden': 'true' } }), titles);
   const modes = el('div', { className: 'modes', attrs: { role: 'tablist' } });
