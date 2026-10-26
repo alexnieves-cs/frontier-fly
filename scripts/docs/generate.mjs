@@ -727,7 +727,7 @@ function readmeMissions(mb, control) {
     table(['Scenario', 'Policy, planner fallback', 'Sensor-only planner', 'Oracle planner (floor plan, reference)'], rows),
     '',
     `Share of ${mb.seedsPerScenario} fresh mission worlds per scenario (seeds ${mb.seedBase}–${mb.seedBase + mb.seedsPerScenario - 1}) where the mission ends with the expected outcome: found, or correctly cleared. Brackets are Wilson 95% intervals.`,
-    `Across all ${flights} flights: ${touched} with a collision, ${falseClears} false clears, ${falseAlarms} false alarms. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
+    `Across all ${flights} flights: ${touched} with a collision, ${falseClears} ${falseClears === 1 ? 'false clear' : 'false clears'}, ${falseAlarms} ${falseAlarms === 1 ? 'false alarm' : 'false alarms'}. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
     `From \`npm run study:missions\` at \`${mb.commit}\`; per-scenario detail is in [BENCHMARKS.md](docs/BENCHMARKS.md).`,
     ...(control ? [`No part of these missions reads ground truth. On the same seeds the code before that change, which still read it, scored ${pct(modes.reduce((a, m) => a + control.modes[m].all.expectedOutcome, 0) / modes.length)} across these explorers against ${pct(modes.reduce((a, m) => a + mb.modes[m].all.expectedOutcome, 0) / modes.length)} ([REPORT.md](docs/REPORT.md#confirm-clear-without-ground-truth)).`] : []),
   ].join('\n');
