@@ -1,5 +1,7 @@
 # Drone Explorer — Spec
 
+> **Status: historical.** This is the original October 2026 plan the project started from, kept for the record. Several non-goals have since been built (a PX4 bridge, for one), and the project is now frontier-fly. For what exists today, read the [README](../../README.md) and [ARCHITECTURE.md](../ARCHITECTURE.md).
+
 Personal project (Alex Nieves). Browser drone sim where a small neural-net policy learns to explore procedurally generated buildings, with training watchable live.
 
 ---

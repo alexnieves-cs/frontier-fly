@@ -12,6 +12,7 @@ import type { OutdoorWorld } from '../world/outdoor/types';
 import { drawOutdoorMap, mapProject } from '../world/outdoor/viz/map';
 import { OutdoorView } from '../world/outdoor/viz/scene';
 import type { StartMessage, WorkerOut } from './bridge.worker';
+import { showStartError } from '../ui/startError';
 
 /**
  * px4.html: the browser sim as PX4's simulator. PX4 SITL flies the woods
@@ -60,7 +61,7 @@ async function start(root: HTMLElement): Promise<void> {
     root.dataset.seed = String(seed);
     ui.loop();
   } catch (error) {
-    boot.textContent = error instanceof Error ? error.message : String(error);
+    showStartError(boot, error);
     console.error(error);
   }
 }
@@ -209,7 +210,7 @@ function markup(seed: number, url: string): string {
         <span>agl <strong id="hud-alt">0 m</strong></span>
         <span>speed <strong id="hud-speed">0 m/s</strong></span>
         <span>roll / pitch <strong id="hud-att">0° / 0°</strong></span>
-        <div class="motors" aria-label="PX4 motor outputs">
+        <div class="motors" role="img" aria-label="PX4 motor outputs">
           <span class="motor"><i></i></span><span class="motor"><i></i></span><span class="motor"><i></i></span><span class="motor"><i></i></span>
         </div>
       </div>

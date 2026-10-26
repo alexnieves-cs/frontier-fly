@@ -73,7 +73,9 @@ export function readLaunchParams(search = window.location.search): LaunchParams 
   let sensor: SensorMode = sensorRaw === 'ir' || sensorRaw === 'depth' ? sensorRaw : 'rgb';
   if (shot === 'night' || shot === 'fpv') sensor = q.get('sensor') === 'ir' ? 'ir' : 'rgb';
   const pilotRaw = q.get('pilot');
-  const pilot = pilotRaw === 'policy' || pilotRaw === 'keys' ? pilotRaw : shot ? 'heuristic' : 'keys';
+  // A first visit flies the shipped policy so the drone is exploring when the page opens. Flight keys take over
+  // whenever they are held, whatever the pilot.
+  const pilot = pilotRaw === 'policy' || pilotRaw === 'keys' || pilotRaw === 'heuristic' ? pilotRaw : shot ? 'heuristic' : 'policy';
   return {
     seed: Math.max(1, Number(q.get('seed') ?? '42') || 42),
     camera,
