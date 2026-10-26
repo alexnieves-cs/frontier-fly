@@ -2,8 +2,9 @@ name: study
 
 # Runs a sharded study (scripts/study/<study>.ts) on GitHub's runners and uploads the merged
 # JSON as an artifact. Long benches (the vision bench is hours on one machine) outlive an
-# interactive container; here each shard gets its own runner. Nothing is committed: download
-# the artifact, check it, and commit it in a PR like a local run.
+# interactive container; here each shard gets its own runner. Nothing lands on main: download
+# the artifact (or fetch the study/<study>-<run id> branch), check it, and commit it in a PR like
+# a local run.
 #
 #   gh workflow run study -f study=vision-study -f out=docs/vision-bench.json
 on:
@@ -78,6 +79,8 @@ jobs:
   merge:
     needs: shard
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       STUDY_ENTRY: ${{ inputs.study }}
     steps:
@@ -94,6 +97,17 @@ jobs:
           path: shards
           merge-multiple: true
       - run: npx vite-node scripts/study/${{ inputs.study }}.ts -- --merge shards/*.jsonl --out ${{ inputs.out }} ${{ inputs.args }}
+      # Also push the result to its own branch: some clients (the cloud container's proxy) can fetch
+      # git but not artifact or log downloads, which are served from blob storage.
+      - name: Push the result to study/<study>-<run id>
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
+          b="study/${{ inputs.study }}-${{ github.run_id }}"
+          git checkout -b "$b"
+          git add -f ${{ inputs.out }}
+          git commit -m "${{ inputs.study }} result from study run ${{ github.run_id }}"
+          git push origin "$b"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.study }}
