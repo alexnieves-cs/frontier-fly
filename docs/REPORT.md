@@ -14,7 +14,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 62 s restricted mean time against 275 s over 100 fresh daytime scenes, a paired difference of -213 s (95% CI -274 to -156 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -16 s (95% CI -41 to +4 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+147 s (95% CI +42 to +254 s) against the sweep-width lanes).
 - **On a quadrotor, a braking-model safety filter removes most collisions.** Quadrotor dynamics with sensor noise cost every pilot coverage (43.6% for the planner, 34.5% for the policy, 22.7% for the oracle teacher). A velocity filter built on the airframe's measured stopping distance cuts the planner's collisions from 6.7 to 1.2 per episode and the guarded policy's from 15.8 to 3.5. Whole missions flown on the quadrotor meet the expected outcome in 97.5% (planner) and 96.7% (policy) of flights. An earlier run lost a third of the quadrotor compound sweeps to a stop-point time-out after the outdoor tilt limit went to 55°; the fix keeps 40° for slow moves around a building in calm air ([run 6](#confirm-clear-without-ground-truth)).
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in 30 of 30 fresh multi-floor buildings and covers 41.8% of them against 37.7% without climbing, with 0.00 collisions per episode. The policy and the teacher still stay on the ground floor.
-- **A rendered camera and a learned detector can fly the same missions.** The drone now renders what its camera sees and a small network, trained here on CC0 people and procedural objects, finds targets in the pixels. On 180 fresh paired flights it meets the expected outcome in 89.4% (84–93%) of them against 96.7% (93–98%) for the analytic detector, with no false alarms or false clears. The gap is all at night: under the flashlight alone it confirms the backpack in 78.3% of flights against 93.3%.
+- **A rendered camera and a learned detector can fly the same missions.** The drone now renders what its camera sees and a small network, trained here on CC0 people and procedural objects, finds targets in the pixels. On 180 fresh paired flights it meets the expected outcome in 92.8% (88–96%) of them against 98.3% (95–99%) for the analytic detector, with no false alarms or false clears. The gap is all at night: under the flashlight alone it confirms the backpack in 85.0% of flights against 98.3%.
 - **Learned map prediction is accurate and does not help coverage here.** A small network predicts the unseen flyable space behind a frontier far better than counting unknown voxels (R² 0.94 against 0.45). Ranking frontiers by it leaves coverage unchanged (66.0% against 65.5% on hard buildings), and so does the true hidden gain (64.7%). In this environment coverage is limited by flight time, not by which frontier comes next.
 - **A team of drones is the lever coverage was waiting for.** On 30 fresh 40 × 40 m buildings with four minutes of flight, one sensor-only planner searches 29.5%, three search 79.1% and four 93.2%, sharing maps over a weak radio that walls attenuate. On the 20 m hard buildings three drones reach 80% in a median 59 s; one drone alone does not get there in two minutes. Sharing maps is what matters: three drones without a radio do little better than one. Splitting frontiers adds a few points more and keeps the drones apart. A dedicated relay keeps the operator's picture fresher on a weak radio but costs a fifth of the coverage, so the shipped team has none.
 - **The drone can estimate its own pose indoors.** An estimator that matches each lidar sweep against a map it builds itself, fused with the gyro and a downward optical-flow sensor, drifts 4.9 cm by day and 5.1 cm at night from its own map over about 200 m of flight in fresh hard buildings, and was 0.5 m off at some point in 0 of 60 flights. Dead reckoning on the same sensors drifts 1.86 m and 2.08 m. Displaced mid-flight, it noticed and re-acquired in 120 of 120 flights. Flown closed loop, with every indoor map, path and command on the estimate instead of the simulator's pose, whole missions meet the expected outcome in 96.7% of flights for the planner (vs 97.5% on the true pose) and 96.7% for the policy (vs 97.5%), with the estimate 7.8 cm from the drone's own map; daytime missions are unaffected and most of the gap is the night search. On a real robot's laser log (Intel Research Lab) the same estimator tracks locally but, without loop closure, averages 1.169 m of relation error over a 45-minute run, against 0.22 m for a published 2009 scan matcher and 0.02–0.03 m for SLAM systems that close loops.
@@ -747,22 +747,24 @@ Recall at a calibrated confidence of 0.5, by distance (labelled boxes in bracket
 
 ### Missions with the camera
 
-Each scenario is flown on 30 fresh worlds (67101–67130) with both indoor explorers, once with the analytic detector and once with the camera, 180 camera flights in all. Contact gating was set on practice worlds 66601–66616 and not changed after.
+Each scenario is flown on 30 fresh worlds (67201–67230) with both indoor explorers, once with the analytic detector and once with the camera, 180 camera flights in all. Contact gating was set on practice worlds 66601–66616 and not changed after.
+
+Since missions stopped reading ground truth, a building is clear only when no contact is still open there. A one-frame false detection the camera placed in a building's wall had no free point around it to be looked at again from, so it stayed open and the building could never be declared clear: on the first reported block (67101–67130), re-flown after that change, the camera met the expected outcome on only 61.7% of compound sweeps. The last look before leaving a building now re-views such a contact from the nearest free point, and rejects it when nothing in the drone's own map can see it. Found on the practice worlds only, it is reported on this fresh block. On the same 180 paired flights, the code before the fix scores 65.0% on camera compound sweeps and 82.8% on all camera flights, with no false clear either way.
 
 | Scenario | Detector | Expected outcome (95% CI) | Mean time to first find | Mean flight | False alarms | False clears |
 | --- | --- | --- | --- | --- | --- | --- |
-| **Cabin search, day** | Analytic detector | 96.7% (89–99%) | 148 s | 190 s | 0 | 0 |
-|  | Camera + learned detector | 96.7% (89–99%) | 150 s | 204 s | 0 | 0 |
-| **Two-building safety sweep** | Analytic detector | 100.0% (94–100%) | — | 920 s | 0 | 0 |
-|  | Camera + learned detector | 93.3% (84–97%) | — | 890 s | 0 | 0 |
-| **Backpack search, night** | Analytic detector | 93.3% (84–97%) | 165 s | 216 s | 0 | 0 |
-|  | Camera + learned detector | 78.3% (66–87%) | 168 s | 278 s | 0 | 0 |
+| **Cabin search, day** | Analytic detector | 100.0% (94–100%) | 146 s | 193 s | 0 | 0 |
+|  | Camera + learned detector | 100.0% (94–100%) | 139 s | 182 s | 0 | 0 |
+| **Two-building safety sweep** | Analytic detector | 96.7% (89–99%) | — | 915 s | 0 | 0 |
+|  | Camera + learned detector | 93.3% (84–97%) | — | 874 s | 0 | 0 |
+| **Backpack search, night** | Analytic detector | 98.3% (91–100%) | 159 s | 210 s | 0 | 0 |
+|  | Camera + learned detector | 85.0% (74–92%) | 176 s | 289 s | 0 | 0 |
 
-**What the numbers say.** Over all 180 paired flights the camera meets the expected outcome in 89.4% against 96.7% for the analytic detector. 13 paired flights succeed only with the analytic detector and 0 only with the camera, so the camera never rescues a flight the analytic model loses.
+**What the numbers say.** Over all 180 paired flights the camera meets the expected outcome in 92.8% against 98.3% for the analytic detector. 10 paired flights succeed only with the analytic detector and 0 only with the camera, so the camera never rescues a flight the analytic model loses.
 
-By day the two are within noise of each other. The gap is the night backpack: 78.3% against 93.3%. Under the flashlight alone, on the practice worlds, the detector often scored the backpack around 0.4 to 0.6, below the 0.8 mean the three-bearing confirmation asks for, so the drone spends its re-views on it and finally rejects the contact. The confirmation threshold was left where the analytic missions set it.
+By day the two are within noise of each other. The gap is the night backpack: 85.0% against 98.3%. Under the flashlight alone, on the practice worlds, the detector often scored the backpack around 0.4 to 0.6, below the 0.8 mean the three-bearing confirmation asks for, so the drone spends its re-views on it and finally rejects the contact. The confirmation threshold was left where the analytic missions set it.
 
-No camera flight confirmed a decoy or declared a building clear with a target inside (0 false alarms, 0 false clears). A camera flight renders and reads about 2,285 frames and takes 29 s of wall time on one CPU core, against 3 s with the analytic detector.
+No camera flight confirmed a decoy or declared a building clear with a target inside (0 false alarms, 0 false clears). A camera flight renders and reads about 2,241 frames and takes 38 s of wall time on one CPU core, against 4 s with the analytic detector.
 
 ## Failure gallery
 
@@ -841,7 +843,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Drone-team bench (reported) | 70001–70030 (hard), 71001–71030 (large) |
 | Training and checking the camera detector | Frames from worlds 66001–66400 (training), 66501–66560 (checkpoint and calibration), 67001–67060 (reported) |
 | Tuning camera contacts | Mission worlds 66601–66616 |
-| Camera mission bench (reported) | 67101–67130 |
+| Camera mission bench (reported) | 67201–67230 (before the wall-contact fix: 67101–67130) |
 | Tuning the pose estimator | Coverage buildings 7001–7012 (stage 3), mission worlds 9101–9116 for the closed-loop fixes |
 | Localization study (reported) | 60001+ (hard) and 62001+ (easy), 30 each |
 | Real floor plans ([REAL_PLANS.md](REAL_PLANS.md)) | 20 dev and 60 eval apartments; env seeds 74001+ and 75001+ (dev), 72001+ (reported) and 73001+ (matched generated controls) |

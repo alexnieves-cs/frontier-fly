@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (271 files, 53,630 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (271 files, 53,677 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -128,8 +128,8 @@ flowchart LR
   mission -->|6| loc
   mission -->|12| perception
   mission -->|4| rl
-  mission -->|27| shared
-  mission -->|15| sim
+  mission -->|28| shared
+  mission -->|16| sim
   mission -->|14| targets
   mission -->|46| world_outdoor
   perception -->|6| shared
@@ -207,12 +207,12 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
 | `src/bench` | 5 | 404 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
-| `src/eval` | 13 | 2,152 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `train`, `vision`, `world/outdoor` | — | — |
+| `src/eval` | 13 | 2,156 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,721 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
 | `src/landing` | 1 | 163 | `film`, `ui` | — | — |
 | `src/loc` | 9 | 2,091 | `shared` | — | — |
-| `src/mission` | 60 | 14,917 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 60 | 14,960 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
 | `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 6 | 1,265 | `mission`, `ui`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |

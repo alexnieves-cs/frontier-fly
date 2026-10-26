@@ -17,6 +17,8 @@ import {
 import { toLocal, toWorld, floorOf, INDOOR_FLY_Z } from '../planner/indoor';
 import { observeOpenings } from '../planner/inspect';
 import { sampleHeight } from '../../../world/outdoor/terrain';
+import { sensorClearance, type SensorGrid } from '../../../sim/sensorPlanner';
+import { VOXEL } from '../../../shared/constants';
 import { type VehicleCommand } from '../vehicle';
 import {
   CONFIRM_DWELL,
@@ -41,6 +43,31 @@ export const CLEAR_MIN_FLOOR_VOXELS = 16;
 
 /** A contact placed this close outside a footprint still counts as in the building: range error at a window. */
 const CONTACT_FOOTPRINT_MARGIN_M = 0.5;
+
+/** How far the last indoor look moves a contact placed in a wall to the nearest free point: about the range error at a wall. */
+const FINAL_LOOK_SNAP_M = 1;
+
+/** The point itself when the drone's own map has it free, else the nearest free voxel centre within maxM, or null. */
+function nearestOpen(g: SensorGrid, floor: number, p: V3, maxM: number): V3 | null {
+  if (sensorClearance(g, floor, p[0], p[1]) > 0) return p;
+  const r = Math.ceil(maxM / VOXEL);
+  const cx = Math.floor(p[0] / VOXEL);
+  const cy = Math.floor(p[1] / VOXEL);
+  let best: V3 | null = null;
+  let bestD = maxM;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      const x = (cx + dx + 0.5) * VOXEL;
+      const y = (cy + dy + 0.5) * VOXEL;
+      const d = Math.hypot(x - p[0], y - p[1]);
+      if (d <= bestD && sensorClearance(g, floor, x, y) > 0) {
+        bestD = d;
+        best = [x, y, p[2]];
+      }
+    }
+  }
+  return best;
+}
 
 export const OUTDOOR_CONFIRM_LOOKS: readonly { agl: number; radius: number }[] = [
   { agl: 7, radius: 3.5 },
@@ -365,8 +392,13 @@ export abstract class SearchPhases extends RunnerBase {
     const flown: number[] = [];
     if (this.inside && v) {
       const grid = v.grid;
-      const est = toLocal(grid, track.estimate);
-      const f = floorOf(grid, est[2]);
+      const placed = toLocal(grid, track.estimate);
+      const f = floorOf(grid, placed[2]);
+      // The last look before leaving re-views a contact placed in a wall or outside the mapped interior
+      // (range error at a wall, a detection through a window) around the nearest free point instead:
+      // no free, visible hover point surrounds a point in a wall, and a contact nobody can look at again
+      // stays open and blocks the building's clear for good.
+      const est = this.finalLook.has(track.id) && v.sensing ? nearestOpen(v.sensing, f, placed, FINAL_LOOK_SNAP_M) ?? placed : placed;
       const z = f * grid.H + INDOOR_FLY_Z;
       let cur = toLocal(grid, pos);
       let views: V3[] = [];
@@ -394,7 +426,7 @@ export abstract class SearchPhases extends RunnerBase {
         flown.push(Math.atan2(est[1] - vp[1], est[0] - vp[0]));
         wps.push({
           pos: at,
-          yaw: headingTo(at, track.estimate),
+          yaw: headingTo(at, toWorld(grid, est)),
           // Lit by the flashlight alone, each frame is a weaker look: hold longer for the same certainty.
           dwell: v.sensing?.lookCone != null ? CONFIRM_DWELL_DARK : CONFIRM_DWELL,
         });
@@ -444,6 +476,17 @@ export abstract class SearchPhases extends RunnerBase {
       // Back up to cruise before the search resumes.
       if (views.length && cur[2] < cruiseAt(cur)[2] - 1) wps.push({ pos: cruiseAt(cur), tol: 0.6 });
       this.resumeAfterConfirm = () => this.startCoverage();
+    }
+    if (!wps.some((w) => w.dwell) && this.inside && this.finalLook.has(track.id)) {
+      // The last look found no free point in the drone's own map that sees the contact: it is not in
+      // the space the drone searched. Rejecting it rather than leaving it open lets the clear rest on
+      // the look estimate, which already requires the camera to have covered that space.
+      this.tracker.reject(track);
+      this.log('warn', `Rejected ${track.classId} contact: nowhere in the mapped interior sees it again (${track.views.length} view(s), best ${fmt(track.best.confidence, 2)}).`);
+      const resume = this.resumeAfterConfirm;
+      this.resumeAfterConfirm = null;
+      resume?.();
+      return;
     }
     if (!wps.some((w) => w.dwell)) {
       // Nowhere to re-view from yet. Keep the track open and try again later.
