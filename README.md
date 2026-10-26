@@ -198,7 +198,7 @@ npm run build      # typecheck and production bundle in dist/
 | `pilot` | `keys`, `heuristic`, or `policy` |
 | `tod`, `flash`, `lights` | Time of day (0–24), flashlight `1`, interior lights `0` |
 
-These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/frontier-fly/sim.html). Old links that put them on the site root are forwarded there. Example: [`sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy`](https://alexnieves-cs.github.io/frontier-fly/sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy). Pilot defaults to the keyboard. Shot URLs fly a lidar heuristic so the camera has something to follow. Choose **Policy** to fly the checkpoint.
+These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/frontier-fly/sim.html). Old links that put them on the site root are forwarded there. Example: [`sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy`](https://alexnieves-cs.github.io/frontier-fly/sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy). The shipped policy flies by default, and holding a flight key takes over until you let go; `pilot=keys` starts on the keyboard. Shot URLs fly a lidar heuristic so the camera has something to follow.
 
 </details>
 
