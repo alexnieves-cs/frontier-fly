@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { out } from './mediaOut';
 
-const out = 'docs/media';
 const frames = 'test-results/frames';
 
 async function openShot(page: import('@playwright/test').Page, query: string): Promise<void> {
