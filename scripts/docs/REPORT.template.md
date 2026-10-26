@@ -374,7 +374,9 @@ Recall at a calibrated confidence of 0.5, by distance (labelled boxes in bracket
 
 ### Missions with the camera
 
-Each scenario is flown on 30 fresh worlds (67101–67130) with both indoor explorers, once with the analytic detector and once with the camera, {{R_V_FLIGHTS}} camera flights in all. Contact gating was set on practice worlds 66601–66616 and not changed after.
+Each scenario is flown on 30 fresh worlds (67201–67230) with both indoor explorers, once with the analytic detector and once with the camera, {{R_V_FLIGHTS}} camera flights in all. Contact gating was set on practice worlds 66601–66616 and not changed after.
+
+Since missions stopped reading ground truth, a building is clear only when no contact is still open there. A one-frame false detection the camera placed in a building's wall had no free point around it to be looked at again from, so it stayed open and the building could never be declared clear: on the first reported block (67101–67130), re-flown after that change, the camera met the expected outcome on only 61.7% of compound sweeps. The last look before leaving a building now re-views such a contact from the nearest free point, and rejects it when nothing in the drone's own map can see it. Found on the practice worlds only, it is reported on this fresh block. On the same 180 paired flights, the code before the fix scores 65.0% on camera compound sweeps and 82.8% on all camera flights, with no false clear either way.
 
 {{VISION_MISSION_TABLE}}
 
@@ -429,7 +431,7 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | Drone-team bench (reported) | 70001–70030 (hard), 71001–71030 (large) |
 | Training and checking the camera detector | Frames from worlds 66001–66400 (training), 66501–66560 (checkpoint and calibration), 67001–67060 (reported) |
 | Tuning camera contacts | Mission worlds 66601–66616 |
-| Camera mission bench (reported) | 67101–67130 |
+| Camera mission bench (reported) | 67201–67230 (before the wall-contact fix: 67101–67130) |
 | Tuning the pose estimator | Coverage buildings 7001–7012 (stage 3), mission worlds 9101–9116 for the closed-loop fixes |
 | Localization study (reported) | 60001+ (hard) and 62001+ (easy), 30 each |
 | Real floor plans ([REAL_PLANS.md](REAL_PLANS.md)) | 20 dev and 60 eval apartments; env seeds 74001+ and 75001+ (dev), 72001+ (reported) and 73001+ (matched generated controls) |

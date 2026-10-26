@@ -8,8 +8,12 @@ import type { HumanoidPoses } from '../vision/humanoid';
 import { createVisionSource } from '../vision/source';
 import { flyMission, summarizeMissions, wilson, type MissionFlight, type MissionMode } from './missions';
 
-/** Fresh block for this track; 66601-66616 were the only mission seeds looked at while building it. */
-export const VISION_SEED_BASE = 67101;
+/**
+ * Fresh block for this track; 66601-66616 were the only mission seeds looked at while building it.
+ * 67101-67130 was the first reported block. 67201-67230 is reported since the wall-placed contact fix
+ * (phases/search.ts nearestOpen), flown once on the fix and once on the code before it.
+ */
+export const VISION_SEED_BASE = 67201;
 export const VISION_SEEDS_PER_SCENARIO = 30;
 export const VISION_MODES = ['policy', 'sensor'] as const satisfies readonly MissionMode[];
 export const PERCEPTIONS = ['analytic', 'vision'] as const;
