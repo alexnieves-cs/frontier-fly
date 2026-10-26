@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
+import { out } from './mediaOut';
 
-const out = 'docs/media';
 
 test.beforeAll(() => {
   mkdirSync(out, { recursive: true });

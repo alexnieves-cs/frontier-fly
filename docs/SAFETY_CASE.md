@@ -27,7 +27,7 @@ The runner carries out the stronger of the two actions. Actions rank `none < hol
 | Lighting | Day and night (flashlight); detector recall falls at night | `perception.ts` |
 | Area | Inside the mission geofence, outside no-fly zones, within the altitude band | `safety.ts` |
 | Buildings | Generated shells, entered only through openings with at least 0.38 m airframe clearance | `planner/entry.ts` |
-| People | Simulated. No real person, animal, or property is ever involved | SPEC.md |
+| People | Simulated. No real person, animal, or property is ever involved | [SPEC.md](history/SPEC.md) |
 
 ## 2. Top-level argument
 

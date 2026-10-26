@@ -2,13 +2,15 @@
 
 Thanks for taking a look. frontier-fly is a browser drone simulator for civilian search, inspection, and confirm-clear missions. Bug reports, benchmark results from other machines, new building or site generators, and policy improvements are all welcome.
 
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Security problems go through [SECURITY.md](SECURITY.md), not public issues.
+
 ## Scope
 
 This project is civilian and defensive only. Contributions that add pursuit, targeting, weapons, payload release, surveillance of real people, or evasion of real-world detection will be closed. Avoidance behavior means the drone moves out of the way. It does not track or engage.
 
 ## Setup
 
-Node 22 and npm.
+Node 22 or newer and npm (`.nvmrc` pins 22; `nvm use` picks it up).
 
 ```bash
 npm ci
@@ -27,7 +29,7 @@ npm run build
 npm run check:pages   # loads every built page without COOP/COEP headers, like GitHub Pages
 ```
 
-`npm run test:e2e` runs headless Chrome checks and rewrites the screenshots in `docs/media/`. CI runs it on every pull request.
+`npm run test:e2e` runs headless Chrome checks and writes its screenshots to `test-results/media/`. CI runs it on every pull request. To refresh the committed screenshots in `docs/media/`, run `UPDATE_MEDIA=1 npm run test:e2e`.
 
 If your change affects the policy, the simulator's speed, or what a page renders, refresh the measured numbers and commit the outputs:
 
@@ -42,7 +44,7 @@ Never edit the generated tables by hand. Edit `scripts/docs/*.template.md` for p
 ## Code layout
 
 - `src/gen`, `src/sim`, `src/rl`, `src/shared`, and `src/world/outdoor` stay headless. ESLint blocks Three.js imports and DOM globals there.
-- `src/shared` is a frozen contract. Propose changes in [CONTRACT_REQUESTS.md](CONTRACT_REQUESTS.md).
+- `src/shared` holds the types, constants and messages every layer shares. Changes there ripple through the sim, the workers and the checkpoint, so open an issue first.
 - The versioned observation (v2, 1088 floats) in [`src/sim/OBS_LAYOUT.md`](src/sim/OBS_LAYOUT.md) is tied to the shipped checkpoint. Changing it needs a new observation version and a retrained checkpoint.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has the module graph.
 

@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { out } from './mediaOut';
 
-const out = 'docs/media';
 
 const CASES = [
   { id: 'cabin-day', outcome: 'found' },

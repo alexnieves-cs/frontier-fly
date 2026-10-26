@@ -56,7 +56,8 @@ function serveDist() {
 function pageNames() {
   if (!existsSync(DIST)) throw new Error('dist/ is missing. Run npm run build first.');
   return readdirSync(DIST)
-    .filter((name) => name.endsWith('.html'))
+    // 404.html is GitHub Pages' static not-found page: no app, no isolation to check.
+    .filter((name) => name.endsWith('.html') && name !== '404.html')
     .sort((a, b) => (a === 'index.html' ? -1 : b === 'index.html' ? 1 : a.localeCompare(b)));
 }
 
