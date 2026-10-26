@@ -279,31 +279,33 @@ function ablationTables(ab) {
  * docs/mission-bench.json (this code) and docs/mission-bench-control.json (the code before it).
  */
 function confirmClearSection(mb, control) {
-  const keys = ['R_CC_FLIGHTS', 'R_CC_FC', 'R_CC_FC_CTRL', 'R_CC_OCC', 'R_CC_OCC_CTRL', 'R_CC_CLEAR', 'R_CC_CLEAR_CTRL', 'R_CC_ALL', 'R_CC_ALL_CTRL', 'R_CC_COMMIT_CTRL', 'R_CC_SEEDS', 'R_CC_COLL', 'R_CC_COLL_CTRL'];
+  const keys = ['R_CC_FLIGHTS', 'R_CC_FC', 'R_CC_OCC', 'R_CC_CLEAR', 'R_CC_CLEAR_CTRL', 'R_CC_ALL', 'R_CC_ALL_CTRL', 'R_CC_COMMON_FLIGHTS', 'R_CC_COMMIT_CTRL', 'R_CC_SEEDS', 'R_CC_COLL', 'R_CC_COLL_CTRL'];
   const out = Object.fromEntries(keys.map((k) => [k, 'n/a']));
   out.CONFIRM_CLEAR_TABLE = '_Not measured yet. Fly `npm run study:missions` on this code and on the code before it, on the same seeds._';
-  if (!mb?.modes.sensor?.['compound-occupied'] || !control?.modes.sensor?.['compound-occupied']) return out;
+  if (!mb?.modes.sensor?.['compound-occupied'] || !control?.modes.sensor) return out;
+  // The code before the change could not fly the occupied sweep, so the two versions are compared on the scenarios both flew.
+  const common = Object.keys(mb.modes.sensor).filter((k) => k !== 'all' && control.modes.sensor[k]);
+  // The headline comparison uses the kinematic explorers; the quadrotor rows of the control also lack the stop-point fix.
+  const kin = ['policy', 'sensor', 'oracle'].filter((m) => mb.modes[m] && control.modes[m]);
   const modes = Object.keys(mb.modes).filter((m) => control.modes[m]);
-  const sum = (b, sc, f) => modes.reduce((a, m) => a + f(b.modes[m][sc]), 0);
-  const mean = (b, sc) => sum(b, sc, (s) => s.expectedOutcome) / modes.length;
-  out.R_CC_FLIGHTS = String(sum(mb, 'compound-occupied', (s) => s.flights));
-  out.R_CC_FC = String(sum(mb, 'all', (s) => s.falseClears));
-  out.R_CC_FC_CTRL = String(sum(control, 'all', (s) => s.falseClears));
-  out.R_CC_OCC = pct(mean(mb, 'compound-occupied'));
-  out.R_CC_OCC_CTRL = pct(mean(control, 'compound-occupied'));
-  out.R_CC_CLEAR = pct(mean(mb, 'compound-clear'));
-  out.R_CC_CLEAR_CTRL = pct(mean(control, 'compound-clear'));
-  out.R_CC_ALL = pct(mean(mb, 'all'));
-  out.R_CC_ALL_CTRL = pct(mean(control, 'all'));
+  const over = (b, ms, scs, f) => ms.reduce((a, m) => a + scs.reduce((c, sc) => c + f(b.modes[m][sc]), 0), 0);
+  const mean = (b, ms, scs) => over(b, ms, scs, (x) => x.expectedOutcome) / (ms.length * scs.length);
+  out.R_CC_FLIGHTS = String(Object.keys(mb.modes).reduce((a, m) => a + mb.modes[m]['compound-occupied'].flights, 0));
+  out.R_CC_FC = String(Object.keys(mb.modes).reduce((a, m) => a + mb.modes[m].all.falseClears, 0));
+  out.R_CC_OCC = pct(Object.keys(mb.modes).reduce((a, m) => a + mb.modes[m]['compound-occupied'].expectedOutcome, 0) / Object.keys(mb.modes).length);
+  out.R_CC_CLEAR = pct(mean(mb, kin, ['compound-clear']));
+  out.R_CC_CLEAR_CTRL = pct(mean(control, kin, ['compound-clear']));
+  out.R_CC_ALL = pct(mean(mb, kin, common));
+  out.R_CC_ALL_CTRL = pct(mean(control, kin, common));
+  out.R_CC_COMMON_FLIGHTS = String(over(mb, kin, common, (x) => x.flights));
   out.R_CC_COMMIT_CTRL = control.commit;
   out.R_CC_SEEDS = String(mb.seedsPerScenario);
-  out.R_CC_COLL = String(sum(mb, 'all', (s) => s.flightsWithCollision));
-  out.R_CC_COLL_CTRL = String(sum(control, 'all', (s) => s.flightsWithCollision));
+  out.R_CC_COLL = String(over(mb, kin, common, (x) => x.flightsWithCollision));
+  out.R_CC_COLL_CTRL = String(over(control, kin, common, (x) => x.flightsWithCollision));
   const ci = (lo, hi) => `${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`;
   const cell = (b, m, sc) => `${pct(b.modes[m][sc].expectedOutcome)} (${ci(...b.modes[m][sc].expectedOutcomeCi)})`;
-  const scenarios = Object.keys(mb.modes.sensor).filter((k) => k !== 'all');
-  const rows = modes.map((m) => [m, ...[...scenarios, 'all'].flatMap((sc) => [`${cell(control, m, sc)} → ${cell(mb, m, sc)}`]), `${control.modes[m].all.falseClears} → ${mb.modes[m].all.falseClears}`]);
-  out.CONFIRM_CLEAR_TABLE = table(['Indoors', ...scenarios, 'All', 'False clears'], rows);
+  const rows = modes.map((m) => [m, ...common.map((sc) => `${cell(control, m, sc)} → ${cell(mb, m, sc)}`), cell(mb, m, 'compound-occupied'), String(mb.modes[m].all.falseClears)]);
+  out.CONFIRM_CLEAR_TABLE = table(['Indoors', ...common, 'compound-occupied (this code only)', 'False clears (this code)'], rows);
   return out;
 }
 
@@ -401,7 +403,10 @@ function reportInline(study, bench) {
       out.R_ML_QUAD_TRUTH = m.sensorQuad ? pct(m.sensorQuad.all.expectedOutcome) : '—';
       const meanOf = (ks, sc) => ks.reduce((a, k) => a + m[k][sc].expectedOutcome, 0) / ks.length;
       const truthKs = all.map((k) => k.replace('Loc', '')).filter((k) => m[k]);
-      out.R_ML_GAP = ((meanOf(truthKs, 'all') - meanOf(all, 'all')) * 100).toFixed(0);
+      {
+        const gap = ((meanOf(truthKs, 'all') - meanOf(all, 'all')) * 100).toFixed(0);
+        out.R_ML_GAP = `${gap} ${gap === '1' ? 'point' : 'points'}`;
+      }
       out.R_ML_NIGHT = pct(meanOf(all, 'backpack-night'));
       out.R_ML_NIGHT_TRUTH = pct(meanOf(truthKs, 'backpack-night'));
       out.R_ML_COLL = String(all.reduce((a, k) => a + m[k].all.flightsWithCollision, 0));
@@ -729,7 +734,13 @@ function readmeMissions(mb, control) {
     `Share of ${mb.seedsPerScenario} fresh mission worlds per scenario (seeds ${mb.seedBase}–${mb.seedBase + mb.seedsPerScenario - 1}) where the mission ends with the expected outcome: found, or correctly cleared. Brackets are Wilson 95% intervals.`,
     `Across all ${flights} flights: ${touched} with a collision, ${falseClears} ${falseClears === 1 ? 'false clear' : 'false clears'}, ${falseAlarms} ${falseAlarms === 1 ? 'false alarm' : 'false alarms'}. The policy hands ${pct(mb.modes.policy.all.handoffRate ?? 0)} of the buildings it enters to the planner.`,
     `From \`npm run study:missions\` at \`${mb.commit}\`; per-scenario detail is in [BENCHMARKS.md](docs/BENCHMARKS.md).`,
-    ...(control ? [`No part of these missions reads ground truth. On the same seeds the code before that change, which still read it, scored ${pct(modes.reduce((a, m) => a + control.modes[m].all.expectedOutcome, 0) / modes.length)} across these explorers against ${pct(modes.reduce((a, m) => a + mb.modes[m].all.expectedOutcome, 0) / modes.length)} ([REPORT.md](docs/REPORT.md#confirm-clear-without-ground-truth)).`] : []),
+    ...(control
+      ? (() => {
+          const common = scenarios.filter((k) => k !== 'all' && control.modes.sensor[k]);
+          const m3 = (b) => modes.reduce((a, m) => a + common.reduce((c, sc) => c + b.modes[m][sc].expectedOutcome, 0), 0) / (modes.length * common.length);
+          return [`No part of these missions reads ground truth. On the ${common.length} scenarios the code before that change could fly, on the same seeds, it scored ${pct(m3(control))} across these explorers, which still read the true floor-plan cells, against ${pct(m3(mb))} now ([REPORT.md](docs/REPORT.md#confirm-clear-without-ground-truth)).`];
+        })()
+      : []),
   ].join('\n');
 }
 
