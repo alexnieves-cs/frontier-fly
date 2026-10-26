@@ -29,6 +29,7 @@ import { drawHeatmap, type HeatmapData } from './heatmap';
 import { battery, copyLight, formatClock, modeLabel } from './readouts';
 import { ReplayBuffer, replayFrame, type StoredEpisode } from './replay';
 import { fitCanvas, must, shell } from './shell';
+import { showStartError } from './startError';
 
 /** True when this page can share memory with its rollout workers (cross-origin isolated). */
 function canTrainHere(): boolean {
@@ -60,7 +61,7 @@ export async function startApp(root: HTMLElement = document.querySelector('#app'
       train.click();
     }
   } catch (error) {
-    bootNote.textContent = error instanceof Error ? error.message : String(error);
+    showStartError(bootNote, error);
     console.error(error);
   }
   void hud;

@@ -11,6 +11,7 @@ import { sampleHeight } from '../terrain';
 import type { OutdoorWorld } from '../types';
 import { drawOutdoorMap } from './map';
 import { OutdoorView, type OutdoorCamera } from './scene';
+import { showStartError } from '../../../ui/startError';
 
 const DYN: DynParams = {
   mass: 0.4,
@@ -32,9 +33,9 @@ export async function startOutdoor(root: HTMLElement): Promise<void> {
   seedInput.value = params.get('seed') ?? '4';
   const canvas = must<HTMLCanvasElement>(root, '#view');
   const map = must<HTMLCanvasElement>(root, '#map');
-  const view = new OutdoorView(canvas);
   const boot = must<HTMLElement>(root, '#boot');
   try {
+    const view = new OutdoorView(canvas);
     await initOutdoorPhysics();
     let world = generateOutdoor({ seed: readSeed(seedInput) });
     let physics = new OutdoorPhysics(world);
@@ -57,7 +58,7 @@ export async function startOutdoor(root: HTMLElement): Promise<void> {
     });
     window.addEventListener('resize', () => view.resize());
   } catch (error) {
-    boot.textContent = error instanceof Error ? error.message : String(error);
+    showStartError(boot, error);
     console.error(error);
   }
 }
