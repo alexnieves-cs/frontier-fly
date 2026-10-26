@@ -1,0 +1,115 @@
+name: study
+
+# Runs a sharded study (scripts/study/<study>.ts) on GitHub's runners and uploads the merged
+# JSON as an artifact. Long benches (the vision bench is hours on one machine) outlive an
+# interactive container; here each shard gets its own runner. Nothing lands on main: download
+# the artifact (or fetch the study/<study>-<run id> branch), check it, and commit it in a PR like
+# a local run.
+#
+#   gh workflow run study -f study=vision-study -f out=docs/vision-bench.json
+on:
+  workflow_dispatch:
+    inputs:
+      study:
+        description: Study script in scripts/study, without .ts (vision-study, mission-study, fault-study, ...)
+        required: true
+        default: vision-study
+      out:
+        description: Output path the merge step writes (the artifact keeps this path)
+        required: true
+        default: docs/vision-bench.json
+      shards:
+        description: Number of runners (each also splits its shard over its own cores)
+        required: true
+        default: '8'
+      args:
+        description: Extra arguments for every shard and the merge (e.g. --base 79301)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - id: plan
+        run: echo "shards=$(python3 -c 'import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))' '${{ inputs.shards }}')" >> "$GITHUB_OUTPUT"
+
+  shard:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    env:
+      STUDY_ENTRY: ${{ inputs.study }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The vision detector runs on tfjs-node when it is installed (src/vision/node.ts), much faster than the cpu backend.
+      - run: npm install --no-save @tensorflow/tfjs-node@4.22.0
+      - name: Run shard
+        run: |
+          # Each runner splits its shard again over its 4 cores: shard s of n becomes shards 4s..4s+3 of 4n.
+          c=4
+          n=$(( ${{ inputs.shards }} * c ))
+          mkdir -p shards
+          for i in $(seq 0 $((c - 1))); do
+            k=$(( ${{ matrix.shard }} * c + i ))
+            npx vite-node scripts/study/${{ inputs.study }}.ts -- --shard "$k" --of "$n" --out "shards/shard-$k.jsonl" ${{ inputs.args }} &
+            pids+=($!)
+          done
+          for p in "${pids[@]}"; do wait "$p"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: shards/
+          retention-days: 7
+
+  merge:
+    needs: shard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      STUDY_ENTRY: ${{ inputs.study }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save @tensorflow/tfjs-node@4.22.0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: shards
+          merge-multiple: true
+      - run: npx vite-node scripts/study/${{ inputs.study }}.ts -- --merge shards/*.jsonl --out ${{ inputs.out }} ${{ inputs.args }}
+      # Also push the result to its own branch: some clients (the cloud container's proxy) can fetch
+      # git but not artifact or log downloads, which are served from blob storage.
+      - name: Push the result to study/<study>-<run id>
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
+          b="study/${{ inputs.study }}-${{ github.run_id }}"
+          git checkout -b "$b"
+          git add -f ${{ inputs.out }}
+          git commit -m "${{ inputs.study }} result from study run ${{ github.run_id }}"
+          git push origin "$b"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.study }}
+          path: ${{ inputs.out }}
+          retention-days: 30
