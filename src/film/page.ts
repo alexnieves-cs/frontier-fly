@@ -13,6 +13,7 @@ import { recordFlight, sampleFlight, type FlightLog } from './flight';
 import { FilmOverlay } from './overlay';
 import { FilmScene } from './scene';
 import { prefetchPbrSet } from '../viz/textures';
+import { isWebglError, showStartError } from '../ui/startError';
 
 /** Width and height the film is composed at. The stage scales to fit the window. */
 const STAGE_W = 1920;
@@ -189,7 +190,8 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     api.error = message;
-    loading.textContent = `Could not build the film: ${message}`;
+    if (isWebglError(error)) showStartError(loading, error);
+    else loading.textContent = `Could not build the film: ${message}`;
     status('error', message);
     console.error(error);
   }

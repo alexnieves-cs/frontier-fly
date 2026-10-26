@@ -2,6 +2,7 @@ import '../film/film.css';
 import './landing.css';
 import bench from '../../docs/benchmarks.json';
 import type { FilmStatus } from '../film/page';
+import { isWebglError, showStartError } from '../ui/startError';
 
 const REPO = 'https://github.com/alexnieves-cs/frontier-fly';
 const HERO_SCENARIO = 'cabin-day';
@@ -142,7 +143,9 @@ function start(root: HTMLElement): void {
       poster.setAttribute('aria-hidden', 'true');
     } else {
       poster.classList.add('failed');
-      text.innerHTML = 'The live replay could not start here. <a href="./film.html">Open the mission film</a>';
+      // Without WebGL the film page fails too, so point at the recorded flights instead.
+      if (isWebglError(message)) showStartError(text, message);
+      else text.innerHTML = 'The live replay could not start here. <a href="./film.html">Open the mission film</a>';
       console.warn('Landing hero:', message);
     }
   };

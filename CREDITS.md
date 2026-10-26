@@ -23,6 +23,8 @@ Frontier-fly ships only assets and data with a clear free license. Geometry writ
 | KayKit Rig_Medium mannequin and clips | Simulated people | [Kay Lousberg](https://www.kaylousberg.com), KayKit Character Animations 1.1 | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Backpack, phone, toolbox, medkit, bottle, radio, helmet, blanket, coat, hiding crate | Search objects and decoys | Original procedural meshes, this repository | MIT |
 
+The site also bundles open-source libraries: three.js (MIT), Rapier (`@dimforge/rapier3d-compat`, Apache-2.0), TensorFlow.js (Apache-2.0) and uPlot (MIT), plus their dependencies. The build writes each one's license to `THIRD_PARTY_LICENSES.txt` at the site root.
+
 No asset in the repository has an unclear or non-commercial license. The floor plans (CC BY 4.0) and the Intel Research Lab log and relations (CC BY 1.0 and 3.0) require attribution; the credits above, in the plan data file and in `data/intel-lab/README.md` satisfy it. Poly Haven and ambientCG downloads used here are CC0, so attribution is not required; the links above are the record of where each file came from. CC0 also does not require credit for KayKit; the credit is here anyway.
 
 ## Simulated people
