@@ -41,15 +41,25 @@ export interface AtlasFlight {
   clearance: { tSec: number; phase: Phase; inside: string | null; tag: string } | null;
   /** Highest detector confidence on the planted target, 0 when it was never seen (null without a target). */
   targetConf: number | null;
+  /** The planted target was confirmed (null without a target). */
+  targetConfirmed: boolean | null;
   declaredClear: string[];
   score: Record<AtlasEvent, number>;
 }
 
-/** Continuous score toward a false clear: 1 for one, else how little the detector ever believed in the target. */
-export function falseClearScore(falseClear: boolean, targetConf: number | null): number {
+/**
+ * Continuous score toward a false clear: 1 for one. A false clear needs two things, a target the
+ * drone never confirmed and a clear declared anyway, so the score climbs with both: an unconfirmed
+ * target scores 0.5, plus up to 0.2 for the share of buildings declared clear and up to 0.2 for how
+ * close the detector came to believing in it (seen but not confirmed is the precursor). A confirmed
+ * target scores under 0.3. The first search scored a target never seen at all highest, and climbed
+ * toward flights that saw nothing (camera dropouts, strong wind) instead of toward false clears.
+ */
+export function falseClearScore(falseClear: boolean, target: { conf: number; confirmed: boolean; clearedShare: number } | null): number {
   if (falseClear) return 1;
-  if (targetConf === null) return 0;
-  return 0.9 * (1 - Math.min(1, targetConf));
+  if (!target) return 0;
+  if (target.confirmed) return 0.3 * (1 - Math.min(1, target.conf));
+  return 0.5 + 0.2 * Math.min(1, target.clearedShare) + 0.2 * Math.min(1, target.conf / 0.8);
 }
 
 /** Continuous score toward a collision: 1 for contact, else how close the drone came to a solid. */
@@ -100,6 +110,8 @@ export async function flyCase(c: AtlasCase, mode: MissionMode = ATLAS_MODE): Pro
   const collision = run.collisions.length > 0;
   const minClearanceM = Math.min(run.clearance?.minM ?? Infinity, collision ? 0 : Infinity);
   const targetConf = planted.size ? watched.best() : null;
+  const targetConfirmed = planted.size ? run.confirmed.some((c) => c.truth.kind === 'tp' && planted.has(c.truth.targetId)) : null;
+  const clearedShare = new Set(run.declaredClear.map((d) => d.scope).filter((s) => s !== 'outdoor')).size / world.buildings.length;
   return {
     case: c,
     worldSeed: world.seed,
@@ -118,9 +130,10 @@ export async function flyCase(c: AtlasCase, mode: MissionMode = ATLAS_MODE): Pro
       ? { tSec: Math.round(run.clearance.tSec * 10) / 10, phase: run.clearance.phase, inside: run.clearance.inside, tag: run.clearance.tag }
       : null,
     targetConf: targetConf === null ? null : Math.round(targetConf * 1000) / 1000,
+    targetConfirmed,
     declaredClear: run.declaredClear.map((d) => d.scope),
     score: {
-      falseClear: falseClearScore(falseClear, targetConf),
+      falseClear: falseClearScore(falseClear, targetConf === null ? null : { conf: targetConf, confirmed: !!targetConfirmed, clearedShare }),
       collision: collisionScore(collision, minClearanceM),
     },
   };

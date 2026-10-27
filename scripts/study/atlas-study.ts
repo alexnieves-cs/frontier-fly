@@ -111,7 +111,9 @@ async function search(): Promise<void> {
   for (const f of first) log({ kind: 'flight', event: 'nominal', gen: 0, ...f });
   log({ kind: 'generation', event: 'nominal', gen: 0, flights: first.length, failures: count(first), proposal: nominal } satisfies Generation & { kind: string });
 
-  for (const event of ATLAS_EVENTS) {
+  // --events falseClear searches one event only.
+  const events = arg('events', ATLAS_EVENTS.join(',')).split(',') as AtlasEvent[];
+  for (const event of events) {
     let proposal = nominal;
     let flights = first;
     for (let g = 1; g <= gens; g++) {

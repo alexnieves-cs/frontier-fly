@@ -59,9 +59,15 @@ describe('atlas search space', () => {
 
 describe('atlas estimators', () => {
   it('scores reach 1 exactly on the event', () => {
-    expect(falseClearScore(true, 0.9)).toBe(1);
-    expect(falseClearScore(false, 0)).toBeLessThan(1);
+    expect(falseClearScore(true, { conf: 0.9, confirmed: false, clearedShare: 1 })).toBe(1);
     expect(falseClearScore(false, null)).toBe(0);
+    // Seen but unconfirmed, with other buildings cleared, is closer than never seen, which is closer than found.
+    const seen = falseClearScore(false, { conf: 0.75, confirmed: false, clearedShare: 0.5 });
+    const unseen = falseClearScore(false, { conf: 0, confirmed: false, clearedShare: 0 });
+    const found = falseClearScore(false, { conf: 0.95, confirmed: true, clearedShare: 0 });
+    expect(seen).toBeLessThan(1);
+    expect(seen).toBeGreaterThan(unseen);
+    expect(unseen).toBeGreaterThan(found);
     expect(collisionScore(true, 0.5)).toBe(1);
     expect(collisionScore(false, 0.05)).toBeGreaterThan(collisionScore(false, 0.5));
   });
