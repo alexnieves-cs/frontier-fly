@@ -49,7 +49,7 @@ interface Failure {
 interface AtlasData {
   mode: string;
   settings: Record<string, number>;
-  seeds: { search: number; mc: number; is: Record<string, number> };
+  seeds: { search: Record<string, number>; mc: number; is: Record<string, number> };
   dims: { id: string; label: string; values: string[]; nominal: number[] }[];
   rates: Record<Event, { importance: Rate; monteCarlo: Rate }>;
   conditional: Record<string, Rate>;
@@ -126,7 +126,7 @@ export function startAtlas(root: HTMLElement): void {
         <ul>
           <li><b>The autopilot.</b> The shipped policy flies each building and hands it to the sensor-only planner on a stall or contact, on the quadrotor airframe, with no ground truth in the loop. The operator approves every entry it asks for.</li>
           <li><b>The declared mix.</b> Each mission is a draw over ${data.dims.length} factors: the mission kind, 1 to 3 buildings, the person's pose, the object, decoys, interior lights, the time of day, wind speed, direction, gusts and arrival, and a sensor or airframe fault on 40% of flights with its timing, severity and bearing. The site layout and where things are placed come from seeds. The rates are rates under this mix; the factor breakdown above lets you weigh it differently.</li>
-          <li><b>The search.</b> The cross-entropy method climbs a score that reaches 1 exactly on the failure: for a false clear, how little the detector ever believed in the target; for a collision, how close the drone came to a solid. Each kept flight is weighted by how much likelier it is under the declared mix than under the search's own odds. ${data.flights.search.toLocaleString()} flights, seeds ${data.seeds.search}+.</li>
+          <li><b>The search.</b> The cross-entropy method climbs a score that reaches 1 exactly on the failure: for a false clear, a target the drone saw but never confirmed, plus how many buildings it declared clear; for a collision, how close the drone came to a solid. Each kept flight is weighted by how much likelier it is under the declared mix than under the search's own odds. A first false-clear search rewarded never seeing the target at all and wandered off toward camera dropouts and strong wind, so it was re-run with the score above. ${data.flights.search.toLocaleString()} flights, seeds ${[...new Set(Object.values(data.seeds.search))].join(' and ')}+.</li>
           <li><b>The estimate.</b> Fresh flights drawn ${Math.round((data.settings.alpha ?? 0.3) * 100)}% from the declared mix and the rest from what the search learned, each weighted back to the declared mix (no weight above ${(1 / (data.settings.alpha ?? 0.3)).toFixed(1)}). Plain Monte Carlo on its own seeds (${data.seeds.mc}+) checks it. No seed block was used for anything else, and nothing was tuned on them.</li>
         </ul>
         <p><a href="https://github.com/alexnieves-cs/frontier-fly/blob/main/docs/ATLAS.md">docs/ATLAS.md</a> has the tables; <a href="https://github.com/alexnieves-cs/frontier-fly/tree/main/src/eval/atlas">src/eval/atlas</a> has the code.</p>

@@ -2,9 +2,10 @@
 //
 //   vite-node scripts/study/atlas-report.ts -- [--dir docs/atlas]
 //
-// Reads <dir>/search.json, <dir>/is-falseClear.json, <dir>/is-collision.json and <dir>/mc.json, the
-// merged outputs of scripts/study/atlas-study.ts.
-import { readFileSync, writeFileSync } from 'node:fs';
+// Reads <dir>/search.json (and an earlier <dir>/search-v1.json, for events the latest search did not
+// cover), <dir>/is-falseClear.json, <dir>/is-collision.json and <dir>/mc.json, the merged outputs of
+// scripts/study/atlas-study.ts.
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ATLAS_EVENTS, type AtlasEvent, type AtlasFlight } from '../../src/eval/atlas/flight';
 import type { RateEstimate, Slice } from '../../src/eval/atlas/estimate';
@@ -27,7 +28,7 @@ interface SearchFile {
   mode: string;
   seedBase: number;
   settings: Record<string, number>;
-  events: Record<AtlasEvent, { generations: { event: string; gen: number; flights: number; failures: Record<AtlasEvent, number>; level?: number }[]; shift: unknown }>;
+  events: Partial<Record<AtlasEvent, { learned: unknown; generations: { event: string; gen: number; flights: number; failures: Record<AtlasEvent, number>; level?: number }[]; shift: unknown }>>;
   flights: (AtlasFlight & { event: string; gen: number })[];
 }
 interface RateFile {
@@ -39,7 +40,11 @@ interface RateFile {
   results: AtlasFlight[];
 }
 
-const search = read<SearchFile>('search.json');
+const searches = ['search.json', 'search-v1.json'].filter((f) => existsSync(join(dir, f))).map((f) => read<SearchFile>(f));
+const search = searches[0]!;
+/** The latest search that learned a proposal for the event. */
+const searchOf = (e: AtlasEvent): SearchFile => searches.find((s) => s.events[e]?.learned) ?? search;
+const searchFlights = searches.flatMap((s) => s.flights.map((f) => ({ ...f, seedBase: s.seedBase })));
 const mc = read<RateFile>('mc.json');
 const is = Object.fromEntries(ATLAS_EVENTS.map((e) => [e, read<RateFile>(`is-${e}.json`)])) as Record<AtlasEvent, RateFile>;
 
@@ -70,7 +75,7 @@ function row(f: AtlasFlight, event: AtlasEvent, source: string) {
 const failures = [
   ...ATLAS_EVENTS.flatMap((e) => mc.results.filter((f) => f[e]).map((f) => row(f, e, 'monte-carlo'))),
   ...ATLAS_EVENTS.flatMap((e) => is[e].results.filter((f) => f[e]).map((f) => row(f, e, 'importance'))),
-  ...ATLAS_EVENTS.flatMap((e) => search.flights.filter((f) => f.event === e && f[e]).map((f) => row(f, e, 'search'))),
+  ...ATLAS_EVENTS.flatMap((e) => searchFlights.filter((f) => f[e]).map((f) => row(f, e, 'search'))),
 ];
 
 /** Rates on the slice of nominal flights a reader cares about most: missions with someone or something inside. */
@@ -87,7 +92,7 @@ const data = {
   commit: { search: search.commit, mc: mc.commit, is: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, is[e].commit])) },
   mode: search.mode,
   settings: search.settings,
-  seeds: { search: search.seedBase, mc: mc.seedBase, is: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, is[e].seedBase])) },
+  seeds: { search: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, searchOf(e).seedBase])), mc: mc.seedBase, is: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, is[e].seedBase])) },
   dims: DIMS.map((d) => ({ id: d.id, label: d.label, values: d.values, nominal: d.nominal })),
   rates: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, { importance: is[e].rates[e], monteCarlo: mc.rates[e] }])),
   conditional: {
@@ -96,9 +101,12 @@ const data = {
   },
   slices: mc.slices,
   search: Object.fromEntries(
-    ATLAS_EVENTS.map((e) => [e, { generations: search.events[e].generations.filter((g) => g.event !== 'nominal').map(({ gen, flights, failures, level }) => ({ gen, flights, failures: failures[e], level: level ?? null })), shift: search.events[e].shift }]),
+    ATLAS_EVENTS.map((e) => {
+      const ev = searchOf(e).events[e]!;
+      return [e, { generations: ev.generations.filter((g) => g.event !== 'nominal').map(({ gen, flights, failures, level }) => ({ gen, flights, failures: failures[e], level: level ?? null })), shift: ev.shift }];
+    }),
   ),
-  flights: { search: search.flights.length, mc: mc.flights, is: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, is[e].flights])) },
+  flights: { search: searchFlights.length, mc: mc.flights, is: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, is[e].flights])) },
   failures,
 };
 writeFileSync(out, `${JSON.stringify(data)}\n`);
@@ -137,9 +145,9 @@ const lines: string[] = [
   '## Method',
   '',
   `- **Operating distribution.** Every flight is a draw from a declared distribution over ${DIMS.length} dimensions (src/eval/atlas/space.ts): mission kind (find a person 35%, sweep an occupied site 25%, sweep an empty site 20%, find an object 20%), 1-3 buildings, the person's pose, the object, decoys, interior lights, time of day (uniform; flashlight on at night), mean wind 6u² m/s with direction, gusts and arrival time, and a sensor or airframe fault on 40% of flights with its onset, severity and bearing. The layout and target placement come from two seeds that are never searched. The rates are rates under this distribution; the conditional rates let a reader re-weight it.`,
-  `- **Search.** Cross-entropy method: each generation of ${search.events.falseClear.generations[0]?.flights ?? 0} flights keeps the top ${search.settings.rho! * 100}% by a score that reaches 1 exactly on the event (false clear: one minus the best detector confidence on the target; collision: how close the drone came to any solid but the ground), weights each kept flight by its likelihood ratio to the nominal, and refits every dimension's probabilities (smoothing ${search.settings.smoothing}, floor ${search.settings.floor}). ${search.flights.length} search flights on seeds from ${search.seedBase}.`,
+  `- **Search.** Cross-entropy method: each generation of ${searchOf('falseClear').events.falseClear?.generations[0]?.flights ?? 0} flights keeps the top ${search.settings.rho! * 100}% by a score that reaches 1 exactly on the event, weights each kept flight by its likelihood ratio to the nominal, and refits only the dimensions where the kept flights differ clearly from their batch (chi-square at 0.999; smoothing ${search.settings.smoothing}, floor ${search.settings.floor}). The collision score is how close the drone came to any solid but the ground. The false-clear score rewards a target seen but never confirmed, plus the share of buildings declared clear; a first search (seeds ${searches[searches.length - 1]!.seedBase}+) scored a target never seen at all highest and climbed toward flights that saw nothing, so it was re-run with that score on seeds ${searchOf('falseClear').seedBase}+. ${searchFlights.length} search flights in all.`,
   `- **Importance sampling.** Fresh flights from a mixture of ${search.settings.alpha! * 100}% nominal and the learned proposal, so no weight exceeds ${(1 / search.settings.alpha!).toFixed(1)}; the rate is the mean weighted indicator with a normal 95% interval. Plain Monte Carlo draws from the nominal itself on its own seeds, as a check.`,
-  `- **Seeds.** Search ${search.seedBase}+, importance sampling ${ATLAS_EVENTS.map((e) => `${label(e).toLowerCase()} ${is[e].seedBase}+`).join(', ')}, Monte Carlo ${mc.seedBase}+. No other study uses these blocks, and nothing was tuned on them.`,
+  `- **Seeds.** Search ${[...new Set(searches.map((x) => x.seedBase))].join(' and ')}+, importance sampling ${ATLAS_EVENTS.map((e) => `${label(e).toLowerCase()} ${is[e].seedBase}+`).join(', ')}, Monte Carlo ${mc.seedBase}+. No other study uses these blocks, and nothing was tuned on them.`,
   '',
 ];
 writeFileSync(md, lines.join('\n'));
