@@ -76,6 +76,11 @@ export interface MissionWorldOptions {
   targets?: TargetWant[];
   /** Look-alike decoys (mannequin, coat, ...) to plant indoors. Default 0. */
   decoys?: number;
+  /**
+   * Seed for where targets and decoys are planted and which rooms are lit, apart from the layout.
+   * Defaults to `seed`. The failure atlas varies the two independently.
+   */
+  placementSeed?: number;
 }
 
 export interface MissionForWorldOptions {
@@ -303,6 +308,20 @@ export interface RunRecord {
    * the prior within aerial reach (inside the fence, off crown-covered ground), and the replans.
    */
   search?: { pos: { tSec: number; pos: number }[]; reachable: number; replans: number };
+  /** With RunnerOptions.measureClearance: the closest the airframe came to any solid but the ground. */
+  clearance?: ClearanceRecord;
+}
+
+/** Closest approach of the drone's sphere to a solid (the ground excluded), and where it happened. */
+export interface ClearanceRecord {
+  /** Gap, m; zero or below is contact. */
+  minM: number;
+  tSec: number;
+  pos: V3;
+  phase: Phase;
+  inside: string | null;
+  /** Collider tag of the solid: wall, floor, door, trunk, canopy, undergrowth. */
+  tag: string;
 }
 
 export interface RunnerSnapshot {
@@ -371,6 +390,8 @@ export interface RunnerOptions {
   locFault?: LocSensorHook;
   /** Outdoor search pattern. Default: lanes. */
   search?: OutdoorSearchOptions;
+  /** Track the closest approach to any solid every tick (RunRecord.clearance). Off by default: it costs a query per tick. */
+  measureClearance?: boolean;
 }
 
 /**
