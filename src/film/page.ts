@@ -54,7 +54,20 @@ export interface FilmApi {
   scenario: ScenarioId;
   /** Render film frame i (frames must be requested in order for the camera springs). */
   render(i: number): void;
+  /** Hash of the flown frames, so frames rendered on different machines can be checked to come from the same flight. */
+  digest?: string;
   error?: string;
+}
+
+/** FNV-1a over the JSON of the flown frames. */
+function digestOf(value: unknown): string {
+  const text = JSON.stringify(value);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
 }
 
 declare global {
@@ -182,6 +195,7 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     };
     api.frames = timeline.length;
     api.render = show;
+    if (recording) api.digest = digestOf(log.frames);
     loading.remove();
     show(0);
     api.ready = true;

@@ -1,0 +1,191 @@
+name: media
+
+# Re-renders the README and Pages media from the commit it runs on: the mission films
+# (scripts/media/film.mjs), the console clips (scripts/media/record.mjs) and the e2e stills
+# (tests/e2e/shots.spec.ts with UPDATE_MEDIA=1). A full film render is about 6 hours on one machine,
+# so each film's frames are split over several runners and stitched in the publish job; every shard
+# flies the mission itself and the publish job refuses frames from flights that differ.
+#
+# Nothing lands on main: the result is pushed to media/<run id>. Check it and merge it in a PR.
+#
+#   gh workflow run media                                    everything
+#   gh workflow run media -f films=none -f stills=false      only the console clips
+#   gh workflow run media -f films=cabin-day -f clips=none -f stills=false
+on:
+  workflow_dispatch:
+    inputs:
+      films:
+        description: Film scenarios to render, space separated, or "none"
+        required: true
+        default: cabin-day backpack-night compound-clear
+      shards:
+        description: Runners per film (frames are split evenly between them)
+        required: true
+        default: '6'
+      clips:
+        description: Console clip ids from scripts/media/scenarios.mjs, space separated, "all" or "none"
+        required: true
+        default: all
+      stills:
+        description: Refresh the e2e screenshots in docs/media
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media
+  cancel-in-progress: false
+
+env:
+  MEDIA_SOURCE: ${{ github.ref_name }}@${{ github.sha }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      films: ${{ steps.plan.outputs.films }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          FILMS: ${{ inputs.films }}
+          SHARDS: ${{ inputs.shards }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os, re
+          films = [f for f in os.environ['FILMS'].split() if f != 'none']
+          assert all(re.fullmatch(r'[a-z0-9-]+', f) for f in films), films
+          n = int(os.environ['SHARDS'])
+          assert 1 <= n <= 16, n
+          print('films=' + ' '.join(films))
+          print('matrix=' + json.dumps({'include': [{'film': f, 'shard': k, 'of': n} for f in films for k in range(n)]}))
+          EOF
+
+  film:
+    needs: plan
+    if: needs.plan.outputs.films != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Render frames
+        env:
+          FILM_SHARD: ${{ matrix.shard }}/${{ matrix.of }}
+          KEEP_FRAMES: '1'
+        run: npm run media:film -- ${{ matrix.film }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ matrix.film }}-${{ matrix.shard }}
+          path: test-results/film/
+          compression-level: 0
+          retention-days: 2
+
+  clips:
+    if: inputs.clips != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - name: Record clips
+        env:
+          CLIPS: ${{ inputs.clips }}
+        run: |
+          if [ "$CLIPS" = all ]; then npm run media; else npm run media -- $CLIPS; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clips
+          path: |
+            docs/media/*.mp4
+            docs/media/*.gif
+            docs/media/media.json
+            docs/missions.json
+            !docs/media/film-*
+          retention-days: 7
+
+  stills:
+    if: inputs.stills
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test tests/e2e/shots.spec.ts
+        env:
+          UPDATE_MEDIA: '1'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stills
+          path: |
+            docs/media/*.png
+            docs/media/*capture.json
+          retention-days: 7
+
+  publish:
+    needs: [plan, film, clips, stills]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - if: needs.film.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          pattern: frames-*
+          path: test-results/film
+          merge-multiple: true
+      - if: needs.film.result == 'success'
+        name: Encode films
+        run: FILM_ENCODE_ONLY=1 npm run media:film -- ${{ needs.plan.outputs.films }}
+      - if: needs.clips.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: clips
+          path: docs
+      - if: needs.stills.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: stills
+          path: docs/media
+      - name: Sizes
+        run: ls -la docs/media
+      # Push to its own branch: the cloud container's proxy can fetch git but not artifact downloads.
+      - name: Push the result to media/<run id>
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
+          b="media/${{ github.run_id }}"
+          git checkout -b "$b"
+          git add docs/media docs/missions.json
+          git commit -m "Media re-rendered from ${MEDIA_SOURCE} (media run ${{ github.run_id }})"
+          git push origin "$b"
