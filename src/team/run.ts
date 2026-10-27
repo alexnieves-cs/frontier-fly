@@ -1,16 +1,10 @@
 import { RNG } from '../shared/rng';
 import type { BuildingSpec, EpisodeConfig } from '../shared/types';
-import { sensorFrame } from '../eval/pilots';
+import { sensorFrame } from '../sim/sensorPlanner';
 import { createEnv, type ExplorerEnv } from '../sim/env';
-import {
-  commandToAction,
-  descentClear,
-  filterVelocity,
-  OccupancyMap,
-  QUAD_BRAKING,
-  SensorPlanner,
-  type SensorCommand,
-} from '../sim/sensorPlanner';
+import { commandToAction, SensorPlanner, type SensorCommand } from '../sim/sensorPlanner';
+import { descentClear, filterVelocity, QUAD_BRAKING } from '../sim/lidarSafety';
+import { OccupancyMap } from '../sim/sensorMap';
 import { initPhysics, PhysicsWorld } from '../sim/world';
 import { ClaimPenalty, DEFAULT_CLAIMS, type ClaimOptions } from './allocate';
 import { exchange, MeshNode, type MeshStats } from './mesh';

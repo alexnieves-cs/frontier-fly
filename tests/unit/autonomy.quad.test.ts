@@ -4,7 +4,7 @@ import type { V3 } from '../../src/mission/autonomy/contracts';
 import { MISSION_QUAD_BRAKING, QuadVehicle } from '../../src/mission/autonomy/quadVehicle';
 import { INDOOR_LIMITS, OUTDOOR_LIMITS, Vehicle } from '../../src/mission/autonomy/vehicle';
 import { buildMissionWorld } from '../../src/mission/autonomy/world';
-import { brakingFilter, safeSpeed } from '../../src/sim/sensorPlanner';
+import { brakingFilter, safeSpeed } from '../../src/sim/lidarSafety';
 import { LIDAR_H, LIDAR_MAX } from '../../src/shared/constants';
 import { initOutdoorPhysics, OutdoorPhysics } from '../../src/world/outdoor/physics';
 import type { MissionWorld } from '../../src/mission/autonomy/contracts';

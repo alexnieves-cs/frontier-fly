@@ -11,7 +11,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import * as tf from '@tensorflow/tfjs';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { GainLabeler, OracleGain, reachablePlane } from '../../src/eval/gainLabels';
-import { classicalPilot, sensorFrame } from '../../src/eval/pilots';
+import { classicalPilot } from '../../src/eval/pilots';
+import { sensorFrame } from '../../src/sim/sensorPlanner';
 import { evalLikeConfig, trainingBuilding } from '../../src/rl/dagger';
 import { RNG } from '../../src/shared/rng';
 import { createEnv } from '../../src/sim/env';
@@ -30,7 +31,8 @@ import {
   unknownGain,
   type GainModelData,
 } from '../../src/sim/mapPredict';
-import { commandToAction, OccupancyMap, SensorPlanner } from '../../src/sim/sensorPlanner';
+import { commandToAction, SensorPlanner } from '../../src/sim/sensorPlanner';
+import { OccupancyMap } from '../../src/sim/sensorMap';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);

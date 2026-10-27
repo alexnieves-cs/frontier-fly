@@ -57,7 +57,7 @@ The **browser pilot** is what the live demo flies when you pick **Policy**: obse
 
 Every pilot flies the same 30 fresh buildings per condition, from `scripts/study/coverage-study.ts` at `d4d4d63` with `public/checkpoints/pretrained.bin`. The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108). Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.
 
-The **oracle teacher** reads the true floor plan; it is the DAgger teacher the policy imitates, so it bounds what imitation can reach. The **sensor-only planner** (`src/sim/sensorPlanner.ts`) plans frontier routes on the drone's own lidar map and filters every velocity through the lidar ring. The **lidar guard** wraps the policy's action with that same filter and holds 1.15 m above the floor. [REPORT.md](REPORT.md) discusses what these numbers mean.
+The **oracle teacher** reads the true floor plan; it is the DAgger teacher the policy imitates, so it bounds what imitation can reach. The **sensor-only planner** (`src/sim/sensorPlanner.ts`) plans frontier routes on the drone's own lidar map and filters every velocity through the lidar ring. The **lidar guard** (`src/sim/lidarSafety.ts`) wraps the policy's action with that same filter and holds 1.15 m above the floor. [REPORT.md](REPORT.md) discusses what these numbers mean.
 
 | Pilot | Hard, day | Hard, night (no lights) | Hard collisions per episode | Two floors | Quadrotor + noise | Quad collisions per episode |
 | --- | --- | --- | --- | --- | --- | --- |

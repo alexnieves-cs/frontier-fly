@@ -9,7 +9,8 @@ import { classicalPilot } from '../../src/eval/pilots';
 import { RNG } from '../../src/shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise, zeroNoise } from '../../src/sim/dynamics/dr';
 import { createEnv } from '../../src/sim/env';
-import { QUAD_BRAKING, type SensorPlannerOptions } from '../../src/sim/sensorPlanner';
+import { type SensorPlannerOptions } from '../../src/sim/sensorPlanner';
+import { QUAD_BRAKING } from '../../src/sim/lidarSafety';
 import { MAX_SPEED_H } from '../../src/shared/constants';
 
 function arg(name: string, fallback: string): string {
