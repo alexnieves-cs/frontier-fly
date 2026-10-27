@@ -11,7 +11,7 @@ import {
 import { mavlinkJson, qgcPlanJson, toWpl } from '../../mission/export/formats';
 import { GEO_ORIGINS, isValidOrigin, type GeoOriginId, type GeoPoint } from '../../mission/export/geo';
 import { importQgcPlan } from '../../mission/export/importPlan';
-import { routeFromCoverage, routeFromPreview, type MissionRoute } from '../../mission/export/route';
+import { routeFromCoverage, type MissionRoute } from '../../mission/export/route';
 import type { Mission, Point } from '../../mission/types';
 import { validateMission } from '../../mission/validate';
 
@@ -31,7 +31,6 @@ const FORMATS: Record<Format, { label: string; ext: string; mime: string }> = {
 };
 
 export interface ExportPanelOptions {
-  mockSite: boolean;
   /** The mission as it stands in the editor. */
   mission: () => Mission;
   /** A valid mission read from a .plan; the editor adopts it. */
@@ -175,7 +174,7 @@ export function createExportPanel(options: ExportPanelOptions): ExportPanel {
       next = { route: null, error: 'Fix the mission errors before exporting.' };
     } else {
       try {
-        next = { route: options.mockSite ? routeFromPreview(mission) : routeFromCoverage(mission, worldFor(mission.seed >>> 0)), error: null };
+        next = { route: routeFromCoverage(mission, worldFor(mission.seed >>> 0)), error: null };
       } catch (error) {
         next = { route: null, error: error instanceof Error ? error.message : String(error) };
       }

@@ -1,14 +1,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { mockDetectionSource } from '../../src/mission/detectionMock';
 import { pathIsOperable, planPath } from '../../src/mission/path';
 import { isSelfIntersecting, ringInsideRing, snapToGrid } from '../../src/mission/polygon';
 import { blankMission, sampleMission } from '../../src/mission/sample';
 import { canonicalMission, decodeMissionHash, missionToHash } from '../../src/mission/serialize';
-import { createSession } from '../../src/mission/session';
 import { validateMission } from '../../src/mission/validate';
-import { mockWorldProvider } from '../../src/mission/worldMock';
 import type { Mission } from '../../src/mission/types';
 
 function square(x: number, y: number, w: number, h: number): Mission['geofence'] {
@@ -149,82 +146,12 @@ describe('mission URL round-trip', () => {
   });
 });
 
-describe('mission preview session', () => {
-  it('keeps the sample sweep inside the operating area and requests entry', () => {
+describe('mission sweep preview', () => {
+  it('keeps the sample sweep inside the operating area', () => {
     const mission = sampleMission(11);
-    const world = mockWorldProvider.load(mission.seed);
     const path = planPath(mission);
     expect(path.length).toBeGreaterThan(4);
     expect(pathIsOperable(mission, path)).toBe(true);
-    const detections = mockDetectionSource.catalog(mission, world);
-    expect(detections.some((detection) => detection.entryRequested)).toBe(true);
-  });
-
-  it('pauses an ask policy until the operator answers, then writes a report', () => {
-    const mission = sampleMission(11);
-    const world = mockWorldProvider.load(11);
-    const session = createSession(mission, world, mockDetectionSource);
-    session.start();
-    let guard = 0;
-    while (session.snapshot().status === 'running' && guard < 8000) {
-      session.step(0.5);
-      guard += 1;
-    }
-    const waiting = session.snapshot();
-    expect(waiting.status).toBe('awaiting_approval');
-    expect(waiting.pendingApproval?.label).toMatch(/person/i);
-    expect(waiting.track.length).toBeGreaterThan(2);
-    session.approve();
-    while (session.snapshot().status === 'running' && guard < 8000) {
-      session.step(0.5);
-      guard += 1;
-    }
-    const done = session.snapshot();
-    expect(done.status).toBe('complete');
-    expect(done.report).not.toBeNull();
-    expect(done.report?.placeholders).toEqual({
-      pathEfficiency: null,
-      sensorHealth: null,
-      commsDropouts: null,
-      falsePositiveRate: null,
-    });
-    expect(done.report?.entriesApproved).toBe(1);
-    expect(done.report?.coverageRatio).toBeGreaterThan(0.4);
-    expect(done.report?.targets[0]?.met).toBe(true);
-  });
-
-  it('does not enter when the policy is never, and enters without asking when it is auto', () => {
-    const world = mockWorldProvider.load(11);
-    const never = createSession({ ...sampleMission(11), entryPolicy: 'never' }, world, mockDetectionSource);
-    never.start();
-    let guard = 0;
-    while (never.snapshot().status === 'running' && guard < 8000) {
-      never.step(1);
-      guard += 1;
-    }
-    expect(never.snapshot().status).toBe('complete');
-    expect(never.snapshot().detections.some((detection) => detection.disposition === 'skipped')).toBe(true);
-    expect(never.snapshot().report?.entriesApproved).toBe(0);
-
-    const auto = createSession({ ...sampleMission(11), entryPolicy: 'auto' }, world, mockDetectionSource);
-    auto.start();
-    guard = 0;
-    while (auto.snapshot().status === 'running' && guard < 8000) {
-      auto.step(1);
-      guard += 1;
-    }
-    expect(auto.snapshot().pendingApproval).toBeNull();
-    expect(auto.snapshot().detections.some((detection) => detection.disposition === 'entered')).toBe(true);
-  });
-
-  it('repeats the same track for the same mission', () => {
-    const run = () => {
-      const session = createSession(sampleMission(15), mockWorldProvider.load(15), mockDetectionSource);
-      session.start();
-      for (let i = 0; i < 20; i++) session.step(0.25);
-      return session.snapshot().track;
-    };
-    expect(run()).toEqual(run());
   });
 });
 

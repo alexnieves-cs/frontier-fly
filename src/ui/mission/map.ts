@@ -1,4 +1,3 @@
-import type { CoverageGrid } from '../../mission/session';
 import { isSelfIntersecting, snapToGrid } from '../../mission/polygon';
 import type { Point } from '../../mission/types';
 import type { WorldFootprint } from '../../mission/world';
@@ -21,7 +20,6 @@ export interface MapLayers {
   plan: Point[];
   track: Point[];
   drone: { x: number; y: number; yawRad: number } | null;
-  coverage: CoverageGrid | null;
   detections: { x: number; y: number; kind: string; label: string }[];
   selection: MapSelection | null;
 }
@@ -72,7 +70,6 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     plan: [],
     track: [],
     drone: null,
-    coverage: null,
     detections: [],
     selection: null,
   };
@@ -359,22 +356,6 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     }
   }
 
-  function drawCoverage(): void {
-    const grid = layers.coverage;
-    if (!grid) return;
-    context.fillStyle = 'rgba(30, 74, 56, 0.22)';
-    for (let row = 0; row < grid.rows; row++) {
-      for (let col = 0; col < grid.cols; col++) {
-        if (grid.visited[row * grid.cols + col] !== 1) continue;
-        const x = grid.originX + col * grid.cellM;
-        const y = grid.originY + (row + 1) * grid.cellM;
-        const a = worldToScreen({ x, y });
-        const size = grid.cellM / mpp;
-        context.fillRect(a.x, a.y, size, size);
-      }
-    }
-  }
-
   function drawVertices(points: Point[], selectedIndex: number | undefined): void {
     points.forEach((point, index) => {
       const at = worldToScreen(point);
@@ -449,7 +430,6 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     context.fillRect(0, 0, width, height);
     drawGrid();
     drawFootprints();
-    drawCoverage();
     fillRing(layers.geofence, 'rgba(30, 74, 56, 0.08)');
     strokeRing(layers.geofence, ACCENT, 2);
     for (const zone of layers.noFly) {
