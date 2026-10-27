@@ -562,7 +562,7 @@ class Demo {
   }
 
   private syncScenarioCards(): void {
-    for (const scenario of SCENARIOS) this.el(`scenario-${scenario.id}`).setAttribute('aria-pressed', String(scenario.id === this.scenario));
+    for (const scenario of SCENARIOS) this.el(`scenario-${scenario.id}`).setAttribute('aria-pressed', String(!this.atlas && scenario.id === this.scenario));
     this.root.dataset.scenario = this.scenario;
   }
 

@@ -96,7 +96,7 @@ const data = {
   },
   slices: mc.slices,
   search: Object.fromEntries(
-    ATLAS_EVENTS.map((e) => [e, { generations: search.events[e].generations.map(({ gen, flights, failures, level }) => ({ gen, flights, failures: failures[e], level: level ?? null })), shift: search.events[e].shift }]),
+    ATLAS_EVENTS.map((e) => [e, { generations: search.events[e].generations.filter((g) => g.event !== 'nominal').map(({ gen, flights, failures, level }) => ({ gen, flights, failures: failures[e], level: level ?? null })), shift: search.events[e].shift }]),
   ),
   flights: { search: search.flights.length, mc: mc.flights, is: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, is[e].flights])) },
   failures,

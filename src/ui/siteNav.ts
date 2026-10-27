@@ -6,7 +6,7 @@ import './theme.css';
 
 export const REPO_URL = 'https://github.com/alexnieves-cs/frontier-fly';
 
-export type SitePage = 'home' | 'film' | 'demo' | 'race' | 'team' | 'sim' | 'outdoor' | 'mission' | 'px4';
+export type SitePage = 'home' | 'film' | 'demo' | 'race' | 'team' | 'atlas' | 'sim' | 'outdoor' | 'mission' | 'px4';
 
 /** Named for what a visitor does there. `gap` starts the second group (tools) after a divider. */
 const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: string; gap?: boolean }> = [
@@ -15,6 +15,7 @@ const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: s
   { id: 'demo', href: './demo.html', label: 'Missions', title: 'Run a woods-to-building rescue mission' },
   { id: 'race', href: './race.html', label: 'Race', title: 'Four pilots search the same building live' },
   { id: 'team', href: './team.html', label: 'Team', title: 'Several drones search one building together' },
+  { id: 'atlas', href: './atlas.html', label: 'Safety', title: 'How often it fails, how, and the flights to prove it' },
   { id: 'sim', href: './sim.html', label: 'Fly indoors', title: 'Fly or train the indoor drone yourself', gap: true },
   { id: 'outdoor', href: './outdoor.html', label: 'Fly outdoors', title: 'Fly the procedural forest site' },
   { id: 'mission', href: './mission.html', label: 'Plan', title: 'Plan a mission and export it' },
