@@ -153,6 +153,7 @@ function mergeSearch(files: string[], outPath: string): void {
     ),
     flights,
   };
+  mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, `${JSON.stringify(report)}\n`);
   console.log(`wrote ${outPath}: ${flights.length} search flights`);
 }
@@ -197,6 +198,7 @@ function mergeRate(files: string[], outPath: string): void {
     ...(learned ? { learned, alpha: ALPHA } : { slices: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, slices(flights, e)])) }),
     results: flights,
   };
+  mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, `${JSON.stringify(report)}\n`);
   console.log(`wrote ${outPath}: ${JSON.stringify(rates)}`);
 }
