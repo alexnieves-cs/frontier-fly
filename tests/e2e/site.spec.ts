@@ -8,9 +8,12 @@ test('the homepage scrolls to its results and footer once the hero film has load
   const overflow = await page.evaluate(() => [getComputedStyle(document.documentElement).overflowY, getComputedStyle(document.body).overflowY]);
   expect(overflow).not.toContain('hidden');
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(900);
-  await page.locator('#results-title').scrollIntoViewIfNeeded();
+  // Scroll with the page's own API: on software GL the hero film keeps the frame clock too busy for
+  // Playwright's "element is stable" check, which is about animation frames, not the layout.
+  await page.evaluate(() => document.getElementById('results-title')!.scrollIntoView({ block: 'center' }));
   await expect(page.locator('#results-title')).toBeInViewport();
-  await page.locator('.foot').scrollIntoViewIfNeeded();
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(page.locator('.foot')).toBeInViewport();
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 });
 
