@@ -1,11 +1,9 @@
 import type { Point } from './types';
 
 /**
- * Site context for the mission map.
- *
- * The outdoor world generator (`src/world/outdoor`, owned by another workstream)
- * is not imported here. A future adapter can implement `WorldProvider` and
- * replace `mockWorldProvider`.
+ * Site context for the mission map: footprints drawn under the plan.
+ * `outdoorWorldProvider` (autonomy/world.ts) derives them from the same
+ * generated world the runner flies.
  */
 export interface WorldFootprint {
   id: string;
