@@ -119,15 +119,24 @@ export function logDensity(proposal: Proposal, c: AtlasCase): number {
   return l;
 }
 
-/** Defensive mixture: alpha of the nominal and the rest of the learned proposal, per dimension. */
-export function mixture(proposal: Proposal, alpha: number): Proposal {
-  const nominal = nominalProposal();
-  return proposal.map((p, d) => p.map((x, j) => alpha * nominal[d]![j]! + (1 - alpha) * x));
-}
-
 /** Likelihood ratio p/q of a case drawn from q. */
 export function weight(sampling: Proposal, c: AtlasCase): number {
   return Math.exp(logDensity(nominalProposal(), c) - logDensity(sampling, c));
+}
+
+/**
+ * Defensive mixture: case i comes from the nominal with probability alpha and from the learned
+ * proposal otherwise. The mixture is over whole cases, not per dimension, so a case's density is
+ * alpha p + (1 - alpha) q and its weight p / (alpha p + (1 - alpha) q) never exceeds 1 / alpha.
+ */
+export function sampleMixture(learned: Proposal, alpha: number, seedBase: number, i: number): AtlasCase {
+  const pick = new RNG((seedBase * 7919 + i) >>> 0, 'atlas-mixture').next();
+  return sampleCase(pick < alpha ? nominalProposal() : learned, seedBase, i);
+}
+
+export function mixtureWeight(learned: Proposal, alpha: number, c: AtlasCase): number {
+  const ratio = Math.exp(logDensity(learned, c) - logDensity(nominalProposal(), c));
+  return 1 / (alpha + (1 - alpha) * ratio);
 }
 
 // ------------------------------------------------------------ decoding

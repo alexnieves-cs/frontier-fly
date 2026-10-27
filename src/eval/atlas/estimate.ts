@@ -3,12 +3,15 @@
 // The search (Rubinstein's cross-entropy method for rare events) draws a batch from the current
 // proposal, keeps the top RHO of it by the event's score (or every flight where the event happened,
 // once that is more than RHO), and moves the proposal toward the kept flights, weighting each by
-// its likelihood ratio to the nominal so the update targets the nominal's own failure region. The
-// final estimate draws fresh cases from a defensive mixture of the nominal and the learned proposal,
-// which bounds every weight by 1/alpha, and reports the weighted failure rate with a CLT interval.
+// its likelihood ratio to the nominal so the update targets the nominal's own failure region.
+// With sixteen dimensions, refitting all of them every generation lets the ones that do not matter
+// drift on noise, and the likelihood ratios collapse. So a dimension is refitted only when the elite
+// is clearly unlike the batch it came from (a chi-square test at SCREEN_Z); the rest keep their
+// probabilities. The final estimate draws fresh cases from a defensive mixture of the nominal and the
+// learned proposal, which bounds every weight by 1/alpha, and reports the weighted failure rate.
 import { wilson } from '../missions';
 import type { AtlasEvent, AtlasFlight } from './flight';
-import { DIMS, mixture, nominalProposal, weight, type Proposal } from './space';
+import { DIMS, mixtureWeight, nominalProposal, weight, type Proposal } from './space';
 
 /** Share of a batch kept as the elite. */
 export const RHO = 0.1;
@@ -18,12 +21,28 @@ export const SMOOTHING = 0.7;
 export const FLOOR = 0.01;
 /** Share of the nominal in the estimation mixture. Weights are at most 1/ALPHA. */
 export const ALPHA = 0.3;
+/** One-sided normal quantile of the screening test (0.999). */
+export const SCREEN_Z = 3.09;
+
+/** Wilson-Hilferty approximation of the chi-square quantile with `df` degrees of freedom at normal quantile z. */
+export function chiSquareQuantile(df: number, z: number): number {
+  const a = 2 / (9 * df);
+  return df * (1 - a + z * Math.sqrt(a)) ** 3;
+}
+
+/** Pearson chi-square of observed category counts against expected shares. */
+export function chiSquare(counts: readonly number[], shares: readonly number[]): number {
+  const n = counts.reduce((a, b) => a + b, 0);
+  return counts.reduce((acc, k, j) => acc + (k - n * shares[j]!) ** 2 / Math.max(1e-12, n * shares[j]!), 0);
+}
 
 export interface CeStep {
   /** Score level that defined the elite. 1 means only flights where the event happened. */
   level: number;
   elite: number;
   failures: number;
+  /** Dimensions the elite moved. */
+  refit: string[];
   next: Proposal;
 }
 
@@ -34,7 +53,17 @@ export function ceUpdate(current: Proposal, flights: readonly AtlasFlight[], eve
   const quantile = scores[Math.max(0, Math.ceil(RHO * scores.length) - 1)] ?? 1;
   const level = Math.min(1, quantile);
   const elite = flights.filter((f) => f.score[event] >= level);
+  const refit: string[] = [];
   const next = current.map((p, d) => {
+    // Screen against the batch the elite came from: its own share of each category.
+    const batch = p.map(() => 0);
+    for (const f of flights) batch[f.case.k[d]!]! += 1;
+    const shares = batch.map((x) => x / flights.length);
+    const seen = shares.map((x, j) => ({ x, j })).filter((o) => o.x > 0);
+    const eliteCounts = seen.map((o) => elite.filter((f) => f.case.k[d] === o.j).length);
+    const df = seen.length - 1;
+    if (df < 1 || chiSquare(eliteCounts, seen.map((o) => o.x)) < chiSquareQuantile(df, SCREEN_Z)) return p;
+    refit.push(DIMS[d]!.id);
     const counts = p.map(() => 0);
     let total = 0;
     for (const f of elite) {
@@ -48,7 +77,7 @@ export function ceUpdate(current: Proposal, flights: readonly AtlasFlight[], eve
     const sum = floored.reduce((a, b) => a + b, 0);
     return floored.map((x) => x / sum);
   });
-  return { level, elite: elite.length, failures, next };
+  return { level, elite: elite.length, failures, refit, next };
 }
 
 export interface RateEstimate {
@@ -69,14 +98,14 @@ export function monteCarloRate(flights: readonly AtlasFlight[], event: AtlasEven
 }
 
 /**
- * Importance-sampled rate, flights drawn from `sampling`. The interval is the normal one on the
+ * Importance-sampled rate, flights drawn from the defensive mixture of the nominal and `learned`. The interval is the normal one on the
  * weighted mean. With no failure at all it falls back to the bound the mixture guarantees: every
  * failing case is at least ALPHA times as likely under the mixture, so 3 / (ALPHA n) bounds the
  * rate at 95%.
  */
-export function importanceRate(flights: readonly AtlasFlight[], event: AtlasEvent, sampling: Proposal, alpha = ALPHA): RateEstimate {
+export function importanceRate(flights: readonly AtlasFlight[], event: AtlasEvent, learned: Proposal, alpha = ALPHA): RateEstimate {
   const n = flights.length;
-  const w = flights.map((f) => weight(sampling, f.case));
+  const w = flights.map((f) => mixtureWeight(learned, alpha, f.case));
   const y = flights.map((f, i) => (f[event] ? w[i]! : 0));
   const mean = y.reduce((a, b) => a + b, 0) / Math.max(1, n);
   const varY = y.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, n - 1);
@@ -86,11 +115,6 @@ export function importanceRate(flights: readonly AtlasFlight[], event: AtlasEven
   const failures = flights.filter((f) => f[event]).length;
   const ci: [number, number] = failures ? [Math.max(0, mean - 1.96 * se), Math.min(1, mean + 1.96 * se)] : [0, Math.min(1, 3 / (alpha * Math.max(1, n)))];
   return { flights: n, failures, p: mean, ci, ess: sw2 > 0 ? (sw * sw) / sw2 : 0, method: 'importance' };
-}
-
-/** The proposal the estimate draws from: the learned one mixed with the nominal. */
-export function estimationProposal(learned: Proposal, alpha = ALPHA): Proposal {
-  return mixture(learned, alpha);
 }
 
 export interface Slice {

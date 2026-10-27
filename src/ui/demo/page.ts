@@ -39,6 +39,8 @@ import { DemoMap, isNight } from './map';
 import { CameraInset, loadVisionKit } from './camera';
 import { createVisionSource } from '../../vision/source';
 import { siteHeader } from '../siteNav';
+import { decodeCase, encodeCase, loadAtlasCase } from '../../eval/atlas/replay';
+import type { AtlasCase } from '../../eval/atlas/space';
 
 export type Speed = 1 | 4 | 16 | 'max';
 export type Detector = 'analytic' | 'camera';
@@ -72,7 +74,9 @@ export function startDemo(root: HTMLElement): void {
   const indoor = params.get('indoor') === 'frontier' ? 'frontier' : 'policy';
   // `camera`: contacts come from the rendered camera and the learned detector (src/vision).
   const detector = params.get('detector') === 'camera' ? 'camera' : 'analytic';
-  const demo = new Demo(root, scenario, speed, autoOperator, indoor, detector);
+  // `atlas`: a flight from the failure atlas (atlas.html), rebuilt from its seeds.
+  const atlas = decodeCase(params.get('atlas') ?? '');
+  const demo = new Demo(root, scenario, speed, autoOperator, indoor, detector, atlas);
   void demo.load().then(() => {
     if (params.get('autorun') === '1') demo.play();
   });
@@ -119,6 +123,7 @@ class Demo {
     private readonly autoOperator: boolean,
     private readonly indoor: 'policy' | 'frontier',
     private detector: Detector,
+    private atlas: AtlasCase | null = null,
   ) {
     root.classList.add('demo');
     root.innerHTML = markup();
@@ -150,7 +155,7 @@ class Demo {
     this.el('operator-prompt').hidden = true;
     this.syncButtons();
     try {
-      const loaded = loadScenario(this.scenario);
+      const loaded = this.atlas ? loadAtlasCase(this.atlas) : loadScenario(this.scenario);
       this.loaded = loaded;
       const policy = this.indoor === 'policy' ? await shippedPolicy() : null;
       if (token !== this.token) return;
@@ -465,6 +470,7 @@ class Demo {
       this.el(`scenario-${scenario.id}`).addEventListener('click', () => {
         if (this.scenario === scenario.id && this.runner && !this.snapshot?.tSec) return;
         this.scenario = scenario.id;
+        this.atlas = null;
         this.syncScenarioCards();
         this.syncUrl();
         void this.load();
@@ -576,6 +582,8 @@ class Demo {
     params.set('speed', String(this.speed));
     if (this.detector === 'camera') params.set('detector', 'camera');
     else params.delete('detector');
+    if (this.atlas) params.set('atlas', encodeCase(this.atlas));
+    else params.delete('atlas');
     params.delete('autorun');
     history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
   }

@@ -5,10 +5,10 @@
 // Three studies, each a sharded run of this script (locally through parallel.mjs, or on GitHub's
 // runners through .github/workflows/study.yml):
 //
-//   search    vite-node scripts/study/atlas-study.ts -- --search --base 200001 --out docs/atlas-search.json
+//   search    vite-node scripts/study/atlas-study.ts -- --search --base 200001 --out docs/atlas/search.json
 //             Shard 0 leads: it draws each generation, flies it in --procs child processes, and
 //             updates the proposal. The other shards exit at once.
-//   estimate  ... -- --estimate falseClear --from docs/atlas-search.json --n 2000 --base 210001 (sharded)
+//   estimate  ... -- --estimate falseClear --from docs/atlas/search.json --n 2000 --base 210001 (sharded)
 //   mc        ... -- --mc --n 6000 --base 220001 (sharded)
 //
 // Each shard writes JSONL; --merge <files> --out <json> writes the result. Seeds: every block here is
@@ -18,8 +18,8 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ATLAS_EVENTS, ATLAS_MODE, flyCase, type AtlasEvent, type AtlasFlight } from '../../src/eval/atlas/flight';
-import { ceUpdate, estimationProposal, importanceRate, monteCarloRate, proposalShift, slices, ALPHA, FLOOR, RHO, SMOOTHING } from '../../src/eval/atlas/estimate';
-import { DIMS, nominalProposal, sampleCase, type AtlasCase, type Proposal } from '../../src/eval/atlas/space';
+import { ceUpdate, importanceRate, monteCarloRate, proposalShift, slices, ALPHA, FLOOR, RHO, SMOOTHING } from '../../src/eval/atlas/estimate';
+import { DIMS, nominalProposal, sampleCase, sampleMixture, type AtlasCase, type Proposal } from '../../src/eval/atlas/space';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -80,6 +80,7 @@ interface Generation {
   failures: Record<AtlasEvent, number>;
   level?: number;
   elite?: number;
+  refit?: string[];
   proposal: Proposal;
 }
 
@@ -115,14 +116,14 @@ async function search(): Promise<void> {
     let flights = first;
     for (let g = 1; g <= gens; g++) {
       const step = ceUpdate(proposal, flights, event);
-      log({ kind: 'generation', event, gen: g - 1, flights: flights.length, failures: count(flights), level: step.level, elite: step.elite, proposal } satisfies Generation & { kind: string });
-      console.log(`${event} gen ${g - 1}: level ${step.level.toFixed(3)}, ${step.failures}/${flights.length} failures`);
+      log({ kind: 'generation', event, gen: g - 1, flights: flights.length, failures: count(flights), level: step.level, elite: step.elite, refit: step.refit, proposal } satisfies Generation & { kind: string });
+      console.log(`${event} gen ${g - 1}: level ${step.level.toFixed(3)}, ${step.failures}/${flights.length} failures, refit ${step.refit.join(' ') || 'nothing'}`);
       proposal = step.next;
       flights = await flyParallel(draw(proposal), join(work, `${event}-g${g}`), procs);
       for (const f of flights) log({ kind: 'flight', event, gen: g, ...f });
     }
     const last = ceUpdate(proposal, flights, event);
-    log({ kind: 'generation', event, gen: gens, flights: flights.length, failures: count(flights), level: last.level, elite: last.elite, proposal } satisfies Generation & { kind: string });
+    log({ kind: 'generation', event, gen: gens, flights: flights.length, failures: count(flights), level: last.level, elite: last.elite, refit: last.refit, proposal } satisfies Generation & { kind: string });
     // The proposal the estimate uses is the update from the last generation.
     log({ kind: 'learned', event, proposal: last.next });
   }
@@ -144,7 +145,7 @@ function mergeSearch(files: string[], outPath: string): void {
       ATLAS_EVENTS.map((e) => [
         e,
         {
-          generations: generations.filter((g) => g.event === e || g.event === 'nominal').map((g) => ({ ...g, proposal: undefined })),
+          generations: generations.filter((g) => g.event === e || g.event === 'nominal'),
           learned: learned[e] ?? null,
           shift: learned[e] ? proposalShift(learned[e]!) : null,
         },
@@ -162,29 +163,28 @@ async function shardRun(): Promise<void> {
   const out = arg('out', `atlas-${shard}.jsonl`);
   const n = Number(arg('n', '1000'));
   const base = Number(arg('base', '220001'));
-  const proposal = samplingProposal();
+  const learned = has('mc') ? null : learnedProposal();
   const mine = Array.from({ length: n }, (_, i) => i)
     .filter((i) => i % of === shard)
-    .map((i) => sampleCase(proposal, base, i));
+    .map((i) => (learned ? sampleMixture(learned, ALPHA, base, i) : sampleCase(nominalProposal(), base, i)));
   await flyAll(mine, out, `shard ${shard}`);
 }
 
-/** The estimate's sampling distribution: the nominal for --mc, the mixture over the learned proposal for --estimate. */
-function samplingProposal(): Proposal {
-  if (has('mc')) return nominalProposal();
+/** The proposal --estimate mixes with the nominal: what the search learned for the event. */
+function learnedProposal(): Proposal {
   const event = arg('estimate', '') as AtlasEvent;
-  const search = JSON.parse(readFileSync(arg('from', 'docs/atlas-search.json'), 'utf8')) as { events: Record<AtlasEvent, { learned: Proposal }> };
-  return estimationProposal(search.events[event].learned);
+  const search = JSON.parse(readFileSync(arg('from', 'docs/atlas/search.json'), 'utf8')) as { events: Record<AtlasEvent, { learned: Proposal }> };
+  return search.events[event].learned;
 }
 
 function mergeRate(files: string[], outPath: string): void {
   const flights = readJsonl<AtlasFlight>(files).sort((a, b) => a.case.i - b.case.i);
   const mc = has('mc');
   const event = arg('estimate', '') as AtlasEvent;
-  const proposal = samplingProposal();
-  const rates = mc
-    ? Object.fromEntries(ATLAS_EVENTS.map((e) => [e, monteCarloRate(flights, e)]))
-    : { [event]: importanceRate(flights, event, proposal) };
+  const learned = mc ? null : learnedProposal();
+  const rates = learned
+    ? { [event]: importanceRate(flights, event, learned) }
+    : Object.fromEntries(ATLAS_EVENTS.map((e) => [e, monteCarloRate(flights, e)]));
   const report = {
     schema: 1,
     commit: commit(),
@@ -194,7 +194,7 @@ function mergeRate(files: string[], outPath: string): void {
     seedBase: Number(arg('base', mc ? '220001' : '210001')),
     flights: flights.length,
     rates,
-    ...(mc ? { slices: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, slices(flights, e)])) } : { proposal }),
+    ...(learned ? { learned, alpha: ALPHA } : { slices: Object.fromEntries(ATLAS_EVENTS.map((e) => [e, slices(flights, e)])) }),
     results: flights,
   };
   writeFileSync(outPath, `${JSON.stringify(report)}\n`);
