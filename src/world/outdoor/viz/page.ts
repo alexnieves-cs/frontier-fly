@@ -1,5 +1,6 @@
 import './outdoor.css';
-import { siteNav } from '../../../ui/siteNav';
+import { siteHeader } from '../../../ui/siteNav';
+import { createTouchSticks, type TouchSticks } from '../../../ui/touchSticks';
 import type { DynParams } from '../../../shared/types';
 import { makeDroneState, scaleAction } from '../../../sim/drone';
 import { KinematicDynamics } from '../../../sim/dynamics/kinematic';
@@ -65,6 +66,7 @@ export async function startOutdoor(root: HTMLElement): Promise<void> {
 
 class Session {
   private readonly keys = new Set<string>();
+  private readonly sticks: TouchSticks = createTouchSticks();
   private readonly dyn = new KinematicDynamics();
   private readonly cmd = new Float32Array(4);
   private state;
@@ -87,6 +89,7 @@ class Session {
     this.dyn.reset(this.state, DYN);
     this.bind();
     this.syncCameraButtons();
+    must<HTMLElement>(root, '.stage').appendChild(this.sticks.element);
   }
 
   reset(world: OutdoorWorld, physics: OutdoorPhysics): void {
@@ -115,7 +118,7 @@ class Session {
     const now = performance.now();
     const dt = Math.max(0.001, Math.min(0.05, (now - this.last) / 1000));
     this.last = now;
-    const action = actionFromKeys(this.keys);
+    const action = this.sticks.apply(actionFromKeys(this.keys));
     scaleAction(action, this.cmd);
     const sub = 2;
     for (let i = 0; i < sub; i++) {
@@ -217,30 +220,30 @@ function readSeed(input: HTMLInputElement): number {
 
 function markup(): string {
   return `
-    <header class="topbar">
-      <div class="brand"><strong>frontier-fly</strong><h1>Outdoor world</h1></div>
-      ${siteNav('outdoor')}
-      <div class="controls">
-        <label>seed <input id="seed" inputmode="numeric" /></label>
-        <button id="regen" type="button">new world</button>
-      </div>
-    </header>
+    ${siteHeader('outdoor', {
+      page: 'Fly outdoors',
+      className: 'topbar',
+      slot: `<div class="controls">
+        <label>Seed <input id="seed" inputmode="numeric" /></label>
+        <button id="regen" type="button">New world</button>
+      </div>`,
+    })}
     <main class="stage">
       <canvas id="view" role="img" aria-label="3D view of the outdoor site"></canvas>
       <canvas id="map" width="240" height="240" role="img" aria-label="Top-down map of the site"></canvas>
       <div class="cam">
-        <button id="cam-fpv" type="button">1 FPV</button>
-        <button id="cam-chase" type="button">2 chase</button>
+        <button id="cam-fpv" type="button" aria-keyshortcuts="1">FPV <kbd>1</kbd></button>
+        <button id="cam-chase" type="button" aria-keyshortcuts="2">Chase <kbd>2</kbd></button>
       </div>
       <div class="hud">
-        <span>speed <strong id="hud-speed">0</strong></span>
-        <span>agl <strong id="hud-alt">0</strong></span>
-        <span>fence <strong id="hud-fence">inside</strong></span>
-        <span>lidar <strong id="hud-lidar">—</strong></span>
+        <span>Speed <strong id="hud-speed">0</strong></span>
+        <span>Height <strong id="hud-alt">0</strong></span>
+        <span>Fence <strong id="hud-fence">inside</strong></span>
+        <span>Lidar <strong id="hud-lidar">—</strong></span>
         <span id="hud-open"></span>
         <span class="keys">WASD fly · QE yaw · Space/C up/down</span>
       </div>
-      <div class="boot" id="boot" role="status">generating terrain…</div>
+      <div class="boot" id="boot" role="status">Generating terrain…</div>
     </main>
   `;
 }

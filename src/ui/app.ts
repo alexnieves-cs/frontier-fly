@@ -75,6 +75,8 @@ class Session {
   private plans: PlanSet | null = null;
   private obs = new Float32Array(OBS_DIM);
   private shown: DroneState = makeDroneState([1, 1, 1]);
+  /** Lidar rays in the 3D view: off at start so the drone and the room read first. */
+  private showRays = false;
   private lighting: LightingState = { timeOfDay: 12, interiorLightsOn: new Uint8Array(), flashlightOn: false, sensorMode: 'rgb' };
   private policy: InferPolicy | null = null;
   private norm: RunningNorm | null = null;
@@ -271,7 +273,7 @@ class Session {
 
   private paint(): void {
     if (!this.spec) return;
-    this.view.setLidar(this.lidar);
+    this.view.setLidar(this.showRays ? this.lidar : null);
     this.view.setTrail(this.trail.slice(-80));
     this.view.setCollision(this.collisions > 0 && this.env.stepCount % 8 < 2);
     if (this.visited) this.view.setVisited(this.spec, this.visited, this.floor);
@@ -286,12 +288,13 @@ class Session {
     text.textContent = `SIM ${this.shown.t.toFixed(1)}s\nALT ${this.shown.pos[2].toFixed(2)} m\nSPD ${speed.toFixed(2)} m/s\nX ${this.shown.pos[0].toFixed(1)}  Y ${this.shown.pos[1].toFixed(1)}`;
     this.q('#clock').textContent = formatClock(this.lighting.timeOfDay);
     this.q('#fps').textContent = `${hooks.fps.toFixed(0)} fps`;
-    this.q('#backend').textContent = hooks.backend.toUpperCase();
+    this.q('#backend').textContent = hooks.backend.replace(/^webgl/iu, 'WebGL').replace(/^webgpu/iu, 'WebGPU');
     this.q('#cov-num').textContent = `${Math.round(this.coverage * 100)}%`;
     this.q('#alt-num').textContent = `${this.shown.pos[2].toFixed(2)} m`;
     this.q('#spd-num').textContent = `${speed.toFixed(2)} m/s`;
     this.q('#bat-num').textContent = `${battery(this.shown.t)}%`;
-    this.q('#mode-label').textContent = modeLabel(this.lighting);
+    const mode = modeLabel(this.lighting);
+    this.q('#mode-label').textContent = mode.charAt(0) + mode.slice(1).toLowerCase();
     this.root.dataset.fps = hooks.fps.toFixed(1);
     this.root.dataset.backend = hooks.backend;
     const visualsReady = !this.launch.shot?.startsWith('targets') || this.targetView.loaded;
@@ -360,10 +363,17 @@ class Session {
     if (overlay) drawDetections(ctx, canvas.width, canvas.height, this.detections);
   }
 
+  /** The first-visit caption over the view goes once the visitor does anything. */
+  private dismissCaption(): void {
+    this.root.querySelector('#stage-caption')?.setAttribute('hidden', '');
+  }
+
   private bind(): void {
+    window.addEventListener('keydown', () => this.dismissCaption(), { once: true });
     this.root.addEventListener('click', (event) => {
       const target = (event.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!target) return;
+      this.dismissCaption();
       const act = target.dataset.act;
       if (act === 'cam') this.setCamera((target.dataset.cam as CameraMode) ?? 'chase');
       else if (act === 'tab') this.setCamera(target.dataset.cam === 'overview' ? 'overview' : target.dataset.cam === 'fpv' ? 'fpv' : 'chase');
@@ -375,7 +385,11 @@ class Session {
       else if (act === 'pause') this.togglePause();
       else if (act === 'train') void this.toggleTrain();
       else if (act === 'seed') this.rebuild(Number(this.q<HTMLInputElement>('#seed').value) || 1, true);
-      else if (act === 'quality') this.setQuality(target.dataset.quality === 'low' ? 'low' : 'high');
+      else if (act === 'rays') {
+        this.showRays = !this.showRays;
+        target.setAttribute('aria-pressed', String(this.showRays));
+        this.q('#rays-label').textContent = this.showRays ? 'Rays on' : 'Show rays';
+      } else if (act === 'quality') this.setQuality(target.dataset.quality === 'low' ? 'low' : 'high');
       else if (act === 'save') this.downloadCheckpoint();
       else if (act === 'idb-save') void this.idbSave();
       else if (act === 'idb-load') void this.idbLoad();
@@ -456,7 +470,7 @@ class Session {
     if (!this.pool) {
       this.pool = new TrainPool({
         onReady: () => {
-          this.q('#link').textContent = 'TRAINING';
+          this.q('#link').textContent = 'Training';
         },
         onShowcase: (snap) => this.onShowcase(snap),
         onMetrics: (metrics) => this.onMetrics(metrics),
@@ -562,7 +576,7 @@ class Session {
       // Refuse instead of feeding the network a different observation layout.
       console.warn(`frontier-fly: ${mismatch}; flying the heuristic pilot instead`);
       const link = this.q('#link');
-      link.textContent = `CKPT OBS v${checkpoint.obsVersion} REFUSED`;
+      link.textContent = `Checkpoint obs v${checkpoint.obsVersion} refused`;
       link.title = `${mismatch}. Flying the heuristic pilot instead.`;
       return;
     }
@@ -572,7 +586,7 @@ class Session {
     this.rawObs = rawObs;
     this.actorOnly = checkpoint.actorOnly === true;
     if (this.pilot !== 'keys') this.pilot = 'policy';
-    if (announce) this.q('#link').textContent = `CKPT S${checkpoint.stage}`;
+    if (announce) this.q('#link').textContent = `Checkpoint stage ${checkpoint.stage}`;
   }
 
   private downloadCheckpoint(): void {
@@ -590,7 +604,7 @@ class Session {
     const checkpoint = this.currentCheckpoint();
     if (!checkpoint) return;
     await saveCheckpointIdb(checkpoint);
-    this.q('#link').textContent = 'SAVED';
+    this.q('#link').textContent = 'Saved';
   }
 
   private async idbLoad(): Promise<void> {

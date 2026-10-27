@@ -1,6 +1,6 @@
 import '../world/outdoor/viz/outdoor.css';
 import './px4.css';
-import { REPO_URL, siteNav } from '../ui/siteNav';
+import { REPO_URL, siteHeader } from '../ui/siteNav';
 import { buildMissionWorld } from '../mission/autonomy/world';
 import { woodsSampleMission } from '../mission/outdoorWorld';
 import { buildFlightPlan, exportStem, type FlightPlan } from '../mission/export/flightPlan';
@@ -185,47 +185,51 @@ function set(root: ParentNode, selector: string, text: string): void {
 
 function markup(seed: number, url: string): string {
   return `
-    <header class="topbar">
-      <div class="brand"><strong>frontier-fly</strong><h1>PX4 in the loop</h1></div>
-      ${siteNav('px4')}
-      <div class="controls">
-        <a href="${REPO_URL}/blob/main/docs/PX4.md" rel="noopener">how it works</a>
-        <span class="muted">woods seed ${seed}</span>
+    ${siteHeader('px4', {
+      page: 'PX4 in the loop',
+      className: 'topbar',
+      slotRow: true,
+      slot: `<div class="controls">
+        <a href="${REPO_URL}/blob/main/docs/PX4.md" rel="noopener">How it works</a>
+        <span class="muted">Woods seed ${seed}</span>
         <span class="muted" id="plan-summary"></span>
         <button id="download" type="button" data-testid="px4-download">Download .plan</button>
-      </div>
-    </header>
+      </div>`,
+    })}
     <main class="stage">
       <canvas id="view" role="img" aria-label="3D view of the drone over the woods"></canvas>
       <canvas id="map" width="240" height="240" role="img" aria-label="Top-down map with the mission route"></canvas>
       <div class="cam">
-        <button id="cam-chase" type="button" data-on="1">chase</button>
         <button id="cam-fpv" type="button">FPV</button>
+        <button id="cam-chase" type="button" data-on="1">Chase</button>
       </div>
       <div class="hud px4-hud">
         <span id="link" data-link="connecting">Starting…</span>
         <span>PX4 <strong id="hud-armed">—</strong></span>
-        <span>sim time <strong id="hud-time">0 s</strong></span>
-        <span>lockstep <strong id="hud-rtf">—</strong></span>
-        <span>agl <strong id="hud-alt">0 m</strong></span>
-        <span>speed <strong id="hud-speed">0 m/s</strong></span>
-        <span>roll / pitch <strong id="hud-att">0° / 0°</strong></span>
+        <span>Sim time <strong id="hud-time">0 s</strong></span>
+        <span>Lockstep <strong id="hud-rtf">—</strong></span>
+        <span>Height <strong id="hud-alt">0 m</strong></span>
+        <span>Speed <strong id="hud-speed">0 m/s</strong></span>
+        <span>Roll / pitch <strong id="hud-att">0° / 0°</strong></span>
         <div class="motors" role="img" aria-label="PX4 motor outputs">
           <span class="motor"><i></i></span><span class="motor"><i></i></span><span class="motor"><i></i></span><span class="motor"><i></i></span>
         </div>
       </div>
       <aside class="help" id="help">
-        <h2>Let PX4 fly this page</h2>
-        <p>This page is PX4's simulator: PX4 sends motor commands, the page answers with IMU, compass, barometer and GNSS readings, in lockstep. It needs PX4 SITL and a small relay running on your computer.</p>
-        <ol>
-          <li>Build PX4 once: <code>make px4_sitl_default</code> in PX4-Autopilot (v1.15).</li>
-          <li>Start the relay: <code>node scripts/px4/bridge.mjs</code> in this repository.</li>
-          <li>Start PX4 with the generic quad: <code>PX4_SYS_AUTOSTART=10016 build/px4_sitl_default/bin/px4</code>.</li>
-          <li>Open QGroundControl, load the plan from <b>Download .plan</b>, upload it and start the mission. Or run <code>python3 scripts/px4/flight_check.py file.plan</code>.</li>
-        </ol>
+        <h2>PX4 flies this page</h2>
+        <p>This page is a simulator for the real PX4 autopilot: PX4 sends motor commands and the page answers with IMU, compass, barometer and GNSS readings, in lockstep. No PX4 is connected now, so the drone waits on the pad. The route PX4 would fly is on the map.</p>
+        <details>
+          <summary>Connect PX4 from your computer (4 steps)</summary>
+          <ol>
+            <li>Build PX4 once: <code>make px4_sitl_default</code> in PX4-Autopilot (v1.15).</li>
+            <li>Start the relay: <code>node scripts/px4/bridge.mjs</code> in this repository.</li>
+            <li>Start PX4 with the generic quad: <code>PX4_SYS_AUTOSTART=10016 build/px4_sitl_default/bin/px4</code>.</li>
+            <li>Open QGroundControl, load the plan from <b>Download .plan</b>, upload it and start the mission. Or run <code>python3 scripts/px4/flight_check.py file.plan</code>.</li>
+          </ol>
+        </details>
         <p class="muted">Relay: <code>${escapeHtml(url)}</code>. Simulators and practice fields only.</p>
       </aside>
-      <div class="boot" id="boot" role="status">generating the woods…</div>
+      <div class="boot" id="boot" role="status">Generating the woods…</div>
     </main>
   `;
 }

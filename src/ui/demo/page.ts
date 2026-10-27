@@ -38,7 +38,7 @@ import {
 import { DemoMap, isNight } from './map';
 import { CameraInset, loadVisionKit } from './camera';
 import { createVisionSource } from '../../vision/source';
-import { siteNavLinks } from '../siteNav';
+import { siteHeader } from '../siteNav';
 
 export type Speed = 1 | 4 | 16 | 'max';
 export type Detector = 'analytic' | 'camera';
@@ -606,16 +606,7 @@ function markup(): string {
   const steps = PHASE_STEPS.map((step, index) => `<li data-step="${step.key}" data-state="todo"><span class="dot">${index + 1}</span><span class="name">${step.label}</span></li>`).join('');
   const speeds = SPEEDS.map((speed) => `<button type="button" data-testid="speed-${speed}" aria-pressed="false">${speed === 'max' ? 'Max' : `${speed}×`}</button>`).join('');
   return `
-    <header class="top">
-      <div class="brand">
-        <span class="mark" aria-hidden="true"></span>
-        <div>
-          <p class="eyebrow">frontier-fly</p>
-          <h1>Autonomous search and rescue</h1>
-        </div>
-      </div>
-      <nav class="nav" aria-label="Pages">${siteNavLinks('demo')}</nav>
-    </header>
+    ${siteHeader('demo', { page: 'Rescue missions' })}
     <main class="layout">
       <section class="rail" aria-label="Scenario">
         <h2>Scenario</h2>
@@ -687,6 +678,7 @@ function markup(): string {
         </div>
         <h2>Event log</h2>
         <ol class="log" data-testid="event-log" aria-live="polite"></ol>
+        <p class="log-empty">Press Run (or Space) to fly the mission. Each decision the drone makes appears here.</p>
       </section>
     </main>
   `;

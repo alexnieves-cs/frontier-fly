@@ -348,7 +348,8 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
         }),
         { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity },
       );
-      if ((box.maxX - box.minX) / mpp < 36) continue;
+      // Canopy is named once in the legend; labels are for the places a mission refers to.
+      if (footprint.kind === 'canopy' || (box.maxX - box.minX) / mpp < 36) continue;
       const at = worldToScreen({ x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 });
       context.fillStyle = MUTED;
       context.font = `12px ${FONT}`;

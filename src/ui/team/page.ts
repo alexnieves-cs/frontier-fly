@@ -5,13 +5,13 @@ import { TEAM_CONDITIONS, teamEpisodeSetup, type TeamCondition } from '../../tea
 import { TeamSim, type Comms, type Role } from '../../team/run';
 import { CoverageChart } from '../race/chart';
 import { DRONE_COLORS, TeamMap } from './draw';
-import { siteNavLinks } from '../siteNav';
+import { prefersReducedMotion, siteHeader } from '../siteNav';
 
 const EVAL_SEED_BASE: Record<string, number> = { hard: 70001, large: 71001 };
 const SPEEDS = [
   { id: '1', label: '1×', rate: 20 },
   { id: '4', label: '4×', rate: 80 },
-  { id: '10', label: '10×', rate: 200 },
+  { id: '16', label: '16×', rate: 320 },
   { id: 'max', label: 'Max', rate: 0 },
 ] as const;
 type SpeedId = (typeof SPEEDS)[number]['id'];
@@ -69,7 +69,7 @@ function readSetup(): { setup: TeamSetup; speed: SpeedId } {
   const drones = Math.max(1, Math.min(4, Number(q.get('drones')) || 3));
   const radio = (RADIOS.find((r) => r.id === q.get('radio'))?.id ?? 'normal') as RadioId;
   const relay = q.get('relay') === '1' && drones >= 2;
-  const speed = (SPEEDS.find((s) => s.id === q.get('speed'))?.id ?? '10') as SpeedId;
+  const speed = (SPEEDS.find((s) => s.id === q.get('speed'))?.id ?? (prefersReducedMotion() ? '1' : '16')) as SpeedId;
   return { setup: { condition: condition.id, seed, drones, radio, relay }, speed };
 }
 
@@ -80,10 +80,7 @@ function markup(): string {
   const speeds = SPEEDS.map((s) => `<button type="button" class="seg" data-speed="${s.id}" aria-pressed="false">${s.label}</button>`).join('');
   return `
   <div class="race team">
-    <header class="race-top">
-      <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true"></span>frontier-fly</a>
-      <nav class="race-nav" aria-label="Pages">${siteNavLinks('team')}</nav>
-    </header>
+    ${siteHeader('team', { heading: false, className: 'race-top' })}
 
     <section class="race-intro">
       <p class="kicker">DRONE TEAM · RUNNING IN YOUR TAB</p>
