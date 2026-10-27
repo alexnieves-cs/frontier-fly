@@ -24,7 +24,7 @@ import { mockWorldProvider } from '../../mission/worldMock';
 import { createExportPanel } from './exportPanel';
 import { createLivePanel } from './livePanel';
 import { createMissionMap, type MapLayers, type MapSelection, type MapTool } from './map';
-import { siteNav } from '../siteNav';
+import { siteHeader } from '../siteNav';
 
 const STORAGE_KEY = 'frontier-fly.mission.draft';
 
@@ -110,7 +110,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   let zoneSignature = '';
   let targetSignature = '';
 
-  root.className = 'mission';
+  root.className = 'mission ff-paper';
   root.dataset.ready = '0';
   root.dataset.site = provider.id;
 
@@ -118,17 +118,13 @@ export function mountMissionEditor(root: HTMLElement): void {
   const saveButton = el('button', { className: 'primary', text: 'Save link', testid: 'mission-save', attrs: { type: 'button' } });
   const planButton = el('button', { text: 'Plan', testid: 'mode-plan', attrs: { type: 'button', role: 'tab', 'aria-selected': 'true' } });
   const runButton = el('button', { text: 'Run', testid: 'mode-run', attrs: { type: 'button', role: 'tab', 'aria-selected': 'false' } });
-  const header = el('header', { className: 'top' });
-  const titles = el('div');
-  titles.append(el('p', { className: 'eyebrow', text: 'frontier-fly' }), el('h1', { text: 'Mission editor' }));
-  const brand = el('div', { className: 'brand' });
-  brand.append(el('span', { className: 'mark', attrs: { 'aria-hidden': 'true' } }), titles);
   const modes = el('div', { className: 'modes', attrs: { role: 'tablist' } });
   modes.append(planButton, runButton);
   const schema = el('p', { className: 'schema', testid: 'schema-version', text: `Schema v${MISSION_SCHEMA_VERSION}` });
-  const nav = el('div', { className: 'nav-slot' });
-  nav.innerHTML = siteNav('mission');
-  header.append(brand, modes, schema, el('span', { className: 'spacer' }), saveStatus, saveButton, nav);
+  const shell = el('div');
+  shell.innerHTML = siteHeader('mission', { page: 'Plan a mission', slot: ' ', slotRow: true });
+  const header = shell.firstElementChild as HTMLElement;
+  header.querySelector('.site-slot')!.append(modes, schema, saveStatus, saveButton);
 
   const nameInput = el('input', { attrs: { type: 'text', id: 'mission-name', maxlength: '80', autocomplete: 'off' }, testid: 'mission-name' });
   const seedInput = el('input', { attrs: { type: 'number', id: 'mission-seed', min: '0', step: '1' }, testid: 'mission-seed' });
@@ -199,7 +195,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   const toolbar = el('div', { className: 'toolbar' });
   toolbar.append(toolButtons.geofence, toolButtons.nofly, toolButtons.start, toolButtons.edit, snapLabel, fitButton, readout);
   const legend = el('p', { className: 'legend' });
-  legend.append(swatch('fence', 'Geofence'), swatch('nofly', 'No-fly'), swatch('building', 'Building'), swatch('track', 'Track'));
+  legend.append(swatch('fence', 'Geofence'), swatch('nofly', 'No-fly'), swatch('building', 'Building'), swatch('canopy', 'Tree canopy'), swatch('track', 'Track'));
   const canvas = el('canvas', { testid: 'mission-map', attrs: { 'aria-hidden': 'true' } });
   const frame = el('div', { className: 'map-frame' });
   const hud = el('div', { className: 'hud', testid: 'live-metrics' });
@@ -668,7 +664,7 @@ export function mountMissionEditor(root: HTMLElement): void {
         zone.name = name.value;
         syncPlan();
       });
-      const reason = el('input', { attrs: { type: 'text', maxlength: '160' } });
+      const reason = el('textarea', { attrs: { maxlength: '160', rows: '2' } });
       reason.value = zone.reason;
       reason.addEventListener('input', () => {
         zone.reason = reason.value;

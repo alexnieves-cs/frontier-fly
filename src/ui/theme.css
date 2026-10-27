@@ -1,0 +1,122 @@
+/*
+ * The site's one set of design tokens and the shared header. Every page imports this through siteNav.ts.
+ * Pages map their own variables onto these, so color, type and radius change in one place.
+ */
+:root {
+  --ff-bg: #05080b;
+  --ff-surface: #0a1219;
+  --ff-surface-2: #0e1821;
+  --ff-surface-3: #132430;
+  --ff-line: rgba(255, 255, 255, 0.12);
+  --ff-line-strong: rgba(255, 255, 255, 0.24);
+  --ff-text: #eef4f7;
+  --ff-text-2: #c9d6de;
+  --ff-muted: #9db0bc;
+  --ff-accent: #56e0ff;
+  --ff-accent-hover: #8beaff;
+  --ff-accent-ink: #041016;
+  --ff-accent-soft: rgba(86, 224, 255, 0.14);
+  --ff-ok: #3dff9a;
+  --ff-warn: #ffd166;
+  --ff-danger: #ff5d73;
+  --ff-font: "Inter", "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --ff-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  --ff-radius: 10px;
+  --ff-radius-lg: 14px;
+  --ff-label: 650 12px var(--ff-font);
+  --ff-label-spacing: 0.14em;
+}
+
+/* The planning theme: the same tokens on paper, for the mission editor. */
+.ff-paper {
+  color-scheme: light;
+  --ff-bg: #f3f1eb;
+  --ff-surface: #fffcf7;
+  --ff-surface-2: #f7f4ec;
+  --ff-surface-3: #ece8de;
+  --ff-line: #d5d1c7;
+  --ff-line-strong: #b9b4a8;
+  --ff-text: #1c1e1a;
+  --ff-text-2: #33372f;
+  --ff-muted: #5c6158;
+  --ff-accent: #1e4a38;
+  --ff-accent-hover: #2a6450;
+  --ff-accent-ink: #f4f7f4;
+  --ff-accent-soft: rgba(30, 74, 56, 0.12);
+  --ff-ok: #1f7a4c;
+  --ff-warn: #8a5a16;
+  --ff-danger: #8c2f2a;
+}
+
+/* Header: logo, wordmark, page name, page-specific controls, then the page menu. */
+.site-header {
+  display: flex; align-items: center; gap: 8px 16px; min-height: 56px; padding: 8px 20px;
+  background: var(--ff-bg); color: var(--ff-text); border-bottom: 1px solid var(--ff-line);
+  font-family: var(--ff-font);
+}
+.site-header .site-slot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; min-width: 0; }
+.site-header .site-slot button, .site-header .site-slot a { white-space: nowrap; }
+.site-header.slot-row { flex-wrap: wrap; padding-bottom: 6px; }
+.site-header.slot-row .site-slot { order: 3; flex: 1 0 100%; margin-left: 0; padding-top: 6px; border-top: 1px solid var(--ff-line); }
+.site-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; color: var(--ff-text); text-decoration: none; }
+.site-mark {
+  flex: none; width: 24px; height: 24px; border-radius: 7px;
+  background: radial-gradient(circle at 30% 30%, #9dfff0, #1fa7a0 55%, #0b3f45);
+  box-shadow: 0 0 14px rgba(86, 224, 255, 0.35);
+}
+.site-word { font: 700 16px var(--ff-font); letter-spacing: -0.01em; white-space: nowrap; }
+.site-page {
+  font: 500 14px var(--ff-font); color: var(--ff-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-left: 10px; border-left: 1px solid var(--ff-line);
+}
+.site-page:empty { display: none; }
+h1.site-page { margin: 0; }
+
+.site-menu { position: relative; display: flex; align-items: center; min-width: 0; }
+.site-menu-toggle {
+  display: none; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: var(--ff-radius);
+  border: 1px solid var(--ff-line); background: var(--ff-surface); color: var(--ff-text); font: 600 14px var(--ff-font); cursor: pointer;
+}
+.site-menu-toggle::after { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-2px) rotate(45deg); }
+.site-menu-toggle[aria-expanded="true"]::after { transform: translateY(2px) rotate(225deg); }
+
+.site-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; font: 550 13.5px var(--ff-font); }
+.site-nav a {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 10px; border-radius: 8px;
+  color: var(--ff-muted); text-decoration: none; white-space: nowrap;
+}
+.site-nav a:hover, .site-nav a:focus-visible { color: var(--ff-text); background: var(--ff-accent-soft); }
+.site-nav a[aria-current="page"] { color: var(--ff-text); box-shadow: inset 0 -2px 0 var(--ff-accent); }
+.site-nav .site-nav-gap { width: 1px; height: 18px; margin: 0 6px; background: var(--ff-line); }
+.site-header :focus-visible, .site-nav :focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
+
+/* Narrow screens: the links fold into a menu button instead of scrolling sideways or wrapping. */
+@media (max-width: 900px) {
+  .site-header { padding: 8px 16px; flex-wrap: wrap; }
+  .site-header .site-slot { order: 3; flex: 1 0 100%; margin-left: 0; }
+  .site-menu { margin-left: auto; }
+  .site-menu-toggle { display: inline-flex; }
+  .site-menu .site-nav {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 50;
+    flex-direction: column; align-items: stretch; width: min(260px, calc(100vw - 32px)); padding: 6px;
+    background: var(--ff-surface); border: 1px solid var(--ff-line-strong); border-radius: var(--ff-radius-lg);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+  .site-menu.open .site-nav { display: flex; }
+  .site-menu .site-nav a { min-height: 44px; font-size: 15px; }
+  .site-menu .site-nav a[aria-current="page"] { box-shadow: inset 3px 0 0 var(--ff-accent); }
+  .site-nav .site-nav-gap { width: auto; height: 1px; margin: 4px 6px; }
+}
+@media (max-width: 480px) {
+  .site-page { display: none; }
+}
+
+/* Visible only to screen readers. */
+.sr-only {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

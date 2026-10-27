@@ -1,33 +1,34 @@
 /** Markup for the indoor sim page and small DOM helpers. */
 
-import { siteNavLinks } from './siteNav';
+import { siteHeader } from './siteNav';
 
 export function shell(): string {
   return `
   <div class="shell" id="shell">
-    <header class="topbar">
-      <div class="brand"><div class="mark" aria-hidden="true"></div><div><h1>frontier-fly</h1><p>INDOOR SIM</p></div></div>
-      <nav class="page-links" aria-label="Pages">${siteNavLinks('sim')}</nav>
+    ${siteHeader('sim', {
+      page: 'Fly indoors',
+      className: 'topbar',
+      slotRow: true,
+      slot: `
       <div class="tabs" role="toolbar" aria-label="View shortcuts">
-        <span class="tabs-label">VIEW</span>
-        <button type="button" data-act="tab" data-cam="chase" class="active">SIMULATION</button>
-        <button type="button" data-act="tab" data-cam="overview">ENVIRONMENT</button>
-        <button type="button" data-act="tab" data-cam="fpv">DRONE</button>
-        <button type="button" data-act="sensor" data-sensor="ir">SENSORS</button>
-        <button type="button" data-act="train" id="train-tab">TRAINING</button>
+        <button type="button" data-act="tab" data-cam="chase" class="active">Simulation</button>
+        <button type="button" data-act="tab" data-cam="overview">Environment</button>
+        <button type="button" data-act="tab" data-cam="fpv">Drone</button>
+        <button type="button" data-act="sensor" data-sensor="ir">Sensors</button>
+        <button type="button" data-act="train" id="train-tab">Training</button>
       </div>
       <div class="status-pills">
-        <span class="pill"><i class="dot"></i><span id="link" title="Simulation, training, and inference all run in this browser tab">IN-BROWSER</span></span>
-        <span class="pill" id="bat-num">100%</span>
-        <span class="pill" id="clock">12:00</span>
+        <span class="pill"><i class="dot"></i><span id="link" title="Simulation, training, and inference all run in this browser tab">In browser</span></span>
+        <span class="pill" id="bat-num" title="Battery">100%</span>
+        <span class="pill" id="clock" title="Time of day">12:00</span>
         <span class="pill" id="fps">-- fps</span>
-        <span class="pill" id="backend">WEBGL2</span>
-      </div>
-    </header>
+        <span class="pill" id="backend">WebGL2</span>
+      </div>`,
+    })}
     <main class="workspace">
       <aside class="rail">
         <div class="group">
-          <p class="kicker">ENVIRONMENT</p>
+          <p class="kicker">Environment</p>
           <div class="row"><span>Day / Night</span><span id="day-label">Day</span></div>
           <div class="seg">
             <button type="button" data-act="day">Toggle</button>
@@ -38,7 +39,7 @@ export function shell(): string {
           <input id="tod" aria-label="Time of day" class="slider" type="range" min="0" max="24" step="0.1" value="13" />
         </div>
         <div class="group">
-          <p class="kicker">CAMERA</p>
+          <p class="kicker">Camera</p>
           <div class="stack">
             <button type="button" class="text-btn" data-act="cam" data-cam="fpv">FPV</button>
             <button type="button" class="text-btn active" data-act="cam" data-cam="chase">Chase</button>
@@ -46,17 +47,17 @@ export function shell(): string {
           </div>
         </div>
         <div class="group">
-          <p class="kicker">PILOT</p>
+          <p class="kicker">Pilot</p>
           <div class="seg">
-            <button type="button" data-act="pilot" data-pilot="keys">Keys</button>
-            <button type="button" data-act="pilot" data-pilot="heuristic">Heuristic</button>
-            <button type="button" data-act="pilot" data-pilot="policy">Policy</button>
+            <button type="button" data-act="pilot" data-pilot="keys" title="You fly with the keyboard">Keys</button>
+            <button type="button" data-act="pilot" data-pilot="heuristic" title="Lidar heuristic: wall following with no map">Heuristic</button>
+            <button type="button" data-act="pilot" data-pilot="policy" title="Learned policy: the network that ships in the page">Learned</button>
           </div>
         </div>
         <div class="group">
-          <p class="kicker">SENSORS</p>
-          <div class="sensor"><span>LiDAR</span><span class="live">ACTIVE</span></div>
-          <div class="sensor"><span>IMU</span><span class="live">ACTIVE</span></div>
+          <p class="kicker">Sensors</p>
+          <button type="button" class="sensor" data-act="rays" aria-pressed="false"><span>Lidar</span><span class="live" id="rays-label">Show rays</span></button>
+          <div class="sensor"><span>IMU</span><span class="live">Active</span></div>
           <div class="seg">
             <button type="button" data-act="sensor" data-sensor="rgb">RGB</button>
             <button type="button" data-act="sensor" data-sensor="ir">IR</button>
@@ -64,7 +65,7 @@ export function shell(): string {
           </div>
         </div>
         <div class="group">
-          <p class="kicker">RUN</p>
+          <p class="kicker">Run</p>
           <div class="row"><span>Seed</span><input id="seed" aria-label="Building seed" inputmode="numeric" class="field" style="width:88px" value="42" /></div>
           <div class="row"><span>Stage</span>
             <select id="stage" aria-label="Curriculum stage" class="field" style="width:88px">
@@ -79,7 +80,7 @@ export function shell(): string {
           </div>
         </div>
         <div class="group">
-          <p class="kicker">CHECKPOINT</p>
+          <p class="kicker">Checkpoint</p>
           <div class="stack">
             <button type="button" class="text-btn" data-act="save">Download</button>
             <button type="button" class="text-btn" data-act="idb-save">Save local</button>
@@ -99,24 +100,20 @@ export function shell(): string {
           <canvas id="hud"></canvas>
           <div class="readout" id="readout"></div>
           <p class="error" id="boot-note">Spinning up the building…</p>
+          <p class="stage-caption" id="stage-caption">The learned policy is searching a building it has never seen. Pick a pilot, camera or sensor on the left, or press WASD to take over.</p>
         </div>
         <div class="bottom">
           <section class="panel">
-            <div class="panel-head"><h2>EXPLORATION MAP</h2><span class="live" id="cov-num">0%</span></div>
-            <canvas class="map-canvas" id="map" role="img" aria-label="Exploration map" width="480" height="180"></canvas>
-            <div class="legend"><span><i class="swatch" style="background:#1ad6b0"></i>Explored</span><span><i class="swatch" style="background:#ff8a3d"></i>Frontier</span><span><i class="swatch" style="background:#c47b3a"></i>Shaft</span></div>
-          </section>
-          <section class="panel">
-            <div class="panel-head"><h2>LIVE TRAINING</h2><span class="live" id="stage-num">0</span></div>
+            <div class="panel-head"><h2>Live training</h2><span class="live" id="stage-num">0</span></div>
             <div class="metrics">
-              <div class="metric"><span>UPDATE</span><strong id="ep-num">0</strong></div>
-              <div class="metric"><span>RETURN</span><strong class="good" id="ret-num">0</strong></div>
-              <div class="metric"><span>BEST</span><strong id="best-num">0</strong></div>
-              <div class="metric"><span>STEPS/S</span><strong id="rate-num">0</strong></div>
+              <div class="metric"><span>Update</span><strong id="ep-num">0</strong></div>
+              <div class="metric"><span>Return</span><strong class="good" id="ret-num">0</strong></div>
+              <div class="metric"><span>Best</span><strong id="best-num">0</strong></div>
+              <div class="metric"><span>Steps/s</span><strong id="rate-num">0</strong></div>
             </div>
             <div class="charts">
-              <div class="chart-box"><p>RETURN</p><div id="chart-return"></div></div>
-              <div class="chart-box"><p>COVERAGE % · ENTROPY</p><div id="chart-cover"></div><div id="chart-entropy"></div></div>
+              <div class="chart-box"><p>Return</p><div id="chart-return"></div></div>
+              <div class="chart-box"><p>Coverage % · entropy</p><div id="chart-cover"></div><div id="chart-entropy"></div></div>
             </div>
             <div class="replay-row">
               <button type="button" class="text-btn" data-act="replay" data-which="latest">Latest</button>
@@ -136,21 +133,25 @@ export function shell(): string {
         <div class="pip-wrap">
           <canvas id="pip" role="img" aria-label="Drone camera feed"></canvas>
           <canvas id="pip-hud"></canvas>
-          <span class="pip-tag">FPV FEED</span>
         </div>
         <section class="panel detect-panel">
-          <div class="panel-head"><h2>DETECTIONS</h2><span class="live" id="detect-count">0</span></div>
+          <div class="panel-head"><h2>Detections</h2><span class="live" id="detect-count">0</span></div>
           <p class="help" id="detect-clear">seen-empty</p>
           <ul id="detect-list" class="detect-list"></ul>
         </section>
         <div class="stat-grid">
-          <div><span>ALT</span><strong id="alt-num">0 m</strong></div>
-          <div><span>SPD</span><strong id="spd-num">0 m/s</strong></div>
-          <div><span>MODE</span><strong id="mode-label">DAY</strong></div>
-          <div><span>KL</span><strong id="kl-num">0</strong></div>
+          <div><span>Altitude</span><strong id="alt-num">0 m</strong></div>
+          <div><span>Speed</span><strong id="spd-num">0 m/s</strong></div>
+          <div><span>Light</span><strong id="mode-label">DAY</strong></div>
+          <div><span title="KL divergence of the last policy update">KL</span><strong id="kl-num">0</strong></div>
         </div>
+        <section class="panel">
+          <div class="panel-head"><h2>Exploration map</h2><span class="live" id="cov-num">0%</span></div>
+          <canvas class="map-canvas" id="map" role="img" aria-label="Exploration map" width="480" height="180"></canvas>
+          <div class="legend"><span><i class="swatch" style="background:#1ad6b0"></i>Explored</span><span><i class="swatch" style="background:#ff8a3d"></i>Frontier</span><span><i class="swatch" style="background:#c47b3a"></i>Shaft</span></div>
+        </section>
         <section class="panel" id="policy-panel" style="flex:1" hidden>
-          <div class="panel-head"><h2>POLICY MAP</h2></div>
+          <div class="panel-head"><h2>Policy map</h2></div>
           <canvas class="heat-canvas" id="heat" width="300" height="220"></canvas>
         </section>
       </aside>

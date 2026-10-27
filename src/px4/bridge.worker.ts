@@ -62,12 +62,18 @@ function start(msg: StartMessage): void {
   if (terrain) {
     session.quad.groundDown = (north, east) => -(sampleHeight(terrain, pad.x + east, pad.y + north) - pad.groundZ);
   }
-  ws.onopen = () => post({ type: 'status', link: 'bridge', text: 'Bridge connected. Waiting for PX4.' });
-  ws.onerror = () => post({ type: 'status', link: 'error', text: `No bridge at ${msg.url}` });
+  let opened = false;
+  ws.onopen = () => {
+    opened = true;
+    post({ type: 'status', link: 'bridge', text: 'Bridge connected. Waiting for PX4.' });
+  };
+  ws.onerror = () => post({ type: 'status', link: 'error', text: 'No PX4 relay on this computer yet.' });
   ws.onclose = () => {
     running = false;
     session.abort();
-    post({ type: 'status', link: 'closed', text: 'Bridge closed. Restart PX4 and the bridge, then reload.' });
+    // A relay that never answered is the normal case for a visitor, not a fault.
+    if (opened) post({ type: 'status', link: 'closed', text: 'Bridge closed. Restart PX4 and the bridge, then reload.' });
+    else post({ type: 'status', link: 'error', text: 'No PX4 relay on this computer yet.' });
   };
   ws.onmessage = (ev) => {
     if (typeof ev.data === 'string') {

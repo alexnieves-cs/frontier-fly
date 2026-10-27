@@ -18,12 +18,12 @@ import {
 } from './pilots';
 import type { FromWorker, LaneFrame, ToWorker } from './protocol';
 import { matchesStudy, STUDY_COMMIT, studyCell, studyEpisode, type StudyEpisode } from './study';
-import { REPO_URL as REPO, siteNavLinks } from '../siteNav';
+import { prefersReducedMotion, REPO_URL as REPO, siteHeader } from '../siteNav';
 
 const SPEEDS = [
   { id: '1', label: '1×', rate: 20 },
   { id: '4', label: '4×', rate: 80 },
-  { id: '10', label: '10×', rate: 200 },
+  { id: '16', label: '16×', rate: 320 },
   { id: 'max', label: 'Max', rate: 0 },
 ] as const;
 type SpeedId = (typeof SPEEDS)[number]['id'];
@@ -76,7 +76,7 @@ function readLaunch(): Launch {
     .filter((p, i, all) => all.indexOf(p) === i)
     .slice(0, 6);
   const speedParam = q.get('speed');
-  const speed = (SPEEDS.find((s) => s.id === speedParam)?.id ?? '10') as SpeedId;
+  const speed = (SPEEDS.find((s) => s.id === speedParam)?.id ?? (prefersReducedMotion() ? '1' : '16')) as SpeedId;
   const inspect = Math.max(0, Number(q.get('inspect')) || 0);
   return { setup: { condition: condition.id, seed, lighting, pilots: pilots.length ? pilots : [...DEFAULT_PILOTS] }, speed, inspect };
 }
@@ -86,10 +86,7 @@ function markup(): string {
   const speeds = SPEEDS.map((s) => `<button type="button" class="seg" data-speed="${s.id}" aria-pressed="false">${s.label}</button>`).join('');
   return `
   <div class="race">
-    <header class="race-top">
-      <a class="brand" href="./index.html"><span class="brand-mark" aria-hidden="true"></span>frontier-fly</a>
-      <nav class="race-nav" aria-label="Pages">${siteNavLinks('race')}</nav>
-    </header>
+    ${siteHeader('race', { heading: false, className: 'race-top' })}
 
     <section class="race-intro">
       <p class="kicker">LIVE PILOT RACE · RUNNING IN YOUR TAB</p>
@@ -337,7 +334,7 @@ class RacePage {
     q.set('seed', String(this.setup.seed));
     if (this.setup.lighting !== 'day') q.set('lighting', 'night');
     if (this.setup.pilots.join(',') !== DEFAULT_PILOTS.join(',')) q.set('pilots', this.setup.pilots.join(','));
-    if (this.speed !== '10') q.set('speed', this.speed);
+    if (this.speed !== '16') q.set('speed', this.speed);
     history.replaceState(null, '', `${location.pathname}?${q.toString()}`);
   }
 

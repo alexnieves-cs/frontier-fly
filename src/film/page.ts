@@ -14,6 +14,7 @@ import { FilmOverlay } from './overlay';
 import { FilmScene } from './scene';
 import { prefetchPbrSet } from '../viz/textures';
 import { isWebglError, showStartError } from '../ui/startError';
+import { prefersReducedMotion } from '../ui/siteNav';
 
 /** Width and height the film is composed at. The stage scales to fit the window. */
 const STAGE_W = 1920;
@@ -135,6 +136,7 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     // On a tall screen (a phone held upright) centre the film in the space above the controls.
     if (!embed && !recording) stage.style.marginTop = `${Math.max(0, (window.innerHeight - 64 - STAGE_H * s) / 2)}px`;
     root.style.setProperty('--stage-scale', String(s));
+    root.classList.toggle('film-tiny', !recording && s < 0.42);
   };
   fit();
   if (embed) new ResizeObserver(fit).observe(root);
@@ -186,7 +188,7 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     root.dataset.ready = '1';
     status('ready', '');
     if (embed) autoplay(root, timeline, show);
-    else if (!recording) controls(root, timeline, show, scenario, log);
+    else if (!recording) controls(root, timeline, show, scenario, stage);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     api.error = message;
@@ -211,6 +213,11 @@ function embedScale(root: HTMLElement): number {
 
 /** Embedded playback: plays on its own, holds the report card, then loops. Pauses while hidden. */
 function autoplay(root: HTMLElement, timeline: FilmFrame[], show: (i: number) => void): void {
+  // Asked for less motion: hold one telling frame (the drone over the building) instead of looping the flight.
+  if (prefersReducedMotion()) {
+    show(Math.floor(timeline.length * 0.35));
+    return;
+  }
   const HOLD_SEC = 3;
   let visible = true;
   new IntersectionObserver((entries) => {
@@ -260,7 +267,7 @@ function apply(scene: FilmScene, log: FlightLog, f: FilmFrame): void {
   });
 }
 
-function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) => void, scenario: ScenarioId, log: FlightLog): void {
+function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) => void, scenario: ScenarioId, stage: HTMLElement): void {
   const bar = document.createElement('div');
   bar.className = 'film-controls';
   root.appendChild(bar);
@@ -303,9 +310,18 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
   home.className = 'film-link';
   home.textContent = 'Home';
   bar.appendChild(home);
-  void log;
+  // On a stage too small for its HUD (film.css .film-tiny), the current phase as readable text.
+  const caption = document.createElement('p');
+  caption.className = 'film-caption';
+  root.appendChild(caption);
+  const showFrame = (i: number) => {
+    show(i);
+    const phase = stage.querySelector('.film-phase')?.textContent ?? '';
+    if (caption.textContent !== phase) caption.textContent = phase;
+  };
 
-  let playing = true;
+  // Asked for less motion: start paused; Play still runs the film.
+  let playing = !prefersReducedMotion();
   let frame = 0;
   let last = performance.now();
   let acc = 0;
@@ -320,7 +336,7 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
   });
   scrub.addEventListener('input', () => {
     frame = Number(scrub.value);
-    show(frame);
+    showFrame(frame);
   });
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space') {
@@ -329,6 +345,7 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
     }
   });
   sync();
+  showFrame(0);
   const tick = (now: number) => {
     const dt = Math.min(0.25, (now - last) / 1000);
     last = now;
@@ -338,7 +355,7 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
       if (steps > 0) {
         acc -= steps;
         frame = Math.min(timeline.length - 1, frame + steps);
-        show(frame);
+        showFrame(frame);
         scrub.value = String(frame);
         if (frame >= timeline.length - 1) {
           playing = false;

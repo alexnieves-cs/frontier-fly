@@ -1,9 +1,11 @@
 /* Landing page. Shares the film palette (src/film/film.css) so the two read as one product. */
 
 html, body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
-body { background: #05080b; }
+body { background: var(--ff-bg); }
 
-.landing { --hero-h: clamp(200px, min(56.25vw, calc(100svh - 236px)), 100svh); min-height: 100svh; display: flex; flex-direction: column; }
+/* The hero leaves room for the header (56 px) and the intro band, so the name and the buttons sit above the fold. */
+.landing { --hero-h: clamp(200px, min(56.25vw, calc(100svh - 330px)), 100svh); min-height: 100svh; display: flex; flex-direction: column; }
+.landing .site-header { position: sticky; top: 0; z-index: 20; background: rgba(5, 8, 11, 0.88); backdrop-filter: blur(8px); }
 .landing a { color: inherit; }
 
 /* Hero: the live film, letterboxed on a dark field. */
@@ -49,11 +51,15 @@ body { background: #05080b; }
 }
 .kicker { margin: 0; font: 650 12px var(--film-font); letter-spacing: 0.2em; color: var(--film-cyan); }
 .intro h1 { margin: 4px 0 6px; font: 750 clamp(30px, 4vw, 44px) var(--film-font); letter-spacing: -0.03em; }
-.pitch { margin: 0; max-width: 720px; font: 450 15px/1.55 var(--film-font); color: #c9d6de; }
+.pitch { margin: 0; max-width: 720px; font: 450 16px/1.55 var(--film-font); color: var(--ff-text-2); }
+.proof { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 12px 0 0; padding: 0; list-style: none; font: 500 14px var(--film-font); color: var(--film-muted); }
+.proof strong { font: 650 18px var(--film-mono); font-variant-numeric: tabular-nums; color: var(--film-green); margin-right: 4px; }
+.method { margin: 10px 0 0; max-width: 720px; font: 450 13.5px/1.5 var(--film-font); color: var(--film-muted); }
+.method a { color: var(--film-cyan); }
 
-.actions { display: grid; grid-template-columns: repeat(2, minmax(170px, auto)); gap: 8px; }
+.actions { display: grid; grid-template-columns: repeat(3, minmax(150px, auto)); gap: 8px; }
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 9px 16px; border-radius: 10px;
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 9px 16px; border-radius: 10px;
   border: 1px solid var(--film-line); background: #0d1820; color: var(--film-ink); text-decoration: none;
   font: 600 14px var(--film-font); white-space: nowrap; transition: background 150ms, border-color 150ms;
 }
@@ -63,9 +69,10 @@ body { background: #05080b; }
 .btn.primary { grid-column: 1 / -1; background: var(--film-cyan); border-color: var(--film-cyan); }
 .landing a.btn.primary { color: #041016; }
 .btn.primary:hover { background: #8beaff; }
-.btn.ghost { grid-column: 1 / -1; min-height: 34px; padding: 6px 16px; background: transparent; color: var(--film-muted); }
-.landing a.btn.ghost { color: var(--film-muted); }
-.landing a.btn.ghost:hover { color: var(--film-ink); }
+.more-links { grid-column: 1 / -1; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4px; margin-top: 2px; }
+.landing .more-links a { display: inline-flex; align-items: center; min-height: 36px; padding: 0 8px; border-radius: 8px; color: var(--film-muted); font: 550 13.5px var(--film-font); text-decoration: none; }
+.landing .more-links a:hover { color: var(--film-ink); text-decoration: underline; }
+.more-links a:focus-visible, .results-foot a:focus-visible, .foot a:focus-visible, .method a:focus-visible { outline: 2px solid var(--film-cyan); outline-offset: 2px; }
 
 /* Results strip. */
 .results {
@@ -96,7 +103,7 @@ body { background: #05080b; }
 .tile-label { font: 500 12px/1.35 var(--film-font); color: var(--film-muted); }
 
 .results-foot { margin: 14px 0 0; font: 450 12.5px/1.5 var(--film-font); color: var(--film-muted); }
-.results-foot a { color: var(--film-cyan); }
+.results-foot a { color: var(--film-cyan); display: inline-block; padding: 4px 0; }
 .results-foot code { font: 500 12px var(--film-mono); }
 
 .foot {
@@ -105,7 +112,7 @@ body { background: #05080b; }
   font: 500 12.5px var(--film-font); color: var(--film-muted);
 }
 .foot-links { display: flex; flex-wrap: wrap; gap: 0 16px; }
-.foot a { color: var(--film-muted); text-decoration: none; display: inline-block; padding: 6px 0; }
+.foot a { color: var(--film-muted); text-decoration: none; display: inline-block; padding: 12px 0; }
 .foot a:hover { color: var(--film-ink); }
 
 @media (max-width: 1000px) {
@@ -116,10 +123,13 @@ body { background: #05080b; }
 
 @media (max-width: 640px) {
   .landing { --hero-h: 56.25vw; }
+  .pitch { font-size: 15.5px; }
+  .proof { flex-direction: column; gap: 4px; }
   .intro, .results { padding: 18px 16px 20px; }
   .foot { padding: 14px 16px 20px; }
-  .actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .actions { grid-template-columns: minmax(0, 1fr); }
   .btn { white-space: normal; text-align: center; }
+  .more-links { justify-content: flex-start; }
   .bar { grid-template-columns: minmax(0, 1fr) 52px; row-gap: 4px; }
   .bar-name { grid-column: 1 / -1; }
   .tiles { flex-direction: column; }

@@ -14,28 +14,25 @@ body {
   color: #1c1e1a;
 }
 
+/* The planning tool keeps a paper look on purpose: the site tokens in their .ff-paper variant (src/ui/theme.css). */
 .mission {
-  --bg: #f3f1eb;
-  --surface: #fffcf7;
-  --ink: #1c1e1a;
-  --muted: #5c6158;
-  --line: #d5d1c7;
-  --accent: #1e4a38;
-  --accent-ink: #f4f7f4;
-  --danger: #8c2f2a;
-  --warn: #8a5a16;
+  --bg: var(--ff-bg);
+  --surface: var(--ff-surface);
+  --ink: var(--ff-text);
+  --muted: var(--ff-muted);
+  --line: var(--ff-line);
+  --accent: var(--ff-accent);
+  --accent-ink: var(--ff-accent-ink);
+  --danger: var(--ff-danger);
+  --warn: var(--ff-warn);
   --track: #1d4e89;
   --map: #e4e1d8;
-  --font: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas, monospace;
+  --font: var(--ff-font);
+  --mono: var(--ff-mono);
   height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
-  --site-nav-fg: var(--muted);
-  --site-nav-active: var(--ink);
-  --site-nav-accent: var(--accent);
-  --site-nav-hover: #efece4;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
@@ -46,14 +43,15 @@ body {
 button, input, select, textarea { font: inherit; color: inherit; }
 
 button {
+  min-height: 36px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 6px 10px;
+  border-radius: 8px;
+  padding: 6px 12px;
   cursor: pointer;
 }
 
-button:hover:not(:disabled):not([aria-pressed="true"]):not(.primary) { background: #efece4; }
+button:hover:not(:disabled):not([aria-pressed="true"]):not(.primary) { background: var(--ff-surface-3); }
 
 button.primary {
   background: var(--accent);
@@ -61,7 +59,7 @@ button.primary {
   color: var(--accent-ink);
 }
 
-button.primary:hover:not(:disabled) { background: #173c2d; }
+button.primary:hover:not(:disabled) { background: var(--ff-accent-hover); }
 
 button[aria-pressed="true"] {
   background: var(--accent);
@@ -78,29 +76,11 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 [hidden] { display: none !important; }
 
-.top {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  min-height: 52px;
-  padding: 6px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--line);
-}
-
-.brand { display: flex; align-items: center; gap: 10px; }
-.mark { width: 10px; height: 10px; background: var(--accent); }
-.eyebrow { margin: 0; font-size: 12px; color: var(--muted); }
-.brand h1 { margin: 0; font-size: 16px; font-weight: 600; }
-
-.modes { display: flex; border: 1px solid var(--line); }
-.modes button { border: 0; background: transparent; padding: 6px 14px; }
+.modes { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.modes button { border: 0; border-radius: 0; background: transparent; padding: 6px 16px; }
 .modes button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
 
 .schema { font-size: 13px; color: var(--muted); }
-.nav-slot { min-width: 0; max-width: 100%; }
-.spacer { flex: 1; }
 .save-status { margin: 0; font-size: 13px; color: var(--muted); }
 .save-status:empty { display: none; }
 
@@ -142,7 +122,8 @@ fieldset {
   margin: 0 0 10px;
 }
 
-.choice { flex-direction: row; align-items: center; gap: 8px; }
+.choice { flex-direction: row; align-items: center; gap: 10px; min-height: 40px; margin: 0; cursor: pointer; }
+.choice input, .snap input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
 
 .field > span, legend {
   font-size: 12px;
@@ -159,11 +140,13 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   background: var(--surface);
-  border-radius: 2px;
+  border-radius: 8px;
+  min-height: 36px;
   padding: 6px 8px;
 }
 
 textarea { min-height: 64px; resize: vertical; }
+.zone textarea { min-height: 0; }
 
 input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] {
   border-color: var(--danger);
@@ -196,9 +179,10 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .legend .fence { background: rgba(30, 74, 56, 0.25); border-color: var(--accent); }
 .legend .nofly { background: rgba(140, 47, 42, 0.2); border-color: var(--danger); }
 .legend .building { background: #cfc8ba; border-color: #6f6a60; }
+.legend .canopy { background: #d7ddd2; border-color: #8a8478; }
 .legend .track { background: var(--track); border-color: var(--track); }
 
-.snap { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-left: 4px; }
+.snap { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 6px; font-size: 13px; margin-left: 4px; cursor: pointer; }
 .readout {
   margin-left: auto;
   font-family: var(--mono);
@@ -209,6 +193,8 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .map-frame {
   position: relative;
   min-height: 0;
+  border-radius: 8px;
+  overflow: hidden;
   border: 1px solid var(--line);
   background: var(--map);
 }
@@ -260,6 +246,7 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 
 .zone, .target {
   border: 1px solid var(--line);
+  border-radius: 8px;
   padding: 8px;
   margin-bottom: 8px;
 }
@@ -337,6 +324,9 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   padding-top: 12px;
 }
 .export summary {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
@@ -352,13 +342,16 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   background: #faf3e6;
 }
 .import-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
   border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 6px 10px;
+  border-radius: 8px;
+  padding: 6px 12px;
   cursor: pointer;
   background: var(--surface);
 }
-.import-button:hover { background: #efece4; }
+.import-button:hover { background: var(--ff-surface-3); }
 .export input[type="file"] {
   position: absolute;
   width: 1px;
@@ -370,12 +363,8 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 [data-testid="export-import-status"][data-state="error"] { color: var(--danger); }
 
 /* Narrow screens: one column, the map first, and the page scrolls. */
-@media (max-width: 1100px) {
-  .nav-slot { flex: 1 0 100%; order: 9; }
-}
 @media (max-width: 900px) {
   html, body, #app, .mission { height: auto; }
-  .top { padding: 8px 12px; }
   .schema { display: none; }
   .workspace { grid-template-columns: minmax(0, 1fr); }
   .stage { order: 1; grid-template-rows: auto auto min(70vh, 460px) auto; padding: 12px; }
