@@ -9,7 +9,6 @@ export {
   siteNameFor,
   worldFootprints,
 } from './autonomy/world';
-export { createPerceptionDetectionSource, perceptionDetectionSource, SWEEP_AGL_M } from './perceptionSource';
 
 /** The page's default mission: find the simulated person in this seed's woods, asking before entry. */
 export function woodsSampleMission(seed: number): Mission {

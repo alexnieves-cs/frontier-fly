@@ -16,7 +16,7 @@ Open **Export to QGroundControl** at the bottom of the right panel. While it is 
 | Geofence | An inclusion fence polygon |
 | No-fly zones | One exclusion fence polygon each |
 
-On the generated woods (the default page) the waypoints come from the autonomy stack's own coverage planner, `planCoverage` in `src/mission/autonomy/planner/coverage.ts`: east-west lanes spaced from the camera footprint, connectors routed around no-fly zones, and heights that follow the terrain. On the flat practice site (`?site=mock`) they come from the editor's sweep preview, with every waypoint pulled at least 2 m inside the fence: the preview runs its lanes edge to edge, and PX4 refuses a waypoint on the fence line. Densely sampled stretches are thinned with a 3D Douglas-Peucker pass (0.5 m tolerance), so a straight lane is two waypoints instead of a dozen.
+On the generated woods (the default page) the waypoints come from the autonomy stack's own coverage planner, `planCoverage` in `src/mission/autonomy/planner/coverage.ts`: east-west lanes spaced from the camera footprint, connectors routed around no-fly zones, and heights that follow the terrain. On the flat practice site (`sampleMission` in `src/mission/sample.ts`, used by the unit tests and the PX4 check) they come from the editor's sweep preview, with every waypoint pulled at least 2 m inside the fence: the preview runs its lanes edge to edge, and PX4 refuses a waypoint on the fence line. Densely sampled stretches are thinned with a 3D Douglas-Peucker pass (0.5 m tolerance), so a straight lane is two waypoints instead of a dozen.
 
 ### What is not in the file
 
