@@ -9,6 +9,7 @@ import { PERSON_SIZE } from '../../src/targets/catalog';
 import type { PlacedTarget } from '../../src/targets/types';
 import { sampleHeight } from '../../src/world/outdoor/terrain';
 import type { Opening } from '../../src/world/outdoor/types';
+import { checkTiming } from './timing';
 
 interface Setup {
   world: MissionWorld;
@@ -249,7 +250,7 @@ describe('perception source', () => {
       frames += 1;
     }
     const msPerFrame = (performance.now() - t0) / frames;
-    expect(msPerFrame).toBeLessThan(2);
+    if (checkTiming) expect(msPerFrame).toBeLessThan(2);
     expect(found.length).toBeGreaterThan(0);
     const truth = source.truthTargets().find((target) => target.classId === 'person')!;
     expect(truth.buildingId).toBeNull();

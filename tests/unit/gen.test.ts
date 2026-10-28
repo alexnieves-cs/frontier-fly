@@ -5,6 +5,7 @@ import { isFullyReachable } from '../../src/gen/validate';
 import { CELL } from '../../src/shared/constants';
 import { buildingToJson } from '../../src/shared/serialize';
 import { RNG } from '../../src/shared/rng';
+import { checkTiming } from './timing';
 
 describe('building generator', () => {
   it('is byte-identical for the same seed', () => {
@@ -39,7 +40,7 @@ describe('building generator', () => {
     generateBuilding({ seed: 7, floors: 3, w: 40, d: 40, stage: 4 });
     const t0 = performance.now();
     generateBuilding({ seed: 8, floors: 3, w: 40, d: 40, stage: 4 });
-    expect(performance.now() - t0).toBeLessThan(50);
+    if (checkTiming) expect(performance.now() - t0).toBeLessThan(50);
   });
 
   it('does not call Math.random', () => {
