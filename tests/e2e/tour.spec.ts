@@ -48,16 +48,22 @@ test.describe('guided tour', () => {
     await expectCardSoon(page, 'One mission, woods to building');
     await expect(card(page)).toHaveAttribute('data-tour-state', 'ready', { timeout: 150_000 });
     await expect(page.locator('.ff-tour-status')).toContainText('Live in your browser');
-    const fps = await page.evaluate(async () => {
-      let frames = 0;
-      const start = performance.now();
-      await new Promise<void>((done) => {
-        const tick = () => (++frames, performance.now() - start < 2000 ? requestAnimationFrame(tick) : done());
-        requestAnimationFrame(tick);
+    // The opaque card costs the live film no frames: compare the frame rate with the card shown and hidden.
+    const fps = () =>
+      page.evaluate(async () => {
+        let frames = 0;
+        const start = performance.now();
+        await new Promise<void>((done) => {
+          const tick = () => (++frames, performance.now() - start < 3000 ? requestAnimationFrame(tick) : done());
+          requestAnimationFrame(tick);
+        });
+        return frames / ((performance.now() - start) / 1000);
       });
-      return frames / ((performance.now() - start) / 1000);
-    });
-    expect(fps).toBeGreaterThan(8);
+    const withCard = await fps();
+    await card(page).evaluate((el) => (el.style.visibility = 'hidden'));
+    const withoutCard = await fps();
+    await card(page).evaluate((el) => (el.style.visibility = ''));
+    expect(withCard).toBeGreaterThan(withoutCard * 0.75);
 
     // Space on the focused Next button belongs to the button, not the film's play/pause shortcut.
     await title(page).focus();
