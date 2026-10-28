@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (275 files, 54,212 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (278 files, 54,807 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -170,10 +170,10 @@ flowchart LR
   ui_mission -->|1| ui
   ui -->|4| app
   ui -->|4| eval
-  ui -->|1| gen
+  ui -->|3| gen
   ui -->|9| mission
   ui -->|11| rl
-  ui -->|28| shared
+  ui -->|30| shared
   ui -->|14| sim
   ui -->|1| targets
   ui -->|4| team
@@ -224,7 +224,7 @@ flowchart LR
 | `src/targets` | 10 | 1,287 | `gen`, `shared` | Three.js | — |
 | `src/team` | 6 | 1,025 | `eval`, `gen`, `shared`, `sim` | — | — |
 | `src/train` | 5 | 1,378 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 35 | 5,535 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
+| `src/ui` | 38 | 6,130 | `app`, `eval`, `gen`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 6 | 2,181 | `mission`, `rl`, `ui` | — | — |
 | `src/vision` | 9 | 1,872 | `mission`, `perception`, `shared`, `sim`, `targets`, `world/outdoor` | TF.js | — |
 | `src/viz` | 19 | 2,355 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
@@ -258,6 +258,7 @@ Each page is its own Vite entry. The production build also loads `coi-servicewor
 | `atlas.html` | `src/ui/atlas/main.ts` | `ui` |
 | `demo.html` | `src/ui/demo/main.ts` | `ui` |
 | `film.html` | `src/film/main.ts` | `film` |
+| `how.html` | `src/ui/how/main.ts` | `ui` |
 | `index.html` | `src/landing/main.ts` | `landing` |
 | `mission.html` | `src/ui/mission/main.ts` | `ui/mission` |
 | `outdoor.html` | `src/world/outdoor/viz/page.ts` | `world/outdoor/viz` |
