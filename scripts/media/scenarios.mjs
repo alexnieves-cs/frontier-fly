@@ -84,8 +84,9 @@ export const SCENARIOS = [
     quality: 'low',
     act: async (page) => {
       await page.locator('#train-btn').click();
+      // Workers compile the policy and fill their world pools first, which takes over 30 s on a 4-core CI runner.
       await page.waitForFunction(() => (document.querySelector('#rate-num')?.textContent ?? '0') !== '0', undefined, {
-        timeout: 30_000,
+        timeout: 120_000,
       });
     },
   },

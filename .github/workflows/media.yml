@@ -30,6 +30,10 @@ on:
         description: Refresh the e2e screenshots in docs/media
         type: boolean
         default: true
+      frames_from_run:
+        description: Reuse the film frames of an earlier media run (its run id) instead of rendering them again
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -65,7 +69,7 @@ jobs:
 
   film:
     needs: plan
-    if: needs.plan.outputs.films != ''
+    if: needs.plan.outputs.films != '' && inputs.frames_from_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 330
     strategy:
@@ -109,7 +113,9 @@ jobs:
           CLIPS: ${{ inputs.clips }}
         run: |
           if [ "$CLIPS" = all ]; then npm run media; else npm run media -- $CLIPS; fi
-      - uses: actions/upload-artifact@v4
+      # record.mjs keeps every clip that did record and exits non-zero for the rest; publish those.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
         with:
           name: clips
           path: |
@@ -144,12 +150,15 @@ jobs:
           retention-days: 7
 
   publish:
+    # A failed clip or still job doesn't throw away hours of film frames: whatever recorded is published,
+    # and the failed job stays red on the run. Missing film frames still stop it.
     needs: [plan, film, clips, stills]
-    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.film.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -164,10 +173,19 @@ jobs:
           pattern: frames-*
           path: test-results/film
           merge-multiple: true
-      - if: needs.film.result == 'success'
+      - if: inputs.frames_from_run != '' && needs.plan.outputs.films != ''
+        uses: actions/download-artifact@v4
+        with:
+          pattern: frames-*
+          path: test-results/film
+          merge-multiple: true
+          run-id: ${{ inputs.frames_from_run }}
+          github-token: ${{ github.token }}
+      - if: needs.film.result == 'success' || (inputs.frames_from_run != '' && needs.plan.outputs.films != '')
         name: Encode films
         run: FILM_ENCODE_ONLY=1 npm run media:film -- ${{ needs.plan.outputs.films }}
-      - if: needs.clips.result == 'success'
+      - if: needs.clips.result == 'success' || needs.clips.result == 'failure'
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: clips
