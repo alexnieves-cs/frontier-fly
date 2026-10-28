@@ -145,22 +145,22 @@ Single-thread numbers are Node on the machine above. The worker rows use `node:w
 
 ## Rendering
 
-Recorded 2026-10-19 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)). Software rendering is far slower than a laptop GPU, so these are a floor, not a claim.
+Recorded 2026-10-28 in headless Chromium (ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)). Software rendering is far slower than a laptop GPU, so these are a floor, not a claim.
 
 | Clip | Page | Quality | Mean fps | Backend |
 | --- | --- | --- | --- | --- |
-| Live PPO training dashboard | `?seed=11&quality=low` | low | 2.7 | webgl2 |
-| FPV night flight, shipped policy, easy building | `?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy&quality=low` | low | 3.3 | webgl2 |
+| Live PPO training dashboard | `sim.html?seed=11&quality=low` | low | 1.5 | webgl2 |
+| FPV night flight, shipped policy, easy building | `sim.html?seed=11&stage=0&camera=fpv&tod=22&flash=1&lights=0&pilot=policy&quality=low` | low | 2.9 | webgl2 |
 
 ## Missions
 
 | Scenario | Outcome | Mission time | Time to find | Outdoor coverage | Indoor coverage | Entries | False clears | False alarms | Missed | Collisions | Battery used | Landed home |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Woods to cabin: find the missing person | found | 3:12 | 2:24 | 29.5% | 100.0% | 1 | 0 | 0 | 0 | 0 | 11.7% | yes |
-| Compound search: confirm the area clear | clear | 8:23 | — | 100.0% | 100.0% | 2 | 0 | 0 | 0 | 1 | 30.2% | yes |
-| Night search: find the lost backpack | found | 4:12 | 3:31 | 28.6% | 100.0% | 1 | 0 | 0 | 0 | 1 | 15.3% | yes |
+| Woods to cabin: find the missing person | found | 2:40 | 1:55 | 21.1% | 95.8% | 1 | 0 | 0 | 0 | 0 | 9.7% | yes |
+| Compound search: confirm the area clear | clear | 15:01 | — | 100.0% | 100.0% | 2 | 0 | 0 | 0 | 0 | 54% | yes |
+| Night search: find the lost backpack | found | 3:43 | 3:00 | 26.9% | 50.0% | 1 | 0 | 0 | 0 | 0 | 13.5% | yes |
 
-Recorded from `main@f5e22fb` by `npm run media`, which reads each run's end-of-mission report from the page. Times are simulated mission time.
+Recorded from `main@81c9adaee765fb02ad6594d89d7919aad1c6c70b` by `npm run media`, which reads each run's end-of-mission report from the page. Times are simulated mission time.
 
 ### On fresh seeds
 
