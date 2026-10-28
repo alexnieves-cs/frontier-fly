@@ -41,8 +41,8 @@ test('export the woods mission as a QGroundControl plan that passes the schema, 
   await expect(page.locator('[data-testid=mission-issues]')).toContainText('No errors');
 });
 
-test('ArduPilot waypoint file and MAVLink items from the mock site', async ({ page }) => {
-  await openMission(page, '?seed=11&site=mock');
+test('ArduPilot waypoint file and MAVLink items', async ({ page }) => {
+  await openMission(page, '?seed=11');
   await openExport(page);
   await page.locator('[data-testid=export-firmware]').selectOption('ardupilot');
   await page.locator('[data-testid=export-origin]').selectOption('ardupilot-sitl');
@@ -66,7 +66,7 @@ test('ArduPilot waypoint file and MAVLink items from the mock site', async ({ pa
 });
 
 test('a bad plan file is refused with a reason', async ({ page }) => {
-  await openMission(page, '?seed=11&site=mock');
+  await openMission(page, '?seed=11');
   await openExport(page);
   await page.locator('[data-testid=export-import]').setInputFiles({
     name: 'broken.plan',

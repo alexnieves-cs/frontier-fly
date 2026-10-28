@@ -57,38 +57,57 @@ test('draw a geofence, save the link, and reload it', async ({ page }) => {
   await expect(page.locator('[data-testid=mission-issues]')).toContainText('No errors');
 });
 
-test('default page loads the generated woods and runs the camera sweep', async ({ page }) => {
+test('default page loads the generated woods and flies the autonomy runner', async ({ page }) => {
+  test.setTimeout(360_000);
   await openMission(page, '?seed=11');
   await expect(page.locator('#app')).toHaveAttribute('data-site', 'outdoor-world');
   await expect(page.locator('[data-testid=site-list]')).toContainText('Tree canopy');
   await expect(page.locator('[data-testid=site-list]')).toContainText('Shed');
   await expect(page.locator('[data-testid=mission-issues]')).toContainText('No errors');
   await page.locator('[data-testid=mode-run]').click();
-  await page.locator('[data-testid=speed]').selectOption('16');
+  await expect(page.locator('#app')).toHaveAttribute('data-flight', 'ready', { timeout: 60_000 });
+  await page.locator('[data-testid=speed]').selectOption('64');
   await page.locator('[data-testid=play]').click();
-  await expect(page.locator('[data-testid=mission-report]')).toBeVisible({ timeout: 120_000 });
+  // The sample asks before entering; keep the drone outside so the flight ends sooner.
+  await expect(page.locator('[data-testid=approval-prompt]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('[data-testid=flight-log]')).toContainText(/opening/i);
+  const deny = page.locator('[data-testid=approval-deny]');
+  const report = page.locator('[data-testid=mission-report]');
+  for (let i = 0; i < 6 && !(await report.isVisible()); i++) {
+    await Promise.race([deny.waitFor({ state: 'visible', timeout: 180_000 }), report.waitFor({ state: 'visible', timeout: 180_000 })]);
+    if (await deny.isVisible()) await deny.click();
+  }
+  await expect(report).toBeVisible({ timeout: 180_000 });
+  await expect(page.locator('#app')).toHaveAttribute('data-outcome', /.+/);
+  await expect(report).toContainText('False clears');
 });
 
 test('editor, live approval, and report screenshots', async ({ page }) => {
-  // The scripted mock site guarantees an entry request for the approval flow.
-  await openMission(page, '?seed=11&site=mock');
+  test.setTimeout(420_000);
+  await openMission(page, '?seed=11');
   await expect(page.locator('[data-testid=mission-summary]')).toContainText('Geofence');
   await page.screenshot({ path: `${out}/mission-editor.png` });
   expect(readFileSync(`${out}/mission-editor.png`).length).toBeGreaterThan(20_000);
 
   await page.locator('[data-testid=mode-run]').click();
-  await page.locator('[data-testid=speed]').selectOption('16');
+  await expect(page.locator('#app')).toHaveAttribute('data-flight', 'ready', { timeout: 60_000 });
+  await page.locator('[data-testid=speed]').selectOption('64');
   await page.locator('[data-testid=play]').click();
-  await expect(page.locator('[data-testid=approval-prompt]')).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator('[data-testid=detection-log]')).toContainText(/person/i);
+  await expect(page.locator('[data-testid=approval-prompt]')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('[data-testid=approval-prompt]')).toContainText('safety score');
   await page.screenshot({ path: `${out}/mission-live.png` });
   expect(readFileSync(`${out}/mission-live.png`).length).toBeGreaterThan(20_000);
 
-  await page.locator('[data-testid=approval-allow]').click();
-  await expect(page.locator('[data-testid=mission-report]')).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('[data-testid=mission-report]')).toContainText('Path efficiency');
-  await expect(page.locator('[data-testid=mission-report]')).toContainText('Not measured');
-  await page.locator('[data-testid=mission-report] dt', { hasText: 'Path efficiency' }).scrollIntoViewIfNeeded();
+  // Allow every entry: on this seed the drone finds the simulated person indoors.
+  const allow = page.locator('[data-testid=approval-allow]');
+  const report = page.locator('[data-testid=mission-report]');
+  for (let i = 0; i < 6 && !(await report.isVisible()); i++) {
+    await Promise.race([allow.waitFor({ state: 'visible', timeout: 240_000 }), report.waitFor({ state: 'visible', timeout: 240_000 })]);
+    if (await allow.isVisible()) await allow.click();
+  }
+  await expect(report).toBeVisible({ timeout: 240_000 });
+  await expect(report).toContainText('Collisions');
+  await report.scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${out}/mission-report.png` });
   expect(readFileSync(`${out}/mission-report.png`).length).toBeGreaterThan(20_000);
 });

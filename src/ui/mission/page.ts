@@ -1,9 +1,8 @@
-import { mockDetectionSource } from '../../mission/detectionMock';
-import type { DetectionSource } from '../../mission/detections';
-import { outdoorWorldProvider, perceptionDetectionSource, woodsSampleMission } from '../../mission/outdoorWorld';
+import type { AutonomyReport, RunnerSnapshot } from '../../mission/autonomy/contracts';
+import { buildReport } from '../../mission/autonomy/report';
+import { outdoorWorldProvider, woodsSampleMission } from '../../mission/outdoorWorld';
 import { canonicalMission, canonicalMissionJson, decodeMissionHash, missionToHash } from '../../mission/serialize';
-import { createSession, type MissionSession, type SessionSnapshot } from '../../mission/session';
-import { blankMission, sampleMission, suggestedTargets } from '../../mission/sample';
+import { blankMission, suggestedTargets } from '../../mission/sample';
 import {
   ENTRY_POLICIES,
   MISSION_SCHEMA_VERSION,
@@ -19,10 +18,10 @@ import {
   type TargetKind,
 } from '../../mission/types';
 import { validateMission } from '../../mission/validate';
-import type { WorldProvider, WorldSnapshot } from '../../mission/world';
-import { mockWorldProvider } from '../../mission/worldMock';
+import type { WorldSnapshot } from '../../mission/world';
 import { createExportPanel } from './exportPanel';
-import { createLivePanel } from './livePanel';
+import { buildingLabel, FLIGHT_DT, prepareFlight, type Flight } from './flight';
+import { createLivePanel, PHASE_LABELS } from './livePanel';
 import { createMissionMap, type MapLayers, type MapSelection, type MapTool } from './map';
 import { siteHeader } from '../siteNav';
 
@@ -87,11 +86,8 @@ function nextIdent(prefix: string, used: string[]): string {
 
 export function mountMissionEditor(root: HTMLElement): void {
   const url = new URL(location.href);
-  // `?site=mock` keeps the fixed practice site and scripted detections for tests.
-  const mockSite = url.searchParams.get('site') === 'mock';
-  const provider: WorldProvider = mockSite ? mockWorldProvider : outdoorWorldProvider;
-  const detector: DetectionSource = mockSite ? mockDetectionSource : perceptionDetectionSource;
-  const sampleFor = (seed: number): Mission => (mockSite ? sampleMission(seed) : woodsSampleMission(seed));
+  const provider = outdoorWorldProvider;
+  const sampleFor = woodsSampleMission;
   let bannerText: string | null = null;
   let mission = loadInitial(url, (message) => {
     bannerText = message;
@@ -103,10 +99,15 @@ export function mountMissionEditor(root: HTMLElement): void {
   let draft: Point[] | null = null;
   let selection: MapSelection | null = null;
   let fieldIssues: MissionIssue[] = [];
-  let session: MissionSession | null = null;
+  let flight: Flight | null = null;
+  let flightSnap: RunnerSnapshot | null = null;
+  let report: AutonomyReport | null = null;
+  // Bumped on every new flight so a slow build cannot land on a newer one.
+  let flightToken = 0;
   let playing = false;
   let speed = 1;
   let raf = 0;
+  let acc = 0;
   let zoneSignature = '';
   let targetSignature = '';
 
@@ -202,8 +203,8 @@ export function mountMissionEditor(root: HTMLElement): void {
   hud.hidden = true;
   const hudTime = hudCell('Elapsed');
   const hudBattery = hudCell('Battery');
-  const hudCover = hudCell('Coverage');
-  hud.append(hudTime.cell, hudBattery.cell, hudCover.cell);
+  const hudPhase = hudCell('Doing');
+  hud.append(hudTime.cell, hudBattery.cell, hudPhase.cell);
   frame.append(canvas, hud);
   const summary = el('p', { className: 'summary', testid: 'mission-summary' });
   const mapError = el('p', { className: 'map-error', testid: 'map-error' });
@@ -230,16 +231,13 @@ export function mountMissionEditor(root: HTMLElement): void {
     el('h2', { text: 'Site context' }),
     el('p', {
       className: 'quiet',
-      text: mockSite
-        ? 'Mock practice site for this seed.'
-        : 'Generated woods for this seed: buildings, trails, and tree canopy. Detections come from the simulated camera.',
+      text: 'Generated woods for this seed: buildings, trails, and tree canopy. Run flies the autonomy over this exact site.',
     }),
     siteList,
     el('h2', { text: 'Share' }),
     linkField,
   );
   const exporter = createExportPanel({
-    mockSite,
     mission: () => mission,
     onImport: (next) => {
       mission = next;
@@ -313,7 +311,7 @@ export function mountMissionEditor(root: HTMLElement): void {
     allow: () => answer(true),
     deny: () => answer(false),
     speed: (value) => {
-      if (value === 1 || value === 4 || value === 16) speed = value;
+      if (value === 1 || value === 4 || value === 16 || value === 64) speed = value;
     },
   });
   side.append(planSide, live.element);
@@ -473,7 +471,7 @@ export function mountMissionEditor(root: HTMLElement): void {
     const validation = validateMission(mission);
     const errors = combinedIssues(validation.issues).filter((issue) => issue.severity === 'error');
     if (!validation.ok || errors.length > 0) {
-      showBanner('Fix the errors in the plan before running the preview.');
+      showBanner('Fix the errors in the plan before flying it.');
       mode = 'plan';
       showMode();
       syncPlan();
@@ -482,11 +480,41 @@ export function mountMissionEditor(root: HTMLElement): void {
     pause();
     mode = 'run';
     mission = canonicalMission(validation.mission ?? mission);
-    session = createSession(mission, world, detector);
     map.setTool('view');
     showMode();
     syncPlan();
+    startFlight();
+  }
+
+  /** Build the site and a fresh runner for the current mission. */
+  function startFlight(): void {
+    const token = ++flightToken;
+    flight = null;
+    flightSnap = null;
+    report = null;
+    acc = 0;
+    root.dataset.flight = 'preparing';
+    delete root.dataset.outcome;
     syncLive();
+    const planned = canonicalMission(mission);
+    // Let the panel paint "preparing" before the world build blocks the thread.
+    setTimeout(() => {
+      prepareFlight(planned).then(
+        (next) => {
+          if (token !== flightToken) return;
+          flight = next;
+          flightSnap = next.runner.snapshot();
+          root.dataset.flight = 'ready';
+          syncLive();
+        },
+        (error: unknown) => {
+          if (token !== flightToken) return;
+          root.dataset.flight = 'error';
+          showBanner(`Could not start the flight: ${error instanceof Error ? error.message : String(error)}`);
+          syncLive();
+        },
+      );
+    }, 0);
   }
 
   function showMode(): void {
@@ -585,7 +613,7 @@ export function mountMissionEditor(root: HTMLElement): void {
   }
 
   function layers(): MapLayers {
-    const liveSnap: SessionSnapshot | null = mode === 'run' && session ? session.snapshot() : null;
+    const liveSnap = mode === 'run' ? flightSnap : null;
     return {
       footprints: world.footprints,
       geofence: mission.geofence.points,
@@ -597,13 +625,15 @@ export function mountMissionEditor(root: HTMLElement): void {
       draft,
       draftKind: tool === 'nofly' ? 'nofly' : 'geofence',
       start: { x: mission.startPose.x, y: mission.startPose.y, yawRad: mission.startPose.yawRad },
-      plan: liveSnap?.plan ?? (mode === 'plan' ? (exporter.preview() ?? []) : []),
-      track: liveSnap?.track ?? [],
-      drone: liveSnap ? liveSnap.pose : null,
-      coverage: liveSnap?.coverage ?? null,
-      detections: (liveSnap?.detections ?? [])
-        .filter((detection) => detection.revealed)
-        .map((detection) => ({ x: detection.x, y: detection.y, kind: detection.kind, label: detection.label })),
+      plan: liveSnap ? liveSnap.plan.map(([x, y]) => ({ x, y })) : mode === 'plan' ? (exporter.preview() ?? []) : [],
+      track: liveSnap ? liveSnap.track.map(([x, y]) => ({ x, y })) : [],
+      drone: liveSnap ? { x: liveSnap.pose.pos[0], y: liveSnap.pose.pos[1], yawRad: liveSnap.pose.yaw } : null,
+      detections: (liveSnap?.confirmed ?? []).map((contact) => ({
+        x: contact.estimate[0],
+        y: contact.estimate[1],
+        kind: contact.classId === 'person' ? 'person' : 'object',
+        label: contact.classId,
+      })),
       selection,
     };
   }
@@ -775,24 +805,44 @@ export function mountMissionEditor(root: HTMLElement): void {
   }
 
   function play(): void {
-    if (!session || mode !== 'run') return;
-    if (session.snapshot().status === 'ready') session.start();
-    if (session.snapshot().status !== 'running') {
-      syncLive();
-      return;
-    }
+    if (!flight || mode !== 'run' || flight.runner.done || flightSnap?.pendingEntry) return;
     playing = true;
     let last = performance.now();
     const tick = (now: number): void => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const realDt = Math.min(0.1, Math.max(0, (now - last) / 1000));
       last = now;
-      session?.step(dt * speed);
+      if (flight) advance(flight, realDt * speed);
       syncLive();
-      if (playing && session?.snapshot().status === 'running') raf = requestAnimationFrame(tick);
+      if (playing && flight && !flight.runner.done && !flightSnap?.pendingEntry) raf = requestAnimationFrame(tick);
       else playing = false;
+      if (!playing) syncLive();
     };
     raf = requestAnimationFrame(tick);
     syncLive();
+  }
+
+  /** Step the runner by `simSec` of mission time in fixed ticks, within a frame budget. */
+  function advance(current: Flight, simSec: number): void {
+    const runner = current.runner;
+    acc += simSec;
+    const start = performance.now();
+    while (acc >= FLIGHT_DT && !runner.done && !runner.snapshot().pendingEntry) {
+      runner.step(FLIGHT_DT);
+      acc -= FLIGHT_DT;
+      // Keep the page responsive: drop the backlog rather than stall a frame.
+      if (performance.now() - start > 14) {
+        acc = 0;
+        break;
+      }
+    }
+    flightSnap = runner.snapshot();
+    if (runner.done) finish(current);
+  }
+
+  function finish(current: Flight): void {
+    if (report) return;
+    report = buildReport(current.runner.record(), current.source, current.world);
+    root.dataset.outcome = report.outcome;
   }
 
   function pause(): void {
@@ -804,31 +854,43 @@ export function mountMissionEditor(root: HTMLElement): void {
 
   function restart(): void {
     pause();
-    session = createSession(mission, world, detector);
-    syncLive();
+    startFlight();
   }
 
   function halt(): void {
-    pause();
-    session?.abort();
+    if (!flight || flight.runner.done) return;
+    // An abort is a command to the drone, not the end of the run: it flies home and lands.
+    flight.runner.abort();
+    flightSnap = flight.runner.snapshot();
+    if (!playing) play();
     syncLive();
   }
 
   function answer(allow: boolean): void {
-    if (!session) return;
-    if (allow) session.approve();
-    else session.deny();
+    if (!flight || !flightSnap?.pendingEntry) return;
+    if (allow) flight.runner.approve();
+    else flight.runner.deny();
+    // The runner reads the answer on its next tick; take it now so the request clears.
+    flight.runner.step(FLIGHT_DT);
+    flightSnap = flight.runner.snapshot();
+    if (flight.runner.done) finish(flight);
     syncLive();
     play();
   }
 
   function syncLive(): void {
-    const snapshot = session?.snapshot() ?? null;
-    live.update(snapshot, playing);
-    if (!snapshot) return;
-    hudTime.value.textContent = clock(snapshot.tSec);
-    hudBattery.value.textContent = `${Math.round(snapshot.batteryRemainingPct)}%`;
-    hudCover.value.textContent = `${Math.round(snapshot.coverage.ratio * 100)}%`;
+    const preparing = mode === 'run' && !flight && root.dataset.flight === 'preparing';
+    live.update({
+      snapshot: flightSnap,
+      playing,
+      preparing,
+      report,
+      label: (id) => (flight ? buildingLabel(flight.world, id) : id),
+      note: flight?.launchNote ?? null,
+    });
+    hudTime.value.textContent = flightSnap ? clock(flightSnap.tSec) : '—';
+    hudBattery.value.textContent = flightSnap ? `${Math.round(flightSnap.batteryPct)}%` : '—';
+    hudPhase.value.textContent = flightSnap ? PHASE_LABELS[flightSnap.phase] : preparing ? 'Preparing' : '—';
     map.setLayers(layers());
   }
 

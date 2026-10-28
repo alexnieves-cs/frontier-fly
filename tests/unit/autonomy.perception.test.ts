@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import type { Contact, DronePose, MissionWorld, V3 } from '../../src/mission/autonomy/contracts';
 import { createPerceptionSource, gimbalFootprint, GIMBAL_MIN_AGL_M, GIMBAL_RANGE_SCALE } from '../../src/mission/autonomy/perception';
 import { buildMissionWorld, missionForWorld } from '../../src/mission/autonomy/world';
-import { createPerceptionDetectionSource } from '../../src/mission/perceptionSource';
 import { pathLength, planPath, pointAtDistance } from '../../src/mission/path';
 import { indoorCells } from '../../src/perception/seenEmpty';
 import { CELL } from '../../src/shared/constants';
@@ -10,7 +9,6 @@ import { PERSON_SIZE } from '../../src/targets/catalog';
 import type { PlacedTarget } from '../../src/targets/types';
 import { sampleHeight } from '../../src/world/outdoor/terrain';
 import type { Opening } from '../../src/world/outdoor/types';
-import { outdoorWorldProvider } from '../../src/mission/autonomy/world';
 
 interface Setup {
   world: MissionWorld;
@@ -269,23 +267,6 @@ describe('perception source', () => {
     expect(fp.halfAlongM).toBeGreaterThan(2);
     expect(gimbalFootprint(GIMBAL_MIN_AGL_M - 3).halfAcrossM).toBe(0);
     expect(gimbalFootprint(60).halfAcrossM).toBe(0);
-  });
-});
-
-describe('perception-backed DetectionSource', () => {
-  it('turns the sweep into detections with mission ids, deterministically', () => {
-    const world = buildMissionWorld({ seed: 11, targets: [{ classId: 'person', state: 'lying', where: 'outdoor' }] });
-    const mission = missionForWorld(world, { missionType: 'find_person' });
-    const source = createPerceptionDetectionSource({ world: { targets: [{ classId: 'person', state: 'lying', where: 'outdoor' }] } });
-    const snapshot = outdoorWorldProvider.load(11);
-    const detections = source.catalog(mission, snapshot);
-    const person = detections.find((item) => item.id === 'det-tgt-person');
-    expect(person).toBeDefined();
-    expect(person!.kind).toBe('person');
-    expect(person!.entryRequested).toBe(false);
-    const truth = world.outdoorScene.targets[0]!;
-    expect(Math.hypot(person!.x - truth.feet[0], person!.y - truth.feet[1])).toBeLessThan(3);
-    expect(source.catalog(mission, snapshot)).toEqual(detections);
   });
 });
 
