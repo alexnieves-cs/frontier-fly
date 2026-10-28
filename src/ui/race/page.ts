@@ -63,6 +63,9 @@ interface Launch {
   inspect: number;
 }
 
+/** Query keys the race page reads and rewrites. */
+const RACE_URL_KEYS = ['condition', 'seed', 'lighting', 'pilots', 'speed', 'inspect'] as const;
+
 function readLaunch(): Launch {
   const q = new URLSearchParams(location.search);
   const condition = conditionById(q.get('condition'));
@@ -130,7 +133,7 @@ function markup(): string {
     <p class="race-banner" id="race-banner" hidden></p>
 
     <main class="race-main">
-      <div class="race-lanes" id="race-lanes"></div>
+      <div class="race-lanes" id="race-lanes" data-tour="race-lanes"></div>
     </main>
 
     <section class="race-result" id="race-result" hidden aria-live="polite"></section>
@@ -142,7 +145,7 @@ function markup(): string {
           <div class="clock-bar"><span id="race-progress"></span></div>
           <p class="clock-note" id="race-status">Loading the policy and building the world…</p>
         </div>
-        <ol class="board" id="race-board" aria-label="Live standings"></ol>
+        <ol class="board" id="race-board" data-tour="race-board" aria-label="Live standings"></ol>
         <figure class="chart-wrap">
           <figcaption>Coverage over flight time</figcaption>
           <canvas class="chart" id="race-chart" role="img" aria-label="Coverage over time for each pilot"></canvas>
@@ -289,7 +292,9 @@ class RacePage {
     });
     this.el.restart!.addEventListener('click', () => this.restart(this.setup));
     this.el.share!.addEventListener('click', () => {
-      const url = location.href;
+      const shared = new URL(location.href);
+      shared.searchParams.delete('tour');
+      const url = shared.href;
       const done = () => {
         this.el.share!.textContent = 'Link copied';
         window.setTimeout(() => (this.el.share!.textContent = 'Copy link'), 1600);
@@ -329,7 +334,9 @@ class RacePage {
   }
 
   private writeUrl(): void {
-    const q = new URLSearchParams();
+    // Keep parameters the race does not own (the guided tour's ?tour) and rewrite the rest.
+    const q = new URLSearchParams(location.search);
+    for (const key of RACE_URL_KEYS) q.delete(key);
     q.set('condition', this.setup.condition);
     q.set('seed', String(this.setup.seed));
     if (this.setup.lighting !== 'day') q.set('lighting', 'night');

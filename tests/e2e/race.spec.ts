@@ -77,9 +77,13 @@ test.describe('pilot race', () => {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     const page = await context.newPage();
     const { errors } = watch(page);
-    await page.goto('/race.html?condition=easy&speed=max');
+    // A parameter the race does not own (the guided tour's) survives the race rewriting its URL.
+    await page.goto('/race.html?condition=easy&speed=max&tour=race-lanes');
     await expect(page.locator('#app[data-ready="1"]')).toBeAttached({ timeout: 90_000 });
     await expect(page.locator('.lane')).toHaveCount(4);
+    const query = new URL(page.url()).searchParams;
+    expect(query.get('tour')).toBe('race-lanes');
+    expect(query.get('condition')).toBe('easy');
     const layout = await page.evaluate(() => {
       const lanes = [...document.querySelectorAll<HTMLElement>('.lane')].map((el) => el.getBoundingClientRect());
       return {
