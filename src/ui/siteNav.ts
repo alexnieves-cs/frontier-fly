@@ -6,11 +6,12 @@ import './theme.css';
 
 export const REPO_URL = 'https://github.com/alexnieves-cs/frontier-fly';
 
-export type SitePage = 'home' | 'film' | 'demo' | 'race' | 'team' | 'atlas' | 'sim' | 'outdoor' | 'mission' | 'px4';
+export type SitePage = 'home' | 'how' | 'film' | 'demo' | 'race' | 'team' | 'atlas' | 'sim' | 'outdoor' | 'mission' | 'px4';
 
 /** Named for what a visitor does there. `gap` starts the second group (tools) after a divider. */
 const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: string; gap?: boolean }> = [
   { id: 'home', href: './index.html', label: 'Home', title: 'Project overview and results' },
+  { id: 'how', href: './how.html', label: 'How it works', title: 'The autopilot explained in seven steps' },
   { id: 'film', href: './film.html', label: 'Watch', title: 'A full mission, replayed in 3D' },
   { id: 'demo', href: './demo.html', label: 'Missions', title: 'Run a woods-to-building rescue mission' },
   { id: 'race', href: './race.html', label: 'Race', title: 'Four pilots search the same building live' },
