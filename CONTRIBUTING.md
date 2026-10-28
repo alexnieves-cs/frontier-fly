@@ -39,6 +39,8 @@ npm run media    # docs/media/*.mp4, *.gif, media.json (needs ffmpeg)
 npm run docs     # docs/ARCHITECTURE.md, docs/BENCHMARKS.md, README tables
 ```
 
+The films (`npm run media:film`) take about six hours on one machine. The `media` workflow re-renders the films, clips and screenshots on GitHub's runners instead, splitting each film over several of them, and pushes the result to a `media/<run id>` branch to review and merge in a pull request: `gh workflow run media` (inputs pick the films, clips and runner count).
+
 Never edit the generated tables by hand. Edit `scripts/docs/*.template.md` for prose. Report numbers you measured, including the ones that miss a target.
 
 ## Code layout
