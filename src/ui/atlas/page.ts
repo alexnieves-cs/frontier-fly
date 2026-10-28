@@ -117,7 +117,7 @@ export function startAtlas(root: HTMLElement): void {
           <h2 id="flights-title">The failing flights</h2>
           <div class="atlas-tabs" role="tablist" aria-label="Event">${EVENTS.map((e, i) => `<button type="button" role="tab" data-list="${e}" aria-selected="${i === 0}">${EVENT_LABEL[e]} <span>${data.failures.filter((f) => f.event === e).length}</span></button>`).join('')}</div>
         </div>
-        <p class="atlas-sub">From all three studies. Replay rebuilds the same site, people, light, wind and fault from the flight's seeds and flies it live on the Missions page.</p>
+        <p class="atlas-sub">Every failure among the ${data.flights.mc.toLocaleString()} randomly drawn missions, the ones a real deployment of this mix would meet. Replay rebuilds the same site, people, light, wind and fault from the flight's seeds and flies it live on the Missions page.</p>
         <div class="atlas-table-wrap"><table class="atlas-table" data-testid="atlas-failures"><thead></thead><tbody></tbody></table></div>
         <button type="button" class="atlas-more" data-testid="atlas-more" hidden>Show more</button>
       </section>

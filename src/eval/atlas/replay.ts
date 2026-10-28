@@ -45,6 +45,8 @@ export function loadAtlasCase(c: AtlasCase): LoadedScenario {
   const options: RunnerOptions = {
     dt: 0.05,
     vehicle: 'quad',
+    // The atlas operator approves every entry; ?operator=approve on the Missions page answers with it.
+    operator: () => 'approve',
     ...(setup.faults.length ? { faults: { plan: setup.faults, seed: world.seed } } : {}),
   };
   const fault = d.fault === 'none' ? 'no fault' : d.fault.replace('-', ' ');

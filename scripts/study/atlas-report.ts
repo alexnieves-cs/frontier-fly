@@ -72,11 +72,10 @@ function row(f: AtlasFlight, event: AtlasEvent, source: string) {
   };
 }
 
-const failures = [
-  ...ATLAS_EVENTS.flatMap((e) => mc.results.filter((f) => f[e]).map((f) => row(f, e, 'monte-carlo'))),
-  ...ATLAS_EVENTS.flatMap((e) => is[e].results.filter((f) => f[e]).map((f) => row(f, e, 'importance'))),
-  ...ATLAS_EVENTS.flatMap((e) => searchFlights.filter((f) => f[e]).map((f) => row(f, e, 'search'))),
-];
+// The page lists the plain Monte Carlo failures: drawn from the operating distribution itself, they are
+// the failures a reader would meet. The search and importance-sampled flights crowd into the failing
+// region by design (over a thousand more rows, which would ship in the page bundle).
+const failures = ATLAS_EVENTS.flatMap((e) => mc.results.filter((f) => f[e]).map((f) => row(f, e, 'monte-carlo')));
 
 /** Rates on the slice of nominal flights a reader cares about most: missions with someone or something inside. */
 function conditional(pred: (f: AtlasFlight) => boolean, e: AtlasEvent) {
