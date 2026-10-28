@@ -34,6 +34,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      # Same generated-docs checks as ci.yml, so main can't publish numbers that differ from the committed JSON.
+      - run: npm run docs:check
+      - run: npx vite-node scripts/px4/report.ts -- --check
 
   build:
     runs-on: ubuntu-latest
