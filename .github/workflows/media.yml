@@ -76,8 +76,8 @@ jobs:
       fail-fast: true
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -88,7 +88,7 @@ jobs:
           FILM_SHARD: ${{ matrix.shard }}/${{ matrix.of }}
           KEEP_FRAMES: '1'
         run: npm run media:film -- ${{ matrix.film }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: frames-${{ matrix.film }}-${{ matrix.shard }}
           path: test-results/film/
@@ -100,8 +100,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -115,7 +115,7 @@ jobs:
           if [ "$CLIPS" = all ]; then npm run media; else npm run media -- $CLIPS; fi
       # record.mjs keeps every clip that did record and exits non-zero for the rest; publish those.
       - if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: clips
           path: |
@@ -131,8 +131,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -141,7 +141,7 @@ jobs:
       - run: npx playwright test tests/e2e/shots.spec.ts
         env:
           UPDATE_MEDIA: '1'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: stills
           path: |
@@ -160,21 +160,21 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
       - if: needs.film.result == 'success'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: frames-*
           path: test-results/film
           merge-multiple: true
       - if: inputs.frames_from_run != '' && needs.plan.outputs.films != ''
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: frames-*
           path: test-results/film
@@ -186,12 +186,12 @@ jobs:
         run: FILM_ENCODE_ONLY=1 npm run media:film -- ${{ needs.plan.outputs.films }}
       - if: needs.clips.result == 'success' || needs.clips.result == 'failure'
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: clips
           path: docs
       - if: needs.stills.result == 'success'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: stills
           path: docs/media

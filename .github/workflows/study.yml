@@ -50,8 +50,8 @@ jobs:
     env:
       STUDY_ENTRY: ${{ inputs.study }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -70,7 +70,7 @@ jobs:
             pids+=($!)
           done
           for p in "${pids[@]}"; do wait "$p"; done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: shard-${{ matrix.shard }}
           path: shards/
@@ -84,14 +84,14 @@ jobs:
     env:
       STUDY_ENTRY: ${{ inputs.study }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm install --no-save @tensorflow/tfjs-node@4.22.0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: shard-*
           path: shards
@@ -108,7 +108,7 @@ jobs:
           git add -f ${{ inputs.out }}
           git commit -m "${{ inputs.study }} result from study run ${{ github.run_id }}"
           git push origin "$b"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ inputs.study }}
           path: ${{ inputs.out }}
