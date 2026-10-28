@@ -22,6 +22,12 @@ const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: s
   { id: 'px4', href: './px4.html', label: 'PX4', title: 'PX4 SITL flies this simulator' },
 ];
 
+/** Which site page a path shows (`/frontier-fly/` and `/frontier-fly/race.html` alike), or null for an unknown page. */
+export function currentSitePage(pathname: string = location.pathname): SitePage | null {
+  const file = pathname.split('/').pop() || 'index.html';
+  return PAGES.find((p) => p.href === `./${file}`)?.id ?? null;
+}
+
 /** The page links plus GitHub, with `aria-current` on the page being shown. */
 export function siteNavLinks(current: SitePage): string {
   const links = PAGES.map(
