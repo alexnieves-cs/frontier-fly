@@ -12,6 +12,7 @@ import type {
   RunRecord,
   SafetyAction,
   V3,
+  ClearanceRecord,
 } from './contracts';
 import { requirementsMet } from './planner/confirm';
 import { columnClear, cruiseZ, dist, segmentClear } from './planner/geometry';
@@ -82,6 +83,7 @@ const LOC_LOST_LAND_SEC = 20;
 
 class Runner extends IndoorPhases {
   private locLostSince = -1;
+  private closest: ClearanceRecord | null = null;
   // ----------------------------------------------------------- public
 
   get done(): boolean {
@@ -149,6 +151,7 @@ class Runner extends IndoorPhases {
       localization: [...this.locVisits, ...(this.loc && this.loc.flownTicks > 0 ? [this.loc.record(this.visit?.b.id ?? '')] : [])],
       log: this.logs.slice(),
       faults: this.faults ? this.faults.transitions().slice() : [],
+      ...(this.closest ? { clearance: { ...this.closest } } : {}),
       ...(this.sar ? { search: { pos: this.sar.history.slice(), reachable: 1 - this.sar.prior.rest, replans: this.sar.replans } } : {}),
     };
   }
@@ -205,6 +208,7 @@ class Runner extends IndoorPhases {
       this.log('warn', `Contact at ${this.where(pos)}${this.inside ? ' inside the building' : ''} during ${this.phase.replace('_', ' ')}.`);
       if (this.visit && this.phase === 'indoor_explore') this.visit.policyCollisions += 1;
     }
+    if (this.options.measureClearance) this.measureClearance();
     this.breadcrumb();
     if (this.t + 1e-9 >= this.nextTrack) {
       this.nextTrack = this.t + TRACK_PERIOD;
@@ -215,6 +219,13 @@ class Runner extends IndoorPhases {
       this.log('warn', `Time limit ${fmt(this.maxSim, 0)} s reached before landing.`);
       this.finish();
     }
+  }
+
+  private measureClearance(): void {
+    const pos = this.vehicle.pos;
+    const c = this.physics.clearance([pos[0], pos[1], pos[2]]);
+    if (!c || (this.closest && c.gapM >= this.closest.minM)) return;
+    this.closest = { minM: c.gapM, tSec: this.t, pos: [pos[0], pos[1], pos[2]], phase: this.phase, inside: this.inside, tag: c.tag };
   }
 
   /**

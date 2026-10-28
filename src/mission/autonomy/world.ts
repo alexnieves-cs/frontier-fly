@@ -301,6 +301,7 @@ function defaultWants(seed: number, buildings: number): TargetWant[] {
  */
 export function buildMissionWorld(options: MissionWorldOptions): MissionWorld {
   const seed = options.seed >>> 0;
+  const placement = (options.placementSeed ?? seed) >>> 0;
   const wanted = options.targets ?? [];
   const highest = wanted.reduce((max, want) => (want.where === 'indoor' ? Math.max(max, want.building ?? 0) : max), -1);
   if (highest >= MAX_BUILDINGS) throw new RangeError(`Target building ${highest} is beyond the ${MAX_BUILDINGS}-building limit.`);
@@ -324,15 +325,15 @@ export function buildMissionWorld(options: MissionWorldOptions): MissionWorld {
       shell,
       footprint: shellFootprint(shell),
       heightM: shell.spec.floors.length * shell.spec.floorHeight,
-      scene: plantIndoor(shell, id, mine, myDecoys, seed),
-      interiorLightsOn: lightsFor(shell, options.interiorLights ?? 'on', seed),
+      scene: plantIndoor(shell, id, mine, myDecoys, placement),
+      interiorLightsOn: lightsFor(shell, options.interiorLights ?? 'on', placement),
     };
   });
   return {
     seed,
     outdoor,
     buildings,
-    outdoorScene: plantOutdoor(outdoor, wants.filter((want) => want.where === 'outdoor'), seed),
+    outdoorScene: plantOutdoor(outdoor, wants.filter((want) => want.where === 'outdoor'), placement),
     timeOfDay: options.timeOfDay ?? 12,
     flashlightOn: options.flashlightOn ?? false,
     sensorMode: options.sensorMode ?? 'rgb',
