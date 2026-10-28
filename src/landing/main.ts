@@ -3,12 +3,14 @@ import './landing.css';
 import type { FilmStatus } from '../film/page';
 import { REPO_URL as REPO, siteHeader } from '../ui/siteNav';
 import { isWebglError, showStartError } from '../ui/startError';
+import { atlasRates } from '../ui/tour/claims';
 import { pct, results } from './results';
 
 const HERO_SCENARIO = 'cabin-day';
 
 function markup(): string {
   const r = results();
+  const falseClear = atlasRates().falseClear;
   const bars = r.pilots
     .map(
       (p) => `
@@ -56,6 +58,7 @@ function markup(): string {
       </div>
       <nav class="actions" aria-label="Start here">
         <a class="btn primary" href="./film.html">Watch the full mission</a>
+        <button type="button" class="btn tour-start" id="tour-start">Take the 90-second tour</button>
         <a class="btn" href="./race.html">Race the pilots live</a>
         <a class="btn" href="./team.html">Send in a drone team</a>
         <a class="btn" href="./sim.html">Fly it yourself</a>
@@ -80,6 +83,7 @@ function markup(): string {
         <div class="tiles">
           <div class="tile"><span class="tile-value">${pct(r.easy)}</span><span class="tile-label">coverage on easy buildings (${r.easySeeds} seeds)</span></div>
           <div class="tile"><span class="tile-value">${pct(Math.min(1, r.nightOverDay))}</span><span class="tile-label">night coverage relative to day, lights off</span></div>
+          <a class="tile tile-limit" href="./atlas.html"><span class="tile-value">${(falseClear.p * 100).toFixed(2)}%</span><span class="tile-label">of flights call a building clear with someone inside (failure atlas)</span></a>
         </div>
       </div>
       <p class="results-foot">
@@ -124,6 +128,13 @@ function start(root: HTMLElement): void {
       console.warn('Landing hero:', message);
     }
   };
+  root.querySelector('#tour-start')!.addEventListener('click', () => void import('../ui/tour').then((m) => m.startTour()));
+  // A link straight to the tour's closing card (?tour=end) is about the numbers: skip the 3D hero.
+  if (new URLSearchParams(location.search).get('tour') === 'end') {
+    poster.classList.add('hidden');
+    poster.setAttribute('aria-hidden', 'true');
+    return;
+  }
   // The film (three.js, the physics engine, the mission stack) is most of the page's code: load it after the
   // landing markup paints, and let the markup paint before the headless flight takes the main thread.
   window.setTimeout(() => {
