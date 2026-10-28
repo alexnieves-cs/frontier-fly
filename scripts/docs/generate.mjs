@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Regenerates docs/ARCHITECTURE.md, docs/BENCHMARKS.md, and the benchmark block in README.md.
+// Regenerates docs/ARCHITECTURE.md, docs/BENCHMARKS.md, the results table in README.md and the benchmark blocks in docs/GUIDE.md.
 //
 //   node scripts/docs/generate.mjs           write the files
 //   node scripts/docs/generate.mjs --check   exit 1 if any file is out of date
@@ -744,6 +744,84 @@ function readmeMissions(mb, control) {
   ].join('\n');
 }
 
+/**
+ * The README's results table: one line per question a reader asks first, each from its own study.
+ * The false-clear and collision rates come from the failure atlas, which samples a declared mix of
+ * missions, light, wind and faults; the mission bench beside it uses fixed scenarios.
+ */
+function readmeHeadline(study, mb, atlas, faults) {
+  if (!study || !mb || !atlas || !faults) return '_Not measured yet. Run the studies behind docs/REPORT.md._';
+  const ci1 = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
+  const ci2 = ([lo, hi]) => `${(lo * 100).toFixed(2)}–${(hi * 100).toFixed(2)}%`;
+  const pct2 = (v) => `${(v * 100).toFixed(2)}%`;
+  const cell = (lighting, pilot) => study.cells.find((c) => c.condition === 'hard' && c.lighting === lighting && c.pilot === pilot);
+  const day = cell('day', 'policy');
+  const night = cell('night-dark', 'policy');
+  const missions = mb.modes.policyQuad.all;
+  const fc = atlas.rates.falseClear.importance;
+  const col = atlas.rates.collision.importance;
+  const occupied = atlas.conditional.falseClearSweepOccupied;
+  const safe = faults.vehicles.quad.all;
+  return table(
+    ['Question', 'Measured', 'On'],
+    [
+      [
+        'How much of a new building does the trained policy search?',
+        `${pct(day.coverage)} (${ci1(day.coverageCi)}) at ${day.collisionsPerEpisode.toFixed(1)} wall contacts per flight; its teacher ${pct(cell('day', 'teacher').coverage)}, the sensor-only planner ${pct(cell('day', 'classical').coverage)} with ${cell('day', 'classical').collisionsPerEpisode ? cell('day', 'classical').collisionsPerEpisode.toFixed(1) : 'none'}`,
+        `${day.episodes} fresh hard buildings`,
+      ],
+      ['Does it work in the dark?', `${pct(night.coverage)} at night with the lights off, ${pct(night.coverage / day.coverage)} of day`, 'the same buildings'],
+      [
+        'Do whole missions end the right way?',
+        `${pct(missions.expectedOutcome)} (${ci1(missions.expectedOutcomeCi)}) found the target or correctly cleared`,
+        `${missions.flights} fixed-scenario missions on the quadrotor`,
+      ],
+      [
+        '**How often does it call a building clear with someone inside?**',
+        `**${pct2(fc.p)} per flight** (${ci2(fc.ci)}); ${pct(occupied.p)} on sweeps of an occupied site`,
+        `${fmt(fc.flights)} importance-sampled flights, checked by ${fmt(atlas.rates.falseClear.monteCarlo.flights)} plain ones`,
+      ],
+      ['How often does it hit something?', `${pct2(col.p)} per flight (${ci2(col.ci)})`, `${fmt(col.flights)} importance-sampled flights`],
+      ['Does it get home when something breaks?', `${pct(safe.safeRate)} (${ci1(safe.safeRateCi)}) of faulted flights end safely`, `${fmt(safe.flights)} flights with sensor, motor, battery, link, GNSS or wind faults`],
+    ],
+  );
+}
+
+/** Failure atlas (scripts/study/atlas-report.ts writes the full page, docs/ATLAS.md); the report quotes its rates. */
+function atlasValues(atlas) {
+  const keys = ['R_ATLAS_FC', 'R_ATLAS_FC_CI', 'R_ATLAS_FC_N', 'R_ATLAS_FC_MC', 'R_ATLAS_FC_MC_CI', 'R_ATLAS_FC_MC_K', 'R_ATLAS_FC_MC_N', 'R_ATLAS_FC_OCC', 'R_ATLAS_FC_OCC_CI', 'R_ATLAS_FC_TARGET', 'R_ATLAS_WALK', 'R_ATLAS_HIDE', 'R_ATLAS_STILL', 'R_ATLAS_MOVING_K', 'R_ATLAS_COL', 'R_ATLAS_COL_CI', 'R_ATLAS_COL_MC', 'R_ATLAS_COL_MC_CI', 'R_ATLAS_SEARCH_N', 'R_ATLAS_DIMS'];
+  if (!atlas) return Object.fromEntries(keys.map((k) => [k, 'not measured']));
+  const p2 = (v) => `${(v * 100).toFixed(2)}%`;
+  const ci = ([lo, hi]) => `${(lo * 100).toFixed(2)}% to ${(hi * 100).toFixed(2)}%`;
+  const fc = atlas.rates.falseClear;
+  const col = atlas.rates.collision;
+  const pose = (v) => atlas.slices.falseClear.find((x) => x.dim === 'personState' && x.value === v);
+  const still = ['standing', 'sitting', 'lying'].map(pose);
+  const stillRate = still.reduce((a, x) => a + x.failures, 0) / still.reduce((a, x) => a + x.flights, 0);
+  return {
+    R_ATLAS_FC: p2(fc.importance.p),
+    R_ATLAS_FC_CI: ci(fc.importance.ci),
+    R_ATLAS_FC_N: fmt(fc.importance.flights),
+    R_ATLAS_FC_MC: p2(fc.monteCarlo.p),
+    R_ATLAS_FC_MC_CI: ci(fc.monteCarlo.ci),
+    R_ATLAS_FC_MC_K: fmt(fc.monteCarlo.failures),
+    R_ATLAS_FC_MC_N: fmt(fc.monteCarlo.flights),
+    R_ATLAS_FC_OCC: pct(atlas.conditional.falseClearSweepOccupied.p),
+    R_ATLAS_FC_OCC_CI: `${pct(atlas.conditional.falseClearSweepOccupied.ci[0])} to ${pct(atlas.conditional.falseClearSweepOccupied.ci[1])}`,
+    R_ATLAS_FC_TARGET: pct(atlas.conditional.falseClearWithTarget.p),
+    R_ATLAS_WALK: pct(pose('walking').rate),
+    R_ATLAS_HIDE: pct(pose('hiding').rate),
+    R_ATLAS_STILL: pct(stillRate),
+    R_ATLAS_MOVING_K: `${pose('walking').failures + pose('hiding').failures} of ${fc.monteCarlo.failures}`,
+    R_ATLAS_COL: p2(col.importance.p),
+    R_ATLAS_COL_CI: ci(col.importance.ci),
+    R_ATLAS_COL_MC: p2(col.monteCarlo.p),
+    R_ATLAS_COL_MC_CI: ci(col.monteCarlo.ci),
+    R_ATLAS_SEARCH_N: fmt(atlas.flights.search),
+    R_ATLAS_DIMS: String(atlas.dims.length),
+  };
+}
+
 /** Indoor localization study (scripts/study/loc-study.ts). */
 function localizationTables(loc) {
   const keys = ['LOC_NOTE', 'LOC_HEADLINE', 'LOC_TABLE', 'LOC_KIDNAP', 'R_LOC_DRIFT', 'R_LOC_DRIFT_NIGHT', 'R_LOC_ABS', 'R_LOC_ODO', 'R_LOC_ODO_YAW', 'R_LOC_HONEST', 'R_LOC_OVER', 'R_LOC_SPARSE', 'R_LOC_SPARSE_OVER', 'R_LOC_SCAN', 'R_LOC_KIDNAP', 'R_LOC_KIDNAP_SEC', 'R_LOC_FALSE_LOST', 'R_LOC_IOU', 'R_LOC_FLIGHTS'];
@@ -996,6 +1074,7 @@ const values = {
   ...reportInline(readJson('docs/study.json'), readJson('docs/mission-bench.json')),
   ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
   GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
+  ...atlasValues(readJson('docs/atlas.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json'), readJson('docs/fault-bench-run4.json'), readJson('docs/fault-bench-run5.json'), readJson('docs/fault-bench-run6.json'), readJson('docs/fault-bench-run7.json')]),
 };
 const header = '<!-- Generated by scripts/docs/generate.mjs. Edit the template in scripts/docs/, not this file. -->\n\n';
@@ -1013,9 +1092,14 @@ const outputs = {
   ...footprint.files,
 };
 let readme = read('README.md');
-readme = replaceBlock(readme, 'benchmarks', values.README_SUMMARY);
-readme = replaceBlock(readme, 'missions', values.README_MISSIONS);
+readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json')));
 outputs['README.md'] = readme;
+// The full tables live in the project guide, one directory down, so their links drop the docs/ prefix.
+const fromDocs = (text) => text.replaceAll('](docs/', '](');
+let guide = read('docs/GUIDE.md');
+guide = replaceBlock(guide, 'benchmarks', fromDocs(values.README_SUMMARY));
+guide = replaceBlock(guide, 'missions', fromDocs(values.README_MISSIONS));
+outputs['docs/GUIDE.md'] = guide;
 
 let stale = false;
 for (const [path, text] of Object.entries(outputs)) {
