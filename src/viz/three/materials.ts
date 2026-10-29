@@ -58,6 +58,12 @@ export function makeMaterials(seed: number, quality: QualityPreset): MaterialSet
   return { textures, wall, concrete, floor, glass, metal, frame, door, ceiling, depth };
 }
 
+/** Frees the set's materials and its own canvas textures (PBR maps applied later are shared and kept). */
+export function disposeMaterials(set: MaterialSet): void {
+  for (const tex of Object.values(set.textures)) tex.dispose();
+  for (const mat of [set.wall, set.concrete, set.floor, set.glass, set.metal, set.frame, set.door, set.ceiling, set.depth]) mat.dispose();
+}
+
 export function applyPbr(
   set: MaterialSet,
   maps: { wall: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }; floor: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }; concrete: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture }; door: { color: THREE.Texture; rough: THREE.Texture; normal: THREE.Texture } },
