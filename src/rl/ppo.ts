@@ -19,6 +19,12 @@ export interface GaeArgs {
  * nextValue and V_{t+1} for t < T-1 is values[t+1].
  *
  * delta_t = r_t + gamma * V_{t+1} * (1 - terminal_t) - V_t
+ *
+ * Every caller resets the env right after a cut-off, so the row after a
+ * truncated step (or nextValue, at the end) is the next episode's first state.
+ * A truncated step therefore bootstraps from its own value, the closest stored
+ * estimate of the state it was cut off in, and the trace does not carry
+ * across the reset.
  */
 export function computeGae(args: GaeArgs): { advantages: Float32Array; returns: Float32Array } {
   const gamma = args.gamma ?? GAMMA;
@@ -31,11 +37,12 @@ export function computeGae(args: GaeArgs): { advantages: Float32Array; returns: 
   const advantages = new Float32Array(tSteps);
   let gae = 0;
   for (let t = tSteps - 1; t >= 0; t--) {
-    const nextV = t === tSteps - 1 ? nextValue : values[t + 1]!;
-    const terminal = dones[t] === 1 && truncated[t] !== 1;
+    const cut = truncated[t] === 1;
+    const nextV = cut ? values[t]! : t === tSteps - 1 ? nextValue : values[t + 1]!;
+    const terminal = dones[t] === 1 && !cut;
     const nonTerminal = terminal ? 0 : 1;
     const delta = rewards[t]! + gamma * nextV * nonTerminal - values[t]!;
-    gae = delta + gamma * lambda * nonTerminal * gae;
+    gae = delta + (cut ? 0 : gamma * lambda * nonTerminal * gae);
     advantages[t] = gae;
   }
   const returns = new Float32Array(tSteps);
