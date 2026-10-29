@@ -538,6 +538,10 @@ export abstract class SearchPhases extends RunnerBase {
       this.startReturn('all required targets confirmed');
       return;
     }
-    if (resume) resume();
+    if (!resume) return;
+    // A confirmation can end mid-dwell, at a low re-view pose: back up to cruise before the search resumes.
+    const climb = this.inside ? [] : this.climbToCruise();
+    if (climb.length) this.setJob(this.followJob('confirm', climb, resume, 0.6));
+    else resume();
   }
 }
