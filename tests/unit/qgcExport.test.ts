@@ -411,6 +411,14 @@ describe('.plan import', () => {
     const res = importQgcPlan(JSON.stringify(tiny), base);
     expect(res.ok).toBe(false);
     expect(res.issues.some((i) => i.path.startsWith('geofence'))).toBe(true);
+    // QGC skips an unversioned or version-1 fence, so its shapes are not read (malformed ones used to throw).
+    for (const version of [undefined, 1]) {
+      const legacy = toQgcPlan(buildFlightPlan(cases[3]!.mission, cases[3]!.route, PX4)) as Loose;
+      legacy.geoFence.version = version;
+      legacy.geoFence.polygons = [{ inclusion: true }];
+      legacy.geoFence.circles = [{ inclusion: true, circle: { center: [1, 2, 3], radius: 5 } }];
+      expect(importQgcPlan(JSON.stringify(legacy), base).issues[0]!.message).toMatch(/no inclusion fence/);
+    }
   });
 });
 
