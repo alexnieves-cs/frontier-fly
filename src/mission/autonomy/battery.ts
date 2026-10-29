@@ -62,7 +62,8 @@ export const DEFAULT_BATTERY: BatteryConfig = {
   cdaM2: 0.03,
   capacityWh: 74,
   usableFraction: 0.85,
-  cruiseMps: 8,
+  // The outdoor speed limit (OUTDOOR_LIMITS.speedH): return legs never fly faster, so energy per meter is priced there.
+  cruiseMps: 5.5,
   climbMps: 2,
   airDensity: AIR_DENSITY,
   descentRecovery: 0.3,

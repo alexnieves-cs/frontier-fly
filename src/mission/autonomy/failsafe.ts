@@ -492,7 +492,7 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
       // ------------------------------------------------------------- wind
       let windScale = 1;
       const w = input.windEstimate;
-      const cruise = input.cruiseMps ?? 8;
+      const cruise = input.cruiseMps ?? 5.5;
       if (!inside && w) {
         const k = 1 - Math.exp(-input.dt / cfg.windAvgSec);
         windMean = windMean ? [windMean[0] + (w[0] - windMean[0]) * k, windMean[1] + (w[1] - windMean[1]) * k] : [w[0] * k, w[1] * k];
