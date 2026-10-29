@@ -156,7 +156,8 @@ export class TrainPool {
         norm: msg.norm,
         sent: false,
       };
-      if (msg.showcase) this.handlers.onShowcase(msg.showcase);
+      // Only worker 0 streams the showcase; the others fly other buildings, and forwarding theirs swaps the view.
+      if (msg.showcase && index === 0) this.handlers.onShowcase(msg.showcase);
       if (this.inbox.every((slot) => slot)) this.assemble();
       return;
     }

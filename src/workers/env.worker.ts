@@ -53,6 +53,8 @@ let sabView: RolloutViews | null = null;
 let yieldEvery = 0;
 let booted = false;
 let started = false;
+/** A loop parked on waitWeights is still alive; a resume must not start a second one beside it. */
+let looping = false;
 let pendingWeights: WeightsMsg | null = null;
 /** Episode resets reuse pre-built worlds; a few are rebuilt as training goes so the set keeps growing. */
 let worlds: { pool: WorldPool; held: (PooledWorld | null)[] } | null = null;
@@ -90,6 +92,15 @@ async function setup(nEnvs: number, baseSeed: number): Promise<void> {
 }
 
 async function loop(): Promise<void> {
+  looping = true;
+  try {
+    await runLoop();
+  } finally {
+    looping = false;
+  }
+}
+
+async function runLoop(): Promise<void> {
   while (running) {
     const outcome = await collectRollout({
       envs,
@@ -184,7 +195,7 @@ self.onmessage = (event: MessageEvent<InMsg>) => {
   } else if (msg.type === 'resume') {
     if (!running) {
       running = true;
-      void loop();
+      if (!looping) void loop();
     }
   } else if (msg.type === 'stop') {
     running = false;
