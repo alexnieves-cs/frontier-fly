@@ -54,6 +54,12 @@ export interface PostStack {
   setView: (mode: CameraMode, speed: number) => void;
 }
 
+/** Frees every pass's render targets, not just the composer's own (EffectComposer.dispose leaves the passes). */
+export function disposePost(post: PostStack): void {
+  for (const pass of post.composer.passes) pass.dispose();
+  post.composer.dispose();
+}
+
 export function makePost(
   renderer: THREE.WebGLRenderer,
   scene: THREE.Scene,

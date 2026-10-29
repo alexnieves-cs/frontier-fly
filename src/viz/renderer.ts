@@ -7,11 +7,11 @@ import { placeFpv } from './cameras/fpv';
 import { placeOverview } from './cameras/overview';
 import { buildDrone } from './droneMesh';
 import { buildBuilding, type BuiltLevel } from './meshBuilding';
-import { loadPbrSet } from './textures';
+import { loadPbrSet, type PbrSet } from './textures';
 import { makeLidarLines, updateLidarLines } from './rays';
 import { applySkyLights, makeSun } from './three/lights';
-import { applyPbr, makeMaterials, type MaterialSet } from './three/materials';
-import { makePost, type PostStack } from './three/post';
+import { applyPbr, disposeMaterials, makeMaterials, type MaterialSet } from './three/materials';
+import { disposePost, makePost, type PostStack } from './three/post';
 import { configureShadows } from './three/shadows';
 import { applySkyBackdrop } from './three/sky';
 import { isSoftwareRendererName, resolveQuality, shouldTryWebGPU, type QualityChoice, type RendererChoice } from './quality';
@@ -46,6 +46,8 @@ export class ThreeView implements Renderer {
   private readonly tmp = new THREE.Vector3();
   private readonly chase = new THREE.Vector3(2, 2, 2);
   private mats: MaterialSet | null = null;
+  /** Downloaded once and shared by every building this view loads. */
+  private pbr: Promise<PbrSet> | null = null;
   private built: BuiltLevel | null = null;
   private spec: BuildingSpec | null = null;
   private post: PostStack | null = null;
@@ -190,10 +192,11 @@ export class ThreeView implements Renderer {
         if (mesh.geometry) mesh.geometry.dispose();
       });
     }
-    this.mats?.wall.dispose();
+    if (this.mats) disposeMaterials(this.mats);
     this.mats = makeMaterials(spec.seed, this.quality);
     const mats = this.mats;
-    void loadPbrSet(`${import.meta.env.BASE_URL}textures/`)
+    this.pbr ??= loadPbrSet(`${import.meta.env.BASE_URL}textures/`);
+    void this.pbr
       .then((maps) => {
         if (this.mats === mats) applyPbr(mats, maps);
       })
@@ -204,7 +207,7 @@ export class ThreeView implements Renderer {
     this.radius = span * 0.85;
     if (this.gl) {
       configureShadows(this.gl, this.sun, this.quality, span);
-      this.post?.composer.dispose();
+      if (this.post) disposePost(this.post);
       try {
         this.post = makePost(this.gl, this.scene, this.mainCam, this.quality);
       } catch (error) {
@@ -375,7 +378,8 @@ export class ThreeView implements Renderer {
   dispose(): void {
     this.disposed = true;
     this.running = false;
-    this.post?.composer.dispose();
+    if (this.post) disposePost(this.post);
+    this.post = null;
     this.gl?.dispose();
     this.gpu?.dispose();
     this.pip?.dispose();

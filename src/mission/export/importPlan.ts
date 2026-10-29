@@ -198,8 +198,10 @@ export function importQgcPlan(text: string, base: Mission): PlanImport {
   const inclusion: Point[][] = [];
   const exclusion: Point[][] = [];
   const issues: MissionIssue[] = [];
-  const polygons = Array.isArray(fenceJson.polygons) ? (fenceJson.polygons as Json[]) : [];
-  const circles = Array.isArray(fenceJson.circles) ? (fenceJson.circles as Json[]) : [];
+  // Validation skips a version-1 or unversioned fence (QGC ignores it), so its shapes were never checked: read none.
+  const fenceRead = fenceJson.version === 2;
+  const polygons = fenceRead && Array.isArray(fenceJson.polygons) ? (fenceJson.polygons as Json[]) : [];
+  const circles = fenceRead && Array.isArray(fenceJson.circles) ? (fenceJson.circles as Json[]) : [];
   for (const polygon of polygons) {
     const vertices = (polygon.polygon as number[][]).map((v) => coordinate(v, false)!);
     if (vertices.some(([la, lo]) => !isNum(la) || !isNum(lo) || far(la, lo))) {
