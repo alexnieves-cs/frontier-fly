@@ -274,6 +274,8 @@ export abstract class IndoorPhases extends EntryPhases {
   protected startExit(after: 'continue' | 'rth'): void {
     this.policyRun?.release();
     const v = this.visit;
+    // Only a building the drone got into counts as searched in the probability map.
+    if (v && this.inside) this.sar?.searched(v.b.id);
     if (v) v.sensorJob = null;
     if (!v || !this.inside || !v.axis) {
       if (after === 'rth') this.startReturnOutside();
