@@ -102,6 +102,16 @@ function coversFit(spec: BuildingSpec, masks: Uint8Array[], f: number, feet: Vec
       if (floor.cells[i] !== CELL.EMPTY || !mask[i]) return false;
     }
   }
+  // Furniture is solid too: a target inside a table or shelf is hidden from the camera.
+  for (const part of spec.furniture?.boxes ?? []) {
+    if (part.floor !== f) continue;
+    const c = Math.abs(Math.cos(part.yaw));
+    const s = Math.abs(Math.sin(part.yaw));
+    const ex = c * part.hx + s * part.hy;
+    const ey = s * part.hx + c * part.hy;
+    const solid: Aabb = { min: [part.cx - ex, part.cy - ey, part.cz - part.hz], max: [part.cx + ex, part.cy + ey, part.cz + part.hz] };
+    if (boxesOverlap(box, solid)) return false;
+  }
   return true;
 }
 
