@@ -1,5 +1,6 @@
-import { MISSION_TYPE_LABELS, TARGET_KIND_LABELS } from '../../mission/types';
-import type { MissionReport, SessionSnapshot } from '../../mission/session';
+import type { AutonomyReport, Phase, RunnerSnapshot } from '../../mission/autonomy/contracts';
+import { reportRows } from '../../mission/autonomy/report';
+import { MISSION_TYPE_LABELS } from '../../mission/types';
 
 export interface LiveActions {
   play: () => void;
@@ -11,10 +12,50 @@ export interface LiveActions {
   speed: (value: number) => void;
 }
 
+export interface LiveView {
+  snapshot: RunnerSnapshot | null;
+  playing: boolean;
+  /** Set while the flight is being built. */
+  preparing: boolean;
+  report: AutonomyReport | null;
+  /** Building label for an id. */
+  label: (buildingId: string | null) => string | null;
+  /** Shown under the heading: how the flight differs from the plan. */
+  note: string | null;
+}
+
 export interface LivePanel {
   element: HTMLElement;
-  update(snapshot: SessionSnapshot | null, playing: boolean): void;
+  update(view: LiveView): void;
 }
+
+export const PHASE_LABELS: Record<Phase, string> = {
+  preflight: 'Preflight',
+  coverage: 'Searching outdoors',
+  approach: 'Approaching a building',
+  inspect: 'Circling a building',
+  entry_select: 'Choosing an opening',
+  await_operator: 'Waiting for the operator',
+  fly_through: 'Flying through an opening',
+  indoor_explore: 'Exploring indoors',
+  confirm: 'Confirming a contact',
+  exit: 'Leaving the building',
+  return_home: 'Returning home',
+  land: 'Landing',
+  recover: 'Recovering from a fault',
+  done: 'Landed',
+};
+
+const OUTCOME_LABELS: Record<AutonomyReport['outcome'], string> = {
+  found: 'Target found and confirmed',
+  clear: 'Area confirmed clear',
+  not_found: 'Searched everything, target not found',
+  incomplete: 'Stopped at a budget before the search finished',
+  aborted: 'Stopped by the operator',
+  landed: 'Landed early',
+};
+
+const LOG_LINES = 8;
 
 function clock(sec: number): string {
   const whole = Math.max(0, Math.floor(sec));
@@ -22,18 +63,16 @@ function clock(sec: number): string {
   return `${minutes}:${String(whole % 60).padStart(2, '0')}`;
 }
 
-function duration(sec: number): string {
-  const whole = Math.max(0, Math.round(sec));
-  const minutes = Math.floor(whole / 60);
-  const seconds = whole % 60;
-  return minutes > 0 ? `${minutes} min ${seconds} s` : `${seconds} s`;
+function classLabel(classId: string): string {
+  return classId.replace(/_/g, ' ');
 }
 
 export function createLivePanel(actions: LiveActions): LivePanel {
   const element = document.createElement('div');
   element.innerHTML = `
-    <h2>Preview</h2>
-    <p class="quiet">A lawnmower sweep over the site with the simulated camera. It is not the trained policy.</p>
+    <h2>Flight</h2>
+    <p class="quiet">The same autonomy as the demo and the benchmarks: the drone searches with its simulated camera, maps buildings with lidar, and confirms contacts before it reports them.</p>
+    <p class="quiet" data-testid="flight-note" hidden></p>
     <div class="playback">
       <button type="button" data-testid="play">Play</button>
       <button type="button" data-testid="pause">Pause</button>
@@ -44,10 +83,11 @@ export function createLivePanel(actions: LiveActions): LivePanel {
           <option value="1">1×</option>
           <option value="4">4×</option>
           <option value="16">16×</option>
+          <option value="64">64×</option>
         </select>
       </label>
     </div>
-    <p class="quiet">Elapsed <span data-testid="mission-clock">0:00</span></p>
+    <p class="quiet">Elapsed <span data-testid="mission-clock">0:00</span> · <span data-testid="mission-phase">Preparing</span></p>
     <section data-testid="approval-prompt" hidden>
       <h3>Entry requested</h3>
       <p data-approval="where"></p>
@@ -57,147 +97,136 @@ export function createLivePanel(actions: LiveActions): LivePanel {
         <button type="button" data-testid="approval-deny">Stay outside</button>
       </div>
     </section>
-    <h2>Detections</h2>
+    <h2>Confirmed</h2>
     <ol class="log" data-testid="detection-log"></ol>
+    <h2>Flight log</h2>
+    <ol class="log" data-testid="flight-log"></ol>
     <section data-testid="mission-report" hidden></section>
   `;
 
-  const play = element.querySelector<HTMLButtonElement>('[data-testid=play]')!;
-  const pause = element.querySelector<HTMLButtonElement>('[data-testid=pause]')!;
-  const restart = element.querySelector<HTMLButtonElement>('[data-testid=restart]')!;
-  const stop = element.querySelector<HTMLButtonElement>('[data-testid=stop]')!;
-  const speed = element.querySelector<HTMLSelectElement>('[data-testid=speed]')!;
-  const clockEl = element.querySelector<HTMLElement>('[data-testid=mission-clock]')!;
-  const approval = element.querySelector<HTMLElement>('[data-testid=approval-prompt]')!;
-  const where = element.querySelector<HTMLElement>('[data-approval=where]')!;
-  const what = element.querySelector<HTMLElement>('[data-approval=what]')!;
-  const log = element.querySelector<HTMLOListElement>('[data-testid=detection-log]')!;
-  const report = element.querySelector<HTMLElement>('[data-testid=mission-report]')!;
+  const q = <T extends HTMLElement>(selector: string): T => element.querySelector<T>(selector)!;
+  const play = q<HTMLButtonElement>('[data-testid=play]');
+  const pause = q<HTMLButtonElement>('[data-testid=pause]');
+  const restart = q<HTMLButtonElement>('[data-testid=restart]');
+  const stop = q<HTMLButtonElement>('[data-testid=stop]');
+  const speed = q<HTMLSelectElement>('[data-testid=speed]');
+  const note = q<HTMLElement>('[data-testid=flight-note]');
+  const clockEl = q<HTMLElement>('[data-testid=mission-clock]');
+  const phaseEl = q<HTMLElement>('[data-testid=mission-phase]');
+  const approval = q<HTMLElement>('[data-testid=approval-prompt]');
+  const where = q<HTMLElement>('[data-approval=where]');
+  const what = q<HTMLElement>('[data-approval=what]');
+  const confirmed = q<HTMLOListElement>('[data-testid=detection-log]');
+  const log = q<HTMLOListElement>('[data-testid=flight-log]');
+  const report = q<HTMLElement>('[data-testid=mission-report]');
   play.addEventListener('click', actions.play);
   pause.addEventListener('click', actions.pause);
   restart.addEventListener('click', actions.restart);
   stop.addEventListener('click', actions.stop);
-  element.querySelector<HTMLButtonElement>('[data-testid=approval-allow]')!.addEventListener('click', actions.allow);
-  element.querySelector<HTMLButtonElement>('[data-testid=approval-deny]')!.addEventListener('click', actions.deny);
+  q<HTMLButtonElement>('[data-testid=approval-allow]').addEventListener('click', actions.allow);
+  q<HTMLButtonElement>('[data-testid=approval-deny]').addEventListener('click', actions.deny);
   speed.addEventListener('change', () => actions.speed(Number(speed.value)));
 
+  let confirmedKey = '';
   let logKey = '';
   let reportKey = '';
 
-  const update = (snapshot: SessionSnapshot | null, playing: boolean): void => {
-    play.disabled = !snapshot || playing || snapshot.status === 'awaiting_approval' || snapshot.status === 'complete' || snapshot.status === 'aborted';
+  const update = (view: LiveView): void => {
+    const { snapshot, playing } = view;
+    const pending = snapshot?.pendingEntry ?? null;
+    const done = !snapshot || snapshot.done;
+    play.disabled = view.preparing || playing || done || pending !== null;
     pause.disabled = !playing;
-    restart.disabled = !snapshot;
-    stop.disabled = !snapshot || snapshot.status === 'complete' || snapshot.status === 'aborted';
+    restart.disabled = view.preparing;
+    stop.disabled = view.preparing || done;
+    note.hidden = !view.note;
+    note.textContent = view.note ?? '';
     clockEl.textContent = snapshot ? clock(snapshot.tSec) : '0:00';
+    phaseEl.textContent = view.preparing ? 'Building the site and loading the indoor policy…' : snapshot ? PHASE_LABELS[snapshot.phase] : '';
 
-    const pending = snapshot?.pendingApproval ?? null;
     approval.hidden = !pending;
     if (pending) {
-      where.textContent = pending.structureLabel
-        ? `The aircraft would cross into ${pending.structureLabel} to confirm the contact.`
-        : 'The aircraft would cross into a structure to confirm the contact.';
-      what.textContent = `${TARGET_KIND_LABELS[pending.kind]}, ${pending.label}, ${Math.round(pending.confidence * 100)}% confidence.`;
+      const label = view.label(pending.buildingId) ?? 'a building';
+      where.textContent = `The drone wants to fly into ${label} through opening ${pending.openingId} (${pending.kind.replace(/_/g, ' ')}).`;
+      what.textContent = `${pending.clearWidth.toFixed(2)} × ${pending.clearHeight.toFixed(2)} m clear, ${pending.clearanceM.toFixed(2)} m of margin, safety score ${Math.round(pending.safety * 100)}%.`;
     }
 
-    const revealed = snapshot?.detections.filter((detection) => detection.revealed) ?? [];
-    const nextKey = revealed.map((detection) => `${detection.id}:${detection.disposition}`).join('|');
-    if (nextKey !== logKey) {
-      logKey = nextKey;
-      log.replaceChildren();
-      if (revealed.length === 0) {
+    const contacts = snapshot?.confirmed ?? [];
+    const nextConfirmed = contacts.map((contact) => contact.contactId).join('|');
+    if (nextConfirmed !== confirmedKey || !snapshot) {
+      confirmedKey = nextConfirmed;
+      confirmed.replaceChildren();
+      if (contacts.length === 0) {
         const empty = document.createElement('li');
-        empty.textContent = 'No contacts yet.';
-        log.append(empty);
+        empty.textContent = 'Nothing confirmed yet.';
+        confirmed.append(empty);
       }
-      for (const detection of revealed) {
+      for (const contact of contacts) {
         const item = document.createElement('li');
-        const disposition = detection.disposition === 'pending' ? 'awaiting approval' : detection.disposition;
-        item.textContent = `${clock(detection.tSec)}  ${TARGET_KIND_LABELS[detection.kind]}  ${detection.label}  ${Math.round(detection.confidence * 100)}%  ${disposition}`;
+        const place = view.label(contact.buildingId) ?? 'outdoors';
+        item.textContent = `${clock(contact.tSec)}  ${classLabel(contact.classId)}  ${Math.round(contact.confidence * 100)}%  ${contact.views} views  ${place}`;
+        confirmed.append(item);
+      }
+    }
+
+    const lines = snapshot?.log.slice(-LOG_LINES) ?? [];
+    const nextLog = `${snapshot?.log.length ?? 0}:${lines[lines.length - 1]?.tSec ?? 0}`;
+    if (nextLog !== logKey) {
+      logKey = nextLog;
+      log.replaceChildren();
+      for (const entry of lines) {
+        const item = document.createElement('li');
+        item.dataset.tone = entry.tone;
+        item.textContent = `${clock(entry.tSec)}  ${entry.message}`;
         log.append(item);
       }
     }
 
-    if (!snapshot?.report) {
+    if (!view.report) {
       report.hidden = true;
       reportKey = '';
       return;
     }
-    const key = `${snapshot.report.outcome}:${snapshot.report.elapsedSec.toFixed(1)}:${snapshot.report.detectionCount}`;
+    const key = `${view.report.outcome}:${view.report.durationSec.toFixed(1)}`;
     if (key === reportKey) return;
     reportKey = key;
     report.hidden = false;
     report.className = 'report';
-    report.replaceChildren(renderReport(snapshot.report));
+    report.dataset.outcome = view.report.outcome;
+    report.replaceChildren(renderReport(view.report));
   };
 
   return { element, update };
 }
 
-function renderReport(report: MissionReport): HTMLElement {
+function renderReport(report: AutonomyReport): HTMLElement {
   const root = document.createElement('div');
   const title = document.createElement('h3');
   title.textContent = report.missionName;
   const outcome = document.createElement('p');
   outcome.className = 'outcome';
-  outcome.textContent = `${outcomeLabel(report)}. ${MISSION_TYPE_LABELS[report.missionType]}.`;
+  outcome.textContent = `${OUTCOME_LABELS[report.outcome]}. ${MISSION_TYPE_LABELS[report.missionType]}.`;
   const metrics = document.createElement('div');
   metrics.className = 'metrics';
-  for (const [label, value] of [
-    ['Elapsed', duration(report.elapsedSec)],
-    ['Battery used', `${Math.round(report.batteryUsedPct)}%`],
-    ['Coverage', `${Math.round(report.coverageRatio * 100)}%`],
-    ['Detections', String(report.detectionCount)],
-    ['Entries allowed', String(report.entriesApproved)],
-    ['Kept outside', String(report.entriesDenied)],
-  ] as const) {
+  // The same rows the benchmarks report, scored against the simulator's truth after the flight.
+  const skip = new Set(['Mission', 'Type', 'Outcome']);
+  for (const row of reportRows(report)) {
+    if (skip.has(row.label)) continue;
     const cell = document.createElement('div');
     cell.className = 'metric';
-    const span = document.createElement('span');
-    span.textContent = label;
-    const strong = document.createElement('strong');
-    strong.textContent = value;
-    cell.append(span, strong);
+    const label = document.createElement('span');
+    label.textContent = row.label;
+    const value = document.createElement('strong');
+    value.textContent = row.value;
+    cell.append(label, value);
     metrics.append(cell);
   }
-  const targets = document.createElement('div');
-  const targetHeading = document.createElement('h2');
-  targetHeading.textContent = 'Targets';
-  targets.append(targetHeading);
-  for (const target of report.targets) {
-    const row = document.createElement('p');
-    row.textContent = `${target.label}: ${target.found} of ${target.minCount}${target.met ? ', met' : ''}`;
-    targets.append(row);
-  }
-  const placeholders = document.createElement('div');
-  placeholders.className = 'placeholders';
-  const heading = document.createElement('h4');
-  heading.textContent = 'Not measured in this preview';
-  const list = document.createElement('dl');
-  for (const label of ['Path efficiency', 'Sensor health', 'Comms dropouts', 'False-positive rate']) {
-    const row = document.createElement('div');
-    const dt = document.createElement('dt');
-    dt.textContent = label;
-    const dd = document.createElement('dd');
-    dd.textContent = 'Not measured';
-    row.append(dt, dd);
-    list.append(row);
-  }
-  placeholders.append(heading, list);
-  const notes = document.createElement('div');
-  for (const note of report.notes) {
+  root.append(title, outcome, metrics);
+  for (const text of report.notes) {
     const p = document.createElement('p');
     p.className = 'notes';
-    p.textContent = note;
-    notes.append(p);
+    p.textContent = text;
+    root.append(p);
   }
-  root.append(title, outcome, metrics, targets, placeholders, notes);
   return root;
-}
-
-function outcomeLabel(report: MissionReport): string {
-  if (report.outcome === 'complete') return 'Sweep finished';
-  if (report.outcome === 'aborted') return 'Stopped by the operator';
-  if (report.budgetCause === 'battery') return 'Stopped at the battery budget';
-  return 'Stopped at the time budget';
 }

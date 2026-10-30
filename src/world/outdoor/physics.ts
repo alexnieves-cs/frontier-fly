@@ -77,6 +77,18 @@ export class OutdoorPhysics {
     return { dist: hit.timeOfImpact, tag: this.tags.get(hit.collider.handle) ?? 'unknown' };
   }
 
+  /**
+   * Gap between the drone's sphere at `pos` and the nearest solid other than the terrain, m; negative
+   * when they overlap. The ground is left out because landing on it is the point of the flight.
+   */
+  clearance(pos: [number, number, number]): { gapM: number; tag: string } | null {
+    const notTerrain = (c: RAPIER.Collider) => this.tags.get(c.handle) !== 'terrain';
+    const hit = this.rapier.projectPoint({ x: pos[0], y: pos[1], z: pos[2] }, true, undefined, undefined, this.drone, undefined, notTerrain);
+    if (!hit) return null;
+    const d = Math.hypot(hit.point.x - pos[0], hit.point.y - pos[1], hit.point.z - pos[2]);
+    return { gapM: (hit.isInside ? -d : d) - DRONE_RADIUS, tag: this.tags.get(hit.collider.handle) ?? 'unknown' };
+  }
+
   /** 32 horizontal rays plus 8 tilted rays, normalized to [0, 1] by the outdoor range. */
   lidar(pos: [number, number, number], yaw: number, out = new Float32Array(LIDAR_H + LIDAR_TILT)): Float32Array {
     const normRay = (dx: number, dy: number, dz: number) => {

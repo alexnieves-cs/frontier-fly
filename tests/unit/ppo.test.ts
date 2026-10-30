@@ -147,9 +147,10 @@ describe('computeGae', () => {
     expect(terminal.advantages[1]).toBeCloseTo(1, 5);
     expect(terminal.returns[1]).toBeCloseTo(1, 5);
 
-    // truncated=1 still bootstraps even if done was also set.
+    // truncated=1 still bootstraps even if done was also set, from its own value: row t+1 is
+    // already the next episode, so neither its value nor its advantage carries back.
     // t=1: delta = 2 + 0.99*3 - 0.7 = 4.27
-    // t=0: delta = 1 + 0.99*0.7 - 0.4 = 1.293; gae = 1.293 + 0.99*0.95*4.27 = 5.308935
+    // t=0: delta = 1 + 0.99*0.4 - 0.4 = 0.996; gae = 0.996
     const trunc = computeGae({
       rewards: new Float32Array([1, 2]),
       values: new Float32Array([0.4, 0.7]),
@@ -158,8 +159,8 @@ describe('computeGae', () => {
       nextValue: 3,
     });
     expect(trunc.advantages[1]).toBeCloseTo(4.27, 5);
-    expect(trunc.advantages[0]).toBeCloseTo(5.308935, 5);
-    expect(trunc.returns[0]).toBeCloseTo(5.708935, 5);
+    expect(trunc.advantages[0]).toBeCloseTo(0.996, 5);
+    expect(trunc.returns[0]).toBeCloseTo(1.396, 5);
     expect(trunc.returns[1]).toBeCloseTo(4.97, 5);
   });
 });

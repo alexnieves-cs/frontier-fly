@@ -84,8 +84,9 @@ export const SCENARIOS = [
     quality: 'low',
     act: async (page) => {
       await page.locator('#train-btn').click();
+      // Workers compile the policy and fill their world pools first, which takes over 30 s on a 4-core CI runner.
       await page.waitForFunction(() => (document.querySelector('#rate-num')?.textContent ?? '0') !== '0', undefined, {
-        timeout: 30_000,
+        timeout: 120_000,
       });
     },
   },
@@ -101,7 +102,7 @@ export const SCENARIOS = [
   },
   {
     id: 'mission-editor',
-    title: 'Mission editor, live preview, and report',
+    title: 'Mission editor, live flight, and report',
     page: 'mission.html',
     query: '?seed=11',
     seconds: 40,
@@ -109,13 +110,20 @@ export const SCENARIOS = [
     act: async (page) => {
       await page.waitForTimeout(3000);
       await page.locator('[data-testid=mode-run]').click();
-      await page.locator('[data-testid=speed]').selectOption('4');
-      await page.locator('[data-testid=play]').click();
-      await page.locator('[data-testid=approval-prompt]').waitFor({ state: 'visible', timeout: 30_000 });
-      await page.waitForTimeout(2500);
-      await page.locator('[data-testid=approval-allow]').click();
+      await page.locator('#app[data-flight="ready"]').waitFor({ timeout: 60_000 });
       await page.locator('[data-testid=speed]').selectOption('16');
-      await page.locator('[data-testid=mission-report]').waitFor({ state: 'visible', timeout: 60_000 });
+      await page.locator('[data-testid=play]').click();
+      await page.locator('[data-testid=approval-prompt]').waitFor({ state: 'visible', timeout: 60_000 });
+      await page.waitForTimeout(2500);
+      await page.locator('[data-testid=speed]').selectOption('64');
+      const allow = page.locator('[data-testid=approval-allow]');
+      const report = page.locator('[data-testid=mission-report]');
+      // The real runner may ask once per building; allow each entry.
+      for (let i = 0; i < 6 && !(await report.isVisible()); i++) {
+        await Promise.race([allow.waitFor({ state: 'visible', timeout: 120_000 }), report.waitFor({ state: 'visible', timeout: 120_000 })]);
+        if (await allow.isVisible()) await allow.click();
+      }
+      await report.waitFor({ state: 'visible', timeout: 120_000 });
       await page.waitForTimeout(1500);
       await page.locator('[data-testid=mission-report]').scrollIntoViewIfNeeded();
     },

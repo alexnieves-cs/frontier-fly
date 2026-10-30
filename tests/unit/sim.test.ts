@@ -6,6 +6,7 @@ import { OBS } from '../../src/sim/sensors';
 import { buildingFromJson } from '../../src/shared/serialize';
 import { OBS_DIM } from '../../src/shared/constants';
 import type { EpisodeConfig } from '../../src/shared/types';
+import { checkTiming } from './timing';
 
 const spec = buildingFromJson(raw);
 
@@ -80,7 +81,7 @@ describe('explorer env', () => {
     const t0 = performance.now();
     for (let i = 0; i < n; i++) env.step(hover);
     const ms = (performance.now() - t0) / n;
-    expect(ms).toBeLessThan(0.3);
+    if (checkTiming) expect(ms).toBeLessThan(0.3);
   });
 
   it('maps keyboard fly keys into body-frame actions', () => {

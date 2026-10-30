@@ -54,7 +54,22 @@ export interface FilmApi {
   scenario: ScenarioId;
   /** Render film frame i (frames must be requested in order for the camera springs). */
   render(i: number): void;
+  /** Hash of the flown frames, so frames rendered on different machines can be checked to come from the same flight. */
+  digest?: string;
   error?: string;
+  /** Latest progress state, so other scripts (the guided tour) can tell when the film is ready or failed. */
+  status: FilmStatus;
+}
+
+/** FNV-1a over the JSON of the flown frames. */
+function digestOf(value: unknown): string {
+  const text = JSON.stringify(value);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
 }
 
 declare global {
@@ -103,8 +118,11 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
       ? Math.min(1, Math.max(0.25, options.renderScale ?? (root.clientWidth < 700 ? 0.5 : 0.75)))
       : 1;
   const flightSec = Number(params.get('length')) || undefined;
-  const status = options.onStatus ?? (() => undefined);
-  const api: FilmApi = { ready: false, frames: 0, fps: FILM_FPS, scenario, render: () => undefined };
+  const api: FilmApi = { ready: false, frames: 0, fps: FILM_FPS, scenario, status: 'flying', render: () => undefined };
+  const status = (next: FilmStatus, message: string) => {
+    api.status = next;
+    options.onStatus?.(next, message);
+  };
   window.__film = api;
 
   root.classList.add('film-root');
@@ -119,6 +137,7 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   }
   const stage = document.createElement('div');
   stage.className = 'film-stage';
+  if (!embed) stage.dataset.tour = 'film-stage';
   stage.style.width = `${STAGE_W}px`;
   stage.style.height = `${STAGE_H}px`;
   root.appendChild(stage);
@@ -182,6 +201,7 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     };
     api.frames = timeline.length;
     api.render = show;
+    if (recording) api.digest = digestOf(log.frames);
     loading.remove();
     show(0);
     api.ready = true;
@@ -339,6 +359,9 @@ function controls(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
     showFrame(frame);
   });
   window.addEventListener('keydown', (e) => {
+    // Space on a focused control (a button, a link, the tour card) belongs to that control.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, a, input, select, textarea, [contenteditable]')) return;
     if (e.code === 'Space') {
       e.preventDefault();
       play.click();

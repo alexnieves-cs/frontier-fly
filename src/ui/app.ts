@@ -184,6 +184,7 @@ class Session {
   }
 
   private rebuild(seed: number, pushUrl: boolean): void {
+    this.stopReplay();
     let stage = this.stageNumber();
     let size = STAGE_SIZE[stage] ?? STAGE_SIZE[3]!;
     const showcase = this.launch.shot?.startsWith('targets') ?? false;
@@ -394,6 +395,7 @@ class Session {
       else if (act === 'idb-save') void this.idbSave();
       else if (act === 'idb-load') void this.idbLoad();
       else if (act === 'replay') this.startReplay(target.dataset.which as 'latest' | 'best' | 'worst');
+      else if (act === 'live') this.stopReplay();
       else if (act === 'speed') {
         this.playSpeed = Number(target.dataset.speed) || 1;
         this.playOn = true;
@@ -431,6 +433,11 @@ class Session {
       if (event.code === 'KeyT') void this.toggleTrain();
     });
     window.addEventListener('keyup', (event) => this.keys.delete(event.code));
+    // A keyup lost to another window (Alt+Tab, Cmd+L) would leave a key held and the manual pilot in charge.
+    window.addEventListener('blur', () => this.keys.clear());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.keys.clear();
+    });
     const stage = this.q('#stage-wrap');
     stage.addEventListener('pointerdown', (event) => {
       if (this.camera !== 'overview') return;
@@ -689,6 +696,14 @@ class Session {
     slider.max = String(ep.states.length - 1);
     slider.value = '0';
     this.q('#replay-label').textContent = `${which} · ${ep.reward.toFixed(1)}`;
+  }
+
+  /** Leaves a replay and hands the view back to the live drone (local flight or the training showcase). */
+  private stopReplay(): void {
+    if (!this.playing) return;
+    this.playing = null;
+    this.playOn = false;
+    this.q('#replay-label').textContent = '';
   }
 
   private syncButtons(): void {

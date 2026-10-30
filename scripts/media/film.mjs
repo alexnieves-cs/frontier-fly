@@ -5,6 +5,8 @@
 //   npm run media:film -- cabin-day             only these scenario ids
 //   BASE_URL=http://host/ npm run media:film    render against a server that is already running
 //   FILM_SCALE=1 FILM_FRAMES=0-300              full 1080p, or a frame range for a quick look
+//   FILM_SHARD=2/6 KEEP_FRAMES=1                render only shard 2 of 6 of the frames (media.yml)
+//   FILM_ENCODE_ONLY=1                          encode frames already in FILM_RAW, no browser
 //
 // The film is deterministic: the mission is flown headless once, and window.__film.render(i)
 // draws frame i with every effect on (shadows, bloom, SMAA) however slowly the GPU or software
@@ -53,6 +55,12 @@ async function startServer() {
 }
 
 function frameRange(total) {
+  const shard = process.env.FILM_SHARD;
+  if (shard) {
+    // Contiguous slices, so each runner steps the camera springs through as few frames as possible.
+    const [k, n] = shard.split('/').map(Number);
+    return [Math.floor((k * total) / n), Math.floor(((k + 1) * total) / n) - 1];
+  }
   const spec = process.env.FILM_FRAMES;
   if (!spec) return [0, total - 1];
   const [a, b] = spec.split('-').map(Number);
@@ -71,6 +79,9 @@ async function renderFilm(browser, base, film) {
   const total = await page.evaluate(() => window.__film.frames);
   const [from, to] = frameRange(total);
   mkdirSync(dir, { recursive: true });
+  // Sharded renders are stitched together later; the flight must be the same one on every runner.
+  const digest = await page.evaluate(() => window.__film.digest ?? null);
+  writeFileSync(join(dir, `flight-${from}.json`), `${JSON.stringify({ from, to, total, digest })}\n`);
   const t0 = Date.now();
   // Frames before `from` still have to be stepped (the camera springs are stateful); render(from) does that.
   for (let i = from; i <= to; i++) {
@@ -118,31 +129,57 @@ function encode(film, { dir, from }) {
   return out;
 }
 
+/** Encodes frames rendered earlier (by FILM_SHARD runs) without opening a browser. */
+function encodeOnly(films) {
+  const results = [];
+  for (const film of films) {
+    const dir = join(RAW, film.scenario);
+    const frames = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.jpg')).sort() : [];
+    if (!frames.length) {
+      console.log(`no frames for ${film.scenario} in ${dir}, skipped`);
+      continue;
+    }
+    const shards = readdirSync(dir).filter((f) => f.startsWith('flight-')).map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')));
+    const digests = new Set(shards.map((s) => s.digest));
+    if (digests.size > 1) throw new Error(`${film.scenario}: shards flew different flights (${[...digests].join(', ')})`);
+    const total = shards[0]?.total ?? frames.length;
+    if (frames.length !== total) throw new Error(`${film.scenario}: ${frames.length} of ${total} frames rendered; a shard is missing`);
+    console.log(`Encoding ${film.scenario} (${frames.length} frames)`);
+    results.push({ scenario: film.scenario, title: film.title, frames: frames.length, seconds: frames.length / 30, width: WIDTH, height: HEIGHT, ...encode(film, { dir, from: 0 }) });
+  }
+  return results;
+}
+
 const wanted = process.argv.slice(2);
 const films = wanted.length ? FILMS.filter((f) => wanted.includes(f.scenario)) : FILMS;
-const server = await startServer();
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || undefined,
-  args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
-});
-const results = [];
-try {
-  for (const film of films) {
-    console.log(`Rendering ${film.scenario} at ${WIDTH}x${HEIGHT}`);
-    const raw = await renderFilm(browser, server.base, film);
-    if (!process.env.FILM_FRAMES) results.push({ scenario: film.scenario, title: film.title, frames: raw.total, seconds: raw.total / 30, width: WIDTH, height: HEIGHT, ...encode(film, raw) });
+const partial = Boolean(process.env.FILM_FRAMES || process.env.FILM_SHARD);
+let results = [];
+if (process.env.FILM_ENCODE_ONLY) {
+  results = encodeOnly(films);
+} else {
+  const server = await startServer();
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
+  });
+  try {
+    for (const film of films) {
+      console.log(`Rendering ${film.scenario} at ${WIDTH}x${HEIGHT}`);
+      const raw = await renderFilm(browser, server.base, film);
+      if (!partial) results.push({ scenario: film.scenario, title: film.title, frames: raw.total, seconds: raw.total / 30, width: WIDTH, height: HEIGHT, ...encode(film, raw) });
+    }
+  } finally {
+    await browser.close();
+    server.stop();
   }
-} finally {
-  await browser.close();
-  server.stop();
 }
 if (results.length) {
   const index = join(OUT, 'film.json');
   const prev = existsSync(index) ? JSON.parse(readFileSync(index, 'utf8')) : { films: [] };
   const films = [...prev.films.filter((f) => !results.some((r) => r.scenario === f.scenario)), ...results];
-  writeFileSync(index, `${JSON.stringify({ renderedAt: new Date().toISOString(), films }, null, 2)}\n`);
+  writeFileSync(index, `${JSON.stringify({ renderedAt: new Date().toISOString(), source: process.env.MEDIA_SOURCE ?? null, films }, null, 2)}\n`);
   console.log(`wrote ${index}`);
 }
-if (!process.env.KEEP_FRAMES && existsSync(RAW) && !process.env.FILM_FRAMES) {
+if (!process.env.KEEP_FRAMES && existsSync(RAW) && !partial) {
   for (const d of readdirSync(RAW)) if (results.some((r) => r.scenario === d)) rmSync(join(RAW, d), { recursive: true });
 }

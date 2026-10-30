@@ -99,6 +99,8 @@ export default defineConfig({
         race: resolve(root, 'race.html'),
         team: resolve(root, 'team.html'),
         px4: resolve(root, 'px4.html'),
+        atlas: resolve(root, 'atlas.html'),
+        how: resolve(root, 'how.html'),
       },
     },
   },

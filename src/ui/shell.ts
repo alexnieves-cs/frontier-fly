@@ -119,6 +119,7 @@ export function shell(): string {
               <button type="button" class="text-btn" data-act="replay" data-which="latest">Latest</button>
               <button type="button" class="text-btn" data-act="replay" data-which="best">Best</button>
               <button type="button" class="text-btn" data-act="replay" data-which="worst">Worst</button>
+              <button type="button" class="text-btn" data-act="live">Live</button>
               <input id="scrub" aria-label="Replay position" class="slider" type="range" min="0" max="1" value="0" />
               <button type="button" class="text-btn" data-act="speed" data-speed="1">1×</button>
               <button type="button" class="text-btn" data-act="speed" data-speed="4">4×</button>

@@ -1,48 +1,11 @@
 import '../film/film.css';
 import './landing.css';
-import bench from '../../docs/benchmarks.json';
 import type { FilmStatus } from '../film/page';
 import { REPO_URL as REPO, siteHeader } from '../ui/siteNav';
 import { isWebglError, showStartError } from '../ui/startError';
+import { pct, results } from './results';
 
 const HERO_SCENARIO = 'cabin-day';
-
-interface CoverageRow {
-  stage: number;
-  lighting: string;
-  coverage: number;
-}
-
-const mean = (xs: number[]): number => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : NaN);
-const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
-
-function dayMean(rows: readonly CoverageRow[], stage: number): number {
-  return mean(rows.filter((r) => r.stage === stage && r.lighting === 'day').map((r) => r.coverage));
-}
-
-/** Headline numbers from docs/benchmarks.json, computed the way scripts/docs/generate.mjs computes them. */
-function results() {
-  const { coverage, protocol } = bench;
-  const hard = protocol.hard.stage;
-  const easy = protocol.easy.stage;
-  const of = (lighting: string) => coverage.policy.filter((r) => r.lighting === lighting).map((r) => r.coverage);
-  return {
-    hardStage: hard,
-    hardSeeds: protocol.hard.seeds.length,
-    easySeeds: protocol.easy.seeds.length,
-    pilots: [
-      { name: 'Learned policy (ships in the page)', value: dayMean(coverage.policy, hard), tone: 'policy' },
-      { name: 'Oracle (the privileged teacher)', value: dayMean(coverage.teacher, hard), tone: 'teacher' },
-      { name: 'Frontier follower (no learning)', value: dayMean(coverage.waypoint, hard), tone: 'base' },
-      { name: 'Lidar heuristic', value: dayMean(coverage.heuristic, hard), tone: 'base' },
-    ],
-    policyLeads: dayMean(coverage.policy, hard) > dayMean(coverage.teacher, hard),
-    easy: dayMean(coverage.policy, easy),
-    nightOverDay: mean(of('night-dark')) / mean(of('day')),
-    measured: bench.measuredAt.slice(0, 10),
-    commit: bench.commit.slice(0, 7),
-  };
-}
 
 function markup(): string {
   const r = results();
@@ -59,7 +22,7 @@ function markup(): string {
   return `
   <div class="landing">
     ${siteHeader('home', { heading: false })}
-    <section class="hero" aria-label="Live mission replay">
+    <section class="hero" data-tour="hero" aria-label="Live mission replay">
       <div class="hero-film" id="hero-film"></div>
       <div class="hero-poster" id="hero-poster" role="status" aria-live="polite">
         <div class="poster-inner">
@@ -106,7 +69,7 @@ function markup(): string {
       </nav>
     </section>
 
-    <section class="results" aria-labelledby="results-title">
+    <section class="results" data-tour="results" aria-labelledby="results-title">
       <div class="results-head">
         <h2 id="results-title">Indoor coverage on unseen hard buildings</h2>
         <p>Fraction of each building the drone saw before time ran out. Stage ${r.hardStage}, mean of ${r.hardSeeds} held-out seeds, daylight.</p>
