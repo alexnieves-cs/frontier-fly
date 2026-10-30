@@ -2,7 +2,9 @@
 import { FLOOR_HEIGHT, OBS } from '../shared/constants';
 import { Climber } from '../sim/climber';
 import { heuristicAction } from '../sim/heuristic';
-import { commandToAction, guardAction, OccupancyMap, QUAD_BRAKING, SensorPlanner, type SensorFrame, type SensorPlannerOptions } from '../sim/sensorPlanner';
+import { commandToAction, SensorPlanner, type SensorFrame, type SensorPlannerOptions } from '../sim/sensorPlanner';
+import { guardAction, QUAD_BRAKING } from '../sim/lidarSafety';
+import { OccupancyMap } from '../sim/sensorMap';
 import { waypointAction } from '../sim/waypointPilot';
 import type { BenchContext, BenchPilot } from './pilot';
 

@@ -8,7 +8,8 @@
 import { createEnv } from '../../src/sim/env';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { classicalPilot } from '../../src/eval/pilots';
-import { QUAD_BRAKING, type SensorPlannerOptions } from '../../src/sim/sensorPlanner';
+import { type SensorPlannerOptions } from '../../src/sim/sensorPlanner';
+import { QUAD_BRAKING } from '../../src/sim/lidarSafety';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);

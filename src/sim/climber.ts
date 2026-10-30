@@ -9,7 +9,9 @@
  * It reads only the sensor frame, so it stays sensor-only.
  */
 import { VOXEL } from '../shared/constants';
-import { filterVelocity, SAFETY_MARGIN, sensorPath, SensorPlanner, type SensorCommand, type SensorFrame } from './sensorPlanner';
+import { SensorPlanner, type SensorCommand, type SensorFrame } from './sensorPlanner';
+import { filterVelocity, SAFETY_MARGIN } from './lidarSafety';
+import { sensorPath } from './sensorMap';
 
 /** Range past the ceiling (or below the floor) that marks a shaft, meters. */
 const SHAFT_EXTRA = 0.8;

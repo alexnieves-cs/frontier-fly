@@ -27,7 +27,7 @@ The **browser pilot** is what the live demo flies when you pick **Policy**: obse
 
 {{STUDY_NOTE}}
 
-The **oracle teacher** reads the true floor plan; it is the DAgger teacher the policy imitates, so it bounds what imitation can reach. The **sensor-only planner** (`src/sim/sensorPlanner.ts`) plans frontier routes on the drone's own lidar map and filters every velocity through the lidar ring. The **lidar guard** wraps the policy's action with that same filter and holds 1.15 m above the floor. [REPORT.md](REPORT.md) discusses what these numbers mean.
+The **oracle teacher** reads the true floor plan; it is the DAgger teacher the policy imitates, so it bounds what imitation can reach. The **sensor-only planner** (`src/sim/sensorPlanner.ts`) plans frontier routes on the drone's own lidar map and filters every velocity through the lidar ring. The **lidar guard** (`src/sim/lidarSafety.ts`) wraps the policy's action with that same filter and holds 1.15 m above the floor. [REPORT.md](REPORT.md) discusses what these numbers mean.
 
 {{STUDY_HEADLINE}}
 

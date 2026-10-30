@@ -1,7 +1,7 @@
 import { makeDroneState } from '../../sim/drone';
 import { defaultDynParams } from '../../sim/dynamics/dr';
 import { QuadrotorDynamics } from '../../sim/dynamics/quad';
-import { QUAD_BRAKING, type BrakingModel } from '../../sim/sensorPlanner';
+import { QUAD_BRAKING, type BrakingModel } from '../../sim/lidarSafety';
 import type { DroneState, DynParams } from '../../shared/types';
 import type { OutdoorPhysics } from '../../world/outdoor/physics';
 import type { OutdoorWorld } from '../../world/outdoor/types';
