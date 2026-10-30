@@ -22,6 +22,7 @@ import type { Fault, FaultTransition } from './faults';
 import type { PlannerConfig } from './sar/planner';
 import type { LocVisitRecord } from './localizer';
 import type { LocSensorHook } from './locSensors';
+import type { ActingPolicy } from './planner/indoor';
 
 export type V3 = [number, number, number];
 
@@ -356,8 +357,8 @@ export interface RunnerOptions {
    * something a real drone could fly.
    */
   indoor?: 'auto' | 'frontier' | 'policy' | 'oracle';
-  /** Optional trained policy weights (InferPolicy). */
-  policy?: unknown;
+  /** Optional trained policy (policy.ts NormalizedPolicy or an InferPolicy): anything with a mean action. */
+  policy?: ActingPolicy;
   /**
    * Airframe model. 'kinematic' (default) follows commands within the
    * acceleration caps; 'quad' flies a 1.2 kg quadrotor on rigid-body dynamics
@@ -366,11 +367,6 @@ export interface RunnerOptions {
   vehicle?: 'kinematic' | 'quad';
   /** Wind at sim time t, world frame, m/s. Default calm. */
   wind?: (tSec: number) => V3;
-  /**
-   * Rewrites the indoor lidar ranges (metres, in place) before the explorers
-   * read them, e.g. to drop sectors. A NaN range is a missing reading.
-   */
-  lidarFault?: (lidar: Float64Array, tSec: number) => void;
   /**
    * Faults to inject (faults.ts), for the fault bench and the demo. The
    * failsafe always runs; without faults it only watches the healthy drone.
@@ -386,7 +382,11 @@ export interface RunnerOptions {
    * the opening it can see.
    */
   localization?: 'truth' | 'estimated';
-  /** Rewrites the localization sensor readings in place before the estimator reads them. */
+  /**
+   * Test hook: rewrites the localization sensor readings in place before the estimator reads them.
+   * Faults the benches and the demo inject belong in `faults`; this is for perturbations no fault
+   * kind models (tests/unit/autonomy.localization.test.ts turns scans against the map).
+   */
   locFault?: LocSensorHook;
   /** Outdoor search pattern. Default: lanes. */
   search?: OutdoorSearchOptions;

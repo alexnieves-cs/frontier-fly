@@ -13,7 +13,7 @@ import {
   MISSION_MODES,
   missionJobs,
   type MissionFlight,
-  type MissionMode,
+  parseMissionModes,
 } from '../../src/eval/missions';
 
 function arg(name: string, fallback: string): string {
@@ -24,7 +24,7 @@ function arg(name: string, fallback: string): string {
 const seeds = Number(arg('seeds', String(MISSION_SEEDS_PER_SCENARIO)));
 const base = Number(arg('base', String(MISSION_SEED_BASE)));
 // Comma lists, for tuning runs: --modes sensor,sensorLoc --scenarios compound-clear
-const modes = arg('modes', MISSION_MODES.join(',')).split(',') as MissionMode[];
+const modes = parseMissionModes(arg('modes', MISSION_MODES.join(',')));
 const scenarioArg = arg('scenarios', '');
 
 if (process.argv.includes('--merge')) {
