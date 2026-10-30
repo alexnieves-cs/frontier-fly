@@ -28,6 +28,8 @@ export class SarSearch {
   readonly planner: ProbabilityPlanner;
   readonly segments: BuildingSegment[];
   readonly visited = new Set<string>();
+  /** Chosen buildings whose interior was actually searched (their POD is applied). */
+  readonly credited = new Set<string>();
   readonly history: PosSample[] = [];
   replans = 0;
   private nextSample = 0;
@@ -70,9 +72,15 @@ export class SarSearch {
     return this.planner.plan(pos, heading, this.segments, this.visited);
   }
 
-  /** A building the planner chose: its mass is searched by the indoor POD. */
+  /** A building the planner chose: it is not offered again, whether or not the drone gets in. */
   visit(id: string): void {
     this.visited.add(id);
+  }
+
+  /** The drone searched inside a chosen building: its mass is searched by the indoor POD (once). */
+  searched(id: string): void {
+    if (!this.visited.has(id) || this.credited.has(id)) return;
+    this.credited.add(id);
     this.belief.observeStructure(id, this.planner.cfg.structurePod);
   }
 }

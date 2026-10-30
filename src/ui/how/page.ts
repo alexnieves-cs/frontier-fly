@@ -335,6 +335,7 @@ export function startHow(root: HTMLElement): void {
   let playing = !prefersReducedMotion();
   let visible = true;
   let last = 0;
+  let owed = 0;
   const api = { ready: true, coverage: 0 };
   window.__how = api;
 
@@ -349,14 +350,17 @@ export function startHow(root: HTMLElement): void {
     seed = nextSeed;
     explorer = new Explorer(seed, Number(stageSelect.value));
     simTime = 0;
+    owed = 0;
     show();
   };
   const frame = (now: number) => {
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0;
     last = now;
     if (playing && visible && !explorer.done) {
-      // Four seconds of flight per second of wall time, in fixed 0.1 s steps.
-      for (let k = 0; k < Math.round((dt * 4) / 0.1); k++) {
+      // Four seconds of flight per second of wall time, in fixed 0.1 s steps; the remainder carries to the next frame.
+      owed += dt * 4;
+      while (owed >= 0.1) {
+        owed -= 0.1;
         explorer.step(0.1);
         simTime += 0.1;
       }

@@ -116,7 +116,7 @@ function loadMap(loader: THREE.TextureLoader, url: string, srgb: boolean): Promi
   });
 }
 
-type PbrSet = Record<'wall' | 'floor' | 'concrete' | 'door', PbrMaps>;
+export type PbrSet = Record<'wall' | 'floor' | 'concrete' | 'door', PbrMaps>;
 
 /** Sets requested ahead of the scene that needs them, by base URL; each is handed out once. */
 const prefetched = new Map<string, Promise<PbrSet>>();

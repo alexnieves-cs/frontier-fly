@@ -222,8 +222,9 @@ export class Vehicle {
       vy = real[1];
       vz = real[2];
     }
-    if (w && !blocked) {
-      // Keep the air-relative velocity as the vehicle's state.
+    if (w) {
+      // Keep the air-relative velocity as the vehicle's state, also after sliding: the slid ground
+      // velocity still carries the wind, and keeping it would add the wind again every contact tick.
       vx -= w[0];
       vy -= w[1];
       vz -= w[2];

@@ -5,6 +5,7 @@
 [![ci](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml)
 [![pages](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23717793.svg)](https://doi.org/10.5281/zenodo.23717793)
 
 <p align="center">
   <img src="docs/media/film-hero.gif" alt="Mission film: the drone crosses the roof of the cabin and lines up on the garage gap it will fly through" width="720">
@@ -21,10 +22,10 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 | --- | --- | --- |
 | How much of a new building does the trained policy search? | 80.0% (76.3–83.6%) at 3.4 wall contacts per flight; its teacher 67.3%, the sensor-only planner 65.5% with none | 30 fresh hard buildings |
 | Does it work in the dark? | 80.0% at night with the lights off, 100.0% of day | the same buildings |
-| Do whole missions end the right way? | 96.7% (91.7–98.7%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
+| Do whole missions end the right way? | 97.5% (92.9–99.1%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
 | **How often does it call a building clear with someone inside?** | **3.55% per flight** (3.21–3.88%); 13.2% on sweeps of an occupied site | 2,000 importance-sampled flights, checked by 6,000 plain ones |
 | How often does it hit something? | 2.70% per flight (1.99–3.41%) | 2,000 importance-sampled flights |
-| Does it get home when something breaks? | 97.8% (96.7–98.6%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
+| Does it get home when something breaks? | 97.9% (96.8–98.6%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
 <!-- generated:headline:end -->
 
 Every number comes from seeds no model or setting was tuned on, with 95% intervals, and is regenerated from the study's JSON by `npm run docs`. The false-clear rate is the one to read first: it is why this is a research simulator and not a product. The [project guide](docs/GUIDE.md#honest-limits) lists the other limits.

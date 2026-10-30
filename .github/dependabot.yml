@@ -1,0 +1,33 @@
+# Weekly dependency updates. Patch and minor bumps arrive grouped in one PR per ecosystem.
+# Runtime libraries whose behaviour feeds the benchmarks (physics, rendering, the policy network)
+# only get patch updates here: a minor or major bump changes flight numbers and needs a bench re-run.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+      runtime-patches:
+        dependency-type: production
+        update-types: [patch]
+    ignore:
+      - dependency-name: '@dimforge/rapier3d-compat'
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: three
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: '@types/three'
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: '@tensorflow/tfjs'
+        update-types: [version-update:semver-minor, version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']

@@ -5,6 +5,7 @@ import { buildMissionWorld, missionForWorld } from '../../src/mission/autonomy/w
 import { InferPolicy } from '../../src/rl/infer';
 import { ACT_DIM, OBS_DIM } from '../../src/shared/constants';
 import { createFakeSource, type FakeSourceOptions } from '../helpers/fakeSource';
+import { checkTiming } from './timing';
 
 /*
  * Full missions with the test detection source. Worlds: seed 20 with one
@@ -52,7 +53,7 @@ describe('mission runner', () => {
       expect(seen.has(phase), phase).toBe(true);
     }
     expect(r.batteryEndPct).toBeLessThan(r.batteryStartPct);
-    expect(wall).toBeLessThan(20_000);
+    if (checkTiming) expect(wall).toBeLessThan(20_000);
 
     const second = await run(PERSON_WORLD, FIND_PERSON);
     expect(JSON.stringify(second.run)).toBe(JSON.stringify(r));

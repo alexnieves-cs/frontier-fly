@@ -480,6 +480,9 @@ export function mountMissionEditor(root: HTMLElement): void {
     pause();
     mode = 'run';
     mission = canonicalMission(validation.mission ?? mission);
+    // The canonical copy has new target and zone objects; rebuild the cards so their edits reach it.
+    zoneSignature = '';
+    targetSignature = '';
     map.setTool('view');
     showMode();
     syncPlan();

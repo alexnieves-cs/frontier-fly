@@ -256,6 +256,9 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
   let estimatorBadSince: number | null = null;
   let motorLowSince: number | null = null;
   let motorLatched: number | null = null;
+  // Mean of the worst ratio over the current low streak; latching the per-tick minimum would ratchet down on ESC noise.
+  let motorSum = 0;
+  let motorN = 0;
   let windHighSince: number | null = null;
   let windMean: [number, number] | null = null;
   let windSevereSince: number | null = null;
@@ -436,8 +439,14 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
       if (ratios && ratios.length > 0) {
         const worst = Math.min(...ratios);
         if (worst < cfg.motorRatioMin) {
-          motorLowSince ??= tSec;
-          if (tSec - motorLowSince >= cfg.motorDetectSec - 1e-9) motorLatched = Math.min(motorLatched ?? 1, worst);
+          if (motorLowSince === null) {
+            motorLowSince = tSec;
+            motorSum = 0;
+            motorN = 0;
+          }
+          motorSum += worst;
+          motorN += 1;
+          if (tSec - motorLowSince >= cfg.motorDetectSec - 1e-9) motorLatched = Math.min(motorLatched ?? 1, motorSum / motorN);
         } else motorLowSince = null;
       }
       if (motorLatched !== null) {
@@ -483,7 +492,7 @@ export function createFailsafe(config?: Partial<FailsafeConfig>): Failsafe {
       // ------------------------------------------------------------- wind
       let windScale = 1;
       const w = input.windEstimate;
-      const cruise = input.cruiseMps ?? 8;
+      const cruise = input.cruiseMps ?? 5.5;
       if (!inside && w) {
         const k = 1 - Math.exp(-input.dt / cfg.windAvgSec);
         windMean = windMean ? [windMean[0] + (w[0] - windMean[0]) * k, windMean[1] + (w[1] - windMean[1]) * k] : [w[0] * k, w[1] * k];
