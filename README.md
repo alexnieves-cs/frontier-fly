@@ -32,6 +32,16 @@ Every number comes from seeds no model or setting was tuned on, with 95% interva
 
 ## Run it
 
+Everything runs in a browser tab, on desktop or phone. Pick the way that suits you:
+
+| Way | What you get | Needs |
+| --- | --- | --- |
+| [Live site](https://alexnieves-cs.github.io/frontier-fly/) | Every page: the film, missions, race, drone team, safety numbers, indoor and outdoor flying, the mission planner and PX4 | Nothing, just a browser |
+| [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/alexnieves-cs/frontier-fly?quickstart=1) | Your own copy in a cloud dev box. Run `npm run dev` and the forwarded port 3000 opens the site | A GitHub account |
+| [Actions](https://github.com/alexnieves-cs/frontier-fly/actions) | CI, the PX4 flight check on every push, and the `study` workflow, which reruns any benchmark from **Run workflow** | Repo access to start a run |
+| Your computer | The site, training and benchmarks (`npm run train:ppo`, `npm run study:missions`, ...) | Node 22 |
+| PX4 + QGroundControl | A real autopilot flying the simulator, with QGroundControl loading plans from the planner page | A local PX4 SITL build, see [PX4.md](docs/PX4.md) |
+
 ```bash
 npm ci && npm run dev   # Node 22, then open http://127.0.0.1:3000
 ```
