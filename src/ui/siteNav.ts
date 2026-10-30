@@ -112,3 +112,8 @@ if (typeof document !== 'undefined') {
     open.querySelector<HTMLElement>('[data-site-menu]')?.focus();
   });
 }
+
+// The guided tour (src/ui/tour) loads only on a page whose URL carries ?tour.
+if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('tour')) {
+  void import('./tour').then((m) => m.resumeTour(currentSitePage()));
+}
