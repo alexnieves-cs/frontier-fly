@@ -3,7 +3,7 @@ import { evalEpisodeSetup } from '../../src/eval/coverage';
 import { classicalPilot } from '../../src/eval/pilots';
 import { DEFAULT_BATTERY, hoverPowerW } from '../../src/mission/autonomy/battery';
 import { createEnv } from '../../src/sim/env';
-import { guardAction } from '../../src/sim/sensorPlanner';
+import { guardAction } from '../../src/sim/lidarSafety';
 import { initPhysics } from '../../src/sim/world';
 
 beforeAll(async () => {

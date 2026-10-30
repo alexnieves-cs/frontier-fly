@@ -1,7 +1,7 @@
 /** One FrontierBench episode: the task's building and airframe, flown by a pilot. */
 import { evalEpisodeSetup } from '../eval/coverage';
 import { curveArea, EpisodeFootprint, FOOTPRINT_RADIUS, timeTo } from '../eval/footprint';
-import { sensorFrame } from '../eval/pilots';
+import { sensorFrame } from '../sim/sensorPlanner';
 import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import type { ExplorerEnv } from '../sim/env';

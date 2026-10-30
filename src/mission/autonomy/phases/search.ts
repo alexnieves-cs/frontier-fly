@@ -17,7 +17,7 @@ import {
 import { toLocal, toWorld, floorOf, INDOOR_FLY_Z } from '../planner/indoor';
 import { observeOpenings } from '../planner/inspect';
 import { sampleHeight } from '../../../world/outdoor/terrain';
-import { sensorClearance, type SensorGrid } from '../../../sim/sensorPlanner';
+import { sensorClearance, type SensorGrid } from '../../../sim/sensorMap';
 import { VOXEL } from '../../../shared/constants';
 import { type VehicleCommand } from '../vehicle';
 import {

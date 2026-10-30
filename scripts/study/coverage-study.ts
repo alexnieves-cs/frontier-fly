@@ -19,7 +19,7 @@ import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dy
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
 import { frontierAction } from '../../src/sim/frontier';
 import { LearnedGain, parseGainModel, type GainModelData } from '../../src/sim/mapPredict';
-import { QUAD_BRAKING } from '../../src/sim/sensorPlanner';
+import { QUAD_BRAKING } from '../../src/sim/lidarSafety';
 import { heuristicAction } from '../../src/sim/heuristic';
 import type { LightingPreset } from '../../src/sim/lighting';
 import { waypointAction } from '../../src/sim/waypointPilot';

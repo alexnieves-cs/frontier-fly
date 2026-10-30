@@ -16,7 +16,8 @@ import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { RNG } from '../../src/shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
-import { QUAD_BRAKING, type SensorPlannerOptions } from '../../src/sim/sensorPlanner';
+import { type SensorPlannerOptions } from '../../src/sim/sensorPlanner';
+import { QUAD_BRAKING } from '../../src/sim/lidarSafety';
 import { bootstrapCi, loadPolicy } from './common';
 
 export const SPEED_SEEDS = 30;

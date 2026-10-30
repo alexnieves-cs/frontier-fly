@@ -12,22 +12,9 @@ import { zeroNoise } from '../../../sim/dynamics/dr';
 import { SensorNoise } from '../../../sim/dynamics/noise';
 import { FrontierNav } from '../../../sim/frontierFeatures';
 import { EgoMaps, SeenMap } from '../../../sim/seenMap';
-import {
-  BRAKING_MARGIN,
-  brakingFilter,
-  type BrakingModel,
-  descentClear,
-  filterVelocity,
-  guardAction,
-  OccupancyMap,
-  SAFETY_MARGIN,
-  SensorPlanner,
-  sensorClearance,
-  sensorLos,
-  sensorPath,
-  type SensorFrame,
-  type SensorGrid,
-} from '../../../sim/sensorPlanner';
+import { SensorPlanner, type SensorFrame } from '../../../sim/sensorPlanner';
+import { BRAKING_MARGIN, brakingFilter, type BrakingModel, descentClear, filterVelocity, guardAction, SAFETY_MARGIN } from '../../../sim/lidarSafety';
+import { OccupancyMap, sensorClearance, sensorLos, sensorPath, type SensorGrid } from '../../../sim/sensorMap';
 import { sense } from '../../../sim/sensors';
 import type { PhysicsWorld } from '../../../sim/world';
 import type { MissionBuilding, V3 } from '../contracts';

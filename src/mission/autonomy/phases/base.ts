@@ -1,4 +1,4 @@
-import { descentClear } from '../../../sim/sensorPlanner';
+import { descentClear } from '../../../sim/lidarSafety';
 import { RNG } from '../../../shared/rng';
 import { OutdoorPhysics } from '../../../world/outdoor/physics';
 import type { Mission } from '../../types';
