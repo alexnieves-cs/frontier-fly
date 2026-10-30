@@ -26,8 +26,16 @@ export default defineConfig({
     { name: 'outdoor', testMatch: /outdoor\.spec\.ts/, use: { ...devices['Desktop Chrome'] } },
     {
       name: 'chromium',
-      testIgnore: /outdoor\.spec\.ts/,
+      testIgnore: [/outdoor\.spec\.ts/, /tour\.spec\.ts/],
       dependencies: ['outdoor'],
+      use: { ...devices['Desktop Chrome'] },
+    },
+    // The tour walks three live 3D pages under tight "card shows within 5 s" budgets, so it runs
+    // after the rest, one test at a time, rather than sharing the CPU with another rendering page.
+    {
+      name: 'tour',
+      testMatch: /tour\.spec\.ts/,
+      dependencies: ['chromium'],
       use: { ...devices['Desktop Chrome'] },
     },
   ],

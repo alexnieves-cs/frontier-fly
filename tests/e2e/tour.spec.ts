@@ -28,8 +28,11 @@ async function pressNext(page: Page, key: 'Enter' | 'Space'): Promise<void> {
 }
 
 test.describe('guided tour', () => {
+  // One page at a time: see the 'tour' project in playwright.config.ts.
+  test.describe.configure({ mode: 'serial' });
+
   test('walks Home, the film and the race to the closing card by keyboard', async ({ page }) => {
-    test.setTimeout(300_000);
+    test.setTimeout(420_000);
     const { errors, requests } = watch(page);
     await page.goto('/index.html');
     await expect(page.locator('#app[data-ready="1"]')).toBeVisible();
