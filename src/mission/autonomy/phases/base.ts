@@ -203,9 +203,9 @@ export abstract class RunnerBase implements MissionRunner {
     this.coverage = planCoverage(mission, world, { agl: this.agl, overlap });
     this.sar =
       search?.mode === 'probability' && mission.missionType === 'find_person' ? new SarSearch(world, this.air, this.agl, search) : null;
-    const p = options.policy as ActingPolicy | undefined;
+    const p = options.policy;
     this.oracle = options.indoor === 'oracle';
-    this.policy = p && typeof p.actWith === 'function' && options.indoor !== 'frontier' && !this.oracle ? p : null;
+    this.policy = p && options.indoor !== 'frontier' && !this.oracle ? p : null;
     if (options.indoor === 'policy' && !this.policy)
       this.log('warn', 'Policy explorer requested without a policy. Using frontier exploration.');
     this.phases.push({ phase: 'preflight', tStart: 0, tEnd: 0 });

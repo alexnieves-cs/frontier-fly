@@ -62,11 +62,7 @@ export abstract class IndoorPhases extends EntryPhases {
     v.sensing = new IndoorSensing(v.grid, this.loc ? this.loc.frameLidar(lidar) : lidar, lighting, this.world.seed);
     v.sensing.lastNewVoxelSec = this.t;
     if (this.vehicle instanceof QuadVehicle) v.sensing.braking = this.vehicle.braking;
-    const extra = this.options.lidarFault;
-    v.sensing.rangeHook = (lidar, tSec) => {
-      extra?.(lidar, tSec);
-      this.lidarHook(lidar);
-    };
+    v.sensing.rangeHook = (lidar) => this.lidarHook(lidar);
     // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
     const dark = nightFactor(lighting) > 0.5 && lighting.sensorMode === 'rgb';
     if (dark) {

@@ -45,14 +45,48 @@ export const MISSION_SEED_BASE = 9600;
 export const MISSION_MODES = ['policy', 'sensor', 'oracle', 'policyQuad', 'sensorQuad', 'policyLoc', 'sensorLoc', 'sensorQuadLoc'] as const;
 export type MissionMode = (typeof MISSION_MODES)[number];
 
+/** What a mode flies: the indoor explorer, the airframe, and where the indoor pose comes from. */
+export interface MissionModeSpec {
+  explorer: 'policy' | 'sensor' | 'oracle';
+  vehicle: NonNullable<RunnerOptions['vehicle']>;
+  localization: NonNullable<RunnerOptions['localization']>;
+}
+
+const kinematicTruth = { vehicle: 'kinematic', localization: 'truth' } as const;
+
+/** Every mode spelled out, so a new mode has to say what it flies. */
+export const MISSION_MODE_SPECS: Readonly<Record<MissionMode, MissionModeSpec>> = {
+  policy: { explorer: 'policy', ...kinematicTruth },
+  sensor: { explorer: 'sensor', ...kinematicTruth },
+  oracle: { explorer: 'oracle', ...kinematicTruth },
+  policyQuad: { explorer: 'policy', vehicle: 'quad', localization: 'truth' },
+  sensorQuad: { explorer: 'sensor', vehicle: 'quad', localization: 'truth' },
+  policyLoc: { explorer: 'policy', vehicle: 'kinematic', localization: 'estimated' },
+  sensorLoc: { explorer: 'sensor', vehicle: 'kinematic', localization: 'estimated' },
+  sensorQuadLoc: { explorer: 'sensor', vehicle: 'quad', localization: 'estimated' },
+};
+
+export function isMissionMode(id: string): id is MissionMode {
+  return Object.hasOwn(MISSION_MODE_SPECS, id);
+}
+
+/** A comma list of modes, rejecting unknown names instead of flying them as a default. */
+export function parseMissionModes(list: string): MissionMode[] {
+  const ids = list.split(',').map((m) => m.trim()).filter(Boolean);
+  const bad = ids.filter((m) => !isMissionMode(m));
+  if (bad.length) throw new Error(`Unknown mission mode(s): ${bad.join(', ')}. Known: ${MISSION_MODES.join(', ')}.`);
+  return ids as MissionMode[];
+}
+
 /** Runner options for an explorer mode; `policy` is the shipped policy, needed by the policy modes. */
 export function missionModeOptions(mode: MissionMode, policy: RunnerOptions['policy']): RunnerOptions {
-  const usesPolicy = mode.startsWith('policy');
+  const spec = MISSION_MODE_SPECS[mode];
   return {
-    indoor: mode === 'oracle' ? 'oracle' : mode.startsWith('sensor') ? 'frontier' : 'auto',
-    ...(usesPolicy ? { policy } : {}),
-    ...(mode.includes('Quad') ? { vehicle: 'quad' as const } : {}),
-    ...(mode.endsWith('Loc') ? { localization: 'estimated' as const } : {}),
+    indoor: spec.explorer === 'oracle' ? 'oracle' : spec.explorer === 'sensor' ? 'frontier' : 'auto',
+    ...(spec.explorer === 'policy' ? { policy } : {}),
+    // Defaults stay unset, so a mode's options match what the runner gets with none.
+    ...(spec.vehicle !== 'kinematic' ? { vehicle: spec.vehicle } : {}),
+    ...(spec.localization !== 'truth' ? { localization: spec.localization } : {}),
   };
 }
 
