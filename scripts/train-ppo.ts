@@ -9,7 +9,14 @@
  *          [--lr 1e-5] [--critic-lr 3e-4] [--clip 0.1] [--epochs 3] [--seq-batch 32]
  *          [--bc 0.05] [--ppo 1] [--log-std -2.3] [--critic-warmup 8] [--imitate 0]
  *          [--eval-every 20] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
- *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|report]
+ *          [--crash-penalty 0] [--impact-penalty 0] [--crash-weight 0.2] [--quad 0] [--eval-quad]
+ *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|report|fresh] [--eval-quad]
+ *
+ * Crash rule (shared/constants.ts CRASH_SPEED): a crash ends the episode with REWARD.crash in the
+ * env. --crash-penalty adds more on that step, --impact-penalty charges every contact per m/s above
+ * half the crash speed, --crash-weight takes crashes off the checkpoint score, and --quad flies that
+ * share of rollouts on quadrotor dynamics (full domain randomization; validation then adds 16 quad
+ * episodes).
  *
  * The defaults are the recipe of the shipped checkpoint's first 400 updates;
  * it then ran 400 more with --init on that run's best checkpoint and --seed 47
@@ -51,14 +58,19 @@ function schedule(name: string, fallback: string): (frac: number) => number {
   return (frac) => (b == null || Number.isNaN(b) ? a! : a! + (b - a!) * Math.min(1, Math.max(0, frac)));
 }
 
-/** Held-out episodes. 'tune' picks checkpoints; 'report' is only ever reported. */
-export function seedSet(name: 'tune' | 'report'): EvalJob[] {
-  const base = name === 'tune' ? 66_000 : 68_000;
-  const jobs: EvalJob[] = [];
+/**
+ * Held-out episodes. 'tune' picks checkpoints; 'report' (68001+, used once by PR #30) and 'fresh'
+ * (69001+, first used for the crash-rule retrain) are only ever reported. With `quad`, 16 more
+ * stage-3 episodes fly quadrotor dynamics with full domain randomization (base + 301..316).
+ */
+export function seedSet(name: 'tune' | 'report' | 'fresh', quad = false): (EvalJob & { quad?: boolean })[] {
+  const base = name === 'tune' ? 66_000 : name === 'report' ? 68_000 : 69_000;
+  const jobs: (EvalJob & { quad?: boolean })[] = [];
   for (let i = 1; i <= 32; i++) jobs.push({ stage: 3, seed: base + i, lighting: 'day' });
   for (let i = 1; i <= 8; i++) jobs.push({ stage: 3, seed: base + 100 + i, lighting: 'night-dark' });
   for (let i = 1; i <= 6; i++) jobs.push({ stage: 0, seed: base + 200 + i, lighting: 'day' });
   for (let i = 1; i <= 2; i++) jobs.push({ stage: 0, seed: base + 250 + i, lighting: 'night-dark' });
+  if (quad) for (let i = 1; i <= 16; i++) jobs.push({ stage: 3, seed: base + 300 + i, lighting: i > 12 ? 'night-dark' : 'day', quad: true });
   return jobs;
 }
 
@@ -67,10 +79,18 @@ interface Score {
   large: number;
   largeNight: number;
   collisions: number;
+  /** Share of all held-out episodes the crash rule ended. */
+  crashRate: number;
+  /** Quadrotor episodes (NaN without them). */
+  quad: number;
+  quadCrashRate: number;
   score: number;
 }
 
-async function evaluate(pool: NodeRolloutPool, workers: number, policy: MemPolicy, jobs: EvalJob[]): Promise<Score> {
+/** Checkpoint score: coverage as before, minus --crash-weight per unit crash rate. */
+const crashWeight = () => num('crash-weight', 0.2);
+
+async function evaluate(pool: NodeRolloutPool, workers: number, policy: MemPolicy, jobs: (EvalJob & { quad?: boolean })[]): Promise<Score> {
   const spec = { weights: policy.getWeights(), hidden: [...policy.hidden], memDim: policy.memDim };
   // Longest episodes first, round robin, so workers finish together.
   const order = jobs.map((job, i) => ({ job, i })).sort((a, b) => b.job.stage - a.job.stage);
@@ -79,17 +99,25 @@ async function evaluate(pool: NodeRolloutPool, workers: number, policy: MemPolic
   const parts = (await pool.runJobAll('seqEval', (w: number) => ({ policy: spec, jobs: per[w]!.map((x) => x.job) }))) as SeqEvalResult[][];
   const results = new Array<SeqEvalResult>(jobs.length);
   per.forEach((list, w) => list.forEach((x, k) => (results[x.i] = parts[w]![k]!)));
-  const pick = (f: (j: EvalJob) => boolean) => results.filter((_, i) => f(jobs[i]!));
+  const pick = (f: (j: EvalJob & { quad?: boolean }) => boolean) => results.filter((_, i) => f(jobs[i]!));
   const small = mean(pick((j) => j.stage <= 1).map((r) => r.coverage));
-  const large = mean(pick((j) => j.stage >= 2).map((r) => r.coverage));
-  const largeNight = mean(pick((j) => j.stage >= 2 && j.lighting !== 'day').map((r) => r.coverage));
-  const collisions = mean(pick((j) => j.stage >= 2).map((r) => r.collisions));
-  // Same weighting as train-indoor's validation: the stage-3 bar is the hard one.
-  return { small, large, largeNight, collisions, score: 0.4 * small + 0.6 * large };
+  const large = mean(pick((j) => j.stage >= 2 && !j.quad).map((r) => r.coverage));
+  const largeNight = mean(pick((j) => j.stage >= 2 && !j.quad && j.lighting !== 'day').map((r) => r.coverage));
+  const collisions = mean(pick((j) => j.stage >= 2 && !j.quad).map((r) => r.collisions));
+  const crashRate = mean(results.map((r) => (r.crashed ? 1 : 0)));
+  const quads = pick((j) => !!j.quad);
+  const quad = quads.length ? mean(quads.map((r) => r.coverage)) : NaN;
+  const quadCrashRate = quads.length ? mean(quads.map((r) => (r.crashed ? 1 : 0))) : NaN;
+  // Same weighting as train-indoor's validation (the stage-3 bar is the hard one), with the quad
+  // episodes, when there are any, taking a third of the hard share; crashes cost on top.
+  const hard = quads.length ? (2 * large + quad) / 3 : large;
+  return { small, large, largeNight, collisions, crashRate, quad, quadCrashRate, score: 0.4 * small + 0.6 * hard - crashWeight() * crashRate };
 }
 
 const fmt = (s: Score) =>
-  `small ${pct(s.small)} large ${pct(s.large)} (night ${pct(s.largeNight)}) coll ${s.collisions.toFixed(2)} score ${pct(s.score)}`;
+  `small ${pct(s.small)} large ${pct(s.large)} (night ${pct(s.largeNight)}) coll ${s.collisions.toFixed(2)} crash ${pct(s.crashRate)}` +
+  (Number.isNaN(s.quad) ? '' : ` quad ${pct(s.quad)} (crash ${pct(s.quadCrashRate)})`) +
+  ` score ${pct(s.score)}`;
 
 function checkpointOf(policy: MemPolicy, base: Checkpoint): Checkpoint {
   return {
@@ -128,8 +156,8 @@ async function main() {
   const validateOnly = arg('validate-only');
   if (validateOnly) {
     const c = parseCheckpoint(readFileSync(validateOnly));
-    const set = (arg('set') ?? 'tune') as 'tune' | 'report';
-    const s = await evaluate(pool, workers, MemPolicy.fromCheckpoint(c), seedSet(set));
+    const set = (arg('set') ?? 'tune') as 'tune' | 'report' | 'fresh';
+    const s = await evaluate(pool, workers, MemPolicy.fromCheckpoint(c), seedSet(set, args.includes('--eval-quad')));
     console.log(`${validateOnly} [${set}] ${fmt(s)}`);
     await pool.close();
     return;
@@ -147,7 +175,8 @@ async function main() {
   trainer.setLogStd(new Array(ACT_DIM).fill(logStd));
   console.log(`backend ${backend}, ${workers} workers x ${envs} envs, mem ${memDim}, init ${arg('init') ?? 'shipped'}`);
 
-  const tune = seedSet('tune');
+  const quadFraction = num('quad', 0);
+  const tune = seedSet('tune', quadFraction > 0 || args.includes('--eval-quad'));
   let best = { label: 'init', score: await evaluate(pool, workers, policy, tune), weights: policy.getWeights() };
   console.log(`init ${fmt(best.score)}  (${((Date.now() - started) / 1000).toFixed(0)} s)`);
 
@@ -179,6 +208,9 @@ async function main() {
       nightFraction: num('night', 0.25),
       seed: 1000 + it * 7919,
       resetEnvs,
+      crashPenalty: num('crash-penalty', 0),
+      impactSpeedPenalty: num('impact-penalty', 0),
+      quadFraction: phase === 'imitate' ? 0 : quadFraction,
     })) as SeqRolloutResult[];
     resetEnvs = false;
     const tCollect = (Date.now() - t0) / 1000;
@@ -238,10 +270,13 @@ async function main() {
       bcReplay: replay?.view(),
     });
     const eps = parts.flatMap((p) => p.episodes);
-    const hard = eps.filter((e) => e.stage === 3);
+    const hard = eps.filter((e) => e.stage === 3 && !e.quad);
+    const quads = eps.filter((e) => e.quad);
     console.log(
       `${phase} ${it} eps ${eps.length} hardCov ${pct(mean(hard.map((e) => e.coverage)))} (${hard.length}) ` +
-        `coll ${mean(hard.map((e) => e.collisions)).toFixed(2)} pi ${m.policyLoss.toFixed(4)} bc ${m.bcLoss.toFixed(4)} ` +
+        `coll ${mean(hard.map((e) => e.collisions)).toFixed(2)} crash ${pct(mean(eps.map((e) => (e.crashed ? 1 : 0))))} ` +
+        (quads.length ? `quad ${pct(mean(quads.map((e) => e.coverage)))} (${quads.length}, crash ${pct(mean(quads.map((e) => (e.crashed ? 1 : 0))))}) ` : '') +
+        `pi ${m.policyLoss.toFixed(4)} bc ${m.bcLoss.toFixed(4)} ` +
         `v ${m.valueLoss.toFixed(4)} kl ${m.kl.toFixed(4)} clip ${m.clipFrac.toFixed(3)} ` +
         `${(n / tCollect).toFixed(0)} steps/s collect ${tCollect.toFixed(0)}s total ${((Date.now() - t0) / 1000).toFixed(0)}s`,
     );
