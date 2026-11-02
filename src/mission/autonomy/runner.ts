@@ -1,6 +1,5 @@
 import { initPhysics } from '../../sim/world';
 import { initOutdoorPhysics, OutdoorPhysics } from '../../world/outdoor/physics';
-import { sampleHeight } from '../../world/outdoor/terrain';
 import type { Mission } from '../types';
 import type {
   LiveDetectionSource,
@@ -15,16 +14,17 @@ import type {
   ClearanceRecord,
 } from './contracts';
 import { requirementsMet } from './planner/confirm';
-import { columnClear, cruiseZ, dist, segmentClear } from './planner/geometry';
-import { containsPoint } from '../../world/outdoor/geofence';
-import { landedAtHome, landingCommand, planReturn } from './planner/home';
-import { floorOf } from './planner/indoor';
+import { cruiseZ, dist, segmentClear } from './planner/geometry';
 import type { VehicleCommand } from './vehicle';
-import { IndoorPhases } from './phases/indoor';
+import { MissionCore } from './phases/core';
+import { EntryPhase } from './phases/entry';
+import { HomePhase } from './phases/home';
+import { IndoorPhase } from './phases/indoor';
+import { Pilot } from './phases/pilot';
+import { SearchPhase } from './phases/search';
 import { DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
 import { DEFAULT_BATTERY } from './battery';
 import type { HealthInput } from './failsafe';
-import { RNG } from '../../shared/rng';
 
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
 /**
@@ -32,36 +32,12 @@ const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
  * infers wind from the tilt it holds against it, which settles over a second or two.
  */
 const WIND_ESTIMATE_TAU = 2;
-/** Landing position integral gain, 1/s^2, and its cap, m/s. */
-const LAND_TRIM_KI = 0.6;
-const LAND_TRIM_MAX = 3;
-/** Emergency landings: open-column radius, m, search radius, m, and how close over it before descending, m. */
-const LAND_COLUMN_M = 0.8;
-const LAND_SEARCH_M = 15;
-const LAND_ALIGN_M = 0.5;
-/** The same in severe wind, when the drone drifts on the way down: a wider clearing, searched further out. */
-const LAND_COLUMN_WINDY_M = 3;
-const LAND_SEARCH_WINDY_M = 40;
-/**
- * An emergency landing that has not got over its column in this long, s, lands on the move instead:
- * it descends wherever the column under it, and under where it will be in LAND_LOOKAHEAD_S, is open.
- * In wind the airframe can't hold position in, it would otherwise hover beside its column until the
- * time limit.
- */
-const LAND_ALIGN_TIMEOUT_S = 10;
-const LAND_LOOKAHEAD_S = 1.5;
 /** Climbing clear in severe wind ends this close under cruise height, m. */
 const CLIMB_CLEAR_TOL_M = 0.5;
 /** ...and does not apply this close to home, m. */
 const CLIMB_CLEAR_HOME_M = 8;
-/** Height a weak airframe may lose on the way to its landing column, m. */
-const LAND_SINK_M = 2;
-/** Height over the range-finder ground at which a landing cuts the motors, m. */
-const LAND_CUT_AGL = 0.4;
-/** RTK GNSS error with a fix (see stepGnss): 1-sigma horizontal and vertical, m, and correlation time, s. */
-const GNSS_SIGMA_H_M = 0.015;
-const GNSS_SIGMA_V_M = 0.025;
-const GNSS_TAU_S = 30;
+/** A drone that cannot re-acquire its pose for this long lands where it is. */
+const LOC_LOST_LAND_SEC = 20;
 
 /**
  * Hierarchical mission runner. A fixed-tick phase machine over the planner
@@ -72,160 +48,198 @@ const GNSS_TAU_S = 30;
  * tick and its actions run through the `recover` phase. Same inputs give
  * the same RunRecord.
  *
- * The phases live in layers under ./phases, each extending the one before:
- * base (state and motion primitives) -> search (coverage, detection,
- * confirmation) -> entry (approach, inspection, fly-through) -> indoor
- * (exploration and the way out). This class adds the public API, the tick,
- * return and landing, and the safety ladder.
+ * The runner is the MissionRunner facade over a few parts in ./phases: the
+ * shared state (core.ts MissionCore), the motion primitives (pilot.ts), and
+ * one object per phase that owns its own state: search (coverage, detection,
+ * confirmation, confirm-clear), entry (approach, inspection, fly-through),
+ * indoor (exploration and the way out) and home (return and landing). A phase
+ * hands over only through the exits its constructor is given, which this
+ * class wires below. The runner itself keeps the tick, the safety ladder and
+ * the record.
  */
-/** A drone that cannot re-acquire its pose for this long lands where it is. */
-const LOC_LOST_LAND_SEC = 20;
-
-class Runner extends IndoorPhases {
+class Runner implements MissionRunner {
+  private readonly c: MissionCore;
+  private readonly pilot: Pilot;
+  private readonly search: SearchPhase;
+  private readonly entry: EntryPhase;
+  private readonly indoor: IndoorPhase;
+  private readonly home: HomePhase;
   private locLostSince = -1;
   private closest: ClearanceRecord | null = null;
+  private gnssPadHoldLogged = false;
+
+  constructor(mission: Mission, world: MissionWorld, source: LiveDetectionSource, options: RunnerOptions, physics: OutdoorPhysics) {
+    const c = new MissionCore(mission, world, source, options, physics);
+    this.c = c;
+    const pilot = new Pilot(c);
+    this.pilot = pilot;
+    this.search = new SearchPhase(c, pilot, {
+      startBuilding: (b) => this.entry.startBuilding(b),
+      startReturn: (reason) => this.home.startReturn(reason),
+      resumeIndoor: () => this.indoor.resumeIndoor(),
+    });
+    this.entry = new EntryPhase(c, pilot, {
+      continueMission: () => this.search.continueMission(),
+      leaveBuilding: () => this.indoor.leaveBuilding(),
+      startExplore: () => this.indoor.startExplore(),
+    });
+    this.indoor = new IndoorPhase(c, pilot, {
+      lastLook: (id) => this.search.lastLook(id),
+      declareIfClear: (scope) => this.search.declareIfClear(scope),
+      continueMission: () => this.search.continueMission(),
+      startReturnOutside: () => this.home.startReturnOutside(),
+      startLand: (reason) => this.home.startLand(reason),
+    });
+    this.home = new HomePhase(c, pilot, {
+      startExit: (after) => this.indoor.startExit(after),
+      finish: () => this.finish(),
+    });
+    c.job = pilot.holdJob('preflight', 1, () => this.search.startCoverage());
+    c.recordTrack();
+  }
+
   // ----------------------------------------------------------- public
 
   get done(): boolean {
-    return this.finished;
+    return this.c.finished;
   }
 
   approve(): void {
-    this.operatorAnswer = 'approve';
+    this.entry.answer('approve');
   }
 
   deny(): void {
-    this.operatorAnswer = 'deny';
+    this.entry.answer('deny');
   }
 
   abort(): void {
-    if (this.finished || this.aborted) return;
-    this.aborted = true;
-    this.log('warn', 'Operator abort. Returning home.');
-    this.startReturn('operator abort');
+    if (this.c.finished || this.c.aborted) return;
+    this.c.aborted = true;
+    this.c.log('warn', 'Operator abort. Returning home.');
+    this.home.startReturn('operator abort');
   }
 
   step(dtSec?: number): void {
-    const n = dtSec === undefined ? 1 : Math.max(1, Math.round(dtSec / this.dt));
-    for (let i = 0; i < n && !this.finished; i++) this.tick();
+    const n = dtSec === undefined ? 1 : Math.max(1, Math.round(dtSec / this.c.dt));
+    for (let i = 0; i < n && !this.c.finished; i++) this.tick();
   }
 
   snapshot(): RunnerSnapshot {
-    const track: V3[] = this.trackRec.slice(-400).map((s) => s.pos);
+    const track: V3[] = this.c.trackRec.slice(-400).map((s) => s.pos);
     return {
-      tSec: this.t,
-      phase: this.phase,
-      pose: this.vehicle.pose(),
-      batteryPct: this.battery.remainingPct(),
-      inside: this.inside,
-      plan: this.job.plan(),
+      tSec: this.c.t,
+      phase: this.c.phase,
+      pose: this.c.vehicle.pose(),
+      batteryPct: this.c.battery.remainingPct(),
+      inside: this.c.inside,
+      plan: this.c.job.plan(),
       track,
-      contacts: this.recent.slice(-20),
-      confirmed: this.confirmed.slice(),
-      pendingEntry: this.pendingEntry,
-      log: this.logs.slice(-50),
-      done: this.finished,
+      contacts: this.c.recent.slice(-20),
+      confirmed: this.c.confirmed.slice(),
+      pendingEntry: this.c.pendingEntry,
+      log: this.c.logs.slice(-50),
+      done: this.c.finished,
     };
   }
 
   record(): RunRecord {
-    const phases = this.phases.map((p) => ({ ...p }));
+    const phases = this.c.phases.map((p) => ({ ...p }));
     const last = phases[phases.length - 1];
-    if (last && !this.finished) last.tEnd = this.t;
+    if (last && !this.c.finished) last.tEnd = this.c.t;
     return {
-      mission: this.mission,
-      seed: this.world.seed,
-      outcome: this.finished ? this.outcome : this.computeOutcome(),
-      tSec: this.t,
-      track: this.trackRec.slice(),
+      mission: this.c.mission,
+      seed: this.c.world.seed,
+      outcome: this.c.finished ? this.c.outcome : this.computeOutcome(),
+      tSec: this.c.t,
+      track: this.c.trackRec.slice(),
       phases,
-      confirmed: this.confirmed.slice(),
-      declaredClear: this.declaredClear.slice(),
-      collisions: this.collisions.slice(),
-      entries: this.entries.slice(),
-      safetyEvents: [...this.monitor.events(), ...this.failsafe.events()].sort((a, b) => a.tSec - b.tSec),
-      batteryStartPct: this.batteryStart,
-      batteryEndPct: this.battery.remainingPct(),
-      landedHome: this.landedHome,
-      indoorExplorer: this.policyClean ? 'policy' : this.frontierRan ? (this.oracle ? 'oracle' : 'frontier') : null,
-      localization: [...this.locVisits, ...(this.loc && this.loc.flownTicks > 0 ? [this.loc.record(this.visit?.b.id ?? '')] : [])],
-      log: this.logs.slice(),
-      faults: this.faults ? this.faults.transitions().slice() : [],
+      confirmed: this.c.confirmed.slice(),
+      declaredClear: this.c.declaredClear.slice(),
+      collisions: this.c.collisions.slice(),
+      entries: this.c.entries.slice(),
+      safetyEvents: [...this.c.monitor.events(), ...this.c.failsafe.events()].sort((a, b) => a.tSec - b.tSec),
+      batteryStartPct: this.c.batteryStart,
+      batteryEndPct: this.c.battery.remainingPct(),
+      landedHome: this.c.landedHome,
+      indoorExplorer: this.indoor.policyClean ? 'policy' : this.indoor.frontierRan ? (this.c.oracle ? 'oracle' : 'frontier') : null,
+      localization: [...this.c.locVisits, ...(this.c.loc && this.c.loc.flownTicks > 0 ? [this.c.loc.record(this.c.visit?.b.id ?? '')] : [])],
+      log: this.c.logs.slice(),
+      faults: this.c.faults ? this.c.faults.transitions().slice() : [],
       ...(this.closest ? { clearance: { ...this.closest } } : {}),
-      ...(this.sar ? { search: { pos: this.sar.history.slice(), reachable: 1 - this.sar.prior.rest, replans: this.sar.replans } } : {}),
+      ...(this.c.sar ? { search: { pos: this.c.sar.history.slice(), reachable: 1 - this.c.sar.prior.rest, replans: this.c.sar.replans } } : {}),
     };
   }
 
-  protected tick(): void {
-    this.ticks += 1;
-    this.t = this.ticks * this.dt;
+  private tick(): void {
+    this.c.ticks += 1;
+    this.c.t = this.c.ticks * this.c.dt;
     this.advanceFaults();
 
-    this.stepGnss();
+    this.c.stepGnss();
     // Navigation and the monitors work on the position the drone believes: outdoors the GNSS
     // reading, indoors the pose estimate (or the true pose in the reference arms). The camera and
     // the airframe always act at the true position.
-    this.believed(() => {
-      this.checkSafety(this.vehicle.pos);
-      if (!this.finished) this.checkHealth();
-      if (!this.finished && this.t >= this.nextBudgetCheck) {
-        this.nextBudgetCheck = this.t + 1;
+    this.c.believed(() => {
+      this.checkSafety(this.c.vehicle.pos);
+      if (!this.c.finished) this.checkHealth();
+      if (!this.c.finished && this.c.t >= this.c.nextBudgetCheck) {
+        this.c.nextBudgetCheck = this.c.t + 1;
         this.checkBudgets();
       }
     });
-    if (this.finished) return;
-    if (this.t + 1e-9 >= this.nextDetect) {
-      this.nextDetect = this.t + DETECT_PERIOD;
+    if (this.c.finished) return;
+    if (this.c.t + 1e-9 >= this.c.nextDetect) {
+      this.c.nextDetect = this.c.t + DETECT_PERIOD;
       // No frames, no detections and no seen-empty cells (SAFETY_CASE.md H4).
-      if (this.faults?.cameraUp() ?? true) {
+      if (this.c.faults?.cameraUp() ?? true) {
         // The camera renders from where the drone really is; what it saw is placed where the drone believes it is.
-        const sensed = this.vehicle.pose();
-        this.believed(() => this.detect(sensed));
+        const sensed = this.c.vehicle.pose();
+        this.c.believed(() => this.search.detect(sensed));
       }
     }
-    if (this.finished) return;
+    if (this.c.finished) return;
 
-    let cmd = this.believed(() => this.climbClear(this.job.tick()));
-    if (this.finished) return;
-    if (this.loc) cmd = this.flyOnEstimate(cmd);
-    this.lastCmd = cmd;
-    const wind: V3 = this.faults && !this.inside ? this.faults.wind() : (this.options.wind?.(this.t) ?? [0, 0, 0]);
-    const step = this.vehicle.step(cmd, this.dt, this.limits(), { wind });
-    this.lastPowerW = step.powerW;
-    const k = 1 - Math.exp(-this.dt / WIND_ESTIMATE_TAU);
-    for (let i = 0; i < 3; i++) this.windEstimate[i] = this.windEstimate[i]! + (wind[i]! - this.windEstimate[i]!) * k;
-    this.lastCollided = step.collided;
+    let cmd = this.c.believed(() => this.climbClear(this.c.job.tick()));
+    if (this.c.finished) return;
+    if (this.c.loc) cmd = this.flyOnEstimate(cmd);
+    this.c.lastCmd = cmd;
+    const wind: V3 = this.c.faults && !this.c.inside ? this.c.faults.wind() : (this.c.options.wind?.(this.c.t) ?? [0, 0, 0]);
+    const step = this.c.vehicle.step(cmd, this.c.dt, this.c.limits(), { wind });
+    this.c.lastPowerW = step.powerW;
+    const k = 1 - Math.exp(-this.c.dt / WIND_ESTIMATE_TAU);
+    for (let i = 0; i < 3; i++) this.c.windEstimate[i] = this.c.windEstimate[i]! + (wind[i]! - this.c.windEstimate[i]!) * k;
+    this.c.lastCollided = step.collided;
     // Sensor models read the airframe's true state once it has moved; the planners read their output next tick.
-    if (this.loc) this.loc.step(this.localTruth(), this.t);
-    this.aperture?.sense(this.vehicle.pos, this.vehicle.vel, this.vehicle.yaw, this.dt);
+    if (this.c.loc) this.c.loc.step(this.c.localTruth(), this.c.t);
+    this.c.aperture?.sense(this.c.vehicle.pos, this.c.vehicle.vel, this.c.vehicle.yaw, this.c.dt);
     if (step.collided) {
-      const pos = this.vehicle.pos;
-      this.collisions.push({
-        tSec: this.t,
+      const pos = this.c.vehicle.pos;
+      this.c.collisions.push({
+        tSec: this.c.t,
         pos: [pos[0], pos[1], pos[2]],
-        inside: this.inside,
+        inside: this.c.inside,
       });
-      this.log('warn', `Contact at ${this.where(pos)}${this.inside ? ' inside the building' : ''} during ${this.phase.replace('_', ' ')}.`);
-      if (this.visit && this.phase === 'indoor_explore') this.visit.policyCollisions += 1;
+      this.c.log('warn', `Contact at ${this.c.where(pos)}${this.c.inside ? ' inside the building' : ''} during ${this.c.phase.replace('_', ' ')}.`);
+      if (this.c.visit && this.c.phase === 'indoor_explore') this.c.visit.policyCollisions += 1;
     }
-    if (this.options.measureClearance) this.measureClearance();
-    this.breadcrumb();
-    if (this.t + 1e-9 >= this.nextTrack) {
-      this.nextTrack = this.t + TRACK_PERIOD;
-      this.recordTrack();
+    if (this.c.options.measureClearance) this.measureClearance();
+    this.pilot.breadcrumb();
+    if (this.c.t + 1e-9 >= this.c.nextTrack) {
+      this.c.nextTrack = this.c.t + TRACK_PERIOD;
+      this.c.recordTrack();
     }
-    if (!this.finished && this.t >= this.maxSim - 1e-9) {
-      this.hardStopped = true;
-      this.log('warn', `Time limit ${fmt(this.maxSim, 0)} s reached before landing.`);
+    if (!this.c.finished && this.c.t >= this.c.maxSim - 1e-9) {
+      this.c.hardStopped = true;
+      this.c.log('warn', `Time limit ${fmt(this.c.maxSim, 0)} s reached before landing.`);
       this.finish();
     }
   }
 
   private measureClearance(): void {
-    const pos = this.vehicle.pos;
-    const c = this.physics.clearance([pos[0], pos[1], pos[2]]);
+    const pos = this.c.vehicle.pos;
+    const c = this.c.physics.clearance([pos[0], pos[1], pos[2]]);
     if (!c || (this.closest && c.gapM >= this.closest.minM)) return;
-    this.closest = { minM: c.gapM, tSec: this.t, pos: [pos[0], pos[1], pos[2]], phase: this.phase, inside: this.inside, tag: c.tag };
+    this.closest = { minM: c.gapM, tSec: this.c.t, pos: [pos[0], pos[1], pos[2]], phase: this.c.phase, inside: this.c.inside, tag: c.tag };
   }
 
   /**
@@ -240,23 +254,23 @@ class Runner extends IndoorPhases {
    * failsafe lands in place (estimator_fault).
    */
   private poseHealth(): HealthInput['poseHealth'] {
-    if (!this.loc || !this.inside) return null;
-    const h = this.loc.estimate.health;
+    if (!this.c.loc || !this.c.inside) return null;
+    const h = this.c.loc.estimate.health;
     if (h.state !== 'lost') return h;
-    return this.locLostSince >= 0 && this.t - this.locLostSince > LOC_LOST_LAND_SEC ? h : null;
+    return this.locLostSince >= 0 && this.c.t - this.locLostSince > LOC_LOST_LAND_SEC ? h : null;
   }
 
-  protected flyOnEstimate(cmd: VehicleCommand): VehicleCommand {
-    const l = this.loc!;
-    if (this.phase === 'land') return cmd;
+  private flyOnEstimate(cmd: VehicleCommand): VehicleCommand {
+    const l = this.c.loc!;
+    if (this.c.phase === 'land') return cmd;
     if (l.lost) {
       if (this.locLostSince < 0) {
-        this.locLostSince = this.t;
-        this.log('warn', 'Pose estimate lost. Hovering while the scan matcher re-acquires.');
+        this.locLostSince = this.c.t;
+        this.c.log('warn', 'Pose estimate lost. Hovering while the scan matcher re-acquires.');
       }
       return { vel: [0, 0, 0] };
     }
-    if (this.locLostSince >= 0) this.log('info', `Pose estimate re-acquired after ${fmt(this.t - this.locLostSince)} s.`);
+    if (this.locLostSince >= 0) this.c.log('info', `Pose estimate re-acquired after ${fmt(this.c.t - this.locLostSince)} s.`);
     this.locLostSince = -1;
     const d = l.yawError;
     const c = Math.cos(d);
@@ -269,272 +283,82 @@ class Runner extends IndoorPhases {
     };
   }
 
-  protected startReturn(reason: string): void {
-    if (this.finished) return;
-    if (!this.returning) this.log('action', `Returning home: ${reason}.`);
-    this.returning = true;
-    this.suspended = null;
-    this.recoverRank = 0;
-    this.pendingEntry = null;
-    if (this.inside) {
-      this.startExit('rth');
-      return;
-    }
-    this.startReturnOutside();
-  }
-
-  protected startReturnOutside(): void {
-    this.returning = true;
-    const climb = this.climbRoute();
-    const from = climb.length ? climb[climb.length - 1]!.pos : this.vehicle.pos;
-    const plan = planReturn(this.physics, this.air, from, this.world.home, null, this.agl);
-    const wps: Waypoint[] = [...climb.map((w) => ({ ...w, tol: 0.3 })), ...plan.waypoints.map((p) => ({ pos: p, tol: 1.5 }))];
-    this.visit = null;
-    this.setJob(this.followJob('return_home', wps, () => this.startLand('home'), 1.5));
-  }
-
-  protected startLand(reason: string): void {
-    let target: V3 = reason === 'home' ? this.world.home : [this.vehicle.pos[0], this.vehicle.pos[1], this.vehicle.pos[2]];
-    if (reason !== 'home') {
-      this.landingEmergency = true;
-      // In wind the airframe can't hold position in, look for a wider clearing: the drone drifts on the way down.
-      const windy = !!this.health?.flags.has('wind_severe');
-      const site = this.inside ? null : ((windy ? this.landingSite(LAND_COLUMN_WINDY_M, LAND_SEARCH_WINDY_M) : null) ?? this.landingSite());
-      if (site && dist(site, this.vehicle.pos) > 0.3) {
-        target = site;
-        this.log('warn', `Landing in place: ${reason}. Moving ${fmt(dist(site, this.vehicle.pos), 1)} m to clear ground first.`);
-      } else this.log('warn', `Landing in place: ${reason}.`);
-    } else {
-      this.log('action', 'Over the pad. Landing.');
-    }
-    const v = this.visit;
-    const indoorGround = this.inside && v ? v.box.baseZ + floorOf(v.grid, this.vehicle.pos[2] - v.box.baseZ) * v.grid.H + 0.1 : null;
-    // Outdoors the range finder gives the ground under the drone, wherever the position estimate puts it.
-    const groundNow = (): number => {
-      if (indoorGround !== null) return indoorGround;
-      const p = this.truePos ?? this.vehicle.pos;
-      return sampleHeight(this.world.outdoor.terrain, p[0], p[1]);
-    };
-    let settle = 0;
-    let stuck = 0;
-    // Integral on the horizontal error, so a steady wind doesn't leave the drone off the pad.
-    const trim: [number, number] = [0, 0];
-    let touchedAt: V3 | null = null;
-    const landStart = this.t;
-    let moveCheckAt = -Infinity;
-    let moveOpen = false;
-    let movingLogged = false;
-    let gnssHoldLogged = false;
-    this.setJob({
-      phase: 'land',
-      plan: () => [target],
-      tick: (): VehicleCommand => {
-        const pos = this.vehicle.pos;
-        const g = groundNow();
-        const c = landingCommand(pos, target, g);
-        // Over the chosen column before descending, so the drone never sinks onto a roof or into canopy.
-        let aligned = Math.hypot(target[0] - pos[0], target[1] - pos[1]) <= LAND_ALIGN_M;
-        if (!aligned && !this.inside && reason !== 'home' && this.t - landStart > LAND_ALIGN_TIMEOUT_S) {
-          // Re-checked a few times a second; the ray casts are not free.
-          if (this.t - moveCheckAt >= 0.25) {
-            moveCheckAt = this.t;
-            const v = this.vehicle.vel;
-            const ahead: [number, number] = [pos[0] + v[0] * LAND_LOOKAHEAD_S, pos[1] + v[1] * LAND_LOOKAHEAD_S];
-            const open = (x: number, y: number): boolean =>
-              columnClear(this.physics, x, y, sampleHeight(this.world.outdoor.terrain, x, y) + 0.2, pos[2], LAND_COLUMN_M);
-            const was = moveOpen;
-            moveOpen = open(pos[0], pos[1]) && open(ahead[0], ahead[1]) && segmentClear(this.physics, pos, [ahead[0], ahead[1], pos[2]]);
-            if (moveOpen && !was && !movingLogged) {
-              movingLogged = true;
-              this.log('warn', `Can't hold over the landing column in this wind. Descending where the ground below is open.`);
-            }
-          }
-          if (moveOpen) aligned = true;
-          // Over trees or a roof and drifting: hold height and keep working toward the column.
-          else c.vel[2] = Math.max(c.vel[2]!, 0);
-        }
-        if (!aligned && !c.touched) c.vel[2] = Math.max(c.vel[2]!, 0);
-        // Over the pad on dead reckoning, the pad may be metres away and the column below may be trees or
-        // a roof. Hold height until the fix is back; the failsafe lands after gnssLandSec if it never is.
-        if (reason === 'home' && this.health?.flags.has('gnss_lost') && !c.touched) {
-          if (!gnssHoldLogged) {
-            gnssHoldLogged = true;
-            this.log('warn', 'Over the pad on dead reckoning. Holding height until the GNSS fix is back.');
-          }
-          c.vel[2] = Math.max(c.vel[2]!, 0);
-          aligned = false;
-        }
-        for (let i = 0; i < 2; i++) {
-          trim[i] = Math.max(-LAND_TRIM_MAX, Math.min(LAND_TRIM_MAX, trim[i]! + (target[i]! - pos[i]!) * LAND_TRIM_KI * this.dt));
-          c.vel[i] = c.vel[i]! + trim[i]!;
-        }
-        // Like a flight controller's land detector: in the last few tens of centimetres over measured ground,
-        // cut the motors and drop, rather than hover in ground effect where the wind can slide the drone.
-        if (aligned && pos[2] - g <= LAND_CUT_AGL) {
-          this.touchdown([pos[0], pos[1], pos[2]]);
-          return { vel: [0, 0, 0] };
-        }
-        // Resting on something above the expected ground also counts.
-        stuck = aligned && this.vehicle.vel[2] > -0.03 && !c.touched ? stuck + this.dt : 0;
-        if (c.touched || stuck > 1.5) {
-          // Where it first touched: on the ground the motors idle and the wind no longer moves it.
-          touchedAt ??= [pos[0], pos[1], pos[2]];
-          settle += this.dt;
-          if (settle > 0.5) this.touchdown(touchedAt);
-        }
-        return { vel: c.vel };
-      },
-    });
-  }
-
-  /**
-   * Nearest point at the current height, within LAND_SEARCH_M, with an open column down to the
-   * ground and a clear straight line to it. Null when there is none (land straight down then).
-   */
-  protected landingSite(column = LAND_COLUMN_M, search = LAND_SEARCH_M): V3 | null {
-    const pos = this.vehicle.pos;
-    const terrain = this.world.outdoor.terrain;
-    const fence = this.world.outdoor.geofence;
-    // Inside the geofence by the column's width too: the fence stops the drone, and a site past it can't be reached.
-    const inFence = (x: number, y: number): boolean =>
-      containsPoint(fence, x - column, y - column) && containsPoint(fence, x + column, y - column) && containsPoint(fence, x - column, y + column) && containsPoint(fence, x + column, y + column);
-    const open = (x: number, y: number): boolean => inFence(x, y) && columnClear(this.physics, x, y, sampleHeight(terrain, x, y) + 0.2, pos[2], column);
-    if (open(pos[0], pos[1])) return [pos[0], pos[1], pos[2]];
-    for (let r = 1; r <= search; r += 1) {
-      const n = Math.max(8, Math.round(r * 4));
-      for (let k = 0; k < n; k++) {
-        const a = (k / n) * Math.PI * 2;
-        const p: V3 = [pos[0] + Math.cos(a) * r, pos[1] + Math.sin(a) * r, pos[2]];
-        // A drone that can't hold height sinks on the way over, so the leg must also be clear lower down.
-        const low = (q: V3): V3 => [q[0], q[1], q[2] - LAND_SINK_M];
-        if (open(p[0], p[1]) && segmentClear(this.physics, pos, p) && segmentClear(this.physics, low(pos), low(p))) return p;
-      }
-    }
-    return null;
-  }
-
-  protected touchdown(at: V3 = this.vehicle.pos): void {
-    if (this.finished) return;
-    this.landedHome = !this.inside && landedAtHome(at, this.world.home);
-    this.log('action', this.landedHome ? 'Landed at home.' : `Landed away from home at ${this.where(at)}.`);
-    this.finish();
-  }
-
-  protected finish(): void {
-    this.policyRun?.release();
-    if (this.finished) return;
-    this.outcome = this.computeOutcome();
-    this.setPhase('done');
-    const last = this.phases[this.phases.length - 1];
-    if (last) last.tEnd = this.t;
-    this.recordTrack();
-    this.finished = true;
-    this.log(
+  private finish(): void {
+    this.indoor.release();
+    if (this.c.finished) return;
+    this.c.outcome = this.computeOutcome();
+    this.c.setPhase('done');
+    const last = this.c.phases[this.c.phases.length - 1];
+    if (last) last.tEnd = this.c.t;
+    this.c.recordTrack();
+    this.c.finished = true;
+    this.c.log(
       'info',
-      `Mission ${this.outcome}. ${fmt(this.t, 0)} s, battery ${fmt(this.battery.remainingPct(), 0)}% left, ${this.collisions.length} collision(s).`,
+      `Mission ${this.c.outcome}. ${fmt(this.c.t, 0)} s, battery ${fmt(this.c.battery.remainingPct(), 0)}% left, ${this.c.collisions.length} collision(s).`,
     );
-    this.job = this.holdJob('done', 1e9, () => undefined);
+    this.c.job = this.pilot.holdJob('done', 1e9, () => undefined);
   }
 
-  protected computeOutcome(): RunOutcome {
-    if (this.aborted || (this.landingEmergency && !this.landedHome)) return 'aborted';
-    const searchedAll = this.coverageDone && this.pending.length === 0;
+  private computeOutcome(): RunOutcome {
+    if (this.c.aborted || (this.c.landingEmergency && !this.c.landedHome)) return 'aborted';
+    const searchedAll = this.search.coverageDone && this.search.pending.length === 0;
     let out: RunOutcome;
-    if (this.findMission()) {
-      out = requirementsMet(this.mission, this.confirmed) ? 'found' : searchedAll ? 'not_found' : 'incomplete';
-    } else if (this.mission.missionType === 'safety_sweep') {
-      if (this.confirmed.some((c) => c.classId === 'person')) out = 'found';
+    if (this.search.findMission()) {
+      out = requirementsMet(this.c.mission, this.c.confirmed) ? 'found' : searchedAll ? 'not_found' : 'incomplete';
+    } else if (this.c.mission.missionType === 'safety_sweep') {
+      if (this.c.confirmed.some((c) => c.classId === 'person')) out = 'found';
       else {
-        const scopes = new Set(this.declaredClear.map((d) => d.scope));
+        const scopes = new Set(this.c.declaredClear.map((d) => d.scope));
         // Building scopes decide a sweep. The outdoor scope rarely completes near the fence,
         // so it is declared when the source says clear but is not required.
-        const all = this.discovered.size > 0 && [...this.discovered].every((id) => scopes.has(id));
+        const all = this.search.discovered.size > 0 && [...this.search.discovered].every((id) => scopes.has(id));
         out = searchedAll && all ? 'clear' : 'incomplete';
       }
     } else {
       out = 'landed';
     }
-    if (this.hardStopped && out !== 'found' && out !== 'clear') return 'incomplete';
+    if (this.c.hardStopped && out !== 'found' && out !== 'clear') return 'incomplete';
     return out;
   }
 
   // ----------------------------------------------------------- safety
 
-  protected distanceHome(pos: V3): number {
-    const home = this.world.home;
-    if (this.inside && this.visit?.opening) {
-      const c = this.visit.opening.center as V3;
+  private distanceHome(pos: V3): number {
+    const home = this.c.world.home;
+    if (this.c.inside && this.c.visit?.opening) {
+      const c = this.c.visit.opening.center as V3;
       return dist(pos, c) + Math.hypot(c[0] - home[0], c[1] - home[1]);
     }
     return Math.hypot(pos[0] - home[0], pos[1] - home[1]);
   }
 
-  protected checkBudgets(): void {
-    if (this.returning || this.finished || this.phase === 'preflight') return;
-    const pos = this.vehicle.pos;
+  private checkBudgets(): void {
+    if (this.c.returning || this.c.finished || this.c.phase === 'preflight') return;
+    const pos = this.c.vehicle.pos;
     const d = this.distanceHome(pos);
-    const climb = Math.max(0, cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2]);
-    const timeHome = d / 4 + climb / 1.2 + (this.inside ? 60 : 0) + 30;
-    if (this.t + timeHome * 1.2 + 10 >= this.maxSim) {
-      this.startReturn(`time budget (${fmt(this.maxSim - this.t, 0)} s left)`);
+    const climb = Math.max(0, cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2]);
+    const timeHome = d / 4 + climb / 1.2 + (this.c.inside ? 60 : 0) + 30;
+    if (this.c.t + timeHome * 1.2 + 10 >= this.c.maxSim) {
+      this.home.startReturn(`time budget (${fmt(this.c.maxSim - this.c.t, 0)} s left)`);
       return;
     }
-    const need = this.battery.costPct(d, climb) * 1.3 * (this.health?.costScale ?? 1) + (this.inside ? 3 : 0) + 3;
-    if (this.battery.usedPct() + need >= this.mission.budgets.batteryPct) {
-      this.startReturn(`battery budget (${fmt(this.battery.usedPct(), 0)}% used of ${fmt(this.mission.budgets.batteryPct, 0)}%)`);
+    const need = this.c.battery.costPct(d, climb) * 1.3 * (this.c.health?.costScale ?? 1) + (this.c.inside ? 3 : 0) + 3;
+    if (this.c.battery.usedPct() + need >= this.c.mission.budgets.batteryPct) {
+      this.home.startReturn(`battery budget (${fmt(this.c.battery.usedPct(), 0)}% used of ${fmt(this.c.mission.budgets.batteryPct, 0)}%)`);
     }
   }
 
   // ----------------------------------------------------------- faults
 
   /** Advance injected faults: motor thrust, the operator link. */
-  protected advanceFaults(): void {
-    const f = this.faults;
+  private advanceFaults(): void {
+    const f = this.c.faults;
     if (!f) return;
-    f.advance(this.t, this.dt, this.phase);
-    this.vehicle.setThrustAuthority(f.motorEfficiency());
+    f.advance(this.c.t, this.c.dt, this.c.phase);
+    this.c.vehicle.setThrustAuthority(f.motorEfficiency());
     const down = !f.linkUp();
-    if (down !== this.linkDown) this.log(down ? 'warn' : 'info', down ? 'Operator link down.' : 'Operator link back.');
-    this.linkDown = down;
-  }
-
-  /**
-   * Nominal GNSS error with a fix: a first-order Gauss-Markov process, GNSS_SIGMA_H_M horizontally and
-   * GNSS_SIGMA_V_M vertically with a GNSS_TAU_S correlation time, as an RTK receiver's fixed solution
-   * wanders. Drawn every tick from its own stream, so it never shifts another random draw.
-   */
-  private gnssNoise: V3 = [0, 0, 0];
-  private gnssRng: RNG | null = null;
-
-  protected stepGnss(): void {
-    this.gnssRng ??= new RNG(this.world.seed >>> 0, 'gnss-rtk');
-    const a = Math.exp(-this.dt / GNSS_TAU_S);
-    const b = Math.sqrt(1 - a * a);
-    const sig = [GNSS_SIGMA_H_M, GNSS_SIGMA_H_M, GNSS_SIGMA_V_M];
-    for (let i = 0; i < 3; i++) this.gnssNoise[i] = this.gnssNoise[i]! * a + sig[i]! * b * this.gnssRng.gaussian();
-  }
-
-  /** Run `fn` with the vehicle at the position the drone believes it is at. */
-  /** The true position while believed() runs on a GNSS estimate; the range finder measures from here. */
-  private truePos: V3 | null = null;
-  private gnssPadHoldLogged = false;
-
-  protected believed<T>(fn: () => T): T {
-    if (this.inside) return fn();
-    // With a fix, an RTK-grade receiver's few centimetres; without one, the dead-reckoning drift on top.
-    const lost = this.faults?.gnss();
-    const n = this.gnssNoise;
-    const d = lost && !lost.fix ? lost.errorM : null;
-    const e: V3 = d ? [n[0] + d[0], n[1] + d[1], n[2] + d[2]] : n;
-    const truth = this.vehicle.pos;
-    this.vehicle.pos = [truth[0] + e[0], truth[1] + e[1], truth[2] + e[2]];
-    this.truePos = truth;
-    try {
-      return fn();
-    } finally {
-      this.vehicle.pos = truth;
-      this.truePos = null;
-    }
+    if (down !== this.c.linkDown) this.c.log(down ? 'warn' : 'info', down ? 'Operator link down.' : 'Operator link back.');
+    this.c.linkDown = down;
   }
 
   /**
@@ -542,30 +366,30 @@ class Runner extends IndoorPhases {
    * dead-reckoning guess, so climb to cruise height (height comes from the barometer and range
    * finder, which still work) and back away from the nearest building, instead of flying the plan.
    */
-  protected climbClear(cmd: VehicleCommand): VehicleCommand {
-    const flags = this.health?.flags;
+  private climbClear(cmd: VehicleCommand): VehicleCommand {
+    const flags = this.c.health?.flags;
     // Without a fix, hold position by climbing rather than hovering where drift can carry the drone into a wall.
     // In strong wind, get above the roofline before the trip home, since the gusts push the drone around near walls.
-    const gnss = flags?.has('gnss_lost') && !this.returning;
-    const pos = this.vehicle.pos;
+    const gnss = flags?.has('gnss_lost') && !this.c.returning;
+    const pos = this.c.vehicle.pos;
     // Not on the final descent over the pad: the clearing around home is open, and climbing back up there
     // turns a landing into a climb-descend cycle that never ends.
-    const atHome = Math.hypot(pos[0] - this.world.home[0], pos[1] - this.world.home[1]) < CLIMB_CLEAR_HOME_M;
+    const atHome = Math.hypot(pos[0] - this.c.world.home[0], pos[1] - this.c.world.home[1]) < CLIMB_CLEAR_HOME_M;
     const severe = flags?.has('wind_severe') && !atHome;
     // Home on dead reckoning: the descent over the pad would put the drone down metres from it, among
     // trees. Hold at cruise height over the believed pad until the fix is back.
-    if (flags?.has('gnss_lost') && this.returning && this.phase === 'return_home' && atHome && !this.inside) {
+    if (flags?.has('gnss_lost') && this.c.returning && this.c.phase === 'return_home' && atHome && !this.c.inside) {
       if (!this.gnssPadHoldLogged) {
         this.gnssPadHoldLogged = true;
-        this.log('warn', 'Over the pad on dead reckoning. Holding at cruise height until the GNSS fix is back.');
+        this.c.log('warn', 'Over the pad on dead reckoning. Holding at cruise height until the GNSS fix is back.');
       }
       return { ...cmd, vel: [cmd.vel[0]!, cmd.vel[1]!, Math.max(cmd.vel[2]!, 0)] };
     }
-    if (!(gnss || severe) || this.inside || this.phase === 'land' || this.phase === 'done') return cmd;
-    const vz = Math.max(0, Math.min(1.2, cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2]));
+    if (!(gnss || severe) || this.c.inside || this.c.phase === 'land' || this.c.phase === 'done') return cmd;
+    const vz = Math.max(0, Math.min(1.2, cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2]));
     let away: [number, number] = [0, 0];
     let nearest = Infinity;
-    for (const b of this.world.buildings) {
+    for (const b of this.c.world.buildings) {
       const ring = b.footprint;
       const cx = ring.reduce((a, p) => a + p.x, 0) / ring.length;
       const cy = ring.reduce((a, p) => a + p.y, 0) / ring.length;
@@ -577,11 +401,11 @@ class Runner extends IndoorPhases {
     }
     // Only near a building, and only until the drone is up at cruise height. Within half a metre counts:
     // the altitude loop holds a few centimetres low in wind, and a stricter test never hands back.
-    const below = cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2] > CLIMB_CLEAR_TOL_M;
+    const below = cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2] > CLIMB_CLEAR_TOL_M;
     if (!gnss && !below) return cmd;
     // Back away and climb only where the way is open: away from the building's middle can be into a tree,
     // and straight up next to a wall can be under the eaves.
-    const step = (d: V3): boolean => segmentClear(this.physics, pos, [pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]]);
+    const step = (d: V3): boolean => segmentClear(this.c.physics, pos, [pos[0] + d[0], pos[1] + d[1], pos[2] + d[2]]);
     const near = nearest < 15 && below && step([away[0] * 1.5, away[1] * 1.5, 0]);
     const up = vz > 0 && step([0, 0, 1.5]) ? vz : 0;
     // Boxed in, under eaves or branches with no open way back: leave the flight to the job, whose route
@@ -591,116 +415,116 @@ class Runner extends IndoorPhases {
   }
 
   /** ESC telemetry: achieved over commanded thrust per motor, with a little measurement noise. */
-  protected motorTelemetry(): number[] {
-    const eff = this.faults?.motorEfficiency() ?? [1, 1, 1, 1];
-    return eff.map((e) => Math.min(1.05, e + this.escNoise.gaussian() * 0.01));
+  private motorTelemetry(): number[] {
+    const eff = this.c.faults?.motorEfficiency() ?? [1, 1, 1, 1];
+    return eff.map((e) => Math.min(1.05, e + this.c.escNoise.gaussian() * 0.01));
   }
 
-  protected checkHealth(): void {
-    const pos = this.vehicle.pos;
-    const home = this.world.home;
+  private checkHealth(): void {
+    const pos = this.c.vehicle.pos;
+    const home = this.c.world.home;
     const dh = Math.hypot(home[0] - pos[0], home[1] - pos[1]);
-    const climb = Math.max(0, cruiseZ(this.air, pos[0], pos[1], this.agl) - pos[2]);
-    const seen = this.failsafe.events().length;
-    const verdict = this.failsafe.check({
-      tSec: this.t,
-      dt: this.dt,
-      phase: this.phase,
-      inside: this.inside,
-      linkUp: !this.linkDown,
-      cameraFrame: this.faults?.cameraUp() ?? true,
-      lidar: this.lastRing,
-      lidarExpected: this.lastExpected,
-      gnssFix: this.faults ? this.faults.gnss().fix : true,
+    const climb = Math.max(0, cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2]);
+    const seen = this.c.failsafe.events().length;
+    const verdict = this.c.failsafe.check({
+      tSec: this.c.t,
+      dt: this.c.dt,
+      phase: this.c.phase,
+      inside: this.c.inside,
+      linkUp: !this.c.linkDown,
+      cameraFrame: this.c.faults?.cameraUp() ?? true,
+      lidar: this.c.lastRing,
+      lidarExpected: this.c.lastExpected,
+      gnssFix: this.c.faults ? this.c.faults.gnss().fix : true,
       poseHealth: this.poseHealth(),
       motorRatio: this.motorTelemetry(),
-      batteryPct: this.battery.remainingPct(),
-      modelPowerW: this.lastPowerW,
+      batteryPct: this.c.battery.remainingPct(),
+      modelPowerW: this.c.lastPowerW,
       usableWh: USABLE_WH,
-      costHomePct: this.battery.costPct(this.distanceHome(pos), climb),
-      budgetPct: this.mission.budgets.batteryPct,
-      windEstimate: this.inside ? null : this.windEstimate,
+      costHomePct: this.c.battery.costPct(this.distanceHome(pos), climb),
+      budgetPct: this.c.mission.budgets.batteryPct,
+      windEstimate: this.c.inside ? null : this.c.windEstimate,
       homeDistM: dh,
       toHome: dh > 1e-6 ? [(home[0] - pos[0]) / dh, (home[1] - pos[1]) / dh] : [1, 0],
       cruiseMps: DEFAULT_BATTERY.cruiseMps,
     });
-    this.lastRing = null;
-    this.lastExpected = null;
-    this.health = verdict;
-    for (const e of this.failsafe.events().slice(seen)) this.log(e.action === 'none' ? 'info' : 'warn', e.message);
+    this.c.lastRing = null;
+    this.c.lastExpected = null;
+    this.c.health = verdict;
+    for (const e of this.c.failsafe.events().slice(seen)) this.c.log(e.action === 'none' ? 'info' : 'warn', e.message);
     if (verdict.action.kind !== 'none') this.handleSafety(verdict.action);
   }
 
-  protected checkSafety(pos: V3): void {
+  private checkSafety(pos: V3): void {
     const look = 0.5;
-    const predicted: V3 = [pos[0] + this.lastCmd.vel[0] * look, pos[1] + this.lastCmd.vel[1] * look, pos[2] + this.lastCmd.vel[2] * look];
-    const action = this.monitor.check({
-      tSec: this.t,
-      pose: this.vehicle.pose(),
+    const predicted: V3 = [pos[0] + this.c.lastCmd.vel[0] * look, pos[1] + this.c.lastCmd.vel[1] * look, pos[2] + this.c.lastCmd.vel[2] * look];
+    const action = this.c.monitor.check({
+      tSec: this.c.t,
+      pose: this.c.vehicle.pose(),
       predicted,
-      battery: this.battery,
+      battery: this.c.battery,
       distanceHomeM: this.distanceHome(pos),
-      collided: this.lastCollided,
-      inside: this.inside,
-      phase: this.phase,
+      collided: this.c.lastCollided,
+      inside: this.c.inside,
+      phase: this.c.phase,
     });
-    this.lastCollided = false;
+    this.c.lastCollided = false;
     if (action.kind !== 'none') this.handleSafety(action);
   }
 
-  protected handleSafety(action: SafetyAction): void {
+  private handleSafety(action: SafetyAction): void {
     const rank = RANK[action.kind];
     if (action.kind === 'land') {
-      if (this.phase !== 'land') {
-        this.log('warn', `Safety: ${action.reason}.`);
-        this.suspended = null;
-        this.startLand(action.reason);
+      if (this.c.phase !== 'land') {
+        this.c.log('warn', `Safety: ${action.reason}.`);
+        this.c.suspended = null;
+        this.home.startLand(action.reason);
       }
       return;
     }
-    if (action.kind === 'exit_building' && this.inside && this.phase === 'exit') {
-      if (!this.returning) this.log('warn', `Safety: ${action.reason}. Returning home after the exit.`);
-      this.returning = true;
+    if (action.kind === 'exit_building' && this.c.inside && this.c.phase === 'exit') {
+      if (!this.c.returning) this.c.log('warn', `Safety: ${action.reason}. Returning home after the exit.`);
+      this.c.returning = true;
       return;
     }
     if (action.kind === 'return_home' || action.kind === 'exit_building') {
-      if (this.returning) return;
-      this.log('warn', `Safety: ${action.reason}.`);
-      this.startReturn(`safety (${action.reason})`);
+      if (this.c.returning) return;
+      this.c.log('warn', `Safety: ${action.reason}.`);
+      this.home.startReturn(`safety (${action.reason})`);
       return;
     }
     // hold and backtrack are latched in the recover phase.
-    if (this.phase === 'recover' && rank <= this.recoverRank) return;
-    if (this.phase === 'land' || this.phase === 'done') return;
-    const resume = this.suspended ?? this.job;
-    this.suspended = resume;
-    this.recoverRank = rank;
-    this.log('warn', `Safety ${action.kind}: ${action.reason}.`);
+    if (this.c.phase === 'recover' && rank <= this.c.recoverRank) return;
+    if (this.c.phase === 'land' || this.c.phase === 'done') return;
+    const resume = this.c.suspended ?? this.c.job;
+    this.c.suspended = resume;
+    this.c.recoverRank = rank;
+    this.c.log('warn', `Safety ${action.kind}: ${action.reason}.`);
     const back = () => {
-      const job = this.suspended;
-      this.suspended = null;
-      this.recoverRank = 0;
-      if (job) this.setJob(job);
+      const job = this.c.suspended;
+      this.c.suspended = null;
+      this.c.recoverRank = 0;
+      if (job) this.c.setJob(job);
     };
     if (action.kind === 'hold') {
-      this.setJob(this.holdJob('recover', action.seconds ?? 1, back));
+      this.c.setJob(this.pilot.holdJob('recover', action.seconds ?? 1, back));
       return;
     }
     // Backtrack: retrace the breadcrumb trail.
     const meters = action.meters ?? 1.5;
-    const pos = this.navPos;
+    const pos = this.c.navPos;
     const trail: Waypoint[] = [];
     let acc = 0;
     let prev: V3 = pos;
-    for (let i = this.crumbs.length - 1; i >= 0 && acc < meters; i--) {
-      const c = this.crumbs[i]!;
+    for (let i = this.c.crumbs.length - 1; i >= 0 && acc < meters; i--) {
+      const c = this.c.crumbs[i]!;
       const d = dist(prev, c);
       if (d < 0.05) continue;
       acc += d;
-      trail.push({ pos: c, yaw: this.navYaw });
+      trail.push({ pos: c, yaw: this.c.navYaw });
       prev = c;
     }
-    this.setJob(this.followJob('recover', trail, back, 0.15));
+    this.c.setJob(this.pilot.followJob('recover', trail, back, 0.15));
   }
 }
 
