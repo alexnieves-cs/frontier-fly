@@ -68,7 +68,7 @@ export class RaceEngine {
       lane.steps += 1;
       if (r.done || lane.steps >= this.maxSteps) {
         lane.done = true;
-        lane.reason = endReason(true, lane.steps, this.maxSteps, lane.coverage, r.truncated, lane.collisions, this.maxCollisions);
+        lane.reason = endReason(true, lane.steps, this.maxSteps, lane.coverage, r.truncated, lane.collisions, this.maxCollisions, r.info.crashed);
       }
     }
   }

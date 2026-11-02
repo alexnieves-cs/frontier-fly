@@ -52,6 +52,7 @@ const OUTCOME_LABELS: Record<AutonomyReport['outcome'], string> = {
   not_found: 'Searched everything, target not found',
   incomplete: 'Stopped at a budget before the search finished',
   aborted: 'Stopped by the operator',
+  crashed: 'Crashed: hit a surface too fast',
   landed: 'Landed early',
 };
 

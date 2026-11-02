@@ -112,6 +112,8 @@ export class MissionCore {
   finished = false;
   hardStopped = false;
   aborted = false;
+  /** The crash rule ended the flight (shared/constants.ts CRASH_SPEED). */
+  crashed = false;
   returning = false;
   landingEmergency = false;
   inside: string | null = null;

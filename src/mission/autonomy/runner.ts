@@ -25,6 +25,7 @@ import { SearchPhase } from './phases/search';
 import { DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
 import { DEFAULT_BATTERY } from './battery';
 import type { HealthInput } from './failsafe';
+import { CRASH_SPEED } from '../../shared/constants';
 
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
 /**
@@ -215,12 +216,23 @@ class Runner implements MissionRunner {
     this.c.aperture?.sense(this.c.vehicle.pos, this.c.vehicle.vel, this.c.vehicle.yaw, this.c.dt);
     if (step.collided) {
       const pos = this.c.vehicle.pos;
+      const crash = step.impactSpeed > CRASH_SPEED;
       this.c.collisions.push({
         tSec: this.c.t,
         pos: [pos[0], pos[1], pos[2]],
         inside: this.c.inside,
+        speed: Math.round(step.impactSpeed * 100) / 100,
+        ...(crash ? { crash: true } : {}),
       });
-      this.c.log('warn', `Contact at ${this.c.where(pos)}${this.c.inside ? ' inside the building' : ''} during ${this.c.phase.replace('_', ' ')}.`);
+      const where = `${this.c.where(pos)}${this.c.inside ? ' inside the building' : ''} during ${this.c.phase.replace('_', ' ')}`;
+      if (crash) {
+        // The crash rule: the airframe is down where it hit, so the flight ends here.
+        this.c.log('warn', `Crash at ${where}: hit at ${fmt(step.impactSpeed, 1)} m/s, over the ${fmt(CRASH_SPEED, 1)} m/s crash limit.`);
+        this.c.crashed = true;
+        this.finish();
+        return;
+      }
+      this.c.log('warn', `Contact at ${where}, ${fmt(step.impactSpeed, 1)} m/s.`);
       if (this.c.visit && this.c.phase === 'indoor_explore') this.c.visit.policyCollisions += 1;
     }
     if (this.c.options.measureClearance) this.measureClearance();
@@ -301,6 +313,7 @@ class Runner implements MissionRunner {
   }
 
   private computeOutcome(): RunOutcome {
+    if (this.c.crashed) return 'crashed';
     if (this.c.aborted || (this.c.landingEmergency && !this.c.landedHome)) return 'aborted';
     const searchedAll = this.search.coverageDone && this.search.pending.length === 0;
     let out: RunOutcome;

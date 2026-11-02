@@ -13,6 +13,8 @@ function quietConfig(): EpisodeConfig {
   cfg.maxSteps = 100_000;
   cfg.stallSteps = 100_000;
   cfg.maxCollisions = 100_000;
+  // Pinned into a corner on purpose: contacts here are the point, not crashes.
+  cfg.crashSpeed = Infinity;
   return cfg;
 }
 

@@ -81,6 +81,10 @@ export interface GenParams {
 export interface StepInfo {
   coverage: number;
   collisions: number;
+  /** Speed into the surface of a contact that started this step, m/s (0 without one). */
+  impactSpeed: number;
+  /** The crash rule ended the flight: a contact started faster than the crash speed. */
+  crashed: boolean;
   floor: number;
   newRoom: boolean;
   newFloor: boolean;
@@ -163,6 +167,8 @@ export interface EpisodeConfig {
   stallSteps?: number;
   /** Hard collisions before the episode ends. Defaults to MAX_HARD_COLLISIONS. */
   maxCollisions?: number;
+  /** Impact speed into a surface that counts as a crash and ends the episode, m/s. Defaults to CRASH_SPEED. */
+  crashSpeed?: number;
   /**
    * Horizontal speed a full action asks for, m/s. Defaults to MAX_SPEED_H
    * (2 m/s), which every shipped checkpoint was trained at.

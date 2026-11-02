@@ -126,12 +126,16 @@ export class QuadVehicle extends Vehicle {
     const delta: V3 = [s.pos[0] - before[0], s.pos[1] - before[1], s.pos[2] - before[2]];
     const moved = this.move(before, delta);
     this.pos = [moved.pos[0], moved.pos[1], moved.pos[2]];
+    let lost = 0;
     if (moved.hit) {
       // The tick's motion was cut short by a surface: keep only the velocity that happened.
       for (let k = 0; k < 3; k++) {
         const real = (this.pos[k]! - before[k]!) / dt;
-        if (Math.abs(real - delta[k]! / dt) > 1e-3) s.vel[k] = real;
+        const cut = real - delta[k]! / dt;
+        lost += cut * cut;
+        if (Math.abs(cut) > 1e-3) s.vel[k] = real;
       }
+      lost = Math.sqrt(lost);
     }
     s.pos[0] = this.pos[0];
     s.pos[1] = this.pos[1];
@@ -140,6 +144,6 @@ export class QuadVehicle extends Vehicle {
     this.accel = [(s.vel[0] - prevVel[0]) / dt, (s.vel[1] - prevVel[1]) / dt, (s.vel[2] - prevVel[2]) / dt];
     this.yaw = ((s.yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     this.yawRate = this.dyn.bodyRates[2] ?? 0;
-    return this.finishStep(before, dt, moved.hit);
+    return this.finishStep(before, dt, moved.hit, lost);
   }
 }

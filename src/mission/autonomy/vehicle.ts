@@ -82,6 +82,8 @@ export interface ImuReading {
 export interface VehicleStep {
   /** A new contact started this tick. */
   collided: boolean;
+  /** Speed into the surface when a new contact started this tick (the velocity the surface took away), m/s; 0 otherwise. */
+  impactSpeed: number;
   /** Any contact this tick (including sliding). */
   touching: boolean;
   powerW: number;
@@ -216,7 +218,8 @@ export class Vehicle {
     this.pos = [moved.pos[0], moved.pos[1], moved.pos[2]];
     // The velocity that actually happened after sliding.
     const real: V3 = [(this.pos[0] - before[0]) / dt, (this.pos[1] - before[1]) / dt, (this.pos[2] - before[2]) / dt];
-    const blocked = Math.hypot(real[0] - vx, real[1] - vy, real[2] - vz) > 1e-3;
+    const lost = Math.hypot(real[0] - vx, real[1] - vy, real[2] - vz);
+    const blocked = lost > 1e-3;
     if (blocked) {
       vx = real[0];
       vy = real[1];
@@ -232,11 +235,11 @@ export class Vehicle {
     this.accel = [(vx - this.vel[0]) / dt, (vy - this.vel[1]) / dt, (vz - this.vel[2]) / dt];
     if (blocked) this.accel = [ax, ay, az];
     this.vel = [vx, vy, vz];
-    return this.finishStep(before, dt, moved.hit);
+    return this.finishStep(before, dt, moved.hit, moved.hit ? lost : 0);
   }
 
   /** Bookkeeping shared by every airframe: odometer, clock, contact events, battery. */
-  protected finishStep(before: V3, dt: number, touching: boolean): VehicleStep {
+  protected finishStep(before: V3, dt: number, touching: boolean, lostSpeed = 0): VehicleStep {
     this.odometer += Math.hypot(this.pos[0] - before[0], this.pos[1] - before[1], this.pos[2] - before[2]);
     this.tSec += dt;
     const collided = touching && this.tSec - this.lastTouch > CONTACT_GAP_SEC;
@@ -244,7 +247,7 @@ export class Vehicle {
     if (collided) this.contacts += 1;
     const powerW = this.battery.powerFor(this.vel, this.accel);
     this.battery.draw(powerW, dt);
-    return { collided, touching, powerW };
+    return { collided, impactSpeed: collided ? lostSpeed : 0, touching, powerW };
   }
 
   /** Move by delta, sliding along solids; the open-air fast path when nothing is near. */

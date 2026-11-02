@@ -4,7 +4,7 @@
 // The small fixed protocol in docs/benchmarks.json is a smoke check and is not shown here.
 // docs/headline.json is the small extract of those cells that scripts/docs/generate.mjs writes, so the page
 // does not ship the study's per-episode rows.
-import { cells as studyCells, commit, conditions, seedsPerCondition } from '../../docs/headline.json';
+import { cells as studyCells, commit, conditions, crashSpeed, seedsPerCondition } from '../../docs/headline.json';
 
 interface StudyCell {
   condition: string;
@@ -15,6 +15,8 @@ interface StudyCell {
   coverageCi: number[];
   collisionsPerEpisode: number;
   episodesWithCollision: number;
+  /** Flights the crash rule ended; null in a study run before the rule. */
+  crashes: number | null;
 }
 
 export const pct = (x: number): string => `${(x * 100).toFixed(1)}%`;
@@ -33,33 +35,42 @@ export interface PilotResult {
   ci: [number, number];
   /** Wall contacts per flight on the same buildings. */
   contacts: number;
+  /** Flights a crash ended (shared/constants.ts CRASH_SPEED), of `episodes`; null before the rule. */
+  crashes: number | null;
+  episodes: number;
   tone: 'policy' | 'teacher' | 'base';
 }
 
 function pilot(id: string, name: string, tone: PilotResult['tone']): PilotResult {
   const c = cell('hard', 'day', id);
-  return { name, value: c.coverage, ci: [c.coverageCi[0] ?? NaN, c.coverageCi[1] ?? NaN], contacts: c.collisionsPerEpisode, tone };
+  return { name, value: c.coverage, ci: [c.coverageCi[0] ?? NaN, c.coverageCi[1] ?? NaN], contacts: c.collisionsPerEpisode, crashes: c.crashes, episodes: c.episodes, tone };
 }
 
 /** Headline numbers from docs/study.json, computed the way scripts/docs/generate.mjs computes its target table. */
 export function results() {
   const hard = conditions.find((c) => c.id === 'hard')!;
-  const policy = pilot('policy', 'Learned policy (ships in the page)', 'policy');
+  // The guarded policy leads: it is what missions fly indoors (the policy under its lidar safety layer).
+  const guarded = pilot('guarded', 'Learned policy + lidar guard (what missions fly)', 'policy');
+  const policy = pilot('policy', 'Learned policy alone', 'policy');
   const teacher = pilot('teacher', 'Oracle (the privileged teacher)', 'teacher');
   return {
     hardStage: hard.stage,
     seeds: seedsPerCondition,
     pilots: [
+      guarded,
       policy,
       teacher,
       pilot('classical', 'Sensor-only planner (no learning)', 'base'),
       pilot('waypoint', 'Frontier follower (no learning)', 'base'),
       pilot('heuristic', 'Lidar heuristic', 'base'),
     ],
-    policyLeads: policy.value > teacher.value,
-    easy: cell('easy', 'day', 'policy').coverage,
-    nightOverDay: cell('hard', 'night-dark', 'policy').coverage / policy.value,
+    /** The policy alone crashes more than under its guard (it learned before the crash rule). */
+    guardSaves: policy.crashes !== null && guarded.crashes !== null && policy.crashes > guarded.crashes,
+    easy: cell('easy', 'day', 'guarded').coverage,
+    nightOverDay: cell('hard', 'night-dark', 'guarded').coverage / guarded.value,
     commit: commit.slice(0, 7),
+    /** The crash speed the study ran under, m/s; null before the crash rule. */
+    crashSpeed: crashSpeed as number | null,
   };
 }
 

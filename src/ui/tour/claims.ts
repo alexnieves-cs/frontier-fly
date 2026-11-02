@@ -34,7 +34,7 @@ export function buildClaims(r: Results = results(), a: AtlasRates = atlasRates()
     {
       value: pct(r.pilots[0]!.value),
       label: 'of unseen hard buildings searched',
-      condition: `Mean of ${r.seeds} fresh stage ${r.hardStage} buildings, daylight, 95% interval ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}, ${r.pilots[0]!.contacts.toFixed(1)} wall contacts per flight.`,
+      condition: `Mean of ${r.seeds} fresh stage ${r.hardStage} buildings, daylight, 95% interval ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}, ${r.pilots[0]!.contacts.toFixed(1)} wall contacts per flight${r.pilots[0]!.crashes !== null ? `, ${r.pilots[0]!.crashes} of ${r.pilots[0]!.episodes} flights ended by a crash` : ''}.`,
       tone: 'result',
     },
     {
