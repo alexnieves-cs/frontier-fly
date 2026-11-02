@@ -1,8 +1,9 @@
 import '../film/film.css';
 import './landing.css';
 import type { FilmStatus } from '../film/page';
-import { REPO_URL as REPO, siteHeader } from '../ui/siteNav';
-import { isWebglError, showStartError } from '../ui/startError';
+import { savingData } from '../ui/network';
+import { prefersReducedMotion, REPO_URL as REPO, siteHeader } from '../ui/siteNav';
+import { isWebglError } from '../ui/startError';
 import { atlasRates } from '../ui/tour/claims';
 import { pct, results, type PilotResult } from './results';
 
@@ -32,17 +33,19 @@ function markup(): string {
   return `
   <div class="landing">
     ${siteHeader('home', { heading: false })}
-    <section class="hero" data-tour="hero" aria-label="Live mission replay">
+    <section class="hero" data-tour="hero" aria-label="Mission replay">
       <div class="hero-film" id="hero-film"></div>
-      <div class="hero-poster" id="hero-poster" role="status" aria-live="polite">
-        <div class="poster-inner">
-          <span class="poster-logo" aria-hidden="true"></span>
-          <p class="poster-kicker">LIVE IN YOUR BROWSER</p>
-          <p class="poster-title">Injured hiker in a cabin</p>
-          <p class="poster-status" id="poster-status">Flying the mission headless…</p>
-          <span class="poster-bar" aria-hidden="true"><span></span></span>
-        </div>
+      <div class="hero-poster" id="hero-poster">
+        <img class="hero-still" src="./hero/poster.webp" width="960" height="540" alt="" fetchpriority="high" decoding="async" />
+        <video class="hero-loop" muted playsinline loop preload="none" aria-hidden="true" tabindex="-1" disablepictureinpicture>
+          <source src="./hero/loop.webm" type="video/webm" />
+          <source src="./hero/loop.mp4" type="video/mp4" />
+        </video>
       </div>
+      <p class="hero-badge" id="hero-badge" role="status" aria-live="polite">
+        <span class="badge-dot" aria-hidden="true"></span><span id="poster-status">Recorded flight · starting the live sim…</span>
+      </p>
+      <button type="button" class="hero-live" id="hero-live" hidden>Fly it live in this tab (about 7 MB)</button>
     </section>
 
     <section class="intro">
@@ -117,41 +120,100 @@ function markup(): string {
   </div>`;
 }
 
+/** Plays the recorded loop under the poster frame, unless the visitor asked for less motion or to save data. */
+function playLoop(video: HTMLVideoElement, poster: HTMLElement): void {
+  if (prefersReducedMotion() || savingData()) return;
+  video.preload = 'auto';
+  video.addEventListener('playing', () => poster.classList.add('moving'), { once: true });
+  // Autoplay can be refused (Low Power Mode, some embeds): the poster frame stays, which is fine.
+  video.play().catch(() => undefined);
+}
+
+function hasWebgl(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    return Boolean(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
+
+/** Runs `fn` once the page has loaded, the browser is idle, and the hero is on screen. */
+function whenSettledAndVisible(target: HTMLElement, fn: () => void): void {
+  const onScreen = () => {
+    const io = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      io.disconnect();
+      fn();
+    });
+    io.observe(target);
+  };
+  const idle = () => {
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(onScreen, { timeout: 1500 });
+    else setTimeout(onScreen, 200);
+  };
+  if (document.readyState === 'complete') idle();
+  else window.addEventListener('load', idle, { once: true });
+}
+
 function start(root: HTMLElement): void {
   root.innerHTML = markup();
-  // The page is usable now; the hero keeps loading behind its poster.
+  // The page is usable now; the hero shows the recorded flight while the live replay loads behind it.
   root.dataset.ready = '1';
+  const hero = root.querySelector<HTMLElement>('.hero')!;
   const film = root.querySelector<HTMLElement>('#hero-film')!;
   const poster = root.querySelector<HTMLElement>('#hero-poster')!;
+  const video = root.querySelector<HTMLVideoElement>('.hero-loop')!;
+  const badge = root.querySelector<HTMLElement>('#hero-badge')!;
   const text = root.querySelector<HTMLElement>('#poster-status')!;
+  const live = root.querySelector<HTMLButtonElement>('#hero-live')!;
+  root.querySelector('#tour-start')!.addEventListener('click', () => void import('../ui/tour').then((m) => m.startTour()));
+  // A link straight to the tour's closing card (?tour=end) is about the numbers: the poster frame is enough.
+  if (new URLSearchParams(location.search).get('tour') === 'end') {
+    badge.hidden = true;
+    return;
+  }
+  playLoop(video, poster);
   const onStatus = (status: FilmStatus, message: string) => {
-    if (status === 'flying') text.textContent = 'Flying the mission headless in your tab…';
-    else if (status === 'building') text.textContent = 'Building the world…';
+    if (status === 'flying') text.textContent = 'Recorded flight · flying the mission live in your tab…';
+    else if (status === 'building') text.textContent = 'Recorded flight · building the live 3D replay…';
     else if (status === 'ready') {
       poster.classList.add('hidden');
       poster.setAttribute('aria-hidden', 'true');
+      badge.classList.add('live');
+      text.textContent = 'Live · flown and drawn in your tab';
+      // The live replay has taken over: stop decoding the recording.
+      window.setTimeout(() => video.pause(), 700);
+      window.setTimeout(() => badge.classList.add('faded'), 5000);
     } else {
-      poster.classList.add('failed');
-      // Without WebGL the film page fails too, so point at the recorded flights instead.
-      if (isWebglError(message)) showStartError(text, message);
-      else text.innerHTML = 'The live replay could not start here. <a href="./film.html">Open the mission film</a>';
+      // The recording keeps playing; say why it is not live and offer the full film page.
+      badge.classList.add('failed');
+      if (isWebglError(message)) text.textContent = 'Recorded flight · the live replay needs WebGL, which is off in this browser';
+      else text.innerHTML = 'Recorded flight · the live replay could not start here. <a href="./film.html">Open the mission film</a>';
       console.warn('Landing hero:', message);
     }
   };
-  root.querySelector('#tour-start')!.addEventListener('click', () => void import('../ui/tour').then((m) => m.startTour()));
-  // A link straight to the tour's closing card (?tour=end) is about the numbers: skip the 3D hero.
-  if (new URLSearchParams(location.search).get('tour') === 'end') {
-    poster.classList.add('hidden');
-    poster.setAttribute('aria-hidden', 'true');
-    return;
-  }
-  // The film (three.js, the physics engine, the mission stack) is most of the page's code: load it after the
-  // landing markup paints, and let the markup paint before the headless flight takes the main thread.
-  window.setTimeout(() => {
+  // The film (three.js, the physics engine, the mission stack, ~7 MB in all) is most of the page: it waits until
+  // the page has loaded and the recorded loop is up, then flies and builds behind the loop and fades in when ready.
+  const goLive = () => {
+    live.hidden = true;
+    if (!hasWebgl()) {
+      onStatus('error', 'WebGL is not available');
+      return;
+    }
+    text.textContent = 'Recorded flight · loading the live sim…';
     import('../film/page')
       .then(({ startFilm }) => startFilm(film, { embed: true, scenario: HERO_SCENARIO, onStatus }))
       .catch((error: unknown) => onStatus('error', error instanceof Error ? error.message : String(error)));
-  }, 120);
+  };
+  if (savingData()) {
+    // Data saver or a 2G link: keep the poster frame, and load the live replay only on request.
+    text.textContent = 'Recorded flight · data saver is on';
+    live.hidden = false;
+    live.addEventListener('click', goLive, { once: true });
+    return;
+  }
+  whenSettledAndVisible(hero, goLive);
 }
 
 const root = document.querySelector('#app');
