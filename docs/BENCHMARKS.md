@@ -8,11 +8,12 @@ Measured 2026-10-22 at commit `228cea7` on 4 cores of Intel(R) Xeon(R) Processor
 
 ## Against the project goals
 
-| Goal | Target | Measured (browser pilot) | Status |
+| Goal | Target | Measured | Status |
 | --- | --- | --- | --- |
-| Coverage, easy buildings | ≥ 80.0% | 95.1% mean of 4 | ✅ meets |
-| Coverage, new hard buildings | ≥ 60.0% | 86.1% mean of 3 | ✅ meets |
-| Night coverage vs day | ≥ 90.0% | 100.8% | ✅ meets |
+| Coverage, easy buildings (policy) | ≥ 80.0% | 95.1% (95.1–95.1), 30 fresh | ✅ meets |
+| Coverage, new hard buildings (policy) | ≥ 60.0% | 80.0% (76.3–83.6), 30 fresh, 3.4 wall contacts per flight | ✅ meets |
+| Coverage, new hard buildings (policy + lidar guard) | ≥ 60.0% | 77.1% (73.3–80.6), 30 fresh, 0.2 wall contacts per flight | ✅ meets |
+| Night coverage vs day, hard buildings (policy) | ≥ 90.0% | 100.0%, 30 fresh | ✅ meets |
 | Kinematic env step | ≤ 0.3 ms | 0.141 ms | ✅ meets |
 | Env steps/s, 4 workers, physics + sensors | ≥ 10,000 | 20,465 | ✅ meets |
 | Env steps/s, 4 workers, with inference and resets | ≥ 10,000 | 13,133 | ✅ meets |
