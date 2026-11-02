@@ -15,6 +15,7 @@ import { disposePost, makePost, type PostStack } from './three/post';
 import { configureShadows } from './three/shadows';
 import { applySkyBackdrop } from './three/sky';
 import { isSoftwareRendererName, resolveQuality, shouldTryWebGPU, type QualityChoice, type RendererChoice } from './quality';
+import { voxelLayout } from '../shared/voxels';
 
 export interface ViewHooks {
   fps: number;
@@ -320,9 +321,7 @@ export class ThreeView implements Renderer {
   }
 
   setVisited(spec: BuildingSpec, visited: Uint8Array, floor: number): void {
-    const grid = spec.floors[0]!;
-    const vw = grid.w * 2;
-    const vd = grid.d * 2;
+    const { vw, vd } = voxelLayout(spec);
     const dummy = new THREE.Object3D();
     let n = 0;
     const base = floor * vw * vd;

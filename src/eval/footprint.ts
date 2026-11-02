@@ -25,6 +25,7 @@ import { VOXEL } from '../shared/constants';
 import type { BuildingSpec } from '../shared/types';
 import { flightMap } from '../gen/validate';
 import type { PhysicsWorld } from '../sim/world';
+import { voxelLayout } from '../shared/voxels';
 
 export const FOOTPRINT_RADII = [1.5, 3, 8] as const;
 /** The headline radius, meters. */
@@ -70,10 +71,7 @@ export class FootprintCoverage {
     const map = flightMap(spec);
     this.reachable = map.reachable;
     this.total = spec.reachableVoxels;
-    const floor0 = spec.floors[0]!;
-    this.vw = floor0.w * 2;
-    this.vd = floor0.d * 2;
-    this.floors = spec.floors.length;
+    ({ vw: this.vw, vd: this.vd, floors: this.floors } = voxelLayout(spec));
     this.floorHeight = spec.floorHeight;
     const n = this.floors * this.vw * this.vd;
     this.seen = this.radii.map(() => new Uint8Array(n));

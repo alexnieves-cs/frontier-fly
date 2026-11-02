@@ -48,4 +48,21 @@ export default tseslint.config(
       'no-restricted-globals': ['error', 'window', 'document', 'localStorage', 'navigator'],
     },
   },
+  {
+    // The phases see the indoor planner through its index (IndoorNav and the explorers), not its grid internals.
+    files: ['src/mission/autonomy/phases/**/*.ts', 'src/mission/autonomy/runner.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/planner/indoor/*'],
+              message: 'Import from planner/indoor. A phase that needs a grid helper is missing an IndoorNav method.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

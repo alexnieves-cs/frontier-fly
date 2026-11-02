@@ -1,5 +1,6 @@
 import { CELL } from '../shared/constants';
 import type { BuildingSpec, DroneState } from '../shared/types';
+import { voxelLayout } from '../shared/voxels';
 
 export function drawCoverage(
   canvas: HTMLCanvasElement,
@@ -19,8 +20,7 @@ export function drawCoverage(
   const pad = 10;
   const cw = (w - pad * 2) / grid.w;
   const ch = (h - pad * 2) / grid.d;
-  const vw = spec.floors[0]!.w * 2;
-  const vd = spec.floors[0]!.d * 2;
+  const { vw, vd } = voxelLayout(spec);
   for (let z = 0; z < grid.d; z++) {
     for (let x = 0; x < grid.w; x++) {
       const cell = grid.cells[z * grid.w + x]!;

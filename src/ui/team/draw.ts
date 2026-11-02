@@ -2,6 +2,7 @@ import { CELL, SURFACE, VOXEL } from '../../shared/constants';
 import type { BuildingSpec } from '../../shared/types';
 import type { RadioModel } from '../../team/radio';
 import type { TeamView } from '../../team/run';
+import { VOXELS_PER_CELL } from '../../shared/voxels';
 
 /** One colour per drone, shared by the map, the legend and the chart. */
 export const DRONE_COLORS = ['#56e0ff', '#ffd166', '#ff7ab6', '#3dff9a'];
@@ -69,8 +70,8 @@ export class TeamMap {
     // Floor, then flown voxels, then walls on top.
     ctx.fillStyle = '#16252f';
     ctx.fillRect(this.px(0), this.py(0), f.w * cs * s, f.d * cs * s);
-    const vw = f.w * 2;
-    const vd = f.d * 2;
+    const vw = f.w * VOXELS_PER_CELL;
+    const vd = f.d * VOXELS_PER_CELL;
     const rgb = DRONE_COLORS.map(hexToRgb);
     const vs = VOXEL * s;
     for (let vy = 0; vy < vd; vy++) {
