@@ -82,6 +82,8 @@ async function renderFilm(browser, base, film) {
   // Sharded renders are stitched together later; the flight must be the same one on every runner.
   const digest = await page.evaluate(() => window.__film.digest ?? null);
   writeFileSync(join(dir, `flight-${from}.json`), `${JSON.stringify({ from, to, total, digest })}\n`);
+  // What each frame shows (mission phase, intro or outro), so story.mjs can cut the film by phase.
+  writeFileSync(join(dir, 'phases.json'), `${JSON.stringify(await page.evaluate(() => window.__film.phases ?? null))}\n`);
   const t0 = Date.now();
   // Frames before `from` still have to be stepped (the camera springs are stateful); render(from) does that.
   for (let i = from; i <= to; i++) {
@@ -103,6 +105,8 @@ function encode(film, { dir, from }) {
   // A full-quality master next to the frames, then a copy for the repo that fits its 5 MB media
   // budget: 960 px wide, two-pass at the bitrate that fills MAX_BYTES over the film's length.
   const master = join(dir, '..', `film-${film.scenario}-master.mp4`);
+  // Keep the per-frame phases beside the master; the frame folder is deleted after encoding.
+  if (existsSync(join(dir, 'phases.json'))) writeFileSync(join(dir, '..', `film-${film.scenario}-phases.json`), readFileSync(join(dir, 'phases.json')));
   ffmpeg([
     '-framerate', '30', '-start_number', String(from), '-i', join(dir, '%05d.jpg'),
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-an', master,

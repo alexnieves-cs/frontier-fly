@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (297 files, 56,761 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (298 files, 57,589 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -195,9 +195,9 @@ flowchart LR
   vision -->|7| targets
   vision -->|3| world_outdoor
   viz -->|2| gen
-  viz -->|20| shared
+  viz -->|22| shared
   viz -->|2| sim
-  viz -->|2| world_outdoor
+  viz -->|4| world_outdoor
   workers -->|2| gen
   workers -->|14| rl
   workers -->|9| shared
@@ -217,7 +217,7 @@ flowchart LR
 | `src/bench` | 5 | 450 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
 | `src/crazyflie` | 4 | 752 | `shared`, `sim` | — | — |
 | `src/eval` | 17 | 2,797 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
-| `src/film` | 6 | 1,763 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
+| `src/film` | 6 | 1,803 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
 | `src/landing` | 2 | 237 | `film`, `ui` | — | — |
 | `src/loc` | 9 | 2,091 | `shared` | — | — |
@@ -234,9 +234,9 @@ flowchart LR
 | `src/ui` | 43 | 6,737 | `app`, `eval`, `gen`, `landing`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 6 | 2,164 | `mission`, `rl`, `ui` | — | — |
 | `src/vision` | 9 | 1,872 | `mission`, `perception`, `shared`, `sim`, `targets`, `world/outdoor` | TF.js | — |
-| `src/viz` | 19 | 2,370 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
+| `src/viz` | 20 | 3,152 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |
 | `src/workers` | 5 | 885 | `gen`, `rl`, `shared`, `sim` | TF.js | `src/workers/env.worker.ts`, `src/workers/learner.worker.ts` |
-| `src/world/outdoor` | 14 | 2,016 | `gen`, `shared` | Rapier | — |
+| `src/world/outdoor` | 14 | 2,022 | `gen`, `shared` | Rapier | — |
 | `src/world/outdoor/viz` | 3 | 593 | `shared`, `sim`, `ui`, `viz`, `world/outdoor` | Three.js | — |
 
 ## Headless boundary

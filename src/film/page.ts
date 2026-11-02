@@ -54,6 +54,17 @@ export interface FilmApi {
   scenario: ScenarioId;
   /** Render film frame i (frames must be requested in order for the camera springs). */
   render(i: number): void;
+  /**
+   * Record mode only: draw the scene at frame i from a free camera (Three axes, metres), for
+   * stills and look-development. Leaves the film's camera springs untouched.
+   */
+  still?(i: number, eye: [number, number, number], target: [number, number, number], fov?: number): void;
+  /** Record mode only: building shells as [x, y, z, width, height, depth] in Three axes, to aim stills. */
+  shells?: [number, number, number, number, number, number][];
+  /** Record mode only: what each film frame shows, the mission phase or 'intro' / 'outro' (for scripts/media/story.mjs). */
+  phases?: string[];
+  /** Record mode only: no-fly polygons in sim x, y (Three x, z). */
+  noFly?: [number, number][][];
   /** Hash of the flown frames, so frames rendered on different machines can be checked to come from the same flight. */
   digest?: string;
   error?: string;
@@ -201,7 +212,26 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     };
     api.frames = timeline.length;
     api.render = show;
-    if (recording) api.digest = digestOf(log.frames);
+    if (recording) {
+      api.digest = digestOf(log.frames);
+      const free = new THREE.PerspectiveCamera(50, STAGE_W / STAGE_H, 0.05, 3000);
+      const pass = composer.passes[0] as RenderPass;
+      api.shells = scene.shellBounds();
+      api.phases = timeline.map((f) => (f.part === 'flight' ? sampleFlight(log, f.t).frame.phase : f.part));
+      api.noFly = log.loaded.world.outdoor.noFly.map((z) => z.polygon.map(([x, y]) => [x, y] as [number, number]));
+      api.still = (i, eye, target, fov = 50) => {
+        const f = timeline[Math.max(0, Math.min(timeline.length - 1, i))]!;
+        apply(scene, log, f);
+        free.fov = fov;
+        free.position.set(...eye);
+        free.lookAt(...target);
+        free.updateProjectionMatrix();
+        pass.camera = free;
+        composer.render();
+        pass.camera = director.camera;
+        overlay.update(f, free);
+      };
+    }
     loading.remove();
     show(0);
     api.ready = true;

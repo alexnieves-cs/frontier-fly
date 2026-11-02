@@ -1,7 +1,7 @@
 name: media
 
 # Re-renders the README and Pages media from the commit it runs on: the mission films
-# (scripts/media/film.mjs), the console clips (scripts/media/record.mjs) and the e2e stills
+# (scripts/media/film.mjs) and the two-minute video cut from them (scripts/media/story.mjs), the console clips (scripts/media/record.mjs) and the e2e stills
 # (tests/e2e/shots.spec.ts with UPDATE_MEDIA=1). A full film render is about 6 hours on one machine,
 # so each film's frames are split over several runners and stitched in the publish job; every shard
 # flies the mission itself and the publish job refuses frames from flights that differ.
@@ -184,6 +184,19 @@ jobs:
       - if: needs.film.result == 'success' || (inputs.frames_from_run != '' && needs.plan.outputs.films != '')
         name: Encode films
         run: FILM_ENCODE_ONLY=1 npm run media:film -- ${{ needs.plan.outputs.films }}
+      # The two-minute captioned video is cut from all three films, so it is only re-cut when all three rendered.
+      - id: story
+        if: contains(needs.plan.outputs.films, 'cabin-day') && contains(needs.plan.outputs.films, 'backpack-night') && contains(needs.plan.outputs.films, 'compound-clear')
+        name: Cut the story video
+        run: |
+          npx playwright install --with-deps chromium
+          npm run media:story
+      - if: steps.story.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: story-master
+          path: test-results/film/story-master.mp4
+          retention-days: 30
       - if: needs.clips.result == 'success' || needs.clips.result == 'failure'
         continue-on-error: true
         uses: actions/download-artifact@v8

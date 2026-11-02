@@ -44,6 +44,7 @@ export function buildDrone(): DroneRig {
     }
   }
   const rotors: THREE.Mesh[] = [];
+  const blurMat = new THREE.MeshBasicMaterial({ map: propBlurTexture(), color: '#b9c2cc', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
   const offsets: [number, number][] = [
     [0.09, -0.09],
     [-0.09, -0.09],
@@ -74,6 +75,12 @@ export function buildDrone(): DroneRig {
     prop.position.set(x, 0.032, z);
     group.add(prop);
     rotors.push(prop);
+    // Motion blur of the spinning blades: a faint disc, darker toward the tips.
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.056, 32), blurMat);
+    disc.rotation.x = -Math.PI / 2;
+    disc.position.set(x, 0.033, z);
+    disc.renderOrder = 2;
+    group.add(disc);
   });
 
   const count = 64;
@@ -103,4 +110,34 @@ export function buildDrone(): DroneRig {
     (wash.material as THREE.PointsMaterial).opacity = Math.min(0.45, 0.08 + thrust * 0.0004);
   };
   return { group, rotors, body, wash, updateWash };
+}
+
+/** Radial alpha for a prop disc: clear hub, a soft blade-tip ring, two faint blade streaks. */
+function propBlurTexture(): THREE.Texture {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const g = canvas.getContext('2d')!;
+  const c = size / 2;
+  const ring = g.createRadialGradient(c, c, 0, c, c, c);
+  ring.addColorStop(0, 'rgba(255,255,255,0)');
+  ring.addColorStop(0.25, 'rgba(255,255,255,0.05)');
+  ring.addColorStop(0.8, 'rgba(255,255,255,0.32)');
+  ring.addColorStop(0.95, 'rgba(255,255,255,0.45)');
+  ring.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = ring;
+  g.fillRect(0, 0, size, size);
+  g.globalCompositeOperation = 'lighter';
+  for (const a of [0.4, 0.4 + Math.PI]) {
+    g.beginPath();
+    g.moveTo(c, c);
+    g.arc(c, c, c * 0.95, a, a + 0.5);
+    g.closePath();
+    g.fillStyle = 'rgba(255,255,255,0.12)';
+    g.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
