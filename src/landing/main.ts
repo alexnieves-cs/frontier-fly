@@ -4,11 +4,17 @@ import type { FilmStatus } from '../film/page';
 import { REPO_URL as REPO, siteHeader } from '../ui/siteNav';
 import { isWebglError, showStartError } from '../ui/startError';
 import { atlasRates } from '../ui/tour/claims';
-import { pct, results } from './results';
+import { pct, results, type PilotResult } from './results';
 
 const HERO_SCENARIO = 'cabin-day';
 
 const contacts = (n: number): string => (n === 0 ? 'no wall contacts' : `${n.toFixed(1)} wall contacts per flight`);
+/** "3 of 30 flights crashed · 0.4 wall contacts per flight", or just the contacts before the crash rule. */
+function safety(p: PilotResult): string {
+  if (p.crashes === null) return contacts(p.contacts);
+  const crashed = p.crashes === 0 ? 'no crashes' : `${p.crashes} of ${p.episodes} flights crashed`;
+  return `${crashed} · ${contacts(p.contacts)}`;
+}
 
 function markup(): string {
   const r = results();
@@ -17,7 +23,7 @@ function markup(): string {
     .map(
       (p) => `
         <li class="bar tone-${p.tone}">
-          <span class="bar-name">${p.name}<small class="bar-contacts">${contacts(p.contacts)}</small></span>
+          <span class="bar-name">${p.name}<small class="bar-contacts">${safety(p)}</small></span>
           <span class="bar-track"><span class="bar-fill" style="width:${(p.value * 100).toFixed(1)}%"></span></span>
           <span class="bar-value">${pct(p.value)}</span>
         </li>`,
@@ -91,6 +97,7 @@ function markup(): string {
       <p class="results-foot">
         Every pilot flies the same ${r.seeds} buildings, measured at commit <code>${r.commit}</code>; the policy's 95% interval is
         ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}.
+        ${r.crashSpeed !== null ? `A contact faster than ${r.crashSpeed} m/s is a crash and ends the flight; coverage counts what was flown until then.` : ''}
         ${r.policyLeads ? 'The policy covers more than its teacher, but touches walls; the sensor-only planner covers less and never does.' : 'The policy still trails its teacher.'}
         Night, multi-floor and quadrotor results are in
         <a href="${REPO}/blob/main/docs/REPORT.md" rel="noopener">REPORT.md</a>; method and every condition in

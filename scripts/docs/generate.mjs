@@ -178,10 +178,14 @@ function studyTables(study) {
   }
   const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}`;
   const cell = (condition, lighting, pilot) => study.cells.find((c) => c.condition === condition && c.lighting === lighting && c.pilot === pilot);
+  // Studies run under the crash rule (shared/constants.ts CRASH_SPEED) also count the flights it ended.
+  const crashRule = study.crashSpeed != null;
+  const crashes = (c) => `${c.crashes}/${c.episodes}`;
   const row = (c) => [
     `${pct(c.coverage)} (${ci(c.coverageCi)})`,
     c.collisionsPerEpisode.toFixed(2),
     `${c.episodesWithCollision}/${c.episodes}`,
+    ...(crashRule ? [crashes(c)] : []),
   ];
   const headline = [];
   for (const pilot of ['teacher', 'classical', 'policy', 'guarded']) {
@@ -194,6 +198,7 @@ function studyTables(study) {
       `${pct(hard.coverage)} (${ci(hard.coverageCi)})`,
       `${pct(night.coverage)} (${ci(night.coverageCi)})`,
       hard.collisionsPerEpisode.toFixed(2),
+      ...(crashRule ? [crashes(hard)] : []),
       `${pct(floors.coverage)} (${ci(floors.coverageCi)})`,
       `${pct(quad.coverage)} (${ci(quad.coverageCi)})`,
       quad.collisionsPerEpisode.toFixed(1),
@@ -213,12 +218,29 @@ function studyTables(study) {
       `Every pilot flies the same ${study.seedsPerCondition} fresh buildings per condition, from \`scripts/study/coverage-study.ts\` at \`${study.commit}\` with \`${study.checkpoint}\`.`,
       'The seeds (20001+, 30001+, 40001+, 50001+) are drawn nowhere else: not by training, checkpoint selection (9001–9166), or the tuning of the sensor planner and guard (9101–9108).',
       'Brackets are bootstrap 95% intervals of the mean. Easy buildings end at 95% coverage, so that row saturates.',
+      ...(crashRule
+        ? [
+            `Every flight runs under the crash rule: a contact that starts faster than ${study.crashSpeed} m/s into a surface is a crash and ends the flight, and coverage counts what was flown until then. Slower touches are counted as collisions.`,
+          ]
+        : []),
     ].join(' '),
     STUDY_HEADLINE: table(
-      ['Pilot', 'Hard, day', 'Hard, night (no lights)', 'Hard collisions per episode', 'Two floors', 'Quadrotor + noise', 'Quad collisions per episode'],
+      [
+        'Pilot',
+        'Hard, day',
+        'Hard, night (no lights)',
+        'Hard collisions per episode',
+        ...(crashRule ? [`Hard, flights ended by a crash (> ${study.crashSpeed} m/s)`] : []),
+        'Two floors',
+        'Quadrotor + noise',
+        'Quad collisions per episode',
+      ],
       headline,
     ),
-    STUDY_TABLE: table(['Condition', 'Lighting', 'Pilot', 'Coverage (95% CI)', 'Collisions per episode', 'Episodes with a collision'], rows),
+    STUDY_TABLE: table(
+      ['Condition', 'Lighting', 'Pilot', 'Coverage (95% CI)', 'Collisions per episode', 'Episodes with a collision', ...(crashRule ? ['Ended by a crash'] : [])],
+      rows,
+    ),
   };
 }
 
@@ -667,6 +689,7 @@ function studyHeadline(study) {
   return {
     source: 'docs/study.json (scripts/study/coverage-study.ts); regenerate with npm run docs',
     commit: study.commit,
+    crashSpeed: study.crashSpeed ?? null,
     seedsPerCondition: study.seedsPerCondition,
     conditions: study.conditions.filter((c) => c.id === 'easy' || c.id === 'hard').map((c) => ({ id: c.id, stage: c.stage })),
     cells: study.cells
@@ -680,6 +703,7 @@ function studyHeadline(study) {
         coverageCi: c.coverageCi,
         collisionsPerEpisode: c.collisionsPerEpisode,
         episodesWithCollision: c.episodesWithCollision,
+        crashes: c.crashes ?? null,
       })),
   };
 }
@@ -703,7 +727,8 @@ function studyTargetRows(study) {
   ]) {
     const c = cell('hard', 'day', pilot);
     if (!c) continue;
-    rows.push([label, `≥ ${pct(TARGETS.hard)}`, `${pct(c.coverage)} (${ci(c.coverageCi)}), ${n} fresh, ${c.collisionsPerEpisode.toFixed(1)} wall contacts per flight`, status(c, TARGETS.hard)]);
+    const crashNote = c.crashes != null ? `, ${c.crashes} of ${c.episodes} flights ended by a crash` : '';
+    rows.push([label, `≥ ${pct(TARGETS.hard)}`, `${pct(c.coverage)} (${ci(c.coverageCi)}), ${n} fresh, ${c.collisionsPerEpisode.toFixed(1)} wall contacts per flight${crashNote}`, status(c, TARGETS.hard)]);
   }
   const day = cell('hard', 'day', 'policy');
   const night = cell('hard', 'night-dark', 'policy');
@@ -810,7 +835,7 @@ function readmeHeadline(study, mb, atlas, faults) {
     [
       [
         'How much of a new building does the trained policy search?',
-        `${pct(day.coverage)} (${ci1(day.coverageCi)}) at ${day.collisionsPerEpisode.toFixed(1)} wall contacts per flight; its teacher ${pct(cell('day', 'teacher').coverage)}, the sensor-only planner ${pct(cell('day', 'classical').coverage)} with ${cell('day', 'classical').collisionsPerEpisode ? cell('day', 'classical').collisionsPerEpisode.toFixed(1) : 'none'}`,
+        `${pct(day.coverage)} (${ci1(day.coverageCi)}) at ${day.collisionsPerEpisode.toFixed(1)} wall contacts per flight${day.crashes != null ? `, ${day.crashes} of ${day.episodes} flights ended by a crash` : ''}; its teacher ${pct(cell('day', 'teacher').coverage)}, the sensor-only planner ${pct(cell('day', 'classical').coverage)} with ${cell('day', 'classical').collisionsPerEpisode ? cell('day', 'classical').collisionsPerEpisode.toFixed(1) : 'none'}`,
         `${day.episodes} fresh hard buildings`,
       ],
       ['Does it work in the dark?', `${pct(night.coverage)} at night with the lights off, ${pct(night.coverage / day.coverage)} of day`, 'the same buildings'],
