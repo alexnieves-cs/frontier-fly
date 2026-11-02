@@ -76,7 +76,7 @@ export class OracleGain implements GainSource {
   private readonly labeler = new GainLabeler();
   private cls = new Uint8Array(0);
   private cache = new Float32Array(0);
-  private reach = new Uint8Array(0);
+  private reach: Uint8Array = new Uint8Array(0);
   private vw = 1;
   private vd = 1;
 
