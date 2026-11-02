@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (284 files, 55,525 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (284 files, 55,553 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -213,7 +213,7 @@ flowchart LR
 | `src/eval` | 17 | 2,795 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,763 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
-| `src/landing` | 2 | 191 | `film`, `ui` | — | — |
+| `src/landing` | 2 | 219 | `film`, `ui` | — | — |
 | `src/loc` | 9 | 2,091 | `shared` | — | — |
 | `src/mission` | 55 | 14,203 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |

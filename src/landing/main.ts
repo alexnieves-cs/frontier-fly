@@ -8,6 +8,8 @@ import { pct, results } from './results';
 
 const HERO_SCENARIO = 'cabin-day';
 
+const contacts = (n: number): string => (n === 0 ? 'no wall contacts' : `${n.toFixed(1)} wall contacts per flight`);
+
 function markup(): string {
   const r = results();
   const falseClear = atlasRates().falseClear;
@@ -15,7 +17,7 @@ function markup(): string {
     .map(
       (p) => `
         <li class="bar tone-${p.tone}">
-          <span class="bar-name">${p.name}</span>
+          <span class="bar-name">${p.name}<small class="bar-contacts">${contacts(p.contacts)}</small></span>
           <span class="bar-track"><span class="bar-fill" style="width:${(p.value * 100).toFixed(1)}%"></span></span>
           <span class="bar-value">${pct(p.value)}</span>
         </li>`,
@@ -47,7 +49,7 @@ function markup(): string {
           above all run in this tab. No server.
         </p>
         <ul class="proof" aria-label="Headline results">
-          <li><strong>${pct(r.pilots[0]!.value)}</strong> of unseen hard buildings searched</li>
+          <li><strong>${pct(r.pilots[0]!.value)}</strong> of ${r.seeds} unseen hard buildings searched</li>
           <li><strong>${pct(r.easy)}</strong> of easy ones</li>
           <li><strong>${pct(Math.min(1, r.nightOverDay))}</strong> as good at night, lights off</li>
         </ul>
@@ -75,22 +77,23 @@ function markup(): string {
     <section class="results" data-tour="results" aria-labelledby="results-title">
       <div class="results-head">
         <h2 id="results-title">Indoor coverage on unseen hard buildings</h2>
-        <p>Fraction of each building the drone saw before time ran out. Stage ${r.hardStage}, mean of ${r.hardSeeds} held-out seeds, daylight.</p>
+        <p>Fraction of each building the drone saw before time ran out, and how often it touched a wall. Stage ${r.hardStage}, mean of ${r.seeds} fresh buildings no training or tuning ever saw, daylight.</p>
       </div>
       <div class="results-body">
         <ul class="bars">${bars}
         </ul>
         <div class="tiles">
-          <div class="tile"><span class="tile-value">${pct(r.easy)}</span><span class="tile-label">coverage on easy buildings (${r.easySeeds} seeds)</span></div>
+          <div class="tile"><span class="tile-value">${pct(r.easy)}</span><span class="tile-label">coverage on easy buildings (${r.seeds} fresh)</span></div>
           <div class="tile"><span class="tile-value">${pct(Math.min(1, r.nightOverDay))}</span><span class="tile-label">night coverage relative to day, lights off</span></div>
           <a class="tile tile-limit" href="./atlas.html"><span class="tile-value">${(falseClear.p * 100).toFixed(2)}%</span><span class="tile-label">of flights call a building clear with someone inside (failure atlas)</span></a>
         </div>
       </div>
       <p class="results-foot">
-        A small, deterministic eval: ${r.hardSeeds} hard and ${r.easySeeds} easy seeds, measured ${r.measured} at commit
-        <code>${r.commit}</code>. ${r.policyLeads ? 'The policy covers more than its teacher here, but collides more than the sensor-only planner.' : 'The policy still trails its teacher.'}
-        Results on 30 fresh buildings per condition, with intervals and collisions, are in
-        <a href="${REPO}/blob/main/docs/REPORT.md" rel="noopener">REPORT.md</a>; method and per-seed numbers in
+        Every pilot flies the same ${r.seeds} buildings, measured at commit <code>${r.commit}</code>; the policy's 95% interval is
+        ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}.
+        ${r.policyLeads ? 'The policy covers more than its teacher, but touches walls; the sensor-only planner covers less and never does.' : 'The policy still trails its teacher.'}
+        Night, multi-floor and quadrotor results are in
+        <a href="${REPO}/blob/main/docs/REPORT.md" rel="noopener">REPORT.md</a>; method and every condition in
         <a href="${REPO}/blob/main/docs/BENCHMARKS.md" rel="noopener">BENCHMARKS.md</a>.
       </p>
     </section>
