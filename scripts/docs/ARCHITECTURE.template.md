@@ -47,7 +47,7 @@ The same loop runs in the browser when you press **Train**, so a visitor can wat
 
 ## Mission layer
 
-`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them.
+`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them. `python/` is the same task as a Python package (a Gymnasium env and the scorer): `scripts/py/server.ts` drives the env and the bench episode recorder over a framed stdin/stdout protocol, and `npm run build:py` bundles it into one Node script the package starts.
 
 `src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, the canonical share-link encoding, and a run session. It talks to the world and the detector only through `WorldProvider` and `DetectionSource`, so the planner page does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear. `src/vision` is the alternative that looks at pixels: a software rasterizer renders the drone's 160×120 camera (CC0 KayKit people baked to posed meshes, room lights, flashlight, auto exposure and sensor noise), and a small CenterNet-style TF.js network finds people and objects in it. It plugs into the mission perception source as `PerceptionOptions.camera`.
 

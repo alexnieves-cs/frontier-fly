@@ -51,6 +51,28 @@ jobs:
               ...["lines", "statements", "functions", "branches"].map(row)].join("\n"));
           ' >> "$GITHUB_STEP_SUMMARY"
 
+  # The Python package (python/): build the simulator bundle, install the package as a user
+  # would (not editable), and run its tests, including bit-identical bench parity.
+  python:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: npm ci
+      - run: npm run build:py
+      - run: pip install './python[test]'
+      - run: python -m pytest python/tests -q
+
   lint:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
