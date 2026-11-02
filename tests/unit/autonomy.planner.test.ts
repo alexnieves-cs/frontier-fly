@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { createBattery } from '../../src/mission/autonomy/battery';
 import type { Contact, MissionWorld, V3 } from '../../src/mission/autonomy/contracts';
 import { planApproach } from '../../src/mission/autonomy/planner/approach';
-import { ConfirmTracker, confirmViewpoints } from '../../src/mission/autonomy/planner/confirm';
+import { ConfirmTracker, confirmViewpoints, UNRESOLVED_FLOOR } from '../../src/mission/autonomy/planner/confirm';
 import { planCoverage } from '../../src/mission/autonomy/planner/coverage';
 import { entryDecision, passageAxis, rankCandidates, SAFETY_ASK, SAFETY_AUTO, scoreOpening } from '../../src/mission/autonomy/planner/entry';
 import { FlyThrough } from '../../src/mission/autonomy/planner/flythrough';
@@ -275,6 +275,62 @@ describe('confirmation', () => {
     low.ingest(contact(at, 60, 0.6, 1));
     low.ingest(contact(at, 130, 0.64, 2));
     expect(low.evaluate(track)).toBe('open');
+  });
+
+  it('closes a track short of the threshold as unresolved above the lookalike floor, rejected below it', () => {
+    const tracker = new ConfirmTracker(a.mission);
+    const strong = tracker.ingest(contact(at, 0, 0.76, 0))!;
+    tracker.ingest(contact(at, 60, 0.74, 1));
+    tracker.ingest(contact(at, 130, 0.75, 2));
+    expect(tracker.evaluate(strong)).toBe('open');
+    expect(tracker.close(strong)).toBe('unresolved');
+    // Still live: a better look later confirms it.
+    tracker.ingest(contact(at, 200, 0.95, 3));
+    tracker.ingest(contact(at, 270, 0.95, 4));
+    expect(tracker.evaluate(strong)).toBe('confirmed');
+
+    const weak = new ConfirmTracker(a.mission);
+    const decoy = weak.ingest(contact(at, 0, 0.64, 0))!;
+    weak.ingest(contact(at, 60, 0.66, 1));
+    weak.ingest(contact(at, 130, 0.62, 2));
+    expect(weak.meanConfidence(decoy)).toBeLessThan(UNRESOLVED_FLOOR);
+    expect(weak.close(decoy)).toBe('rejected');
+  });
+
+  it('follows a walker: the estimate tracks the newest contacts and the gate grows while unseen', () => {
+    const tracker = new ConfirmTracker(a.mission);
+    let track = tracker.ingest(contact([10, 10, 1], 0, 0.75, 0))!;
+    for (let i = 1; i <= 10; i++) tracker.ingest(contact([10 + i * 0.2, 10, 1], 0, 0.75, i * 0.2));
+    expect(track.estimate[0]).toBeGreaterThan(11.5);
+    // Unseen for 3 s, it reappears 3 m on: past the 1.5 m radius, inside the grown gate.
+    expect(tracker.ingest(contact([15, 10, 1], 90, 0.75, 5))).toBe(track);
+    expect(tracker.tracks.length).toBe(1);
+    // A rejected track keeps the plain radius and does not swallow a person passing by.
+    tracker.reject(track);
+    track = tracker.ingest(contact([18, 10, 1], 0, 0.75, 9))!;
+    expect(tracker.tracks.length).toBe(2);
+    expect(track.status).toBe('open');
+  });
+
+  it('merges a walker split into two tracks, but never two people seen in one frame', () => {
+    const tracker = new ConfirmTracker(a.mission, { minViews: 9 });
+    const first = tracker.ingest(contact([10, 10, 1], 0, 0.75, 0))!;
+    // Seen again at once 3 m away: no time to walk there, so a second track.
+    const second = tracker.ingest(contact([13, 10, 1], 60, 0.77, 0.2))!;
+    expect(second).not.toBe(first);
+    expect(first.status).toBe('open');
+    // Seen later between the two, within both grown gates: they were never co-seen, so one person.
+    expect(tracker.ingest(contact([11, 10, 1], 120, 0.77, 2.2))).toBe(first);
+    expect(second.status).toBe('merged');
+    expect(first.views.length).toBe(3);
+    expect(first.frames).toBe(3);
+
+    const two = new ConfirmTracker(a.mission, { minViews: 9 });
+    const p = two.ingest(contact([10, 10, 1], 0, 0.75, 0))!;
+    const q = two.ingest(contact([13, 10, 1], 60, 0.75, 0))!;
+    two.ingest(contact([11.5, 10, 1], 120, 0.75, 3));
+    expect(p.status).toBe('open');
+    expect(q.status).toBe('open');
   });
 
   it('plans re-view poses at fresh bearings first', () => {

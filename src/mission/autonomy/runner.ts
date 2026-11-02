@@ -140,6 +140,7 @@ class Runner extends IndoorPhases {
       track: this.trackRec.slice(),
       phases,
       confirmed: this.confirmed.slice(),
+      unresolved: this.tracker.tracks.filter((t) => t.status === 'unresolved').map((t) => this.tracker.toConfirmed(t, t.lastSec)),
       declaredClear: this.declaredClear.slice(),
       collisions: this.collisions.slice(),
       entries: this.entries.slice(),
