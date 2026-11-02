@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (293 files, 55,903 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (297 files, 56,655 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -80,6 +80,7 @@ Edges are relative imports between modules. The label is the number of import st
 flowchart LR
   app["app"]
   bench["bench"]
+  crazyflie["crazyflie"]
   eval["eval"]
   film["film"]
   gen["gen"]
@@ -108,6 +109,8 @@ flowchart LR
   bench -->|3| shared
   bench -->|11| sim
   bench -->|3| team
+  crazyflie -->|3| shared
+  crazyflie -->|2| sim
   eval -->|4| gen
   eval -->|4| loc
   eval -->|48| mission
@@ -212,6 +215,7 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
 | `src/bench` | 5 | 450 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
+| `src/crazyflie` | 4 | 752 | `shared`, `sim` | — | — |
 | `src/eval` | 17 | 2,797 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,763 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |

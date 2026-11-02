@@ -42,6 +42,7 @@ Everything runs in a browser tab, on desktop or phone. Pick the way that suits y
 | Your computer | The site, training and benchmarks (`npm run train:ppo`, `npm run study:missions`, ...) | Node 22 |
 | Python | A Gymnasium env (`gym.make("FrontierFly-hard-v0")`) and the FrontierBench scorer, on the same simulator, see [python/](python/README.md) | Python 3.10+ and Node 22 |
 | PX4 + QGroundControl | A real autopilot flying the simulator, with QGroundControl loading plans from the planner page | A local PX4 SITL build, see [PX4.md](docs/PX4.md) |
+| A real Crazyflie | The sensor-only explorer on a 33 g quadrotor with four range beams, behind a safety guard. Simulated and tested in CI; not flown yet | A Crazyflie with Flow and Multi-ranger decks, see [CRAZYFLIE.md](docs/CRAZYFLIE.md) |
 
 ```bash
 npm ci && npm run dev   # Node 22, then open http://127.0.0.1:3000
