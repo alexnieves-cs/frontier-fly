@@ -275,7 +275,7 @@ async function main(): Promise<void> {
   console.log = console.info = console.warn = console.debug = (...args: unknown[]) => process.stderr.write(`${args.join(' ')}\n`);
   const session = new Session();
   await session.init();
-  let buf = Buffer.alloc(0);
+  let buf: Buffer = Buffer.alloc(0);
   process.stdin.on('data', (chunk: Buffer) => {
     buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
     while (buf.length >= 4) {

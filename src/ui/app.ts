@@ -73,7 +73,7 @@ export async function startApp(root: HTMLElement = document.querySelector('#app'
 class Session {
   private spec: BuildingSpec | null = null;
   private plans: PlanSet | null = null;
-  private obs = new Float32Array(OBS_DIM);
+  private obs: Float32Array = new Float32Array(OBS_DIM);
   private shown: DroneState = makeDroneState([1, 1, 1]);
   /** Lidar rays in the 3D view: off at start so the drone and the room read first. */
   private showRays = false;
