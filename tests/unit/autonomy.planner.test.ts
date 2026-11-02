@@ -8,16 +8,8 @@ import { entryDecision, passageAxis, rankCandidates, SAFETY_ASK, SAFETY_AUTO, sc
 import { FlyThrough } from '../../src/mission/autonomy/planner/flythrough';
 import { airspaceFor, buildingBox, inRing, insideBox, operable, segmentClear } from '../../src/mission/autonomy/planner/geometry';
 import { landedAtHome, landingCommand, planReturn } from '../../src/mission/autonomy/planner/home';
-import {
-  cellAt,
-  FrontierExplorer,
-  INDOOR_FLY_Z,
-  IndoorVisibility,
-  indoorGrid,
-  nearestNav,
-  toLocal,
-  wallClearance,
-} from '../../src/mission/autonomy/planner/indoor';
+import { FrontierExplorer, INDOOR_FLY_Z, IndoorVisibility, indoorGrid, toLocal } from '../../src/mission/autonomy/planner/indoor';
+import { cellAt, nearestNav, wallClearance } from '../../src/mission/autonomy/planner/indoor/grid';
 import { observeOpenings, planInspection } from '../../src/mission/autonomy/planner/inspect';
 import { INDOOR_LIMITS, OUTDOOR_LIMITS, Vehicle, type VehicleLimits } from '../../src/mission/autonomy/vehicle';
 import { buildMissionWorld, missionForWorld } from '../../src/mission/autonomy/world';
