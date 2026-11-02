@@ -1,5 +1,6 @@
 import type { EntryCandidate, MissionWorld, RunnerSnapshot, TruthTarget, V3 } from '../../mission/autonomy/contracts';
 import { sampleHeight } from '../../world/outdoor/terrain';
+import { DEMO_GLYPH, fillDroneGlyph, fitProjection, type MapProjection, tracePath } from '../map/draw';
 import { CLASS_COLORS, classLabel, openingSafetyHint, safetyColor } from './format';
 
 export interface MapOverlay {
@@ -12,12 +13,6 @@ export interface MapOverlay {
   now: number;
 }
 
-interface Projection {
-  scale: number;
-  x: (wx: number) => number;
-  y: (wy: number) => number;
-}
-
 const MAP_FONT = '600 11px ui-sans-serif, system-ui, "Segoe UI", sans-serif';
 
 export function isNight(world: MissionWorld): boolean {
@@ -28,7 +23,7 @@ export function isNight(world: MissionWorld): boolean {
 export class DemoMap {
   private layer: HTMLCanvasElement | null = null;
   private layerKey = '';
-  private proj: Projection = { scale: 1, x: (v) => v, y: (v) => v };
+  private proj: MapProjection = { scale: 1, x: (v) => v, y: (v) => v };
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -126,9 +121,7 @@ export class DemoMap {
     ctx.setLineDash([5, 5]);
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
     ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(this.proj.x(snap.pose.pos[0]), this.proj.y(snap.pose.pos[1]));
-    for (const point of snap.plan) ctx.lineTo(this.proj.x(point[0]), this.proj.y(point[1]));
+    tracePath(ctx, this.proj, [snap.pose.pos, ...snap.plan]);
     ctx.stroke();
     ctx.restore();
   }
@@ -139,23 +132,13 @@ export class DemoMap {
     ctx.lineJoin = 'round';
     ctx.strokeStyle = 'rgba(16, 24, 32, 0.55)';
     ctx.lineWidth = 5;
-    this.tracePath(ctx, track);
+    tracePath(ctx, this.proj, track);
     ctx.stroke();
     ctx.strokeStyle = '#5ab8ff';
     ctx.lineWidth = 2.4;
-    this.tracePath(ctx, track);
+    tracePath(ctx, this.proj, track);
     ctx.stroke();
     ctx.restore();
-  }
-
-  private tracePath(ctx: CanvasRenderingContext2D, track: V3[]): void {
-    ctx.beginPath();
-    track.forEach((point, index) => {
-      const x = this.proj.x(point[0]);
-      const y = this.proj.y(point[1]);
-      if (index === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
   }
 
   private paintContacts(ctx: CanvasRenderingContext2D, snap: RunnerSnapshot): void {
@@ -226,15 +209,8 @@ export class DemoMap {
     ctx.beginPath();
     ctx.arc(0, 0, 10, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = snap.inside ? '#ffb15a' : '#f4fff8';
-    ctx.beginPath();
-    ctx.moveTo(9, 0);
-    ctx.lineTo(-6, 5.5);
-    ctx.lineTo(-3, 0);
-    ctx.lineTo(-6, -5.5);
-    ctx.closePath();
-    ctx.fill();
     ctx.restore();
+    fillDroneGlyph(ctx, x, y, snap.pose.yaw, DEMO_GLYPH, snap.inside ? '#ffb15a' : '#f4fff8');
   }
 }
 
@@ -250,7 +226,7 @@ function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number
   ctx.fillText(text, x, y);
 }
 
-function project(world: MissionWorld, cssW: number, cssH: number): Projection {
+function project(world: MissionWorld, cssW: number, cssH: number): MapProjection {
   const fence = world.outdoor.geofence.polygon;
   let minX = Infinity;
   let minY = Infinity;
@@ -267,17 +243,10 @@ function project(world: MissionWorld, cssW: number, cssH: number): Projection {
   minY = Math.max(0, minY - pad);
   maxX = Math.min(world.outdoor.size, maxX + pad);
   maxY = Math.min(world.outdoor.size, maxY + pad);
-  const scale = Math.min(cssW / (maxX - minX), cssH / (maxY - minY));
-  const ox = (cssW - (maxX - minX) * scale) / 2;
-  const oy = (cssH - (maxY - minY) * scale) / 2;
-  return {
-    scale,
-    x: (wx) => ox + (wx - minX) * scale,
-    y: (wy) => cssH - oy - (wy - minY) * scale,
-  };
+  return fitProjection({ minX, minY, maxX, maxY }, cssW, cssH);
 }
 
-function paintSite(world: MissionWorld, proj: Projection, w: number, h: number, dpr: number): HTMLCanvasElement {
+function paintSite(world: MissionWorld, proj: MapProjection, w: number, h: number, dpr: number): HTMLCanvasElement {
   const layer = document.createElement('canvas');
   layer.width = w;
   layer.height = h;
@@ -339,7 +308,7 @@ function paintSite(world: MissionWorld, proj: Projection, w: number, h: number, 
   // No-fly zones, hatched.
   for (const zone of outdoor.noFly) {
     ctx.save();
-    tracePolygon(ctx, proj, zone.polygon);
+    tracePath(ctx, proj, zone.polygon, true);
     ctx.fillStyle = 'rgba(232, 72, 72, 0.22)';
     ctx.fill();
     ctx.clip();
@@ -352,7 +321,7 @@ function paintSite(world: MissionWorld, proj: Projection, w: number, h: number, 
       ctx.stroke();
     }
     ctx.restore();
-    tracePolygon(ctx, proj, zone.polygon);
+    tracePath(ctx, proj, zone.polygon, true);
     ctx.strokeStyle = 'rgba(255, 120, 120, 0.9)';
     ctx.lineWidth = 1.4;
     ctx.stroke();
@@ -364,7 +333,7 @@ function paintSite(world: MissionWorld, proj: Projection, w: number, h: number, 
   // Geofence.
   ctx.save();
   ctx.setLineDash([8, 5]);
-  tracePolygon(ctx, proj, outdoor.geofence.polygon);
+  tracePath(ctx, proj, outdoor.geofence.polygon, true);
   ctx.strokeStyle = '#6ff5e6';
   ctx.lineWidth = 2;
   ctx.stroke();
@@ -409,15 +378,6 @@ function paintSite(world: MissionWorld, proj: Projection, w: number, h: number, 
   ctx.font = '700 12px ui-sans-serif, system-ui, sans-serif';
   ctx.fillText('H', hx - 4.2, hy + 4.3);
   return layer;
-}
-
-function tracePolygon(ctx: CanvasRenderingContext2D, proj: Projection, polygon: [number, number][]): void {
-  ctx.beginPath();
-  polygon.forEach(([x, y], index) => {
-    if (index === 0) ctx.moveTo(proj.x(x), proj.y(y));
-    else ctx.lineTo(proj.x(x), proj.y(y));
-  });
-  ctx.closePath();
 }
 
 function centroid(polygon: [number, number][]): [number, number] {
