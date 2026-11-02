@@ -93,6 +93,14 @@ export const MINIBATCH = 512;
 export const COVERAGE_SUCCESS = 0.95;
 export const SUCCESS_BONUS = 20;
 export const MAX_HARD_COLLISIONS = 3;
+/**
+ * The crash rule, m/s. A contact that starts with the airframe moving into the surface faster than
+ * this is a crash, and the flight ends there: in the coverage env (training, the race page and the
+ * coverage studies) and in missions. Slower touches are contacts: counted and penalized, but a
+ * prop-guarded airframe bumps off them. 0.5 m/s is deliberately strict, a quarter of the env's
+ * 2 m/s speed limit; the coverage study also reports the numbers at 1 and 1.5 m/s.
+ */
+export const CRASH_SPEED = 0.5;
 export const STALL_STEPS = 200;
 
 export const REWARD = {
@@ -100,6 +108,8 @@ export const REWARD = {
   newRoom: 5,
   newFloor: 10,
   collision: -5,
+  /** On top of `collision` when the impact is a crash (CRASH_SPEED), which also ends the episode. */
+  crash: -20,
   contact: -0.1,
   smooth: 0.01,
   effort: 0.001,

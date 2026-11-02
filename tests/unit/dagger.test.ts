@@ -25,6 +25,8 @@ function cfg(): EpisodeConfig {
   c.maxSteps = 10_000;
   c.stallSteps = 10_000;
   c.maxCollisions = 10_000;
+  // The corner student pins itself against walls on purpose; crashes would end its episodes.
+  c.crashSpeed = Infinity;
   return c;
 }
 

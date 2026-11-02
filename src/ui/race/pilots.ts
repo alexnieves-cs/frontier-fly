@@ -151,10 +151,19 @@ export function pilotAct(pilot: RacePilot, spec: BuildingSpec, policy: PolicyFn 
 export type EndReason = 'running' | 'complete' | 'time' | 'stalled' | 'crashed' | 'left';
 
 /** Why an episode ended, from the env's own done rules (src/sim/env.ts step). */
-export function endReason(done: boolean, steps: number, maxSteps: number, coverage: number, truncated: boolean, collisions: number, maxCollisions: number): EndReason {
+export function endReason(
+  done: boolean,
+  steps: number,
+  maxSteps: number,
+  coverage: number,
+  truncated: boolean,
+  collisions: number,
+  maxCollisions: number,
+  crashed = false,
+): EndReason {
   if (!done) return 'running';
   if (coverage >= 0.95) return 'complete';
-  if (collisions > maxCollisions) return 'crashed';
+  if (crashed || collisions > maxCollisions) return 'crashed';
   if (truncated) return 'stalled';
   if (steps >= maxSteps) return 'time';
   return 'left';

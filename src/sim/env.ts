@@ -1,6 +1,7 @@
 import { applyObsAblation } from './ablation';
 import {
   COVERAGE_SUCCESS,
+  CRASH_SPEED,
   MAX_HARD_COLLISIONS,
   OBS_DIM,
   MAX_SPEED_H,
@@ -73,6 +74,10 @@ export class ExplorerEnv implements Env {
   private collisions = 0;
   private hard = 0;
   private inContact = false;
+  /** An impact faster than the crash speed ended this episode (shared/constants.ts CRASH_SPEED). */
+  private crashed = false;
+  /** Speed into the surface of a contact that started this step, m/s; 0 without one. */
+  private impactSpeed = 0;
   private steps = 0;
   private stall = 0;
   private maxSteps = 1000;
@@ -145,6 +150,8 @@ export class ExplorerEnv implements Env {
     this.held.fill(0);
     this.collisions = 0;
     this.hard = 0;
+    this.crashed = false;
+    this.impactSpeed = 0;
     this.inContact = false;
     this.steps = 0;
     this.stall = 0;
@@ -184,6 +191,8 @@ export class ExplorerEnv implements Env {
 
     const wind = this.cfg.wind;
     let hit = false;
+    // Fastest approach into a solid this step: the velocity component along each blocked axis before it is zeroed.
+    let normalSpeed = 0;
     const substeps = this.cfg.dynamics === 'quad' ? PHYSICS_SUBSTEPS : 1;
     const dt = this.cfg.dynamics === 'quad' ? PHYSICS_DT : POLICY_DT;
     for (let i = 0; i < substeps; i++) {
@@ -206,6 +215,7 @@ export class ExplorerEnv implements Env {
       this.state.pos[2] = resolved.pos[2];
       if (resolved.hit) {
         hit = true;
+        for (let k = 0; k < 3; k++) if (resolved.blocked[k]) normalSpeed = Math.max(normalSpeed, Math.abs(this.state.vel[k]!));
         if (resolved.blocked[0]) this.state.vel[0] = 0;
         if (resolved.blocked[1]) this.state.vel[1] = 0;
         if (resolved.blocked[2]) this.state.vel[2] = 0;
@@ -237,10 +247,12 @@ export class ExplorerEnv implements Env {
       newFloor = true;
     }
     const impact = hit && !this.inContact;
+    this.impactSpeed = impact ? normalSpeed : 0;
     if (hit) {
       if (impact) {
         this.hard += 1;
         this.collisions += 1;
+        if (normalSpeed > (this.cfg.crashSpeed ?? CRASH_SPEED)) this.crashed = true;
       }
       this.inContact = true;
     } else {
@@ -258,6 +270,7 @@ export class ExplorerEnv implements Env {
       newRoom,
       newFloor,
       impact,
+      crash: impact && this.crashed,
       inContact: hit && !impact,
       action,
       prevAction: this.prevAction,
@@ -275,7 +288,7 @@ export class ExplorerEnv implements Env {
 
     const success = coverage >= COVERAGE_SUCCESS;
     const truncated = this.stall >= this.stallLimit;
-    const crashed = this.hard > (this.cfg.maxCollisions ?? MAX_HARD_COLLISIONS);
+    const crashed = this.crashed || this.hard > (this.cfg.maxCollisions ?? MAX_HARD_COLLISIONS);
     const oob = !this.inside(this.state.pos);
     this.done = success || truncated || crashed || oob || this.steps >= this.maxSteps;
     const obs = this.observe();
@@ -443,6 +456,8 @@ export class ExplorerEnv implements Env {
     return {
       coverage: this.coverage,
       collisions: this.collisions,
+      impactSpeed: this.impactSpeed,
+      crashed: this.crashed,
       floor: this.floorAt(this.state.pos[2]),
       newRoom,
       newFloor,

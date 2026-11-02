@@ -47,6 +47,7 @@ export const OUTCOME_LABELS: Record<RunOutcome, string> = {
   not_found: 'Not found',
   incomplete: 'Incomplete',
   aborted: 'Aborted',
+  crashed: 'Crashed',
   landed: 'Landed early',
 };
 

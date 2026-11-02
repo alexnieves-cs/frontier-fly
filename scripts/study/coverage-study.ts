@@ -14,6 +14,7 @@ import { EpisodeFootprint, FOOTPRINT_META, summarizeFootprint, withoutCurve, typ
 import { OracleGain } from '../../src/eval/gainLabels';
 import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
+import { CRASH_SPEED } from '../../src/shared/constants';
 import { RNG } from '../../src/shared/rng';
 import { sampleDynParams, sampleNoise, defaultDynParams } from '../../src/sim/dynamics/dr';
 import { createEnv, type ExplorerEnv } from '../../src/sim/env';
@@ -94,6 +95,10 @@ export interface Result extends Job, Partial<FootprintRecord> {
   /** Flown coverage: voxels the drone center passed through (the env's own metric). */
   coverage: number;
   collisions: number;
+  /** The crash rule (shared/constants.ts CRASH_SPEED) ended the flight. */
+  crashed?: boolean;
+  /** Speed into the surface of every contact, m/s, in order; the last one is the crash when `crashed`. */
+  impacts?: number[];
   steps: number;
   floorsReached: number;
   floors: number;
@@ -195,6 +200,8 @@ export async function runJob(
   setup?: ReturnType<typeof evalEpisodeSetup>,
 ): Promise<Result> {
   const { env, spec, cfg, act, obs: first } = await startEpisode(job, policy, setup);
+  const impacts: number[] = [];
+  let crashed = false;
   const fp = new EpisodeFootprint();
   fp.start(env, spec, cfg.maxSteps);
   let obs = first;
@@ -207,13 +214,15 @@ export async function runJob(
     obs = step.obs;
     coverage = step.info.coverage;
     collisions = step.info.collisions;
+    if (step.info.impactSpeed > 0) impacts.push(Math.round(step.info.impactSpeed * 1000) / 1000);
+    crashed = step.info.crashed;
     floors.add(step.info.floor);
     steps = t + 1;
     fp.step(env, steps, coverage);
     if (step.done) break;
   }
   env.dispose();
-  return { ...job, coverage, collisions, steps, floorsReached: floors.size, floors: spec.floors.length, ...fp.finish(coverage) };
+  return { ...job, coverage, collisions, crashed, impacts, steps, floorsReached: floors.size, floors: spec.floors.length, ...fp.finish(coverage) };
 }
 
 /**
@@ -243,6 +252,18 @@ function arg(name: string, fallback: string): string {
 }
 
 
+/** Crash-rule columns of a cell: flights the rule ended, the crash-free share with its interval, and contact speeds. */
+function crashCells(rs: Result[]) {
+  const free: number[] = rs.map((r) => (r.crashed ? 0 : 1));
+  const speeds = rs.flatMap((r) => r.impacts ?? []).sort((a, b) => a - b);
+  return {
+    crashes: rs.length - free.reduce((a, b) => a + b, 0),
+    crashFree: free.reduce((a, b) => a + b, 0) / rs.length,
+    crashFreeCi: bootstrapCi(free),
+    medianContactSpeed: speeds.length ? speeds[Math.floor((speeds.length - 1) / 2)]! : null,
+  };
+}
+
 export function summarizeStudy(rows: Result[]) {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const cells = [];
@@ -263,6 +284,7 @@ export function summarizeStudy(rows: Result[]) {
           collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
           episodesWithCollision: rs.filter((r) => r.collisions > 0).length,
           reachedAnotherFloor: rs.filter((r) => r.floorsReached > 1).length,
+          ...(rs.every((r) => r.crashed !== undefined) ? crashCells(rs) : {}),
           ...fp,
         });
       }
@@ -286,6 +308,7 @@ if (MAIN && process.argv.includes('--merge')) {
   );
   const report = {
     schema: 1,
+    crashSpeed: CRASH_SPEED,
     commit: execSync('git rev-parse --short HEAD').toString().trim(),
     checkpoint: arg('checkpoint', SHIPPED_CHECKPOINT_PATH),
     seedsPerCondition: SEEDS_PER_CONDITION,

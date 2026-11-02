@@ -117,6 +117,8 @@ export abstract class RunnerBase implements MissionRunner {
   protected finished = false;
   protected hardStopped = false;
   protected aborted = false;
+  /** The crash rule ended the flight (shared/constants.ts CRASH_SPEED). */
+  protected crashed = false;
   protected returning = false;
   protected landingEmergency = false;
   protected inside: string | null = null;

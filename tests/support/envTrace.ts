@@ -48,6 +48,8 @@ export function traceConfig(c: TraceCase, spec: BuildingSpec, episode: number): 
   cfg.maxSteps = 260;
   cfg.stallSteps = 120;
   cfg.maxCollisions = 4;
+  // The golden hashes predate the crash rule (shared/constants.ts CRASH_SPEED); tests/unit/crash.test.ts covers it.
+  cfg.crashSpeed = Infinity;
   return cfg;
 }
 

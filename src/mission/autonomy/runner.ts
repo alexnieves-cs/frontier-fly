@@ -25,6 +25,7 @@ import { DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/
 import { DEFAULT_BATTERY } from './battery';
 import type { HealthInput } from './failsafe';
 import { RNG } from '../../shared/rng';
+import { CRASH_SPEED } from '../../shared/constants';
 
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
 /**
@@ -200,12 +201,23 @@ class Runner extends IndoorPhases {
     this.aperture?.sense(this.vehicle.pos, this.vehicle.vel, this.vehicle.yaw, this.dt);
     if (step.collided) {
       const pos = this.vehicle.pos;
+      const crash = step.impactSpeed > CRASH_SPEED;
       this.collisions.push({
         tSec: this.t,
         pos: [pos[0], pos[1], pos[2]],
         inside: this.inside,
+        speed: Math.round(step.impactSpeed * 100) / 100,
+        ...(crash ? { crash: true } : {}),
       });
-      this.log('warn', `Contact at ${this.where(pos)}${this.inside ? ' inside the building' : ''} during ${this.phase.replace('_', ' ')}.`);
+      const where = `${this.where(pos)}${this.inside ? ' inside the building' : ''} during ${this.phase.replace('_', ' ')}`;
+      if (crash) {
+        // The crash rule: the airframe is down where it hit, so the flight ends here.
+        this.log('warn', `Crash at ${where}: hit at ${fmt(step.impactSpeed, 1)} m/s, over the ${fmt(CRASH_SPEED, 1)} m/s crash limit.`);
+        this.crashed = true;
+        this.finish();
+        return;
+      }
+      this.log('warn', `Contact at ${where}, ${fmt(step.impactSpeed, 1)} m/s.`);
       if (this.visit && this.phase === 'indoor_explore') this.visit.policyCollisions += 1;
     }
     if (this.options.measureClearance) this.measureClearance();
@@ -437,6 +449,7 @@ class Runner extends IndoorPhases {
   }
 
   protected computeOutcome(): RunOutcome {
+    if (this.crashed) return 'crashed';
     if (this.aborted || (this.landingEmergency && !this.landedHome)) return 'aborted';
     const searchedAll = this.coverageDone && this.pending.length === 0;
     let out: RunOutcome;

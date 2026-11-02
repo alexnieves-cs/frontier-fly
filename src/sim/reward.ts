@@ -5,6 +5,8 @@ export interface RewardInput {
   newRoom: boolean;
   newFloor: boolean;
   impact: boolean;
+  /** The impact was a crash (faster than CRASH_SPEED into the surface). */
+  crash?: boolean;
   inContact: boolean;
   action: ArrayLike<number>;
   prevAction: ArrayLike<number>;
@@ -17,6 +19,7 @@ export function rawReward(input: RewardInput): number {
   if (input.newRoom) reward += REWARD.newRoom;
   if (input.newFloor) reward += REWARD.newFloor;
   if (input.impact) reward += REWARD.collision;
+  if (input.crash) reward += REWARD.crash;
   else if (input.inContact) reward += REWARD.contact;
   let smooth = 0;
   let effort = 0;

@@ -27,7 +27,8 @@ const FAILSAFE_KINDS: ReadonlySet<string> = new Set<HealthEventKind>([
   'wind',
 ]);
 
-export type Response = SafeResponse | 'airborne';
+/** `crashed`: the crash rule ended the flight (never safe). */
+export type Response = SafeResponse | 'airborne' | 'crashed';
 
 /** Airframes the bench flies. The quad is the default: its velocity loop holds ground speed in wind, as a real flight controller does. */
 export const FAULT_VEHICLES = ['quad', 'kinematic'] as const;
@@ -105,7 +106,9 @@ export async function flyFault(job: FaultJob): Promise<FaultFlight> {
   ).length;
   const expectedOutcome = run.outcome === scenario.expect.outcome && run.landedHome;
   const timeLimit = run.log.some((l) => /Time limit .* reached before landing/.test(l.message));
-  const response: Response = timeLimit
+  const response: Response = run.outcome === 'crashed'
+    ? 'crashed'
+    : timeLimit
     ? 'airborne'
     : run.landedHome
       ? expectedOutcome
@@ -114,6 +117,7 @@ export async function flyFault(job: FaultJob): Promise<FaultFlight> {
       : 'landed';
   const unsafeReasons: string[] = [];
   if (response === 'airborne') unsafeReasons.push('still flying at the time limit');
+  else if (response === 'crashed') unsafeReasons.push('crashed');
   else if (!fault.safe.includes(response)) unsafeReasons.push(`${response.replace('_', ' ')} is not a safe response here`);
   if (report.falseClears > 0) unsafeReasons.push('false clear');
   if (entriesWithoutLink > 0) unsafeReasons.push('entered without the link');

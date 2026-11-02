@@ -36,6 +36,9 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
   const envSeed = run.plan ? seed : setup.envSeed;
   cfg.dynamics = task.dynamics;
   cfg.speedH = task.speedH;
+  // FrontierBench v2 predates the crash rule (shared/constants.ts CRASH_SPEED): its scores count
+  // contacts instead of ending the flight, so submitted results stay comparable.
+  cfg.crashSpeed = Infinity;
   if (task.dynamics === 'quad' && task.dr > 0) {
     const rng = new RNG(seed, 'bench-dr');
     cfg.dyn = sampleDynParams(rng, defaultDynParams(), task.dr);

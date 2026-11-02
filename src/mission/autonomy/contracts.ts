@@ -278,7 +278,8 @@ export interface LogEntry {
   message: string;
 }
 
-export type RunOutcome = 'found' | 'clear' | 'not_found' | 'incomplete' | 'aborted' | 'landed';
+/** `crashed`: a contact started faster than CRASH_SPEED (shared/constants.ts) and the flight ended there. */
+export type RunOutcome = 'found' | 'clear' | 'not_found' | 'incomplete' | 'aborted' | 'crashed' | 'landed';
 
 /** Everything the runner saw and decided. The report is derived from this. */
 export interface RunRecord {
@@ -291,7 +292,8 @@ export interface RunRecord {
   confirmed: ConfirmedContact[];
   /** Scopes the planner declared clear, and when. */
   declaredClear: { scope: ClearScope; tSec: number }[];
-  collisions: { tSec: number; pos: V3; inside: string | null }[];
+  /** Contacts, each with the speed into the surface it started at (m/s); `crash` marks the one that ended the flight. */
+  collisions: { tSec: number; pos: V3; inside: string | null; speed?: number; crash?: boolean }[];
   entries: EntryRecord[];
   safetyEvents: SafetyEvent[];
   batteryStartPct: number;
