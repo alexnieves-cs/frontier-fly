@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (293 files, 55,769 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (293 files, 55,810 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -49,7 +49,7 @@ The same loop runs in the browser when you press **Train**, so a visitor can wat
 
 ## Mission layer
 
-`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them.
+`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them. `python/` is the same task as a Python package (a Gymnasium env and the scorer): `scripts/py/server.ts` drives the env and the bench episode recorder over a framed stdin/stdout protocol, and `npm run build:py` bundles it into one Node script the package starts.
 
 `src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, and the canonical share-link encoding. The planner page reads site footprints through `WorldProvider`, so it does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear. `src/vision` is the alternative that looks at pixels: a software rasterizer renders the drone's 160×120 camera (CC0 KayKit people baked to posed meshes, room lights, flashlight, auto exposure and sensor noise), and a small CenterNet-style TF.js network finds people and objects in it. It plugs into the mission perception source as `PerceptionOptions.camera`.
 
@@ -105,7 +105,7 @@ flowchart LR
   app -->|1| ui
   bench -->|2| app
   bench -->|2| eval
-  bench -->|2| shared
+  bench -->|3| shared
   bench -->|11| sim
   bench -->|3| team
   eval -->|4| gen
@@ -211,7 +211,7 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/bench` | 5 | 406 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
+| `src/bench` | 5 | 447 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
 | `src/eval` | 17 | 2,793 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,763 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |

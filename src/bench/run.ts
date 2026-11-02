@@ -5,7 +5,8 @@ import { sensorFrame } from '../sim/sensorPlanner';
 import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import type { ExplorerEnv } from '../sim/env';
-import type { BenchPilot } from './pilot';
+import type { BuildingSpec, EpisodeConfig, StepResult } from '../shared/types';
+import type { BenchContext, BenchPilot } from './pilot';
 import { planEpisodeSetup } from '../plans';
 import type { BenchRun, BenchTask } from './tasks';
 
@@ -28,7 +29,8 @@ export interface BenchEpisode {
   footprintHalfS: number | null;
 }
 
-export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun, pilot: BenchPilot): BenchEpisode {
+/** Building, env seed and config of one flight of a task (no env touched). */
+export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: BuildingSpec; envSeed: number; cfg: EpisodeConfig & { maxSteps: number } } {
   const seed = run.seed;
   const setup = run.plan ? planEpisodeSetup(run.plan.set, run.plan.record, task.lighting) : evalEpisodeSetup(task.stage, seed, task.lighting);
   const { spec, cfg } = setup;
@@ -41,34 +43,73 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
     cfg.dyn = sampleDynParams(rng, defaultDynParams(), task.dr);
     cfg.noise = sampleNoise(rng, task.dr, task.lighting !== 'day');
   }
-  pilot.reset({ speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics });
-  let obs = env.reset(spec, envSeed, cfg);
-  const fp = new EpisodeFootprint();
-  fp.start(env, spec, cfg.maxSteps);
-  let info = { coverage: 0, collisions: 0, energyWh: 0 };
-  let halfS: number | null = null;
-  let steps = 0;
-  for (let t = 0; t < cfg.maxSteps; t++) {
+  return { spec, envSeed, cfg };
+}
+
+/**
+ * A bench episode in progress. The constructor resets the env to the task's
+ * building and airframe; the caller steps the env with any pilot and hands each
+ * step to `record`, which says when the episode is over (done or out of steps).
+ * `finish` returns the scored episode. The Python bridge (scripts/py/server.ts)
+ * drives this one step at a time; `runBenchEpisode` drives it with a BenchPilot.
+ */
+export class BenchEpisodeRecorder {
+  readonly ctx: BenchContext;
+  readonly obs: Float32Array;
+  private readonly fp = new EpisodeFootprint();
+  private info = { coverage: 0, collisions: 0, energyWh: 0 };
+  private halfS: number | null = null;
+  private steps = 0;
+  private over = false;
+
+  constructor(
+    private readonly env: ExplorerEnv,
+    private readonly task: BenchTask,
+    private readonly run: BenchRun,
+  ) {
+    const { spec, envSeed, cfg } = benchEpisodeSetup(task, run);
+    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics };
+    this.obs = env.reset(spec, envSeed, cfg);
+    this.fp.start(env, spec, cfg.maxSteps);
+  }
+
+  /** Record one env step; true when the episode is over. */
+  record(s: StepResult): boolean {
+    if (this.over) throw new Error('bench episode already over');
+    this.info = s.info;
+    this.steps += 1;
+    if (this.halfS === null && this.info.coverage >= 0.5) this.halfS = this.steps / 20;
+    this.fp.step(this.env, this.steps, this.info.coverage);
+    this.over = s.done || this.steps >= this.ctx.maxSteps;
+    return this.over;
+  }
+
+  finish(): BenchEpisode {
+    const rec = this.fp.finish(this.info.coverage);
+    return {
+      task: this.task.id,
+      seed: this.run.seed,
+      ...(this.run.plan ? { plan: this.run.plan.record.id } : {}),
+      coverage: this.info.coverage,
+      collisions: this.info.collisions,
+      energyWh: this.info.energyWh,
+      halfS: this.halfS,
+      steps: this.steps,
+      footprint: rec.footprint[String(FOOTPRINT_RADIUS)]!,
+      area: { flown: curveArea(rec.curve.flown), footprint: curveArea(rec.curve.footprint) },
+      footprintHalfS: timeTo(rec.curve.footprint, 0.5, this.ctx.maxSteps / 20),
+    };
+  }
+}
+
+export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun, pilot: BenchPilot): BenchEpisode {
+  const rec = new BenchEpisodeRecorder(env, task, run);
+  pilot.reset(rec.ctx);
+  let obs = rec.obs;
+  for (;;) {
     const s = env.step(pilot.act(obs, sensorFrame(env, obs)));
     obs = s.obs;
-    info = s.info;
-    steps = t + 1;
-    if (halfS === null && info.coverage >= 0.5) halfS = steps / 20;
-    fp.step(env, steps, info.coverage);
-    if (s.done) break;
+    if (rec.record(s)) break;
   }
-  const rec = fp.finish(info.coverage);
-  return {
-    task: task.id,
-    seed,
-    ...(run.plan ? { plan: run.plan.record.id } : {}),
-    coverage: info.coverage,
-    collisions: info.collisions,
-    energyWh: info.energyWh,
-    halfS,
-    steps,
-    footprint: rec.footprint[String(FOOTPRINT_RADIUS)]!,
-    area: { flown: curveArea(rec.curve.flown), footprint: curveArea(rec.curve.footprint) },
-    footprintHalfS: timeTo(rec.curve.footprint, 0.5, cfg.maxSteps / 20),
-  };
+  return rec.finish();
 }
