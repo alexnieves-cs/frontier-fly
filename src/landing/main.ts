@@ -1,7 +1,7 @@
 import '../film/film.css';
 import './landing.css';
 import type { FilmStatus } from '../film/page';
-import { REPO_URL as REPO, siteHeader } from '../ui/siteNav';
+import { AUTHOR, REPO_URL as REPO, siteHeader } from '../ui/siteNav';
 import { isWebglError, showStartError } from '../ui/startError';
 import { atlasRates } from '../ui/tour/claims';
 import { pct, results, type PilotResult } from './results';
@@ -105,8 +105,32 @@ function markup(): string {
       </p>
     </section>
 
+    <section class="about" id="about" aria-labelledby="about-title">
+      <div class="about-copy">
+        <p class="kicker">ABOUT THE BUILDER</p>
+        <h2 id="about-title">Built by ${AUTHOR.name}</h2>
+        <p>
+          frontier-fly is ${AUTHOR.name}'s project: a browser simulator, a learned autopilot and a benchmark for
+          drones that search buildings for people. It is built in the open, every number on this site regenerates
+          from code in the repository, and the limits are written down next to the results.
+        </p>
+        <p class="about-links">
+          <a href="${AUTHOR.site}" rel="noopener">Portfolio</a>
+          <a href="${AUTHOR.github}" rel="noopener">GitHub profile</a>
+          <a href="${REPO}#readme" rel="noopener">The repository</a>
+          <a href="${REPO}/blob/main/CITATION.cff" rel="noopener">Cite it</a>
+        </p>
+      </div>
+      <ul class="skills" aria-label="What the project covers">
+        <li><strong>Reinforcement learning</strong>behavior cloning, DAgger and PPO, trained in the browser and on CI</li>
+        <li><strong>Robotics</strong>quadrotor dynamics, lidar mapping, scan-matching localization, PX4 SITL</li>
+        <li><strong>Evaluation</strong>fresh-seed benchmarks with intervals, a failure atlas, an open leaderboard</li>
+        <li><strong>Engineering</strong>TypeScript, three.js and WebGL, Rapier physics, a Python Gymnasium package, CI</li>
+      </ul>
+    </section>
+
     <footer class="foot">
-      <span>frontier-fly · civilian search, inspection, and confirm-clear only · MIT</span>
+      <span>frontier-fly · built by <a class="foot-author" href="${AUTHOR.site}" rel="noopener">${AUTHOR.name}</a> · civilian search, inspection, and confirm-clear only · MIT</span>
       <span class="foot-links">
         <a href="./mission.html">Plan a mission</a>
         <a href="./px4.html">PX4 in the loop</a>
