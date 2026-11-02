@@ -9,6 +9,7 @@ const MAP_SIZE = C.MAP_SIZE;
 const VOXEL = C.VOXEL;
 import type { BuildingSpec } from '../shared/types';
 import { flightMap } from '../gen/validate';
+import { voxelCount, voxelLayout } from '../shared/voxels';
 
 /** Rays shorter than this many meters before the return are not trusted as free. */
 const HIT_MARGIN = 0.15;
@@ -25,8 +26,8 @@ for (let i = 0; i < LIDAR_H; i++) {
 /**
  * Sensor-only "seen free" voxel map. Each step the horizontal lidar rays are
  * walked (voxel DDA) from the drone to just short of their return, on the
- * drone's current floor. Same layout as the env's visited grid:
- * `f * vw * vd + vy * vw + vx`, 0.5 m voxels, vw = floor0.w * 2.
+ * drone's current floor. Same layout as the env's visited grid (shared/voxels.ts):
+ * `f * vw * vd + vy * vw + vx`, 0.5 m voxels.
  *
  * Unlike the teacher's building cells this is knowledge a real robot has.
  * Readings with no return (misses and glass/night dropouts) mark nothing, so a
@@ -53,11 +54,8 @@ export class SeenMap {
    */
   reset(spec: BuildingSpec, mask?: Uint8Array): void {
     this.flyable = mask ?? flightMap(spec).reachable;
-    const floor0 = spec.floors[0]!;
-    this.vw = floor0.w * 2;
-    this.vd = floor0.d * 2;
-    this.floors = spec.floors.length;
-    const n = this.floors * this.vw * this.vd;
+    ({ vw: this.vw, vd: this.vd, floors: this.floors } = voxelLayout(spec));
+    const n = voxelCount(this);
     if (this.data.length !== n) this.data = new Uint8Array(n);
     else this.data.fill(0);
     this.count = 0;
