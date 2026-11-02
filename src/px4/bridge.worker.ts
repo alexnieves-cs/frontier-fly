@@ -54,7 +54,6 @@ function start(msg: StartMessage): void {
   const ws = new WebSocket(msg.url);
   ws.binaryType = 'arraybuffer';
   socket = ws;
-  // MAVLink frames are built in plain (non-shared) buffers, which is what WebSocket.send takes.
   const session = new Px4SimSession((bytes) => ws.readyState === WebSocket.OPEN && ws.send(bytes as Uint8Array<ArrayBuffer>), {
     home: msg.home,
     lockstepTimeoutMs: 100,

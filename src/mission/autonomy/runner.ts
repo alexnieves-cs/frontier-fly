@@ -154,6 +154,7 @@ class Runner implements MissionRunner {
       track: this.c.trackRec.slice(),
       phases,
       confirmed: this.c.confirmed.slice(),
+      unresolved: this.c.tracker.tracks.filter((t) => t.status === 'unresolved').map((t) => this.c.tracker.toConfirmed(t, t.lastSec)),
       declaredClear: this.c.declaredClear.slice(),
       collisions: this.c.collisions.slice(),
       entries: this.c.entries.slice(),
