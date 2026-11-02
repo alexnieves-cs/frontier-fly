@@ -1,4 +1,5 @@
 import type { DynParams, NoiseParams } from '../../shared/types';
+import { AIRFRAME } from '../../shared/airframe';
 import { GRAVITY } from '../../shared/constants';
 import type { RNG } from '../../shared/rng';
 
@@ -23,18 +24,19 @@ function scalePos(rng: RNG, value: number, scale: number): number {
   return out > 1e-9 ? out : 1e-9;
 }
 
-/** Hover rotor speed is about 700 rad/s for the given mass. */
-export function defaultDynParams(mass = 0.45): DynParams {
+/** The airframe (shared/airframe.ts); hover rotor speed is about 700 rad/s. */
+export function defaultDynParams(): DynParams {
+  const mass = AIRFRAME.massKg;
   const hoverForcePerMotor = (mass * GRAVITY) / 4;
   const kf = hoverForcePerMotor / (HOVER_W * HOVER_W);
   const km = kf * 0.02;
   return {
     mass,
-    inertia: [0.0022, 0.0024, 0.0036],
-    arm: 0.1,
+    inertia: [AIRFRAME.inertia[0], AIRFRAME.inertia[1], AIRFRAME.inertia[2]],
+    arm: AIRFRAME.armM,
     kf,
     km,
-    motorTau: 0.03,
+    motorTau: AIRFRAME.motorTauS,
     dragLin: [0.12, 0.12, 0.18],
     dragQuad: [0.05, 0.05, 0.06],
   };

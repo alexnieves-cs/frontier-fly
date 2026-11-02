@@ -1,3 +1,4 @@
+import type { BatteryConfig } from '../mission/autonomy/battery';
 export type Cell = 0 | 1 | 2 | 3;
 
 export interface Room {
@@ -169,6 +170,8 @@ export interface EpisodeConfig {
   maxCollisions?: number;
   /** Impact speed into a surface that counts as a crash and ends the episode, m/s. Defaults to CRASH_SPEED. */
   crashSpeed?: number;
+  /** Power model the reported energyWh is integrated with. Defaults to DEFAULT_BATTERY (shared/airframe.ts). */
+  energyModel?: BatteryConfig;
   /**
    * Horizontal speed a full action asks for, m/s. Defaults to MAX_SPEED_H
    * (2 m/s), which every shipped checkpoint was trained at.

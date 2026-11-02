@@ -96,7 +96,9 @@ export class IndoorPhase {
     const lidar = shellLidar(v.grid, (...a) => this.c.physics.cast(...a));
     if (this.c.options.localization === 'estimated') this.startLocalization(lighting, lidar);
     this.c.aperture = null;
-    v.sensing = new IndoorSensing(v.grid, this.c.loc ? this.c.loc.frameLidar(lidar) : lidar, lighting, this.c.world.seed);
+    // Back after a battery swap, the visit carries the maps of the first one (EntryPhase.startBuilding).
+    if (v.sensing) this.c.log('info', `Resuming the search of ${v.b.label} on the maps from the first visit.`);
+    v.sensing ??= new IndoorSensing(v.grid, this.c.loc ? this.c.loc.frameLidar(lidar) : lidar, lighting, this.c.world.seed);
     v.sensing.lastNewVoxelSec = this.c.t;
     if (this.c.vehicle instanceof QuadVehicle) v.sensing.braking = this.c.vehicle.braking;
     v.sensing.rangeHook = (lidar) => this.pilot.lidarHook(lidar);

@@ -1,4 +1,5 @@
 import type { DroneState, DynParams, Dynamics } from '../../shared/types';
+import { AIRFRAME } from '../../shared/airframe';
 import { GRAVITY, MAX_SPEED_V, MAX_YAW_RATE } from '../../shared/constants';
 import { integrateQuat, quatFromEulerZXY, quatNormalize, quatToEulerInto, rotateBodyToWorld, rotateWorldToBody } from './spatial';
 import { AngleController } from './controller';
@@ -34,10 +35,11 @@ function isIdentityish(q: ArrayLike<number>): boolean {
 export class QuadrotorDynamics implements Dynamics {
   private state: DroneState | null = null;
   private readonly ctrl = new AngleController();
-  private mass = 0.45;
-  private ix = 0.0022;
-  private iy = 0.0024;
-  private iz = 0.0036;
+  // Placeholders until reset() loads the episode's DynParams (dr.ts defaultDynParams: shared/airframe.ts).
+  private mass = AIRFRAME.massKg;
+  private ix = AIRFRAME.inertia[0];
+  private iy = AIRFRAME.inertia[1];
+  private iz = AIRFRAME.inertia[2];
   private kf = 1e-5;
   private km = 1e-7;
   private motorTau = 0.03;

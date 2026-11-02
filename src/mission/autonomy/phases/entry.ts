@@ -1,4 +1,5 @@
 import type { EntryCandidate, MissionBuilding, V3 } from '../contracts';
+import type { MeasuredOpening } from '../openingSensor';
 import { planApproach } from '../planner/approach';
 import { passageAxis, rankCandidates, scoreOpening } from '../planner/entry';
 import { FlyThrough } from '../planner/flythrough';
@@ -28,6 +29,8 @@ export interface EntryExits {
  */
 export class EntryPhase {
   private operatorAnswer: 'approve' | 'deny' | null = null;
+  /** Openings inspected and ranked per building, for a return after a battery swap. */
+  private readonly known = new Map<string, { observed: Map<number, MeasuredOpening>; ranked: EntryCandidate[]; visit: Visit }>();
 
   constructor(
     private readonly c: MissionCore,
@@ -87,6 +90,28 @@ export class EntryPhase {
         yaw: i === plan.descent.length - 1 ? plan.standoff!.yaw : null,
       })),
     ];
+    // Back after a battery swap: the openings were inspected and ranked on the first visit.
+    const known = this.known.get(b.id);
+    if (known) {
+      for (const [k, o] of known.observed) v.observed.set(k, o);
+      v.ranked = known.ranked;
+      // And the maps it built inside, on the true pose: the search picks up where it left off. On the
+      // pose estimate the new entry starts a new estimate, which the old map is not aligned to.
+      if (this.c.options.localization !== 'estimated') v.sensing = known.visit.sensing;
+      this.c.setJob(
+        this.pilot.followJob(
+          'approach',
+          wps,
+          () => {
+            this.c.setPhase('entry_select');
+            this.c.log('action', `Back at ${b.label}: entering through the openings ranked on the first visit.`);
+            this.tryCandidate();
+          },
+          0.3,
+        ),
+      );
+      return;
+    }
     this.c.setJob(this.pilot.followJob('approach', wps, () => this.startInspect(), 0.3));
   }
 
@@ -116,6 +141,7 @@ export class EntryPhase {
     }
     v.ranked = rankCandidates(cands);
     v.candIdx = 0;
+    this.known.set(v.b.id, { observed: new Map(v.observed), ranked: v.ranked, visit: v });
     if (!cands.length) {
       this.c.log('warn', `No openings observed on ${v.b.label}.`);
     }

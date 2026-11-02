@@ -166,6 +166,8 @@ export interface BatteryModel {
   usedPct(): number;
   /** Percent of the pack needed to fly `distanceM` horizontally and climb `climbM`, at cruise. */
   costPct(distanceM: number, climbM: number): number;
+  /** Fit a fresh pack: on the ground at home, between flights of one mission. */
+  swap(): void;
 }
 
 // --------------------------------------------------------------- safety
@@ -220,6 +222,8 @@ export interface SafetyMonitor {
   /** The strongest action needed now. `none` when flight is nominal. */
   check(input: SafetyInput): SafetyAction;
   events(): SafetyEvent[];
+  /** A fresh pack is in: the battery reserve and critical alarms re-arm for the next flight. */
+  batterySwapped(): void;
 }
 
 // -------------------------------------------------------------- planner
@@ -303,6 +307,9 @@ export interface RunRecord {
   safetyEvents: SafetyEvent[];
   batteryStartPct: number;
   batteryEndPct: number;
+  /** Packs swapped at home mid-mission, and the usable % drawn from them before they came out. */
+  batterySwaps?: number;
+  swappedUsedPct?: number;
   /** True when the drone landed within 1.5 m of home. */
   landedHome: boolean;
   indoorExplorer: 'policy' | 'frontier' | 'oracle' | null;

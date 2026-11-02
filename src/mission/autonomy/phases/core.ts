@@ -115,6 +115,11 @@ export class MissionCore {
   /** The crash rule ended the flight (shared/constants.ts CRASH_SPEED). */
   crashed = false;
   returning = false;
+  /** The return home is to swap the battery and fly on, not the end of the mission. */
+  swapping = false;
+  batterySwaps = 0;
+  /** Usable % drawn from packs already swapped out. */
+  swappedUsedPct = 0;
   landingEmergency = false;
   inside: string | null = null;
   lastCollided = false;

@@ -140,6 +140,8 @@ export interface MissionFlight {
   /** Who explored indoors: 'policy' only when it kept every building to itself. */
   explorer: string | null;
   handoffs: string[];
+  /** Batteries swapped at home mid-mission (absent when none). */
+  swaps?: number;
   /** Indoor localization, for flights on the estimated pose that entered a building. */
   loc?: FlightLoc | null;
 }
@@ -208,6 +210,7 @@ export async function flyMission(
     operatorAsks: asks,
     explorer: run.indoorExplorer,
     handoffs,
+    ...(run.batterySwaps ? { swaps: run.batterySwaps } : {}),
     ...(run.localization.length ? { loc: flightLoc(run.localization) } : {}),
   };
 }

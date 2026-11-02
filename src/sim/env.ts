@@ -278,7 +278,7 @@ export class ExplorerEnv implements Env {
     const reward = base - this.penalty.total;
     this.prevAction.set(action.length >= 4 ? action.subarray(0, 4) : action);
     for (let i = 0; i < 3; i++) this.accel[i] = (this.state.vel[i]! - this.prevVel[i]!) / POLICY_DT;
-    this.energyWh += (powerFor(DEFAULT_BATTERY, this.state.vel, this.accel) * POLICY_DT) / 3600;
+    this.energyWh += (powerFor(this.cfg.energyModel ?? DEFAULT_BATTERY, this.state.vel, this.accel) * POLICY_DT) / 3600;
     this.prevVel[0] = this.state.vel[0];
     this.prevVel[1] = this.state.vel[1];
     this.prevVel[2] = this.state.vel[2];

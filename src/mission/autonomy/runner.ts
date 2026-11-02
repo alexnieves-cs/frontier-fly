@@ -12,6 +12,7 @@ import type {
   SafetyAction,
   V3,
   ClearanceRecord,
+  MissionBuilding,
 } from './contracts';
 import { requirementsMet } from './planner/confirm';
 import { cruiseZ, dist, segmentClear } from './planner/geometry';
@@ -22,7 +23,7 @@ import { HomePhase } from './phases/home';
 import { IndoorPhase } from './phases/indoor';
 import { Pilot } from './phases/pilot';
 import { SearchPhase } from './phases/search';
-import { DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
+import { centerDist, DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
 import { DEFAULT_BATTERY } from './battery';
 import type { HealthInput } from './failsafe';
 import { CRASH_SPEED } from '../../shared/constants';
@@ -33,6 +34,20 @@ const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
  * infers wind from the tilt it holds against it, which settles over a second or two.
  */
 const WIND_ESTIMATE_TAU = 2;
+/**
+ * Battery swaps. The airframe (shared/airframe.ts) flies about 17 minutes on a pack, so a long sweep
+ * lands at home on its battery budget, takes a fresh pack and flies on: SPARE_PACKS spares, SWAP_SEC
+ * on the pad for each, and only when at least SWAP_MIN_FLIGHT_SEC of the time budget is left after it.
+ */
+const SPARE_PACKS = 2;
+const SWAP_SEC = 60;
+const SWAP_MIN_FLIGHT_SEC = 120;
+/**
+ * Usable % of a pack one building search is assumed to take before any has been flown on this
+ * mission; after that, the most any visit took. A building search that would not fit in what is
+ * left of the pack starts on a fresh one instead, so it is not cut short.
+ */
+const VISIT_PCT_DEFAULT = 40;
 /** Climbing clear in severe wind ends this close under cruise height, m. */
 const CLIMB_CLEAR_TOL_M = 0.5;
 /** ...and does not apply this close to home, m. */
@@ -68,6 +83,9 @@ class Runner implements MissionRunner {
   private locLostSince = -1;
   private closest: ClearanceRecord | null = null;
   private gnssPadHoldLogged = false;
+  /** Pack energy used, usable %, when the current building visit started; and what each visit took. */
+  private visitFromPct: number | null = null;
+  private readonly visitPcts: number[] = [];
 
   constructor(mission: Mission, world: MissionWorld, source: LiveDetectionSource, options: RunnerOptions, physics: OutdoorPhysics) {
     const c = new MissionCore(mission, world, source, options, physics);
@@ -75,7 +93,7 @@ class Runner implements MissionRunner {
     const pilot = new Pilot(c);
     this.pilot = pilot;
     this.search = new SearchPhase(c, pilot, {
-      startBuilding: (b) => this.entry.startBuilding(b),
+      startBuilding: (b) => this.beginBuilding(b),
       startReturn: (reason) => this.home.startReturn(reason),
       resumeIndoor: () => this.indoor.resumeIndoor(),
     });
@@ -93,7 +111,7 @@ class Runner implements MissionRunner {
     });
     this.home = new HomePhase(c, pilot, {
       startExit: (after) => this.indoor.startExit(after),
-      finish: () => this.finish(),
+      finish: () => (this.c.swapping && this.c.landedHome ? this.swapBattery() : this.finish()),
     });
     c.job = pilot.holdJob('preflight', 1, () => this.search.startCoverage());
     c.recordTrack();
@@ -162,6 +180,7 @@ class Runner implements MissionRunner {
       safetyEvents: [...this.c.monitor.events(), ...this.c.failsafe.events()].sort((a, b) => a.tSec - b.tSec),
       batteryStartPct: this.c.batteryStart,
       batteryEndPct: this.c.battery.remainingPct(),
+      ...(this.c.batterySwaps ? { batterySwaps: this.c.batterySwaps, swappedUsedPct: this.c.swappedUsedPct } : {}),
       landedHome: this.c.landedHome,
       indoorExplorer: this.indoor.policyClean ? 'policy' : this.indoor.frontierRan ? (this.c.oracle ? 'oracle' : 'frontier') : null,
       localization: [...this.c.locVisits, ...(this.c.loc && this.c.loc.flownTicks > 0 ? [this.c.loc.record(this.c.visit?.b.id ?? '')] : [])],
@@ -173,6 +192,10 @@ class Runner implements MissionRunner {
   }
 
   private tick(): void {
+    if (this.visitFromPct !== null && !this.c.visit) {
+      this.visitPcts.push(this.energyUsedPct() - this.visitFromPct);
+      this.visitFromPct = null;
+    }
     this.c.ticks += 1;
     this.c.t = this.c.ticks * this.c.dt;
     this.advanceFaults();
@@ -346,20 +369,100 @@ class Runner implements MissionRunner {
     return Math.hypot(pos[0] - home[0], pos[1] - home[1]);
   }
 
+  /** Rough flight time home from here, s: out of the building, up to cruise and across. */
+  private timeHome(): number {
+    const pos = this.c.vehicle.pos;
+    const climb = Math.max(0, cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2]);
+    return this.distanceHome(pos) / 4 + climb / 1.2 + (this.c.inside ? 60 : 0) + 30;
+  }
+
   private checkBudgets(): void {
     if (this.c.returning || this.c.finished || this.c.phase === 'preflight') return;
     const pos = this.c.vehicle.pos;
     const d = this.distanceHome(pos);
     const climb = Math.max(0, cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2]);
-    const timeHome = d / 4 + climb / 1.2 + (this.c.inside ? 60 : 0) + 30;
+    const timeHome = this.timeHome();
     if (this.c.t + timeHome * 1.2 + 10 >= this.c.maxSim) {
       this.home.startReturn(`time budget (${fmt(this.c.maxSim - this.c.t, 0)} s left)`);
       return;
     }
     const need = this.c.battery.costPct(d, climb) * 1.3 * (this.c.health?.costScale ?? 1) + (this.c.inside ? 3 : 0) + 3;
     if (this.c.battery.usedPct() + need >= this.c.mission.budgets.batteryPct) {
-      this.home.startReturn(`battery budget (${fmt(this.c.battery.usedPct(), 0)}% used of ${fmt(this.c.mission.budgets.batteryPct, 0)}%)`);
+      const budget = `battery budget (${fmt(this.c.battery.usedPct(), 0)}% used of ${fmt(this.c.mission.budgets.batteryPct, 0)}%)`;
+      if (this.canSwap(timeHome)) this.startSwapReturn(budget);
+      else this.home.startReturn(budget);
     }
+  }
+
+  /**
+   * Whether a battery-budget return should land for a fresh pack and fly on: there is search left,
+   * a spare pack, time for the swap and a useful flight after it, and no fault active (a faulted
+   * flight comes home and stays home, so the fault bench measures the failsafe, not the spares).
+   */
+  private canSwap(timeHome: number, next: MissionBuilding | null = null): boolean {
+    if (this.c.batterySwaps >= SPARE_PACKS || this.c.health?.flags.size) return false;
+    if (this.c.t + timeHome * 1.2 + SWAP_SEC + SWAP_MIN_FLIGHT_SEC >= this.c.maxSim) return false;
+    if (this.search.findMission() && requirementsMet(this.c.mission, this.c.confirmed)) return false;
+    return next !== null || !this.search.coverageDone || this.search.pending.length > 0 || this.unfinishedVisit() !== null;
+  }
+
+  /** Energy drawn so far over every pack, usable %. */
+  private energyUsedPct(): number {
+    return this.c.swappedUsedPct + this.c.battery.usedPct();
+  }
+
+  /**
+   * Start a building search, or first swap the battery when the search would not fit in what is
+   * left of the pack (the probability search picks its next building itself, so it is left alone).
+   */
+  private beginBuilding(b: MissionBuilding): void {
+    const used = this.c.battery.usedPct();
+    const est = this.visitPcts.length ? Math.max(...this.visitPcts) : VISIT_PCT_DEFAULT;
+    const home = this.c.battery.costPct(centerDist(b, this.c.world.home), 0) * 1.3 + 6;
+    const budget = this.c.mission.budgets.batteryPct;
+    // Only when a fresh pack would cover it, or the drone would shuttle between pad and building.
+    if (!this.c.sar && used + est + home >= budget && est + home < budget - used && this.canSwap(this.timeHome(), b)) {
+      this.search.pending.unshift(b);
+      this.c.swapping = true;
+      this.home.startReturn(`battery: ${fmt(used, 0)}% used and a building search takes about ${fmt(est, 0)}%, so swapping the battery before ${b.label}`);
+      return;
+    }
+    this.visitFromPct = this.energyUsedPct();
+    this.entry.startBuilding(b);
+  }
+
+  /** The building being searched, while its search is not finished. */
+  private unfinishedVisit(): MissionBuilding | null {
+    const v = this.c.visit;
+    return v && !v.searchComplete && this.c.phase !== 'exit' ? v.b : null;
+  }
+
+  private startSwapReturn(budget: string): void {
+    // A building cut short goes back in the queue: the next flight searches it from the start.
+    const b = this.unfinishedVisit();
+    if (b && !this.search.pending.some((p) => p.id === b.id)) this.search.pending.unshift(b);
+    this.c.swapping = true;
+    this.home.startReturn(`${budget}, to swap the battery${b ? ` and come back for ${b.label}` : ''}`);
+  }
+
+  /** On the pad after a swap return: fit a fresh pack, take off and carry on where the search left off. */
+  private swapBattery(): void {
+    this.c.swapping = false;
+    this.c.batterySwaps += 1;
+    this.c.swappedUsedPct += this.c.battery.usedPct();
+    this.c.battery.swap();
+    this.c.monitor.batterySwapped();
+    this.c.log('action', `Battery swap ${this.c.batterySwaps} of ${SPARE_PACKS}: fresh pack fitted, ${fmt(SWAP_SEC, 0)} s on the pad.`);
+    this.c.setJob(
+      this.pilot.holdJob('preflight', SWAP_SEC, () => {
+        this.c.returning = false;
+        this.c.landedHome = false;
+        this.c.log('action', 'Taking off to resume the search.');
+        const climb = this.pilot.climbToCruise();
+        if (climb.length) this.c.setJob(this.pilot.followJob('coverage', climb, () => this.search.continueMission(), 0.6));
+        else this.search.continueMission();
+      }),
+    );
   }
 
   // ----------------------------------------------------------- faults
@@ -504,7 +607,9 @@ class Runner implements MissionRunner {
     if (action.kind === 'return_home' || action.kind === 'exit_building') {
       if (this.c.returning) return;
       this.c.log('warn', `Safety: ${action.reason}.`);
-      this.home.startReturn(`safety (${action.reason})`);
+      // The battery reserve is the end of a pack, not of the mission, while there are spares.
+      if (action.reason.startsWith('Battery reserve') && this.canSwap(this.timeHome())) this.startSwapReturn(`safety (${action.reason})`);
+      else this.home.startReturn(`safety (${action.reason})`);
       return;
     }
     // hold and backtrack are latched in the recover phase.
