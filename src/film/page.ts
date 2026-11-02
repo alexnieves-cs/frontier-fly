@@ -143,6 +143,8 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   root.appendChild(stage);
   const canvas = document.createElement('canvas');
   canvas.className = 'film-canvas';
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', '3D replay of a search-and-rescue mission flown by the autopilot');
   stage.appendChild(canvas);
   const loading = document.createElement('div');
   loading.className = 'film-loading';

@@ -109,7 +109,7 @@ function markup(): string {
             <button type="button" data-play aria-pressed="true">Pause</button>
             <label class="how-check"><input type="checkbox" data-truth /> Show the floor plan</label>
           </div>
-          <canvas class="how-canvas" data-canvas width="660" height="480"></canvas>
+          <canvas class="how-canvas" data-canvas role="img" aria-label="Animated diagram of this step" width="660" height="480"></canvas>
           <p class="how-readout" data-readout role="status" aria-live="off"></p>
         </div>
       </section>

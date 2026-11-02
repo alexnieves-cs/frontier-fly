@@ -650,9 +650,9 @@ function markup(): string {
           <div><span>Finds</span><strong data-testid="hud-finds">0</strong></div>
         </div>
         <div class="map-wrap">
-          <canvas data-testid="demo-map" aria-label="Top-down mission map"></canvas>
-          <div class="cam" data-testid="camera-inset" hidden><canvas data-testid="camera-canvas" aria-label="Drone camera with detections"></canvas><span data-testid="camera-caption"></span></div>
-          <div class="pip" data-testid="pip" hidden><canvas data-testid="pip-canvas"></canvas><span>3D chase · daylight render</span></div>
+          <canvas data-testid="demo-map" role="img" aria-label="Top-down mission map"></canvas>
+          <div class="cam" data-testid="camera-inset" hidden><canvas data-testid="camera-canvas" role="img" aria-label="Drone camera with detections"></canvas><span data-testid="camera-caption"></span></div>
+          <div class="pip" data-testid="pip" hidden><canvas data-testid="pip-canvas" role="img" aria-label="3D chase view of the drone"></canvas><span>3D chase · daylight render</span></div>
           <button type="button" class="toggle-3d" data-testid="toggle-3d" aria-pressed="false">3D chase</button>
           <ul class="legend" aria-label="Map legend">
             <li><i class="lg-fence"></i>Geofence</li>
