@@ -90,7 +90,7 @@ export interface StepInfo {
   newRoom: boolean;
   newFloor: boolean;
   success: boolean;
-  /** Electrical energy used so far by a 1.2 kg quad flying this track (mission/autonomy/battery.ts), Wh. */
+  /** Electrical energy used so far by the airframe flying this track (mission/autonomy/battery.ts; FrontierBench v2 keeps its own model), Wh. */
   energyWh: number;
   /** Progress penalties subtracted from this step's reward (see sim/reward.ts ProgressTracker). */
   penalty?: { stuck: number; still: number; flip: number; total: number };

@@ -339,7 +339,7 @@ function reportInline(study, bench) {
   const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
   const keys5 = ['R_CLIMB_FLOORS', 'R_CLIMB_FLOORS_CI', 'R_PLANNER_FLOORS', 'R_PLANNER_FLOORS_CI', 'R_CLIMB_REACHED', 'R_CLIMB_COLL', 'R_PRED_HARD', 'R_PRED_HARD_CI', 'R_ORACLEGAIN_HARD', 'R_PRED_FLOORS', 'R_ORACLEGAIN_FLOORS', 'R_PLANNER_FLOORS_N'];
   const keys6 = ['R_MP_R2', 'R_MP_BASE_R2', 'R_MP_MAE', 'R_MP_BASE_MAE', 'R_MP_TRAIN', 'R_MP_VAL'];
-  const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL'];
+  const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL', 'R_M_SWAP_FLIGHTS', 'R_M_SWAP_COMPOUND'];
   for (const k of [...keys, ...keys2, ...keys3, ...keys4, ...keys5, ...keys6]) out[k] = 'n/a';
   const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
   const mp = readJson('public/models/mappred.json');
@@ -425,6 +425,11 @@ function reportInline(study, bench) {
     out.R_M_NIGHT_SENSOR = pct(m.sensor['backpack-night'].expectedOutcome);
     out.R_M_NIGHT_ORACLE = pct(m.oracle['backpack-night'].expectedOutcome);
     out.R_M_COMPOUND = pct(m.sensor['compound-clear'].expectedOutcome);
+    // Battery swaps (runner.ts): flights that landed for a fresh pack, over every mode.
+    const fl = bench.flights ?? [];
+    out.R_M_SWAP_FLIGHTS = `${fl.filter((f) => f.swaps).length} of ${fl.length}`;
+    const compound = fl.filter((f) => f.scenario.startsWith('compound'));
+    out.R_M_SWAP_COMPOUND = `${compound.filter((f) => f.swaps).length} of ${compound.length}`;
     if (m.sensorLoc?.all.loc) {
       const all = ['sensorLoc', 'policyLoc', 'sensorQuadLoc'].filter((k) => m[k]?.all.loc);
       const flights = all.reduce((a, k) => a + m[k].all.flights, 0);
@@ -661,7 +666,7 @@ function benchmarks() {
       'The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around.',
       'The sensor-only planner reads only the drone\'s own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode.',
       '`compound-occupied` is the compound sweep with a person lying inside one building, so a sweep that declares that building clear is a false clear; its expected outcome is found.',
-      'The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
+      'The quadrotor rows fly the policy and the planner on the rigid-body quadrotor airframe (`shared/airframe.ts`) under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
       'The estimated-pose rows fly the same explorers indoors on the drone\'s own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator\'s pose, and the estimate starts at the doorway from the aperture tracker.',
       'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
     ].join(' ');

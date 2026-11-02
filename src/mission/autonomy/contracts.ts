@@ -375,7 +375,7 @@ export interface RunnerOptions {
   policy?: ActingPolicy;
   /**
    * Airframe model. 'kinematic' (default) follows commands within the
-   * acceleration caps; 'quad' flies a 1.2 kg quadrotor on rigid-body dynamics
+   * acceleration caps; 'quad' flies the airframe (shared/airframe.ts) as a quadrotor on rigid-body dynamics
    * and an angle-mode flight controller, and indoors uses the braking filter.
    */
   vehicle?: 'kinematic' | 'quad';

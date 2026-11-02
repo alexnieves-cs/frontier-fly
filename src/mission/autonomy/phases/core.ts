@@ -50,7 +50,7 @@ import {
 } from './shared';
 
 /**
- * Outdoor tilt limit, rad (55°). The 1.2 kg quad has a thrust-to-weight of 2.5, so 55° leaves 30% of thrust
+ * Outdoor tilt limit, rad (55°). The mission quad (shared/airframe.ts) has a thrust-to-weight of 2.5, so 55° leaves 30% of thrust
  * for altitude and attitude. Indoors keeps the default 23° the close-in planners are tuned around.
  */
 const OUTDOOR_TILT_RAD = 0.96;
@@ -208,7 +208,7 @@ export class MissionCore {
   limits(): VehicleLimits {
     let base = this.baseLimits();
     // Outdoors the airframe may lean to 55° (PX4's MPC_TILTMAX_AIR allows up to 89°). The default 23° holds
-    // about 5 m/s of wind on the 1.2 kg quad and 40° about 8 m/s, so at 40° an 8 m/s wind left no headway home.
+    // about 5 m/s of wind on the mission quad and 40° about 8 m/s, so at 40° an 8 m/s wind left no headway home.
     // The limit is fixed rather than scheduled on the wind estimate: the estimate lags a wind front by a second
     // or two, and that is when the drone is blown into walls. Fly-throughs keep 40° unless it is windy.
     const windy = Math.hypot(this.windEstimate[0], this.windEstimate[1]) >= 3;
