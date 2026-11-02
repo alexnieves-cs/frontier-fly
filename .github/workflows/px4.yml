@@ -155,3 +155,39 @@ jobs:
           name: px4-browser
           path: test-results/px4
           retention-days: 14
+
+  # Physics validation: the same maneuvers flown by PX4 on its own simulator (SIH, with the
+  # mission quad's constants), by PX4 on frontier-fly's rigid body through the bridge, and by
+  # frontier-fly's own controller (docs/PHYSICS_VALIDATION.md). Informational, like the rest.
+  physics:
+    needs: build-px4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: pip install -q pymavlink
+      - uses: actions/download-artifact@v8
+        with:
+          name: px4-sitl
+      - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
+      - run: sudo setcap cap_sys_nice+ep "$PX4_BUILD/bin/px4"
+      - name: Fly the validation maneuvers
+        env:
+          PX4_SIM_SPEED_FACTOR: 2
+        run: scripts/physics/run.sh test-results/physics all
+      - if: always()
+        run: npx vite-node scripts/physics/report.ts -- --in test-results/physics --summary "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: px4-physics
+          path: test-results/physics
+          retention-days: 14
