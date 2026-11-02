@@ -209,7 +209,7 @@ These apply to the indoor sim, [`sim.html`](https://alexnieves-cs.github.io/fron
 Landed, each with its own study in [REPORT.md](REPORT.md):
 
 - **Indoor localization.** Missions can fly on an estimated pose (scan matching plus inertial odometry) instead of the true one. The same estimator is also replayed on a real robot's laser log, the Intel Research Lab dataset ([report](REPORT.md#real-data-intel-research-lab)).
-- **Search by probability** outdoors, **faults and a safety case** ([SAFETY_CASE.md](SAFETY_CASE.md)), **QGroundControl export** ([QGC_EXPORT.md](QGC_EXPORT.md)) and **PX4 in the loop** ([PX4.md](PX4.md)).
+- **Search by probability** outdoors, **faults and a safety case** ([SAFETY_CASE.md](SAFETY_CASE.md)), **QGroundControl export** ([QGC_EXPORT.md](QGC_EXPORT.md)), **PX4 in the loop** ([PX4.md](PX4.md)) and a **plan for a real Crazyflie flight** ([CRAZYFLIE.md](CRAZYFLIE.md)).
 - **Drone teams** sharing maps over a radio that walls weaken ([live](https://alexnieves-cs.github.io/frontier-fly/team.html)), **speed and energy** metering, **search by sight** with a rendered camera and a learned detector, **real floor plans** ([REAL_PLANS.md](REAL_PLANS.md)), a policy **fine-tuned with PPO** on its own flights, and the **FrontierBench** leaderboard with a team track ([LEADERBOARD.md](LEADERBOARD.md)).
 
 Next:
