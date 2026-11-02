@@ -829,7 +829,7 @@ function readmeMissions(mb, control) {
  * The false-clear and collision rates come from the failure atlas, which samples a declared mix of
  * missions, light, wind and faults; the mission bench beside it uses fixed scenarios.
  */
-function readmeHeadline(study, mb, atlas, faults) {
+function readmeHeadline(study, mb, atlas, faults, tracking) {
   if (!study || !mb || !atlas || !faults) return '_Not measured yet. Run the studies behind docs/REPORT.md._';
   const ci1 = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
   const ci2 = ([lo, hi]) => `${(lo * 100).toFixed(2)}–${(hi * 100).toFixed(2)}%`;
@@ -859,15 +859,81 @@ function readmeHeadline(study, mb, atlas, faults) {
         `${pct(missions.expectedOutcome)} (${ci1(missions.expectedOutcomeCi)}) found the target or correctly cleared`,
         `${missions.flights} fixed-scenario missions on the quadrotor`,
       ],
-      [
-        '**How often does it call a building clear with someone inside?**',
-        `**${pct2(fc.p)} per flight** (${ci2(fc.ci)}); ${pct(occupied.p)} on sweeps of an occupied site`,
-        `${fmt(fc.flights)} importance-sampled flights, checked by ${fmt(atlas.rates.falseClear.monteCarlo.flights)} plain ones`,
-      ],
+      tracking
+        ? [
+            '**How often does it call a building clear with someone inside?**',
+            `**${pct2(tracking.now.rates.falseClear.p)} per flight** (${ci2(tracking.now.rates.falseClear.ci)}), down from ${pct2(tracking.ctrl.rates.falseClear.p)} before unconfirmed people blocked a clear`,
+            `${fmt(tracking.now.flights)} fresh flights from the failure atlas's mix, both versions on the same seeds (atlas at v1.0.0: ${pct2(fc.p)})`,
+          ]
+        : [
+            '**How often does it call a building clear with someone inside?**',
+            `**${pct2(fc.p)} per flight** (${ci2(fc.ci)}); ${pct(occupied.p)} on sweeps of an occupied site`,
+            `${fmt(fc.flights)} importance-sampled flights, checked by ${fmt(atlas.rates.falseClear.monteCarlo.flights)} plain ones`,
+          ],
       ['How often does it hit something?', `${pct2(col.p)} per flight (${ci2(col.ci)})`, `${fmt(col.flights)} importance-sampled flights`],
       ['Does it get home when something breaks?', `${pct(safe.safeRate)} (${ci1(safe.safeRateCi)}) of faulted flights end safely`, `${fmt(safe.flights)} flights with sensor, motor, battery, link, GNSS or wind faults`],
     ],
   );
+}
+
+/**
+ * Person tracking after the atlas (docs/atlas/mc-tracking.json): plain Monte Carlo from the atlas's
+ * nominal distribution on a fresh block, flown by the current code and by the code before the change
+ * (mc-tracking-control.json) on the same seeds. Case indices follow DIMS in src/eval/atlas/space.ts:
+ * k[0] is the mission, k[2] the person's pose.
+ */
+const trackingRuns = () => {
+  const now = readJson('docs/atlas/mc-tracking.json');
+  const ctrl = readJson('docs/atlas/mc-tracking-control.json');
+  return now && ctrl ? { now, ctrl } : null;
+};
+const ATLAS_MISSIONS = ['find-person', 'sweep-occupied', 'sweep-empty', 'find-object'];
+const ATLAS_POSES = ['standing', 'sitting', 'lying', 'walking', 'hiding'];
+function trackingValues(now, ctrl) {
+  const keys = ['R_TRK_N', 'R_TRK_SEEDS', 'R_TRK_FC', 'R_TRK_FC_CI', 'R_TRK_FC_K', 'R_TRK_FC_CTRL', 'R_TRK_FC_CTRL_CI', 'R_TRK_FC_CTRL_K', 'R_TRK_OCC', 'R_TRK_OCC_CTRL', 'R_TRK_OK', 'R_TRK_OK_CTRL', 'R_TRK_WALK', 'R_TRK_WALK_CTRL', 'R_TRK_WALK_N', 'R_TRK_HIDE', 'R_TRK_HIDE_CTRL', 'R_TRK_HIDE_N', 'R_TRK_EMPTY', 'R_TRK_EMPTY_CTRL', 'R_TRK_EMPTY_N', 'R_TRK_COL', 'R_TRK_COL_CTRL', 'R_TRK_COMMIT', 'R_TRK_CTRL_COMMIT'];
+  if (!now || !ctrl) return Object.fromEntries(keys.map((k) => [k, 'not measured']));
+  const p2 = (v) => `${(v * 100).toFixed(2)}%`;
+  const ci = ([lo, hi]) => `${(lo * 100).toFixed(2)}% to ${(hi * 100).toFixed(2)}%`;
+  const count = (run, test) => run.results.filter(test).length;
+  const mission = (r) => ATLAS_MISSIONS[r.case.k[0]];
+  const pose = (r) => ATLAS_POSES[r.case.k[2]];
+  const withPerson = (r) => mission(r) === 'find-person' || mission(r) === 'sweep-occupied';
+  const share = (run, of, test) => {
+    const n = count(run, of);
+    return { k: count(run, (r) => of(r) && test(r)), n };
+  };
+  const frac = ({ k, n }) => `${k} of ${n}`;
+  const found = (state) => (r) => withPerson(r) && pose(r) === state;
+  const isFound = (r) => r.outcome === 'found';
+  const occ = (run) => share(run, (r) => mission(r) === 'sweep-occupied', (r) => r.falseClear);
+  const empty = (run) => share(run, (r) => mission(r) === 'sweep-empty', (r) => r.expected);
+  return {
+    R_TRK_N: fmt(now.flights),
+    R_TRK_SEEDS: `${now.seedBase}-${now.seedBase + now.flights - 1}`,
+    R_TRK_FC: p2(now.rates.falseClear.p),
+    R_TRK_FC_CI: ci(now.rates.falseClear.ci),
+    R_TRK_FC_K: fmt(now.rates.falseClear.failures),
+    R_TRK_FC_CTRL: p2(ctrl.rates.falseClear.p),
+    R_TRK_FC_CTRL_CI: ci(ctrl.rates.falseClear.ci),
+    R_TRK_FC_CTRL_K: fmt(ctrl.rates.falseClear.failures),
+    R_TRK_OCC: pct(occ(now).k / occ(now).n),
+    R_TRK_OCC_CTRL: pct(occ(ctrl).k / occ(ctrl).n),
+    R_TRK_OK: pct(count(now, (r) => r.expected) / now.flights),
+    R_TRK_OK_CTRL: pct(count(ctrl, (r) => r.expected) / ctrl.flights),
+    R_TRK_WALK: frac(share(now, found('walking'), isFound)),
+    R_TRK_WALK_CTRL: String(share(ctrl, found('walking'), isFound).k),
+    R_TRK_WALK_N: String(share(now, found('walking'), isFound).n),
+    R_TRK_HIDE: frac(share(now, found('hiding'), isFound)),
+    R_TRK_HIDE_CTRL: String(share(ctrl, found('hiding'), isFound).k),
+    R_TRK_HIDE_N: String(share(now, found('hiding'), isFound).n),
+    R_TRK_EMPTY: frac(empty(now)),
+    R_TRK_EMPTY_CTRL: String(empty(ctrl).k),
+    R_TRK_EMPTY_N: String(empty(now).n),
+    R_TRK_COL: p2(now.rates.collision.p),
+    R_TRK_COL_CTRL: p2(ctrl.rates.collision.p),
+    R_TRK_COMMIT: now.commit,
+    R_TRK_CTRL_COMMIT: ctrl.commit,
+  };
 }
 
 /** Failure atlas (scripts/study/atlas-report.ts writes the full page, docs/ATLAS.md); the report quotes its rates. */
@@ -1158,6 +1224,7 @@ const values = {
   ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
   GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...atlasValues(readJson('docs/atlas.json')),
+  ...trackingValues(readJson('docs/atlas/mc-tracking.json'), readJson('docs/atlas/mc-tracking-control.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json'), readJson('docs/fault-bench-run4.json'), readJson('docs/fault-bench-run5.json'), readJson('docs/fault-bench-run6.json'), readJson('docs/fault-bench-run7.json')]),
 };
 const header = '<!-- Generated by scripts/docs/generate.mjs. Edit the template in scripts/docs/, not this file. -->\n\n';
@@ -1179,7 +1246,7 @@ const outputs = {
 const headline = studyHeadline(readJson('docs/study.json'));
 if (headline) outputs['docs/headline.json'] = `${JSON.stringify(headline, null, 2)}\n`;
 let readme = read('README.md');
-readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json')));
+readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json'), trackingRuns()));
 outputs['README.md'] = readme;
 // The full tables live in the project guide, one directory down, so their links drop the docs/ prefix.
 const fromDocs = (text) => text.replaceAll('](docs/', '](');

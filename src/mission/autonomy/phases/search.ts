@@ -1,7 +1,7 @@
 import type { ClearScope, DronePose, MissionBuilding, V3 } from '../contracts';
 import { buildingAt, placeContact } from '../perception';
 import type { ClearReport } from '../../../perception/seenEmpty';
-import { angleDiff, confirmViewpoints, requirementsMet, type ConfirmTrack } from '../planner/confirm';
+import { angleDiff, confirmViewpoints, isLive, requirementsMet, thresholdFor, type ConfirmTrack } from '../planner/confirm';
 import { senseBuildings } from '../planner/coverage';
 import {
   columnClear,
@@ -280,7 +280,7 @@ export class SearchPhase {
 
   /**
    * Confirm-clear from the drone's own evidence. A scope is clear when no contact of the category is
-   * still open or confirmed there, and the camera has looked at enough of it by the drone's own
+   * still open, unresolved or confirmed there, and the camera has looked at enough of it by the drone's own
    * estimate: indoors, CLEAR_MIN_LOOKED of the known-free voxels on every floor of a map the
    * explorer finished (not cut short by its time slot); outdoors, every ground cell of the site map.
    * Nothing here knows where the targets are, so a person the detector missed is a false clear.
@@ -292,7 +292,7 @@ export class SearchPhase {
     // those by where the track's estimate now is, so a person confirmed through a window still blocks.
     const buildingOf = (t: ConfirmTrack) => t.buildingId ?? buildingAt(this.c.world, t.estimate, CONTACT_FOOTPRINT_MARGIN_M);
     const blocking = this.c.tracker.tracks.filter(
-      (t) => buildingOf(t) === where && (t.status === 'open' || t.status === 'confirmed') && (category === 'person') === (t.classId === 'person'),
+      (t) => buildingOf(t) === where && (isLive(t) || t.status === 'confirmed') && (category === 'person') === (t.classId === 'person'),
     ).length;
     if (scope === 'outdoor') {
       const r = this.c.outdoorLook.report(category);
@@ -397,7 +397,7 @@ export class SearchPhase {
       this.c.tracker.ingest(c);
     }
     for (const track of this.c.tracker.tracks) {
-      if (track.status !== 'open') continue;
+      if (!isLive(track)) continue;
       if (this.c.tracker.evaluate(track) === 'confirmed') {
         const cc = this.c.tracker.toConfirmed(track, this.c.t);
         this.c.confirmed.push(cc);
@@ -450,7 +450,7 @@ export class SearchPhase {
       const tried = this.triedBearings.get(track.id) ?? [];
       const seenFrom = { ...track, views: [...track.views, ...tried.map((angle) => ({ angle, confidence: 1, tSec: 0, range: 0 }))] };
       search: for (const sep of [40, 27]) {
-        const radii = track.classId === 'person' ? [2.2, 2.8, 1.6] : v.sensing?.lookCone != null ? [1.8, 2.2, 2.6] : [2.4, 2.0, 2.8, 1.8];
+        const radii = track.classId === 'person' ? [3.2, 2.6, 2.0] : v.sensing?.lookCone != null ? [1.8, 2.2, 2.6] : [2.4, 2.0, 2.8, 1.8];
         for (const r of radii) {
           views = confirmViewpoints(seenFrom, est, cur, r, z, need + 1, accept, sep);
           if (views.length >= need) break search;
@@ -557,11 +557,15 @@ export class SearchPhase {
               `${track.classId} contact still unconfirmed (${track.views.length} view(s), ${fmt(this.c.tracker.meanConfidence(track), 2)}). Will look again.`,
             );
           } else if (track.status === 'open') {
-            this.c.tracker.reject(track);
-            this.c.log(
-              'warn',
-              `Rejected ${track.classId} contact: ${track.views.length} view(s), mean confidence ${fmt(this.c.tracker.meanConfidence(track), 2)} after re-views.`,
-            );
+            const mean = fmt(this.c.tracker.meanConfidence(track), 2);
+            if (this.c.tracker.close(track) === 'unresolved') {
+              this.c.log(
+                'warn',
+                `Unresolved ${track.classId} contact at ${this.c.where(track.estimate)}: ${track.views.length} view(s), mean confidence ${mean}, under the ${fmt(thresholdFor(this.c.mission, track.classId), 2)} to confirm but above what a lookalike scores. It blocks a clear there; flag it for a person to check.`,
+              );
+            } else {
+              this.c.log('warn', `Rejected ${track.classId} contact: ${track.views.length} view(s), mean confidence ${mean} after re-views.`);
+            }
           }
           this.endConfirm();
         },
