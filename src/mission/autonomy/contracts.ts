@@ -289,6 +289,11 @@ export interface RunRecord {
   track: { t: number; pos: V3; phase: Phase }[];
   phases: { phase: Phase; tStart: number; tEnd: number }[];
   confirmed: ConfirmedContact[];
+  /**
+   * Contacts that ran out of re-views short of the confirm threshold but above what a lookalike
+   * scores: probable targets the drone could not confirm. Each blocks a clear where it is.
+   */
+  unresolved?: ConfirmedContact[];
   /** Scopes the planner declared clear, and when. */
   declaredClear: { scope: ClearScope; tSec: number }[];
   collisions: { tSec: number; pos: V3; inside: string | null }[];

@@ -198,6 +198,11 @@ export function buildReport(run: RunRecord, source: LiveDetectionSource, world?:
   if (incomplete.length > 0) notes.push(`Incomplete indoor scopes: ${incomplete.join(', ')}.`);
   if (run.declaredClear.length === 0 && mission.missionType === 'safety_sweep') notes.push('No scope was declared clear.');
   if (falseClears > 0) notes.push(`${falseClears} scope(s) were declared clear while a target was present.`);
+  for (const u of run.unresolved ?? []) {
+    notes.push(
+      `Unresolved ${u.classId} contact${u.buildingId ? ` in ${world?.buildings.find((b) => b.id === u.buildingId)?.label ?? u.buildingId}` : ' outdoors'}: mean confidence ${u.confidence.toFixed(2)} over ${u.views} view(s), short of the bar to confirm. That scope was not declared clear; a person should check it.`,
+    );
+  }
   if (!run.landedHome) notes.push('The drone did not land within 1.5 m of home.');
   if (run.indoorExplorer) notes.push(`Indoor exploration used the ${run.indoorExplorer} explorer.`);
 

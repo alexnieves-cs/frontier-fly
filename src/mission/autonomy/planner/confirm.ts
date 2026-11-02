@@ -9,7 +9,15 @@ import type { ConfirmedContact, Contact, V3 } from '../contracts';
  * within range; each view keeps its best confidence. A track confirms with
  * `minViews` distinct views whose best confidences average to the threshold, so one
  * high-confidence frame never confirms. A track that runs out of
- * re-view poses without confirming is rejected.
+ * re-view poses without confirming is closed: rejected when its views score
+ * no better than a lookalike does, else left unresolved. An unresolved track
+ * is a probable target the drone could not confirm, and it still blocks a
+ * clear.
+ *
+ * People move, so a person track's estimate follows its recent contacts and
+ * its association gate grows with the time since it was last seen, at walking
+ * speed: a walker seen again across the room joins its own track instead of
+ * starting a fresh one with no views.
  */
 
 export interface ConfirmOptions {
@@ -24,7 +32,32 @@ export interface ConfirmOptions {
    * gimbal lens. Their views count out to maxRange times this. Default 1.
    */
   outdoorRangeScale?: number;
+  /**
+   * A track closed below the threshold is rejected only when its mean confidence is under this;
+   * otherwise it is unresolved. Default UNRESOLVED_FLOOR.
+   */
+  unresolvedFloor?: number;
 }
+
+/**
+ * Mean confidence above which an unconfirmed track is not explained away as a lookalike. Set from
+ * the dev block 240001-240240 (docs/REPORT.md): decoy tracks closed at 0.48 to 0.68 there, the real
+ * people the drone failed to confirm at 0.62 to 0.80. A different detector needs its own value, as
+ * it needs its own confirm threshold.
+ */
+export const UNRESOLVED_FLOOR = 0.7;
+
+/** Walking speed bound for growing a person track's association gate, m/s. */
+export const PERSON_WALK_MPS = 1.2;
+/** Largest gate a person track grows to, meters. */
+export const PERSON_GATE_MAX_M = 4;
+/** A live person track's association gate after `sinceSec` unseen, meters. */
+export function personGate(radius: number, sinceSec: number): number {
+  return Math.min(Math.max(radius, PERSON_GATE_MAX_M), radius + PERSON_WALK_MPS * sinceSec);
+}
+
+/** Weight of the newest contact in a person track's estimate, at least. */
+export const PERSON_ESTIMATE_GAIN = 0.3;
 
 export interface ConfirmView {
   /** Horizontal bearing angle from the camera to the target, radians. */
@@ -34,7 +67,8 @@ export interface ConfirmView {
   range: number;
 }
 
-export type TrackStatus = 'open' | 'confirmed' | 'rejected';
+/** 'merged': a person track folded into another live track of the same walker; it holds no evidence of its own. */
+export type TrackStatus = 'open' | 'confirmed' | 'rejected' | 'unresolved' | 'merged';
 
 export interface ConfirmTrack {
   id: string;
@@ -46,7 +80,14 @@ export interface ConfirmTrack {
   status: TrackStatus;
   last: Contact;
   best: Contact;
+  /** When the track last gained a contact, seconds. */
+  lastSec: number;
+  /** Frame times of its contacts (person tracks): two tracks seen in one frame are two people. */
+  seenAt: number[];
 }
+
+/** A track that can still gain evidence. */
+export const isLive = (t: ConfirmTrack): boolean => t.status === 'open' || t.status === 'unresolved';
 
 /** Classes the mission is looking for. Person targets want 'person'; object targets want any object class. */
 export function targetClasses(mission: Mission): Set<TargetClass> {
@@ -88,6 +129,7 @@ export class ConfirmTracker {
   readonly maxRange: number;
   readonly associateM: number;
   readonly outdoorRangeScale: number;
+  readonly unresolvedFloor: number;
   private readonly classes: Set<TargetClass>;
   private nextId = 0;
 
@@ -100,6 +142,7 @@ export class ConfirmTracker {
     this.maxRange = options.maxRange ?? 9;
     this.associateM = options.associateM ?? 1.5;
     this.outdoorRangeScale = options.outdoorRangeScale ?? 1;
+    this.unresolvedFloor = options.unresolvedFloor ?? UNRESOLVED_FLOOR;
     this.classes = targetClasses(mission);
   }
 
@@ -107,19 +150,27 @@ export class ConfirmTracker {
     return this.classes.has(classId);
   }
 
-  /** Track a contact belongs to, by class and estimate distance. */
-  find(contact: Pick<Contact, 'classId' | 'estimate'>, radius = this.associateM): ConfirmTrack | null {
+  /**
+   * Track a contact belongs to, by class and estimate distance. A person track's gate grows by
+   * PERSON_WALK_MPS for every second since it was last seen (up to PERSON_GATE_MAX_M) when the
+   * contact carries a time, while the track is live (open or unresolved); the nearest track by
+   * distance over its gate wins. A rejected track keeps the plain radius, so a person walking past
+   * a rejected lookalike is not swallowed by it.
+   */
+  find(contact: Pick<Contact, 'classId' | 'estimate'> & { tSec?: number }, radius = this.associateM): ConfirmTrack | null {
     let best: ConfirmTrack | null = null;
-    let bestD = radius;
+    let bestScore = 1;
     for (const track of this.tracks) {
-      if (track.classId !== contact.classId) continue;
+      if (track.classId !== contact.classId || track.status === 'merged') continue;
       const d = Math.hypot(
         track.estimate[0] - contact.estimate[0],
         track.estimate[1] - contact.estimate[1],
         track.estimate[2] - contact.estimate[2],
       );
-      if (d <= bestD) {
-        bestD = d;
+      const since = contact.tSec === undefined ? 0 : Math.max(0, contact.tSec - track.lastSec);
+      const gate = track.classId === 'person' && isLive(track) ? personGate(radius, since) : radius;
+      if (d / gate <= bestScore) {
+        bestScore = d / gate;
         best = track;
       }
     }
@@ -141,15 +192,19 @@ export class ConfirmTracker {
         status: 'open',
         last: contact,
         best: contact,
+        lastSec: contact.tSec,
+        seenAt: [],
       };
       this.tracks.push(track);
     }
     track.frames += 1;
     track.last = contact;
+    track.lastSec = contact.tSec;
+    if (track.classId === 'person' && track.seenAt[track.seenAt.length - 1] !== contact.tSec) track.seenAt.push(contact.tSec);
     if (contact.confidence > track.best.confidence) track.best = contact;
-    if (track.status !== 'open') return track;
-    // Running mean of the estimate.
-    const w = 1 / track.frames;
+    if (!isLive(track)) return track;
+    // Running mean of the estimate; a person's leans on the newest contacts, so it follows a walker.
+    const w = track.classId === 'person' ? Math.max(1 / track.frames, PERSON_ESTIMATE_GAIN) : 1 / track.frames;
     for (let i = 0; i < 3; i++) track.estimate[i] = track.estimate[i]! * (1 - w) + contact.estimate[i]! * w;
     const maxRange = track.buildingId === null ? this.maxRange * this.outdoorRangeScale : this.maxRange;
     if (contact.range <= maxRange) {
@@ -161,7 +216,34 @@ export class ConfirmTracker {
         track.views.push({ angle, confidence: contact.confidence, tSec: contact.tSec, range: contact.range });
       }
     }
+    if (track.classId === 'person') this.absorbWalker(track);
     return track;
+  }
+
+  /**
+   * A walker that crossed out of its track's gate while unseen starts a second track. Once the
+   * newest track comes back within reach of an older live one, and the two were never seen in the
+   * same frame, they are one person: the older track's views and frames fold into this one.
+   */
+  private absorbWalker(track: ConfirmTrack): void {
+    const t = track.lastSec;
+    for (const other of this.tracks) {
+      if (other === track || other.classId !== 'person' || !isLive(other)) continue;
+      const d = Math.hypot(track.estimate[0] - other.estimate[0], track.estimate[1] - other.estimate[1], track.estimate[2] - other.estimate[2]);
+      if (d > personGate(this.associateM, Math.max(0, t - other.lastSec))) continue;
+      const seen = new Set(other.seenAt);
+      if (track.seenAt.some((s) => seen.has(s))) continue;
+      for (const v of other.views) {
+        const near = track.views.find((w) => angleDiff(w.angle, v.angle) < this.minSeparation);
+        if (!near) track.views.push({ ...v });
+        else if (v.confidence > near.confidence) near.confidence = v.confidence;
+      }
+      track.frames += other.frames;
+      track.seenAt = [...other.seenAt, ...track.seenAt].sort((a, b) => a - b);
+      if (other.best.confidence > track.best.confidence) track.best = other.best;
+      track.buildingId ??= other.buildingId;
+      other.status = 'merged';
+    }
   }
 
   /** Mean of the best `minViews` view confidences (all views when fewer). */
@@ -174,9 +256,9 @@ export class ConfirmTracker {
     return best.reduce((s, c) => s + c, 0) / best.length;
   }
 
-  /** Confirm when enough distinct views agree. Never rejects on its own. */
+  /** Confirm when enough distinct views agree; an unresolved track can still confirm. Never rejects on its own. */
   evaluate(track: ConfirmTrack): TrackStatus {
-    if (track.status !== 'open') return track.status;
+    if (!isLive(track)) return track.status;
     if (track.views.length >= this.minViews && this.meanConfidence(track) >= thresholdFor(this.mission, track.classId)) {
       track.status = 'confirmed';
     }
@@ -185,6 +267,15 @@ export class ConfirmTracker {
 
   reject(track: ConfirmTrack): void {
     if (track.status === 'open') track.status = 'rejected';
+  }
+
+  /**
+   * Closes a track that ran out of re-views without confirming: rejected when its views score no
+   * better than a lookalike's (under unresolvedFloor), else unresolved.
+   */
+  close(track: ConfirmTrack): TrackStatus {
+    if (track.status === 'open') track.status = this.meanConfidence(track) >= this.unresolvedFloor ? 'unresolved' : 'rejected';
+    return track.status;
   }
 
   toConfirmed(track: ConfirmTrack, tSec: number): ConfirmedContact {
