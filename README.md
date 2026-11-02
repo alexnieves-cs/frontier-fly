@@ -23,7 +23,7 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 | How much of a new building does the trained policy search? | 80.0% (76.3–83.6%) at 3.4 wall contacts per flight; its teacher 67.3%, the sensor-only planner 65.5% with none | 30 fresh hard buildings |
 | Does it work in the dark? | 80.0% at night with the lights off, 100.0% of day | the same buildings |
 | Do whole missions end the right way? | 97.5% (92.9–99.1%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
-| **How often does it call a building clear with someone inside?** | **3.55% per flight** (3.21–3.88%); 13.2% on sweeps of an occupied site | 2,000 importance-sampled flights, checked by 6,000 plain ones |
+| **How often does it call a building clear with someone inside?** | **0.30% per flight** (0.14–0.65%), down from 4.05% before unconfirmed people blocked a clear | 2,000 fresh flights from the failure atlas's mix, both versions on the same seeds (atlas at v1.0.0: 3.55%) |
 | How often does it hit something? | 2.70% per flight (1.99–3.41%) | 2,000 importance-sampled flights |
 | Does it get home when something breaks? | 97.9% (96.8–98.6%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
 <!-- generated:headline:end -->
