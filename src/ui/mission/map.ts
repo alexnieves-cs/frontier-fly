@@ -1,6 +1,7 @@
 import { isSelfIntersecting, snapToGrid } from '../../mission/polygon';
 import type { Point } from '../../mission/types';
 import type { WorldFootprint } from '../../mission/world';
+import { PLANNER_GLYPH, fillDroneGlyph, tracePath, viewProjection } from '../map/draw';
 
 export type MapTool = 'geofence' | 'nofly' | 'start' | 'edit' | 'view';
 
@@ -89,8 +90,10 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
   let pendingFit: Point[] | null = null;
   let ready = false;
 
+  const proj = viewProjection(() => ({ cx, cy, mpp, width, height }));
+
   function worldToScreen(point: Point): { x: number; y: number } {
-    return { x: (point.x - cx) / mpp + width / 2, y: (cy - point.y) / mpp + height / 2 };
+    return { x: proj.x(point.x), y: proj.y(point.y) };
   }
 
   function screenToWorld(sx: number, sy: number): Point {
@@ -244,14 +247,7 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
 
   function trace(points: Point[], close: boolean): void {
     if (points.length === 0) return;
-    context.beginPath();
-    const first = worldToScreen(points[0]!);
-    context.moveTo(first.x, first.y);
-    for (let i = 1; i < points.length; i++) {
-      const point = worldToScreen(points[i]!);
-      context.lineTo(point.x, point.y);
-    }
-    if (close && points.length > 2) context.closePath();
+    tracePath(context, proj, points, close && points.length > 2);
   }
 
   function hatchRing(points: Point[]): void {
@@ -369,18 +365,7 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
 
   function drawMarker(point: { x: number; y: number; yawRad: number }, fill: string): void {
     const at = worldToScreen(point);
-    context.save();
-    context.translate(at.x, at.y);
-    context.rotate(-point.yawRad);
-    context.beginPath();
-    context.moveTo(11, 0);
-    context.lineTo(-7, 5);
-    context.lineTo(-4, 0);
-    context.lineTo(-7, -5);
-    context.closePath();
-    context.fillStyle = fill;
-    context.fill();
-    context.restore();
+    fillDroneGlyph(context, at.x, at.y, point.yawRad, PLANNER_GLYPH, fill);
   }
 
   function drawScale(): void {
@@ -439,13 +424,7 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     }
     if (layers.plan.length > 1) strokeRing(layers.plan, 'rgba(29, 78, 137, 0.45)', 1, [3, 4]);
     if (layers.track.length > 1) {
-      context.beginPath();
-      const first = worldToScreen(layers.track[0]!);
-      context.moveTo(first.x, first.y);
-      for (let i = 1; i < layers.track.length; i++) {
-        const point = worldToScreen(layers.track[i]!);
-        context.lineTo(point.x, point.y);
-      }
+      trace(layers.track, false);
       context.strokeStyle = TRACK;
       context.lineWidth = 2;
       context.stroke();
