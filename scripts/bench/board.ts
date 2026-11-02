@@ -9,7 +9,7 @@ import { BENCH_TASKS, BENCH_VERSION } from '../../src/bench/tasks';
 import { createEnv } from '../../src/sim/env';
 import { flyAll, loadPilot, summarize } from './lib';
 
-const IDS = ['planner', 'planner-momentum', 'guarded', 'policy', 'waypoint', 'heuristic'];
+const IDS = ['planner', 'planner-momentum', 'guarded', 'policy', 'waypoint', 'heuristic', 'yamauchi', 'nbvp', 'boustrophedon'];
 const i = process.argv.indexOf('--only');
 const ids = i >= 0 ? process.argv[i + 1]!.split(',') : IDS;
 const commit = execSync('git rev-parse --short HEAD').toString().trim();
