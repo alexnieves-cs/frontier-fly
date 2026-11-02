@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frontierfly"
+version = "0.1.0"
+description = "frontier-fly's indoor drone exploration task as a Gymnasium environment, plus the FrontierBench scorer."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Alex Nieves" }]
+keywords = ["gymnasium", "reinforcement-learning", "drone", "exploration", "benchmark", "robotics"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Intended Audience :: Science/Research",
+]
+dependencies = ["gymnasium>=1.0", "numpy>=1.24"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://alexnieves-cs.github.io/frontier-fly/"
+Source = "https://github.com/alexnieves-cs/frontier-fly"
+
+[tool.setuptools]
+packages = ["frontierfly"]
+
+[tool.setuptools.package-data]
+frontierfly = ["_server/server.mjs", "_server/LICENSE.*", "_server/assets/checkpoints/*.bin", "_server/assets/plans/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
