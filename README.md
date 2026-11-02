@@ -40,6 +40,7 @@ Everything runs in a browser tab, on desktop or phone. Pick the way that suits y
 | [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/alexnieves-cs/frontier-fly?quickstart=1) | Your own copy in a cloud dev box. Run `npm run dev` and the forwarded port 3000 opens the site | A GitHub account |
 | [Actions](https://github.com/alexnieves-cs/frontier-fly/actions) | CI, the PX4 flight check on every push, and the `study` workflow, which reruns any benchmark from **Run workflow** | Repo access to start a run |
 | Your computer | The site, training and benchmarks (`npm run train:ppo`, `npm run study:missions`, ...) | Node 22 |
+| Python | A Gymnasium env (`gym.make("FrontierFly-hard-v0")`) and the FrontierBench scorer, on the same simulator, see [python/](python/README.md) | Python 3.10+ and Node 22 |
 | PX4 + QGroundControl | A real autopilot flying the simulator, with QGroundControl loading plans from the planner page | A local PX4 SITL build, see [PX4.md](docs/PX4.md) |
 | A real Crazyflie | The sensor-only explorer on a 33 g quadrotor with four range beams, behind a safety guard. Simulated and tested in CI; not flown yet | A Crazyflie with Flow and Multi-ranger decks, see [CRAZYFLIE.md](docs/CRAZYFLIE.md) |
 
