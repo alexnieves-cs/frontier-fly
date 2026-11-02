@@ -1,4 +1,5 @@
 import * as C from '../shared/constants';
+import { voxelCount } from '../shared/voxels';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -63,7 +64,7 @@ export class OccupancyMap {
     readonly vd: number,
     floors: number,
   ) {
-    const n = vw * vd * floors;
+    const n = voxelCount({ vw, vd, floors });
     this.occupied = new Uint8Array(n);
     this.hits = new Uint8Array(n);
     this.passes = new Uint8Array(n);

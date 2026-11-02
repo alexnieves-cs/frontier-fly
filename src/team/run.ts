@@ -9,6 +9,7 @@ import { initPhysics, PhysicsWorld } from '../sim/world';
 import { ClaimPenalty, DEFAULT_CLAIMS, type ClaimOptions } from './allocate';
 import { exchange, MeshNode, type MeshStats } from './mesh';
 import { basePosition, RadioModel, type RadioParams } from './radio';
+import { voxelCount, voxelLayout } from '../shared/voxels';
 
 export type Role = 'explore' | 'relay';
 /** Coverage levels the time-to-clear metric is reported at, percent. */
@@ -190,8 +191,7 @@ export class TeamSim {
     this.radio = new RadioModel(spec, opts.radio);
     this.base = basePosition(spec);
     this.physics = new PhysicsWorld(spec);
-    const floor0 = spec.floors[0]!;
-    this.size = spec.floors.length * floor0.w * 2 * floor0.d * 2;
+    this.size = voxelCount(voxelLayout(spec));
     this.firstBy = new Uint8Array(this.size);
     this.reach = Math.max(1, spec.reachableVoxels);
     this.baseNode = new MeshNode(opts.drones, this.size, opts.drones + 1);
