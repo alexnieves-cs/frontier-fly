@@ -41,3 +41,5 @@ It never sees the floor plan. It returns the env's action: forward, left, up and
 4. Run `npm run docs` and open a pull request. CI re-scores the entry and fails if the result differs.
 
 Learned pilots can ship their weights in the entry folder. Keep each file under a few MB.
+
+**From Python.** The [`frontierfly`](../python/README.md) package scores a Python pilot on the same flights (`python -m frontierfly.bench --policy my_module:MyPolicy --split dev`); its tests check that the flights are bit-identical to `bench:score`. A Python result is not yet a leaderboard entry, because CI re-scores entries from TypeScript code; port the pilot to `pilot.ts` to submit it.

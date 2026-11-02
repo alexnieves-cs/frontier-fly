@@ -8,6 +8,9 @@ export default tseslint.config(
   {
     ignores: [
       'dist/**',
+      // Built by npm run build:py.
+      'python/frontierfly/_server/**',
+      'python/build/**',
       'node_modules/**',
       'test-results/**',
       'playwright-report/**',
@@ -18,7 +21,7 @@ export default tseslint.config(
   },
   {
     // Node scripts. Browser globals are allowed for code passed to page.evaluate.
-    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/px4/**/*.mjs', 'scripts/check-pages.mjs'],
+    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/px4/**/*.mjs', 'scripts/py/**/*.mjs', 'scripts/check-pages.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
@@ -43,6 +46,23 @@ export default tseslint.config(
         },
       ],
       'no-restricted-globals': ['error', 'window', 'document', 'localStorage', 'navigator'],
+    },
+  },
+  {
+    // The phases see the indoor planner through its index (IndoorNav and the explorers), not its grid internals.
+    files: ['src/mission/autonomy/phases/**/*.ts', 'src/mission/autonomy/runner.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/planner/indoor/*'],
+              message: 'Import from planner/indoor. A phase that needs a grid helper is missing an IndoorNav method.',
+            },
+          ],
+        },
+      ],
     },
   },
 );

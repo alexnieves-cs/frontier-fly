@@ -1,6 +1,7 @@
 import { CELL, VOXEL } from '../../shared/constants';
 import type { BuildingSpec } from '../../shared/types';
 import type { LaneFrame } from './protocol';
+import { voxelLayout } from '../../shared/voxels';
 
 /**
  * Top-down view of one lane: the floor plan at voxel resolution, what the
@@ -60,8 +61,7 @@ export class LaneView {
 
   reset(spec: BuildingSpec): void {
     this.spec = spec;
-    this.vw = spec.floors[0]!.w * 2;
-    this.vd = spec.floors[0]!.d * 2;
+    ({ vw: this.vw, vd: this.vd } = voxelLayout(spec));
     this.voxels.width = this.vw;
     this.voxels.height = this.vd;
     this.image = this.vctx.createImageData(this.vw, this.vd);

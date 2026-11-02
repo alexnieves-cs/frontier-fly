@@ -26,6 +26,7 @@ import { frontierDistance } from './frontier';
 import { FrontierNav } from './frontierFeatures';
 import { EgoMaps, SeenMap } from './seenMap';
 import { DEFAULT_BATTERY, powerFor } from '../mission/autonomy/battery';
+import { voxelCount, voxelLayout } from '../shared/voxels';
 
 export function defaultEpisodeConfig(stage = 0, nRooms = 1): EpisodeConfig {
   return {
@@ -131,10 +132,7 @@ export class ExplorerEnv implements Env {
     this.speedH = this.cfg.speedH ?? MAX_SPEED_H;
     this.dyn.setSpeedLimit?.(this.speedH);
     this.energyWh = 0;
-    const floor0 = spec.floors[0]!;
-    const vw = floor0.w * 2;
-    const vd = floor0.d * 2;
-    this.visited = new Uint8Array(spec.floors.length * vw * vd);
+    this.visited = new Uint8Array(voxelCount(voxelLayout(spec)));
     this.visitedCount = 0;
     this.seen.reset(spec);
     if (markVisited(spec, this.visited, this.state.pos[0], this.state.pos[1], this.state.pos[2])) {
