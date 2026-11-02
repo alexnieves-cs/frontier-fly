@@ -41,7 +41,7 @@ describe('quad mission vehicle', () => {
   });
 
   it('holds position in strong wind with the outdoor tilt limit, and keeps its tilt inside it', () => {
-    // Outdoors the runner sets a tilt limit (phases/base.ts limits()), which also turns on the velocity
+    // Outdoors the runner sets a tilt limit (phases/core.ts limits()), which also turns on the velocity
     // integral. The default 23° per axis holds only about 5 m/s on the 1.2 kg airframe.
     const drift = (limits: typeof OUTDOOR_LIMITS, wind: V3) => {
       const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
@@ -73,7 +73,7 @@ describe('quad mission vehicle', () => {
   });
 
   it('settles on a stop point under the 55° outdoor limit', () => {
-    // The waypoint follower's stop loop (phases/base.ts followJob) on a point 1.5 m off. A full-gain
+    // The waypoint follower's stop loop (phases/pilot.ts followJob) on a point 1.5 m off. A full-gain
     // velocity loop leaned the whole 55° each way and circled the point at 1 m/s, never inside the
     // 0.12 m stop tolerance: compound sweeps hung at a building's standoff until the time ran out.
     for (const maxTilt of [0.7, 0.96]) {
