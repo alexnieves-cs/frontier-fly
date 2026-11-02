@@ -34,13 +34,13 @@ export function buildClaims(r: Results = results(), a: AtlasRates = atlasRates()
     {
       value: pct(r.pilots[0]!.value),
       label: 'of unseen hard buildings searched',
-      condition: `Mean of ${r.hardSeeds} held-out stage ${r.hardStage} buildings, daylight, measured ${r.measured}.`,
+      condition: `Mean of ${r.seeds} fresh stage ${r.hardStage} buildings, daylight, 95% interval ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}, ${r.pilots[0]!.contacts.toFixed(1)} wall contacts per flight.`,
       tone: 'result',
     },
     {
       value: pct(Math.min(1, r.nightOverDay)),
       label: 'as good at night, lights off',
-      condition: 'Night coverage relative to day on the same buildings.',
+      condition: `Night coverage relative to day on the same ${r.seeds} hard buildings, lights off.`,
       tone: 'result',
     },
     {

@@ -488,12 +488,20 @@ function benchmarks() {
     const h = coverageSummary(coverage.policy, protocol.hard.stage);
     const allDay = mean(coverage.policy.filter((r) => r.lighting === 'day').map((r) => r.coverage));
     const allNight = mean(coverage.policy.filter((r) => r.lighting === 'night-dark').map((r) => r.coverage));
+    // Coverage goals are judged on the 30-fresh-building study when it exists: the fixed protocol's handful of
+    // seeds is a smoke check, and its hard-building mean ran several points above the large study.
+    const study = readJson('docs/study.json');
+    const coverageGoals = study
+      ? studyTargetRows(study)
+      : [
+          ['Coverage, easy buildings', `≥ ${pct(TARGETS.easy)}`, `${pct(e.day)} mean of ${e.n}`, mark(e.day >= TARGETS.easy)],
+          ['Coverage, new hard buildings', `≥ ${pct(TARGETS.hard)}`, `${pct(h.day)} mean of ${h.n}`, mark(h.day >= TARGETS.hard)],
+          ['Night coverage vs day', `≥ ${pct(TARGETS.nightRatio)}`, pct(allNight / allDay), mark(allNight / allDay >= TARGETS.nightRatio)],
+        ];
     out.TARGET_TABLE = table(
-      ['Goal', 'Target', 'Measured (browser pilot)', 'Status'],
+      ['Goal', 'Target', 'Measured', 'Status'],
       [
-        ['Coverage, easy buildings', `≥ ${pct(TARGETS.easy)}`, `${pct(e.day)} mean of ${e.n}`, mark(e.day >= TARGETS.easy)],
-        ['Coverage, new hard buildings', `≥ ${pct(TARGETS.hard)}`, `${pct(h.day)} mean of ${h.n}`, mark(h.day >= TARGETS.hard)],
-        ['Night coverage vs day', `≥ ${pct(TARGETS.nightRatio)}`, pct(allNight / allDay), mark(allNight / allDay >= TARGETS.nightRatio)],
+        ...coverageGoals,
         ['Kinematic env step', `≤ ${TARGETS.stepMs} ms`, `${throughput.kinematicStepMs.toFixed(3)} ms`, mark(throughput.kinematicStepMs <= TARGETS.stepMs)],
         [`Env steps/s, ${throughput.workers} workers, physics + sensors`, `≥ ${fmt(TARGETS.envStepsPerSec)}`, fmt(throughput.heuristic), mark(throughput.heuristic >= TARGETS.envStepsPerSec)],
         [`Env steps/s, ${throughput.workers} workers, with inference and resets`, `≥ ${fmt(TARGETS.envStepsPerSec)}`, fmt(throughput.policy), mark(throughput.policy >= TARGETS.envStepsPerSec)],
@@ -640,9 +648,9 @@ function benchmarks() {
       '',
       out.STUDY_HEADLINE,
       '',
-      `**Targets.** Fixed protocol (${bench.protocol.easy.seeds.length} easy and ${bench.protocol.hard.seeds.length} hard seeds) unless the row says otherwise:`,
+      `**Targets.** Coverage goals on the same ${study.seedsPerCondition} fresh buildings per condition; the small fixed protocol (${bench.protocol.easy.seeds.length} easy and ${bench.protocol.hard.seeds.length} hard seeds) is a smoke check in [BENCHMARKS.md](docs/BENCHMARKS.md):`,
       '',
-      readmeTargets(out, study),
+      out.TARGET_TABLE,
       '',
       out.THROUGHPUT_TABLE,
     ].join('\n');
@@ -652,23 +660,58 @@ function benchmarks() {
 }
 
 
-/** The fixed-protocol target table plus the same hard-building goal measured on the 30-seed study. */
-function readmeTargets(out, study) {
-  const lines = out.TARGET_TABLE.split('\n');
-  const extra = [];
+/** The coverage-study cells the homepage shows (src/landing/results.ts reads docs/headline.json). */
+function studyHeadline(study) {
+  if (!study) return null;
+  const keep = ['teacher', 'classical', 'policy', 'guarded', 'waypoint', 'heuristic'];
+  return {
+    source: 'docs/study.json (scripts/study/coverage-study.ts); regenerate with npm run docs',
+    commit: study.commit,
+    seedsPerCondition: study.seedsPerCondition,
+    conditions: study.conditions.filter((c) => c.id === 'easy' || c.id === 'hard').map((c) => ({ id: c.id, stage: c.stage })),
+    cells: study.cells
+      .filter((c) => (c.condition === 'easy' || c.condition === 'hard') && keep.includes(c.pilot))
+      .map((c) => ({
+        condition: c.condition,
+        lighting: c.lighting,
+        pilot: c.pilot,
+        episodes: c.episodes,
+        coverage: c.coverage,
+        coverageCi: c.coverageCi,
+        collisionsPerEpisode: c.collisionsPerEpisode,
+        episodesWithCollision: c.episodesWithCollision,
+      })),
+  };
+}
+
+/**
+ * The coverage goals measured on the coverage study (30 fresh buildings per condition, bootstrap 95% intervals).
+ * The same cells feed the homepage (src/landing/results.ts), so the site and the docs quote one number.
+ */
+function studyTargetRows(study) {
+  const cell = (condition, lighting, pilot) => study.cells.find((x) => x.condition === condition && x.lighting === lighting && x.pilot === pilot);
+  const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}`;
+  const n = study.seedsPerCondition;
+  const status = (c, target) =>
+    c.coverageCi[0] >= target ? '✅ meets' : c.coverage >= target ? '⚠️ meets on the mean; interval spans the target' : '❌ misses';
+  const rows = [];
+  const easy = cell('easy', 'day', 'policy');
+  if (easy) rows.push(['Coverage, easy buildings (policy)', `≥ ${pct(TARGETS.easy)}`, `${pct(easy.coverage)} (${ci(easy.coverageCi)}), ${n} fresh`, status(easy, TARGETS.easy)]);
   for (const [pilot, label] of [
-    ['policy', 'Coverage, new hard buildings, 30 fresh seeds (policy)'],
-    ['guarded', 'Coverage, new hard buildings, 30 fresh seeds (policy + lidar guard)'],
+    ['policy', 'Coverage, new hard buildings (policy)'],
+    ['guarded', 'Coverage, new hard buildings (policy + lidar guard)'],
   ]) {
-    const c = study.cells.find((x) => x.condition === 'hard' && x.lighting === 'day' && x.pilot === pilot);
+    const c = cell('hard', 'day', pilot);
     if (!c) continue;
-    const [lo, hi] = c.coverageCi;
-    const status = lo >= TARGETS.hard ? '✅ meets' : c.coverage >= TARGETS.hard ? '⚠️ meets on the mean; interval spans the target' : '❌ misses';
-    extra.push(`| ${label} | ≥ ${pct(TARGETS.hard)} | ${pct(c.coverage)} (${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}) | ${status} |`);
+    rows.push([label, `≥ ${pct(TARGETS.hard)}`, `${pct(c.coverage)} (${ci(c.coverageCi)}), ${n} fresh, ${c.collisionsPerEpisode.toFixed(1)} wall contacts per flight`, status(c, TARGETS.hard)]);
   }
-  const at = lines.findIndex((l) => l.startsWith('| Coverage, new hard buildings'));
-  lines.splice(at + 1, 0, ...extra);
-  return lines.join('\n');
+  const day = cell('hard', 'day', 'policy');
+  const night = cell('hard', 'night-dark', 'policy');
+  if (day && night) {
+    const ratio = night.coverage / day.coverage;
+    rows.push(['Night coverage vs day, hard buildings (policy)', `≥ ${pct(TARGETS.nightRatio)}`, `${pct(ratio)}, ${n} fresh`, mark(ratio >= TARGETS.nightRatio)]);
+  }
+  return rows;
 }
 
 /** Pose error of the mission bench flights flown indoors on the estimate, against the same explorer on the true pose. */
@@ -1091,6 +1134,10 @@ const outputs = {
   ...rl.files,
   ...footprint.files,
 };
+// The homepage and the tour quote the coverage study through this small extract, so the page does not ship
+// the study's per-episode rows (docs/study.json is ~700 KB).
+const headline = studyHeadline(readJson('docs/study.json'));
+if (headline) outputs['docs/headline.json'] = `${JSON.stringify(headline, null, 2)}\n`;
 let readme = read('README.md');
 readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json')));
 outputs['README.md'] = readme;
