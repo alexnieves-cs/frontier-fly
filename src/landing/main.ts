@@ -55,7 +55,7 @@ function markup(): string {
           above all run in this tab. No server.
         </p>
         <ul class="proof" aria-label="Headline results">
-          <li><strong>${pct(r.pilots[0]!.value)}</strong> of ${r.seeds} unseen hard buildings searched</li>
+          <li><strong>${pct(r.pilots[0]!.value)}</strong> of ${r.seeds} unseen hard buildings searched${r.pilots[0]!.crashes !== null ? `, ${r.pilots[0]!.crashes === 0 ? 'no' : r.pilots[0]!.crashes} crash${r.pilots[0]!.crashes === 1 ? '' : 'es'}` : ''}</li>
           <li><strong>${pct(r.easy)}</strong> of easy ones</li>
           <li><strong>${pct(Math.min(1, r.nightOverDay))}</strong> as good at night, lights off</li>
         </ul>
@@ -95,10 +95,10 @@ function markup(): string {
         </div>
       </div>
       <p class="results-foot">
-        Every pilot flies the same ${r.seeds} buildings, measured at commit <code>${r.commit}</code>; the policy's 95% interval is
+        Every pilot flies the same ${r.seeds} buildings, measured at commit <code>${r.commit}</code>; the guarded policy's 95% interval is
         ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}.
         ${r.crashSpeed !== null ? `A contact faster than ${r.crashSpeed} m/s is a crash and ends the flight; coverage counts what was flown until then.` : ''}
-        ${r.policyLeads ? 'The policy covers more than its teacher, but touches walls; the sensor-only planner covers less and never does.' : 'The policy still trails its teacher.'}
+        ${r.guardSaves ? 'Alone, the policy hits walls hard: it learned before the crash rule, when contacts were free. The lidar guard is what makes it safe.' : ''}
         Night, multi-floor and quadrotor results are in
         <a href="${REPO}/blob/main/docs/REPORT.md" rel="noopener">REPORT.md</a>; method and every condition in
         <a href="${REPO}/blob/main/docs/BENCHMARKS.md" rel="noopener">BENCHMARKS.md</a>.

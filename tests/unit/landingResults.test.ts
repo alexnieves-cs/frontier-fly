@@ -5,7 +5,7 @@ import { pct, results } from '../../src/landing/results';
 describe('landing results', () => {
   it('computes finite headline numbers from the coverage study', () => {
     const r = results();
-    expect(r.pilots).toHaveLength(5);
+    expect(r.pilots).toHaveLength(6);
     for (const p of r.pilots) {
       expect(Number.isFinite(p.value)).toBe(true);
       expect(Number.isFinite(p.contacts)).toBe(true);
@@ -17,8 +17,8 @@ describe('landing results', () => {
     expect(pct(0.8081)).toBe('80.8%');
   });
 
-  it('leads with the 30-fresh-building policy cell, the number the README and GUIDE target tables quote', () => {
-    const cell = study.cells.find((c) => c.condition === 'hard' && c.lighting === 'day' && c.pilot === 'policy')!;
+  it('leads with the 30-fresh-building guarded-policy cell, the number the README headline quotes', () => {
+    const cell = study.cells.find((c) => c.condition === 'hard' && c.lighting === 'day' && c.pilot === 'guarded')!;
     expect(results().pilots[0]!.value).toBe(cell.coverage);
     expect(study.seedsPerCondition).toBeGreaterThanOrEqual(30);
   });

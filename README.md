@@ -20,8 +20,8 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 <!-- generated:headline:start -->
 | Question | Measured | On |
 | --- | --- | --- |
-| How much of a new building does the trained policy search? | 80.0% (76.3–83.6%) at 3.4 wall contacts per flight; its teacher 67.3%, the sensor-only planner 65.5% with none | 30 fresh hard buildings |
-| Does it work in the dark? | 80.0% at night with the lights off, 100.0% of day | the same buildings |
+| How much of a new building does the trained policy search? | 76.4% (72.5–80.0%) under its lidar guard, 1 of 30 flights ended by a crash; alone 63.0%, 19 of 30 flights ended by a crash; its teacher 64.5%, the sensor-only planner 65.5% with none | 30 fresh hard buildings |
+| Does it work in the dark? | 71.8% at night with the lights off, 94.0% of day | the same buildings |
 | Do whole missions end the right way? | 97.5% (92.9–99.1%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
 | **How often does it call a building clear with someone inside?** | **3.55% per flight** (3.21–3.88%); 13.2% on sweeps of an occupied site | 2,000 importance-sampled flights, checked by 6,000 plain ones |
 | How often does it hit something? | 2.70% per flight (1.99–3.41%) | 2,000 importance-sampled flights |

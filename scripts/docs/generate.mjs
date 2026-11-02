@@ -334,7 +334,7 @@ function confirmClearSection(mb, control) {
 /** Numbers the report's prose quotes, so the prose cannot drift from the JSON. */
 function reportInline(study, bench) {
   const out = {};
-  const keys = ['R_TEACHER_HARD', 'R_PLANNER_HARD', 'R_POLICY_HARD', 'R_GUARD_HARD', 'R_POLICY_COLL', 'R_GUARD_COLL', 'R_PLANNER_QUAD', 'R_POLICY_QUAD', 'R_TEACHER_QUAD'];
+  const keys = ['R_CRASH_SPEED', 'R_POLICY_CRASHES', 'R_GUARD_CRASHES', 'R_POLICY_HARD_FREE', 'R_POLICY_CONTACT_SPEED', 'R_GUARD_CONTACT_SPEED', 'R_Q_BRAKE_TRACK_CRASHES', 'R_TEACHER_HARD', 'R_PLANNER_HARD', 'R_POLICY_HARD', 'R_GUARD_HARD', 'R_POLICY_COLL', 'R_GUARD_COLL', 'R_PLANNER_QUAD', 'R_POLICY_QUAD', 'R_TEACHER_QUAD'];
   const keys3 = ['R_Q_PLANNER', 'R_Q_PLANNER_COLL', 'R_Q_PLANNER_BRAKE', 'R_Q_PLANNER_BRAKE_COLL', 'R_Q_GUARD', 'R_Q_GUARD_COLL', 'R_Q_GUARD_BRAKE', 'R_Q_GUARD_BRAKE_COLL', 'R_Q_TRACK', 'R_Q_TRACK_COLL', 'R_Q_BRAKE_TRACK', 'R_Q_BRAKE_TRACK_CI', 'R_Q_BRAKE_TRACK_COLL', 'R_Q_BRAKE_TRACK_EPS'];
   const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
   const keys5 = ['R_CLIMB_FLOORS', 'R_CLIMB_FLOORS_CI', 'R_PLANNER_FLOORS', 'R_PLANNER_FLOORS_CI', 'R_CLIMB_REACHED', 'R_CLIMB_COLL', 'R_PRED_HARD', 'R_PRED_HARD_CI', 'R_ORACLEGAIN_HARD', 'R_PRED_FLOORS', 'R_ORACLEGAIN_FLOORS', 'R_PLANNER_FLOORS_N'];
@@ -358,6 +358,18 @@ function reportInline(study, bench) {
     out.R_POLICY_HARD = pct(c('hard', 'policy').coverage);
     out.R_GUARD_HARD = pct(c('hard', 'guarded').coverage);
     out.R_POLICY_COLL = c('hard', 'policy').collisionsPerEpisode.toFixed(1);
+    if (study.crashSpeed != null) {
+      const crashes = (x) => `${x.crashes} of ${x.episodes}`;
+      out.R_CRASH_SPEED = String(study.crashSpeed);
+      out.R_POLICY_CRASHES = crashes(c('hard', 'policy'));
+      out.R_GUARD_CRASHES = crashes(c('hard', 'guarded'));
+      out.R_POLICY_CONTACT_SPEED = c('hard', 'policy').medianContactSpeed?.toFixed(2) ?? 'n/a';
+      out.R_GUARD_CONTACT_SPEED = c('hard', 'guarded').medianContactSpeed?.toFixed(2) ?? 'n/a';
+      const track = c('quad', 'classicalBrakeTrack');
+      if (track) out.R_Q_BRAKE_TRACK_CRASHES = String(track.crashes);
+    }
+    // The last coverage study before the crash rule (scripts/study/coverage-study.ts at 7bf2693 and earlier).
+    out.R_POLICY_HARD_FREE = '80.0%';
     out.R_GUARD_COLL = c('hard', 'guarded').collisionsPerEpisode.toFixed(2);
     out.R_PLANNER_QUAD = pct(c('quad', 'classical').coverage);
     out.R_POLICY_QUAD = pct(c('quad', 'policy').coverage);
@@ -823,8 +835,11 @@ function readmeHeadline(study, mb, atlas, faults) {
   const ci2 = ([lo, hi]) => `${(lo * 100).toFixed(2)}–${(hi * 100).toFixed(2)}%`;
   const pct2 = (v) => `${(v * 100).toFixed(2)}%`;
   const cell = (lighting, pilot) => study.cells.find((c) => c.condition === 'hard' && c.lighting === lighting && c.pilot === pilot);
-  const day = cell('day', 'policy');
-  const night = cell('night-dark', 'policy');
+  // The guarded policy leads, as on the homepage: it is what missions fly indoors.
+  const day = cell('day', 'guarded');
+  const night = cell('night-dark', 'guarded');
+  const alone = cell('day', 'policy');
+  const crashed = (c) => (c.crashes != null ? `, ${c.crashes} of ${c.episodes} flights ended by a crash` : '');
   const missions = mb.modes.policyQuad.all;
   const fc = atlas.rates.falseClear.importance;
   const col = atlas.rates.collision.importance;
@@ -835,7 +850,7 @@ function readmeHeadline(study, mb, atlas, faults) {
     [
       [
         'How much of a new building does the trained policy search?',
-        `${pct(day.coverage)} (${ci1(day.coverageCi)}) at ${day.collisionsPerEpisode.toFixed(1)} wall contacts per flight${day.crashes != null ? `, ${day.crashes} of ${day.episodes} flights ended by a crash` : ''}; its teacher ${pct(cell('day', 'teacher').coverage)}, the sensor-only planner ${pct(cell('day', 'classical').coverage)} with ${cell('day', 'classical').collisionsPerEpisode ? cell('day', 'classical').collisionsPerEpisode.toFixed(1) : 'none'}`,
+        `${pct(day.coverage)} (${ci1(day.coverageCi)}) under its lidar guard${crashed(day)}; alone ${pct(alone.coverage)}${crashed(alone)}; its teacher ${pct(cell('day', 'teacher').coverage)}, the sensor-only planner ${pct(cell('day', 'classical').coverage)} with ${cell('day', 'classical').collisionsPerEpisode ? cell('day', 'classical').collisionsPerEpisode.toFixed(1) : 'none'}`,
         `${day.episodes} fresh hard buildings`,
       ],
       ['Does it work in the dark?', `${pct(night.coverage)} at night with the lights off, ${pct(night.coverage / day.coverage)} of day`, 'the same buildings'],
