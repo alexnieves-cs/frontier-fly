@@ -3,6 +3,7 @@ import type { ExplorerEnv } from './env';
 import type { GainSource } from './mapPredict';
 import { approachSpeed, CommandShaper, profileSpeed, uTurnSpeed, resolveTracker, type ResolvedTracker, type TrackerOptions } from './tracker';
 import { BRAKING_MARGIN, brakingFilter, descentClear, filterVelocity, SAFETY_HORIZON, SAFETY_MARGIN, type BrakingModel } from './lidarSafety';
+import { voxelLayout } from '../shared/voxels';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -597,9 +598,7 @@ export function sensorFrame(env: ExplorerEnv, obs: Float32Array): SensorFrame {
   return {
     seen: env.seenGrid,
     visited: env.visitedGrid,
-    vw: spec.floors[0]!.w * 2,
-    vd: spec.floors[0]!.d * 2,
-    floors: spec.floors.length,
+    ...voxelLayout(spec),
     floorHeight: spec.floorHeight,
     pos: s.pos,
     yaw: s.yaw,

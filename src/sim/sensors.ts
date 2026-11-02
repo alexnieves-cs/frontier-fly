@@ -15,6 +15,7 @@ import type { FrontierNav } from './frontierFeatures';
 import { nightFactor } from './lighting';
 import type { EgoMaps, SeenMap } from './seenMap';
 import type { PhysicsWorld } from './world';
+import { VOXELS_PER_CELL } from '../shared/voxels';
 
 /** Observation v2 offsets; re-exported from shared/constants. Layout in sim/OBS_LAYOUT.md. */
 export { OBS };
@@ -47,8 +48,8 @@ export interface SenseContext {
 
 function voxelIndex(spec: BuildingSpec, x: number, y: number, z: number): number {
   const floor = spec.floors[0]!;
-  const vw = floor.w * 2;
-  const vd = floor.d * 2;
+  const vw = floor.w * VOXELS_PER_CELL;
+  const vd = floor.d * VOXELS_PER_CELL;
   const vx = Math.floor(x / VOXEL);
   const vy = Math.floor(y / VOXEL);
   const f = Math.floor(z / spec.floorHeight);
@@ -124,8 +125,8 @@ export function sense(ctx: SenseContext, out: Float32Array): Float32Array {
   out[OBS.ceil] = Math.max(0, Math.min(2, (up ? up.dist : spec.floorHeight) / spec.floorHeight));
 
   const floor0 = spec.floors[0]!;
-  const vw = floor0.w * 2;
-  const vd = floor0.d * 2;
+  const vw = floor0.w * VOXELS_PER_CELL;
+  const vd = floor0.d * VOXELS_PER_CELL;
   const fCount = spec.floors.length;
   const x = state.pos[0];
   const y = state.pos[1];

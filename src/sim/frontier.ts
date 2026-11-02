@@ -2,6 +2,7 @@ import { DRONE_RADIUS, VOXEL } from '../shared/constants';
 import type { BuildingSpec } from '../shared/types';
 import { furnitureIndex, type FurnitureIndex } from '../gen/furniture';
 import { FLIGHT_ALTITUDE, flightMap, isWalkable, wallHits, type FlightMap } from '../gen/validate';
+import { VOXELS_PER_CELL } from '../shared/voxels';
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -39,9 +40,9 @@ function cellBest(
  * policy sees still has the local visited map, which is what imitation learns.
  */
 function nearestOpen(spec: BuildingSpec, visited: Uint8Array, pos: [number, number, number], radius: number): number {
-  if (spec.cellSize !== VOXEL * 2) return nearestOpenScan(spec, visited, pos, radius);
-  const vw = spec.floors[0]!.w * 2;
-  const vd = spec.floors[0]!.d * 2;
+  if (spec.cellSize !== VOXEL * VOXELS_PER_CELL) return nearestOpenScan(spec, visited, pos, radius);
+  const vw = spec.floors[0]!.w * VOXELS_PER_CELL;
+  const vd = spec.floors[0]!.d * VOXELS_PER_CELL;
   const cs = spec.cellSize;
   const px = pos[0];
   const py = pos[1];
@@ -121,8 +122,8 @@ function nearestOpen(spec: BuildingSpec, visited: Uint8Array, pos: [number, numb
 
 /** Reference row-major scan. Kept for non-standard cell sizes; nearestOpen must match it exactly. */
 function nearestOpenScan(spec: BuildingSpec, visited: Uint8Array, pos: [number, number, number], radius: number): number {
-  const vw = spec.floors[0]!.w * 2;
-  const vd = spec.floors[0]!.d * 2;
+  const vw = spec.floors[0]!.w * VOXELS_PER_CELL;
+  const vd = spec.floors[0]!.d * VOXELS_PER_CELL;
   const cs = spec.cellSize;
   let best = 6;
   for (let f = 0; f < spec.floors.length; f++) {
@@ -359,8 +360,8 @@ export function frontierAction(
   const floorIndex = Math.max(0, Math.min(spec.floors.length - 1, Math.floor(pos[2] / spec.floorHeight)));
   const floor = spec.floors[floorIndex]!;
   const cs = spec.cellSize;
-  const vw = spec.floors[0]!.w * 2;
-  const vd = spec.floors[0]!.d * 2;
+  const vw = spec.floors[0]!.w * VOXELS_PER_CELL;
+  const vd = spec.floors[0]!.d * VOXELS_PER_CELL;
   const gx = clamp(Math.floor(pos[0] / cs), 0, floor.w - 1);
   const gz = clamp(Math.floor(pos[1] / cs), 0, floor.d - 1);
 
