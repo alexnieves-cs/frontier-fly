@@ -1,0 +1,37 @@
+name: crazyflie
+
+# The Crazyflie flight stack, in software: the safety guard's rules, the
+# flight script flying the simulated Crazyflie through every ladder mode and
+# injected fault, and the cflib link against a stand-in Crazyflie. No radio.
+# Informational, like ci.yml.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crazyflie-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flight-stack:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: pip install -r scripts/crazyflie/requirements.txt
+      - run: npm run crazyflie:arena -- scripts/crazyflie/arenas/example-room.json
+      - run: python -m pytest -v scripts/crazyflie/tests
