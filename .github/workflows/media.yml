@@ -209,7 +209,7 @@ jobs:
           name: stills
           path: docs/media
       - name: Sizes
-        run: ls -la docs/media
+        run: ls -la docs/media public/hero
       # Push to its own branch: the cloud container's proxy can fetch git but not artifact downloads.
       - name: Push the result to media/<run id>
         run: |
@@ -217,6 +217,6 @@ jobs:
           git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
           b="media/${{ github.run_id }}"
           git checkout -b "$b"
-          git add docs/media docs/missions.json
+          git add docs/media docs/missions.json public/hero
           git commit -m "Media re-rendered from ${MEDIA_SOURCE} (media run ${{ github.run_id }})"
           git push origin "$b"

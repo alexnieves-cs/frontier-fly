@@ -12,11 +12,13 @@
 // draws frame i with every effect on (shadows, bloom, SMAA) however slowly the GPU or software
 // renderer runs. Each frame is screenshotted, so the output plays at a true 30 fps even when a
 // frame takes seconds to draw. Writes docs/media/film-<scenario>.mp4 and, for the first
-// scenario, a short hero loop docs/media/film-hero.mp4 and docs/media/film-hero.gif.
+// scenario, a short hero loop docs/media/film-hero.mp4 and docs/media/film-hero.gif, and the
+// homepage poster from that loop (public/hero/, see hero-poster.mjs).
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from '@playwright/test';
+import { encodeHeroPoster } from './hero-poster.mjs';
 
 const OUT = 'docs/media';
 /** Repo budget for one media file. */
@@ -128,6 +130,8 @@ function encode(film, { dir, from }) {
       '-vf', 'fps=10,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle',
       gif,
     ]);
+    // The homepage plays the same clip as its poster while the live replay loads.
+    encodeHeroPoster(hero);
     Object.assign(out, { hero, gif, gifBytes: statSync(gif).size });
   }
   return out;

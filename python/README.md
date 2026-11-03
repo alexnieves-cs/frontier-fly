@@ -12,14 +12,18 @@ are bit-identical to the committed leaderboard.
 
 You need Python 3.10+ and Node.js 22+ on `PATH`. Nothing from npm is needed at run time.
 
+From PyPI, once the first release is up (the wheel carries the bundled simulator):
+
+```bash
+pip install frontierfly
+```
+
 From a checkout of the repository:
 
 ```bash
 npm ci && npm run build:py      # bundles the simulator into python/frontierfly/_server/
 pip install -e python           # or: pip install ./python
 ```
-
-The package is not on PyPI yet.
 
 ## Train
 
@@ -38,7 +42,7 @@ env.close()
 
 | | |
 | --- | --- |
-| Observation | `Box(1088,)` float32: 32 + 8 lidar rays, IMU, a frontier navigation block, four 16x16 egocentric maps. Layout: [`OBS_LAYOUT.md`](../src/sim/OBS_LAYOUT.md); index it by name with `frontierfly.obs`. |
+| Observation | `Box(1088,)` float32: 32 + 8 lidar rays, IMU, a frontier navigation block, four 16x16 egocentric maps. Layout: [`OBS_LAYOUT.md`](https://github.com/alexnieves-cs/frontier-fly/blob/main/src/sim/OBS_LAYOUT.md); index it by name with `frontierfly.obs`. |
 | Action | `Box(4,)` in [-1, 1]: forward, left, up, yaw rate, scaled to the task's speed cap, 1 m/s and 90 deg/s. 20 steps per second. |
 | Reward | New flown volume, new rooms and floors, progress toward the nearest frontier; penalties for impacts, contact, jerky actions and circling (`src/sim/reward.ts`). |
 | Terminated | 95% of the reachable volume flown, too many collisions, or out of the building. |
@@ -71,7 +75,7 @@ env.pilot_action("planner")        # the action it would take now, as a label
 env.sensor_frame()                 # pose, lidar in meters, seen/visited voxel grids
 ```
 
-[`examples/collect_demos.py`](examples/collect_demos.py) writes a behavior-cloning
+[`examples/collect_demos.py`](https://github.com/alexnieves-cs/frontier-fly/blob/main/python/examples/collect_demos.py) writes a behavior-cloning
 dataset from the planner's flights.
 
 ## Benchmark
@@ -79,7 +83,7 @@ dataset from the planner's flights.
 FrontierBench is 7 frozen tasks with fixed seeds: a dev split (tune freely) and a
 test split (score once). The score is mean flown coverage over tasks; `safeShare`
 is the share of flights that touched nothing. Current standings are in
-[`docs/LEADERBOARD.md`](../docs/LEADERBOARD.md).
+[`docs/LEADERBOARD.md`](https://github.com/alexnieves-cs/frontier-fly/blob/main/docs/LEADERBOARD.md).
 
 ```bash
 python -m frontierfly.bench --pilot planner --split dev
@@ -96,9 +100,9 @@ print(result["score"], result["safeShare"], result["tasks"]["hard"])
 A policy is a callable `policy(obs) -> action`, or an object with
 `act(obs, env)` and an optional `reset(info, env)`; `env.sensor_frame()` gives it
 what a bench pilot may see besides the observation (never the floor plan).
-[`examples/waypoint_pilot.py`](examples/waypoint_pilot.py) ports the TypeScript
+[`examples/waypoint_pilot.py`](https://github.com/alexnieves-cs/frontier-fly/blob/main/python/examples/waypoint_pilot.py) ports the TypeScript
 `waypoint` baseline to Python and scores identically. To put a result on the
-leaderboard, follow [`docs/BENCHMARKS.md`](../docs/BENCHMARKS.md); entries are
+leaderboard, follow [`docs/BENCHMARKS.md`](https://github.com/alexnieves-cs/frontier-fly/blob/main/docs/BENCHMARKS.md); entries are
 re-scored from their TypeScript pilot code in CI.
 
 ## Tests
@@ -114,4 +118,4 @@ both license texts ship in `frontierfly/_server/`. The real apartment plans
 (`_server/assets/plans/swiss-dwellings.json`) are from
 [Swiss Dwellings v3.0.0](https://zenodo.org/records/7788422) by Archilyse AG,
 doi:10.5281/zenodo.7788422, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/);
-the changes are recorded in the file and in [`docs/REAL_PLANS.md`](../docs/REAL_PLANS.md).
+the changes are recorded in the file and in [`docs/REAL_PLANS.md`](https://github.com/alexnieves-cs/frontier-fly/blob/main/docs/REAL_PLANS.md).
