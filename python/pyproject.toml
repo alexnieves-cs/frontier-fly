@@ -25,8 +25,10 @@ test = ["pytest>=8"]
 Homepage = "https://alexnieves-cs.github.io/frontier-fly/"
 Source = "https://github.com/alexnieves-cs/frontier-fly"
 
-[tool.setuptools]
-packages = ["frontierfly"]
+[tool.setuptools.packages.find]
+# The bundled simulator under _server/ is data, found as namespace packages so setuptools ships it.
+include = ["frontierfly*"]
+namespaces = true
 
 [tool.setuptools.package-data]
 frontierfly = ["_server/server.mjs", "_server/LICENSE.*", "_server/assets/checkpoints/*.bin", "_server/assets/plans/*.json"]

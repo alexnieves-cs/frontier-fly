@@ -1,0 +1,81 @@
+name: huggingface
+
+# Stages the shipped policy as a Hugging Face model repository (scripts/hf/stage.ts: checkpoints,
+# result JSON and a model card generated from docs/headline.json and bench/results/) and uploads it
+# only when run by hand with `upload` checked. Without it, the staged folder is an artifact to review.
+#
+# One-time setup, by the account owner: create a write token at huggingface.co/settings/tokens and
+# save it as the repository secret HF_TOKEN. See docs/RELEASING.md.
+on:
+  pull_request:
+    paths:
+      - scripts/hf/**
+      - .github/workflows/huggingface.yml
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: Model repository on the Hub, <user>/<name>
+        required: true
+        default: alexnieves-cs/frontier-fly-policy
+      upload:
+        description: Upload to the Hub (otherwise only stage and keep the artifact)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run hf:stage -- --out dist-hf --repo "$REPO"
+        env:
+          REPO: ${{ inputs.repo || 'alexnieves-cs/frontier-fly-policy' }}
+      - run: cat dist-hf/README.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hf-model
+          path: dist-hf/
+          include-hidden-files: true
+
+  upload:
+    needs: stage
+    if: github.event_name == 'workflow_dispatch' && inputs.upload
+    runs-on: ubuntu-latest
+    environment: huggingface
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: hf-model
+          path: dist-hf/
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: python -m pip install 'huggingface_hub>=0.30'
+      - name: Upload
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          REPO: ${{ inputs.repo }}
+          SHA: ${{ github.sha }}
+        run: |
+          test -n "$HF_TOKEN" || { echo "::error::Add the HF_TOKEN repository secret first (docs/RELEASING.md)"; exit 1; }
+          [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::repo must be <user>/<name>"; exit 1; }
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = os.environ["REPO"]
+          api.create_repo(repo, repo_type="model", exist_ok=True)
+          info = api.upload_folder(repo_id=repo, repo_type="model", folder_path="dist-hf",
+                                   commit_message=f"frontier-fly policy from {os.environ['SHA'][:7]}")
+          print(info)
+          PY
+          echo "Uploaded to https://huggingface.co/$REPO" >> "$GITHUB_STEP_SUMMARY"

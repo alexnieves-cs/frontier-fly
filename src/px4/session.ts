@@ -9,7 +9,7 @@ import {
   type ActuatorControls,
   type Heartbeat,
 } from './mavlink';
-import { Px4Quad, rotateInv, type Vec3 } from './quad';
+import { Px4Quad, rotateInv, type QuadState, type Vec3 } from './quad';
 import { DECLINATION, INCLINATION, STRENGTH } from './wmmTables';
 
 /**
@@ -24,10 +24,19 @@ import { DECLINATION, INCLINATION, STRENGTH } from './wmmTables';
  * the browser reaches PX4 through a WebSocket bridge (scripts/px4/bridge.mjs).
  */
 
+/** What the session needs from a vehicle model: Px4Quad, or FrontierPlant (frontier-fly's own rigid body). */
+export interface Px4Plant {
+  readonly s: QuadState;
+  specificForce: Vec3;
+  wind: Vec3;
+  groundDown: (north: number, east: number) => number;
+  step(u: ArrayLike<number>, dt: number): void;
+}
+
 export interface SessionOptions {
   /** Where the pad is on the globe; the GNSS and magnetometer use it. */
   home: GeoPoint;
-  quad?: Px4Quad;
+  quad?: Px4Plant;
   /** Physics and IMU step, microseconds. PX4 expects 250 Hz. */
   stepUs?: number;
   gpsRateHz?: number;
@@ -111,7 +120,7 @@ class Noise {
 }
 
 export class Px4SimSession {
-  readonly quad: Px4Quad;
+  readonly quad: Px4Plant;
   readonly home: GeoPoint;
   readonly frame: LocalFrame;
   readonly stepUs: number;
