@@ -61,6 +61,9 @@ export function buildProps(spec: BuildingSpec, mats: MaterialSet): THREE.Group {
       add(group, new THREE.BoxGeometry(1.3, 0.4, 0.1), cloth, 0, 0.62, -0.22);
       add(group, new THREE.BoxGeometry(0.1, 0.28, 0.55), cloth, -0.6, 0.48, 0);
       add(group, new THREE.BoxGeometry(0.1, 0.28, 0.55), cloth, 0.6, 0.48, 0);
+    } else if (prop.kind === 'door') {
+      // Ajar interior door: the leaf swings about the hinge at the group origin (PROP_PARTS.door).
+      add(group, new THREE.BoxGeometry(0.88, 2.88, 0.04), wood, 0.45, 1.45, 0);
     } else {
       add(group, new THREE.CylinderGeometry(0.12, 0.1, 0.18, 12), pot, 0, 0.1, 0);
       add(group, new THREE.SphereGeometry(0.2, 12, 8), leaf, 0, 0.36, 0);
