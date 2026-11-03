@@ -425,6 +425,30 @@ Both versions flew the same {{R_TRK_N}} fresh flights (seeds {{R_TRK_SEEDS}}, pl
 
 What it costs: a sweep with an unresolved person ends *incomplete* rather than *found*, so most of the former false clears became incomplete sweeps, not finds. Hiding people are found less often than before, and a few empty sweeps no longer clear. Every remaining false clear has a hiding person whose views averaged 0.66 to 0.69, inside the band decoys also reach: this detector cannot tell them from a mannequin, and only a better detector or more views would.
 
+## Doors, glass and smoke
+
+Until now every interior door stood open and door leaves were only drawn. Three hazards now change what the drone can fly through and what its sensors return, each with its own seed block, pass condition and bench row (`src/gen/hazards.ts`, applied after generation and seeded by the building):
+
+- **Doors.** A share of interior doorways is shut: the leaf becomes a wall cell with a door surface, and a shut door is never opened. A shut door that leaves less than half the building reachable is opened again. Most of the others get a thin leaf standing ajar at 30–75°, a collidable obstacle in the doorway. Coverage counts only what is reachable with the doors as they are.
+- **Glass and mirrors.** The inner walls of some rooms turn to glass, where a lidar beam drops out 35% of the time and reads as max range, and a few interior wall faces become mirrors that return the reflected path, so the wall reads further away than it is.
+- **Smoke.** Some rooms fill with smoke of visibility 1.5–4 m. A horizontal lidar beam crossing smoke can come back early, and the camera detector's recall falls with the smoke's transmittance along the line of sight.
+
+The explorers know hazards exist but not where. With hazard awareness on, a mission logs every shut door it sees whose far side it has not searched and will not call a building clear while one is left; it tells the operator a ground team is needed. It skips smoke-filled voxels when it scores a look, and it never rejects a contact seen in smoke: the contact is left unresolved, which blocks the clear. The unaware control flies the same code with all three switched off.
+
+**Coverage.** The hard-building coverage study flies each hazard on fresh stage-3 buildings 86001–86030 (day), paired with the same buildings without hazards. The pass condition, fixed before the run: the sensor-only planner and the guarded policy each keep at least 90% of their own no-hazard coverage and crash on at most 2 of 30 flights, in every hazard (crash = contact at 0.5 m/s or more). Cells give mean coverage, then crashes of 30 in brackets, then the ratio to the pilot's own control.
+
+{{HAZARD_COVERAGE_TABLE}}
+
+{{HAZARD_COVERAGE_PASS}}
+
+**Missions.** Sweeps of an occupied compound with shut and ajar doors, the same with smoke, and the injured-hiker cabin with smoke or with glass rooms and mirrors, each flown on the first 30 seeds of a fresh block from 86501. The door and glass scenarios keep only seeds whose first building has an interior doorway, a rule fixed before the run ({{HAZARD_MISSION_SEEDS}}). The pass condition, fixed before the run: with awareness on, no false clear in any flight, and the hiker found in at least 80% of the cabin flights.
+
+{{HAZARD_MISSION_TABLE}}
+
+{{HAZARD_MISSION_PASS}}
+
+{{HAZARD_NOTE}}
+
 ## Failure gallery
 
 Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture grey, flown voxels light blue, the track blue, the start green, collisions red. The episodes are picked by rule from the coverage study (`scripts/study/gallery.ts`).
@@ -481,6 +505,8 @@ Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture
 | Real floor plans ([REAL_PLANS.md](REAL_PLANS.md)) | 20 dev and 60 eval apartments; env seeds 74001+ and 75001+ (dev), 72001+ (reported) and 73001+ (matched generated controls) |
 | FrontierBench ([LEADERBOARD.md](LEADERBOARD.md)) | 81001+ (dev) and 82001+ (test); team track 83001+ and 83101+; apartments task 84001+ and 84101+ |
 | Real-data check (Intel Research Lab log) | Parameters picked on sweeps 0–2999 only; reported on the whole log and on the relations after sweep 2999 |
+| Tuning indoor hazards | Coverage buildings and mission worlds 81901–81999 |
+| Indoor hazards (reported) | Coverage 86001–86030 (stage 3, day); missions 86501+ (first 30 seeds per scenario) |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce

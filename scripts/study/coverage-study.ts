@@ -369,7 +369,8 @@ if (MAIN && process.argv.includes('--merge')) {
   const conditions = arg('conditions', '').split(',').filter(Boolean);
   const pilots = arg('pilots', '').split(',').filter(Boolean);
   const mine = jobs()
-    .filter((j) => (!conditions.length || conditions.includes(j.condition)) && (!pilots.length || pilots.includes(j.pilot)))
+    // The hazard conditions run only when named (docs/hazard-coverage.json), so docs/study.json keeps its rows.
+    .filter((j) => (conditions.length ? conditions.includes(j.condition) : !HAZARD_CONDITIONS.some((c) => c.id === j.condition)) && (!pilots.length || pilots.includes(j.pilot)))
     .filter((_, i) => shardOf(i, of) === shard);
   // Development runs: `--dev-base 81901 --dev-seeds 8` flies the first seeds of another block instead.
   const devBase = Number(arg('dev-base', '0'));
