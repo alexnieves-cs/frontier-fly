@@ -8,10 +8,10 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 
 | # | Pilot | Score | Footprint score | room | hard | dark | fast | floors | quad | apartments | Flights that touched nothing | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **69.5%** | 85.3% | 95.1% | 74.3% | 73.3% | 84.0% | 39.9% | 40.3% | 79.4% | 64% | `20aa664` |
+| 1 | [Shipped policy (DAgger + PPO) under the lidar guard](../bench/results/guarded.json) | **68.4%** | 84.5% | 95.1% | 73.8% | 74.9% | 84.4% | 39.3% | 38.6% | 72.4% | 67% | `37e14d1` |
 | 2 | Sensor-only planner + momentum (baseline) | **67.8%** | 88.5% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 42.6% | 86.1% | 93% | `20aa664` |
 | 3 | Sensor-only planner (baseline) | **67.5%** | 87.0% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 41.1% | 85.5% | 94% | `20aa664` |
-| 4 | Shipped policy (DAgger + PPO) (baseline) | **62.9%** | 81.5% | 95.1% | 79.0% | 78.1% | 41.5% | 41.5% | 32.5% | 72.8% | 20% | `20aa664` |
+| 4 | [Shipped policy (DAgger + PPO)](../bench/results/policy.json) | **67.4%** | 85.9% | 95.1% | 76.2% | 78.5% | 70.4% | 40.0% | 42.8% | 68.8% | 28% | `37e14d1` |
 | 5 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.7%** | 83.5% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 80.6% | 96% | `20aa664` |
 | 6 | Frontier waypoint follower (baseline) | **28.6%** | 61.6% | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 34.6% | 0% | `20aa664` |
 | 7 | Lidar wall-follower (baseline) | **17.0%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `20aa664` |
