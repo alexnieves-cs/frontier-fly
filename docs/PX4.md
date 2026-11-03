@@ -121,7 +121,7 @@ npx vite-node scripts/px4/report.ts -- --sih test-results/px4/sih --bridge test-
 ## Limits
 
 - Only the pre-planned part of a mission is a plan. Confirming a contact, entering a building and searching indoors are decided in flight by frontier-fly's own autonomy, not by PX4.
-- The bridge vehicle is a rigid body with first-order motors and linear drag. It has no blade flapping, no ground effect, no battery model and no wind gusts. Collisions with trees and buildings are measured (closest tree) but not simulated. PX4 is never told about obstacles.
+- The bridge vehicle is a rigid body with first-order motors and linear drag. It has no blade flapping, no ground effect, no battery model and no wind gusts. The physics validation flies PX4 on frontier-fly's own airframe instead, with gusts, a sagging pack and near-surface aerodynamics: see [PHYSICS_VALIDATION.md](PHYSICS_VALIDATION.md). Collisions with trees and buildings are measured (closest tree) but not simulated. PX4 is never told about obstacles.
 - PX4's GNSS here has no multipath or dropouts, so the estimator has an easy time. The fault bench in [SAFETY_CASE.md](SAFETY_CASE.md) covers degraded sensors with frontier-fly's own failsafe, not with PX4's.
 - PX4 SITL needs real-time thread priority to run reliably. Without it, the work queue that runs PX4's simulated barometer, compass and battery can stall for a few seconds after arming, and PX4 then fails safe (`No valid data from Baro 0`, `Battery unhealthy`). This showed up only on GitHub's runners at first, because PX4 there ran as an ordinary user, and it reproduced in the cloud container once real-time priority was taken away. CI now gives the PX4 binary that right (`setcap cap_sys_nice+ep`). If you run the checks yourself as an ordinary user, do the same or run PX4 as root.
 - The checks pin PX4 to v1.15.4. A newer PX4 may change defaults such as the return height.
@@ -137,6 +137,7 @@ npx vite-node scripts/px4/report.ts -- --sih test-results/px4/sih --bridge test-
 | `scripts/px4/run-browser-check.sh` | PX4, the bridge, Chromium on `px4.html`, and the flight check together |
 | `scripts/px4/sim-node.ts` | The headless simulator. It also writes the true track and the closest approach to any tree. |
 | `scripts/px4/bridge.mjs` | The TCP-to-WebSocket relay |
+| `scripts/physics/` | The physics validation: the same maneuvers on PX4 SIH, PX4 on frontier-fly physics and frontier-fly's own controller ([PHYSICS_VALIDATION.md](PHYSICS_VALIDATION.md)) |
 | `scripts/px4/report.ts` | Collects reports into `docs/px4-flight-check.json` and the table above. `--check` keeps them in sync in CI. |
 | `scripts/px4/mavlink_fixtures.py` | Regenerates the pymavlink test frames |
 | `src/px4/` | The MAVLink codec, the quad, the sensors, the lockstep session and the page |
