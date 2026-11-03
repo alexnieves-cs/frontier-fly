@@ -11,6 +11,9 @@ export default tseslint.config(
       // Built by npm run build:py.
       'python/frontierfly/_server/**',
       'python/build/**',
+      // Built by npm run build:cli.
+      'dist-cli/**',
+      'dist-hf/**',
       'node_modules/**',
       'test-results/**',
       'playwright-report/**',
@@ -21,7 +24,7 @@ export default tseslint.config(
   },
   {
     // Node scripts. Browser globals are allowed for code passed to page.evaluate.
-    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/px4/**/*.mjs', 'scripts/py/**/*.mjs', 'scripts/check-pages.mjs'],
+    files: ['scripts/media/**/*.mjs', 'scripts/docs/**/*.mjs', 'scripts/px4/**/*.mjs', 'scripts/py/**/*.mjs', 'scripts/cli/**/*.mjs', 'scripts/check-pages.mjs'],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
