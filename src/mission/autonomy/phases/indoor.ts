@@ -98,6 +98,7 @@ export class IndoorPhase {
     this.c.aperture = null;
     v.sensing = new IndoorSensing(v.grid, this.c.loc ? this.c.loc.frameLidar(lidar) : lidar, lighting, this.c.world.seed);
     v.sensing.lastNewVoxelSec = this.c.t;
+    v.sensing.hazardAware = this.c.options.hazardAware ?? true;
     if (this.c.vehicle instanceof QuadVehicle) v.sensing.braking = this.c.vehicle.braking;
     v.sensing.rangeHook = (lidar) => this.pilot.lidarHook(lidar);
     // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
@@ -265,6 +266,11 @@ export class IndoorPhase {
     const v = this.c.visit!;
     // An open contact in this building gets one more look before leaving.
     if (!this.c.returning && this.go.lastLook(v.b.id)) return;
+    if (v.sensing?.hazardAware) {
+      const shut = v.sensing.unsearchedDoors();
+      this.c.shutDoors.set(v.b.id, shut);
+      if (shut > 0) this.c.log('warn', `${v.b.label}: ${shut} shut door${shut > 1 ? 's' : ''} with space behind that the drone cannot search. A ground team has to open ${shut > 1 ? 'them' : 'it'}.`);
+    }
     if (v.vis) this.c.log('info', `${v.b.label} explored: ${fmt(v.vis.coverage() * 100, 0)}% of cells seen by the oracle planner.`);
     else if (v.sensing)
       this.c.log(

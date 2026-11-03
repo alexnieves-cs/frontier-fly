@@ -171,7 +171,9 @@ function buildingGeometry(world: MissionWorld, index: number, palette: Palette):
   const furniture = spec.furniture;
   if (furniture) {
     for (const part of furniture.boxes) {
-      const kind = furniture.props[part.prop]?.kind ?? 'table';
+      // An ajar door leaf (gen/hazards.ts) takes the table's wood: no new palette draw, so palettes stay as seeded.
+      const prop = furniture.props[part.prop]?.kind ?? 'table';
+      const kind = prop === 'door' ? 'table' : prop;
       items.push({ t: 1, cx: part.cx + ox, cy: part.cy + oy, cz: part.cz + oz, hx: part.hx, hy: part.hy, hz: part.hz, yaw: part.yaw, p: palette.furniture[kind] });
     }
   }

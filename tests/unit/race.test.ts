@@ -8,7 +8,7 @@ import { influenceFromActions, INPUT_BLOCKS, occlusionBatch } from '../../src/ui
 import { RaceEngine } from '../../src/ui/race/engine';
 import { DEFAULT_PILOTS, RACE_CONDITIONS } from '../../src/ui/race/pilots';
 import { matchesStudy, studyEpisode } from '../../src/ui/race/study';
-import { CONDITIONS } from '../../scripts/study/coverage-study';
+import { CONDITIONS, HAZARD_CONDITIONS } from '../../scripts/study/coverage-study';
 
 function shippedPolicy() {
   const ck = parseCheckpoint(readFileSync(SHIPPED_CHECKPOINT_PATH));
@@ -18,9 +18,10 @@ function shippedPolicy() {
 }
 
 describe('pilot race', () => {
+  // The race flies the study's main conditions; the hazard conditions are bench-only.
   it('mirrors the study conditions', () => {
     expect(RACE_CONDITIONS.map(({ id, stage, seedBase, lighting, quad }) => ({ id, stage, seedBase, lighting, quad: quad ?? 0 }))).toEqual(
-      CONDITIONS.map(({ id, stage, seedBase, lighting, quad }) => ({ id, stage, seedBase, lighting, quad: quad ?? 0 })),
+      CONDITIONS.filter((c) => !HAZARD_CONDITIONS.includes(c)).map(({ id, stage, seedBase, lighting, quad }) => ({ id, stage, seedBase, lighting, quad: quad ?? 0 })),
     );
   });
 
