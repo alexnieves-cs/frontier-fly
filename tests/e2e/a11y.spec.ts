@@ -16,8 +16,13 @@ async function unnamedCanvases(page: Page): Promise<string[]> {
 
 for (const name of PAGES) {
   test(`${name}.html passes axe (WCAG 2.1 A/AA), names its canvases, and shows keyboard focus`, async ({ page }) => {
-    await page.goto(`/${name}.html`);
-    await page.waitForLoadState('load');
+    await page.goto(`/${name}.html`, { waitUntil: 'domcontentloaded' });
+    // The film page flies its mission headless before it draws the overlay; wait for that, not for
+    // the window load event, which a busy runner can hold back for minutes.
+    if (name === 'film') {
+      test.setTimeout(300_000);
+      await expect(page.locator('.film-map-canvas')).toBeAttached({ timeout: 240_000 });
+    }
     // Let the page build its live parts (3D view, overlays, panels) before scanning them.
     await page.waitForTimeout(5000);
 
@@ -28,7 +33,9 @@ for (const name of PAGES) {
     expect(await unnamedCanvases(page), 'canvases need role="img" and an aria-label, or aria-hidden="true"').toEqual([]);
 
     // The first Tab lands on a visible control in the page header with a visible focus ring.
-    await page.locator('body').focus();
+    // Start from the top of the document. Not locator.focus(): it waits for the page to settle,
+    // which a page rendering 3D every frame on software GL may not do in time.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press('Tab');
     const focus = await page.evaluate(() => {
       const el = document.activeElement as HTMLElement | null;
