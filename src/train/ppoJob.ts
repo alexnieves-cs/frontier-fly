@@ -14,6 +14,7 @@
  * part of what the critic sees, so a time-out is a real end, not a truncation.
  */
 import { evalEpisodeSetup } from '../eval/coverage';
+import { guardedAction } from '../eval/pilots';
 import { MemPolicy } from '../rl/memPolicy';
 import { ACT_DIM, CRASH_SPEED } from '../shared/constants';
 import { RNG } from '../shared/rng';
@@ -53,6 +54,12 @@ export interface SeqRolloutPayload {
   crashPenalty?: number;
   /** Share of episodes flown with quadrotor dynamics, domain-randomized at full scale (as the coverage study's quad condition). */
   quadFraction?: number;
+  /**
+   * What the BC labels (the `teacher` rows) are: the frontier teacher's action (default), the teacher's
+   * action through the lidar guard (src/eval/pilots.ts guardedAction), or the policy's own action
+   * through the guard, which teaches the actor to brake the way the guard does so it needs no guard.
+   */
+  labels?: 'teacher' | 'guard-teacher' | 'guard-self';
   /** Penalty per contact, in reward per m/s of impact speed above half the crash speed (0 = off). */
   impactSpeedPenalty?: number;
 }
@@ -249,6 +256,11 @@ const seqRollout: JobFn = (ctx, raw) => {
       const pose = env.snapshot();
       const teacher = frontierAction(slot.spec!, env.visitedGrid, pose.pos, pose.yaw);
       out.teacher.set(teacher.subarray(0, ACT_DIM), row * ACT_DIM);
+      if (p.labels === 'guard-teacher') {
+        const g = guardedAction(teacher, slot.obs!, env);
+        out.teacher[row * ACT_DIM] = g[0]!;
+        out.teacher[row * ACT_DIM + 1] = g[1]!;
+      }
       privileged(env, slot, teacher, collisions[i]!, out.priv, row * PRIV_DIM);
       if (m > 0 && t % L === 0) out.state0.set(worker.state.subarray(i * m, (i + 1) * m), (i * (T / L) + t / L) * m);
     }
@@ -259,6 +271,13 @@ const seqRollout: JobFn = (ctx, raw) => {
       const row = i * T + t;
       const action = act.action.subarray(i * ACT_DIM, (i + 1) * ACT_DIM);
       out.actions.set(action, row * ACT_DIM);
+      if (p.labels === 'guard-self') {
+        // Horizontal velocity only: the guard also holds a fixed height, which the policy should not copy.
+        const g = guardedAction(action, slot.obs!, env);
+        out.teacher.set(action, row * ACT_DIM);
+        out.teacher[row * ACT_DIM] = g[0]!;
+        out.teacher[row * ACT_DIM + 1] = g[1]!;
+      }
       out.logp[row] = act.logp[i]!;
       const step = env.step(action);
       let reward = step.reward;

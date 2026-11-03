@@ -10,13 +10,15 @@
  *          [--bc 0.05] [--ppo 1] [--log-std -2.3] [--critic-warmup 8] [--imitate 0]
  *          [--eval-every 20] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
  *          [--crash-penalty 0] [--impact-penalty 0] [--crash-weight 0.2] [--quad 0] [--eval-quad]
+ *          [--labels teacher|guard-teacher|guard-self]
  *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|report|fresh] [--eval-quad]
  *
  * Crash rule (shared/constants.ts CRASH_SPEED): a crash ends the episode with REWARD.crash in the
  * env. --crash-penalty adds more on that step, --impact-penalty charges every contact per m/s above
  * half the crash speed, --crash-weight takes crashes off the checkpoint score, and --quad flies that
  * share of rollouts on quadrotor dynamics (full domain randomization; validation then adds 16 quad
- * episodes).
+ * episodes). --labels picks the BC labels: the frontier teacher, the teacher through the lidar
+ * guard, or the policy's own action through the guard (it learns to brake as the guard does).
  *
  * The defaults are the recipe of the shipped checkpoint's first 400 updates;
  * it then ran 400 more with --init on that run's best checkpoint and --seed 47
@@ -211,6 +213,7 @@ async function main() {
       crashPenalty: num('crash-penalty', 0),
       impactSpeedPenalty: num('impact-penalty', 0),
       quadFraction: phase === 'imitate' ? 0 : quadFraction,
+      labels: (arg('labels') ?? 'teacher') as 'teacher' | 'guard-teacher' | 'guard-self',
     })) as SeqRolloutResult[];
     resetEnvs = false;
     const tCollect = (Date.now() - t0) / 1000;
