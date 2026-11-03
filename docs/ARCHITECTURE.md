@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (298 files, 56,829 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (298 files, 56,908 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -49,7 +49,7 @@ The same loop runs in the browser when you press **Train**, so a visitor can wat
 
 ## Mission layer
 
-`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them. `python/` is the same task as a Python package (a Gymnasium env and the scorer): `scripts/py/server.ts` drives the env and the bench episode recorder over a framed stdin/stdout protocol, and `npm run build:py` bundles it into one Node script the package starts.
+`src/bench` is FrontierBench: frozen tasks and seeds, the `BenchPilot` interface a submitted pilot implements, the episode runner and the baselines; `scripts/bench/` scores, re-scores and ranks them. `python/` is the same task as a Python package (a Gymnasium env and the scorer): `scripts/py/server.ts` drives the env and the bench episode recorder over a framed stdin/stdout protocol, and `npm run build:py` bundles it into one Node script the package starts. `scripts/cli/` is the headless command line (`frontier-fly mission | bench | plan | list`) over the same mission runner, bench episode runner and plan exporter the pages use; `npm run build:cli` bundles it into `dist-cli/`, which the `Dockerfile` ships as `ghcr.io/alexnieves-cs/frontier-fly`. [CLI.md](CLI.md) covers both, and [RELEASING.md](RELEASING.md) the image, PyPI and Hugging Face releases.
 
 `src/mission` holds the versioned mission schema (geofence, no-fly zones, altitude band, targets, entry policy, budgets), its validator, and the canonical share-link encoding. The planner page reads site footprints through `WorldProvider`, so it does not import the renderer. `src/targets` places simulated people, objects, and decoys. `src/perception` is a geometric camera detector with distance, occlusion, lighting, and motion-blur misses, plus a seen-empty tracker for confirm-clear. `src/vision` is the alternative that looks at pixels: a software rasterizer renders the drone's 160×120 camera (CC0 KayKit people baked to posed meshes, room lights, flashlight, auto exposure and sensor noise), and a small CenterNet-style TF.js network finds people and objects in it. It plugs into the mission perception source as `PerceptionOptions.camera`.
 
@@ -219,7 +219,7 @@ flowchart LR
 | `src/eval` | 17 | 2,797 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,763 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 7 | 1,357 | `shared` | — | — |
-| `src/landing` | 2 | 299 | `film`, `ui` | — | — |
+| `src/landing` | 2 | 323 | `film`, `ui` | — | — |
 | `src/loc` | 9 | 2,091 | `shared` | — | — |
 | `src/mission` | 62 | 14,503 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 813 | `shared`, `sim`, `targets` | — | — |
@@ -231,7 +231,7 @@ flowchart LR
 | `src/targets` | 10 | 1,297 | `gen`, `shared` | Three.js | — |
 | `src/team` | 6 | 1,019 | `eval`, `gen`, `shared`, `sim` | — | — |
 | `src/train` | 5 | 1,378 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
-| `src/ui` | 44 | 6,743 | `app`, `eval`, `gen`, `landing`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
+| `src/ui` | 44 | 6,798 | `app`, `eval`, `gen`, `landing`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 6 | 2,164 | `mission`, `rl`, `ui` | — | — |
 | `src/vision` | 9 | 1,872 | `mission`, `perception`, `shared`, `sim`, `targets`, `world/outdoor` | TF.js | — |
 | `src/viz` | 19 | 2,370 | `gen`, `shared`, `sim`, `world/outdoor` | Three.js | — |

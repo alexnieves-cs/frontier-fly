@@ -118,6 +118,26 @@ button.btn { cursor: pointer; }
 .results-foot a { color: var(--film-cyan); display: inline-block; padding: 4px 0; }
 .results-foot code { font: 500 12px var(--film-mono); }
 
+/* About the builder. */
+.about {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 520px); gap: 18px 40px; align-items: start;
+  width: 100%; max-width: 1280px; margin: 0 auto; padding: 22px 32px 26px; border-top: 1px solid var(--film-line);
+  scroll-margin-top: 64px;
+}
+.about h2 { margin: 4px 0 8px; font: 700 22px var(--film-font); letter-spacing: -0.015em; }
+.about-copy p { margin: 0; max-width: 640px; font: 450 14.5px/1.55 var(--film-font); color: var(--ff-text-2); }
+.about-copy .about-links { display: flex; flex-wrap: wrap; gap: 0 18px; margin-top: 10px; }
+.landing .about-links a { display: inline-block; padding: 8px 0; color: var(--film-cyan); font-weight: 600; text-decoration: none; }
+.landing .about-links a:hover { text-decoration: underline; }
+.about-links a:focus-visible, .foot-author:focus-visible { outline: 2px solid var(--film-cyan); outline-offset: 2px; }
+.skills { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.skills li {
+  padding: 12px 14px; border-radius: 12px; background: var(--film-panel); border: 1px solid var(--film-line);
+  font: 450 12.5px/1.45 var(--film-font); color: var(--film-muted);
+}
+.skills strong { display: block; margin-bottom: 2px; font: 650 13.5px var(--film-font); color: var(--film-ink); }
+.landing .foot .foot-author { padding: 0; color: var(--film-ink); }
+
 .foot {
   display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; width: 100%; max-width: 1280px;
   margin: auto auto 0; padding: 16px 32px 22px; border-top: 1px solid var(--film-line);
@@ -131,13 +151,15 @@ button.btn { cursor: pointer; }
   .intro { grid-template-columns: minmax(0, 1fr); }
   .actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .results-body { grid-template-columns: minmax(0, 1fr); }
+  .about { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 640px) {
   .landing { --hero-h: 56.25vw; }
   .pitch { font-size: 15.5px; }
   .proof { flex-direction: column; gap: 4px; }
-  .intro, .results { padding: 18px 16px 20px; }
+  .intro, .results, .about { padding: 18px 16px 20px; }
+  .skills { grid-template-columns: minmax(0, 1fr); }
   .foot { padding: 14px 16px 20px; }
   .actions { grid-template-columns: minmax(0, 1fr); }
   .btn { white-space: normal; text-align: center; }
