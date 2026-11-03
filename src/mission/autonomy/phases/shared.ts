@@ -54,6 +54,11 @@ export interface Waypoint {
   spin?: boolean;
   /** Pass-through tolerance override. */
   tol?: number;
+  /**
+   * A point on the path already flown (a breadcrumb). Descending onto it skips the ring-lidar descent
+   * check: the drone climbed through that column, and next to a wall the check never lets it back down.
+   */
+  flown?: boolean;
 }
 
 export interface Job {

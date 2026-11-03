@@ -323,7 +323,7 @@ export class IndoorPhase {
       const crumbs = this.c.crumbs;
       for (let i = crumbs.length - 1; i >= 0; i--) {
         const p = crumbs[i]!;
-        wps.push({ pos: p, tol: 0.2 });
+        wps.push({ pos: p, tol: 0.2, flown: true });
         const rest = (crumbs.length - 1 - i) % 5 === 4 || i === 0 ? route(toLocal(v.grid, p)) : null;
         if (rest) {
           wps.push(...rest);

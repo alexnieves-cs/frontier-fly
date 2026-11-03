@@ -48,6 +48,10 @@ import {
   type Visit,
   fmt,
 } from './shared';
+import { CRASH_SPEED } from '../../../shared/constants';
+
+/** Indoor speed cap while backing off after a contact, m/s. */
+const RECOVER_SPEED = 0.6 * CRASH_SPEED;
 
 /**
  * Outdoor tilt limit, rad (55°). The mission quad (shared/airframe.ts) has a thrust-to-weight of 2.5, so 55° leaves 30% of thrust
@@ -214,6 +218,9 @@ export class MissionCore {
     const windy = Math.hypot(this.windEstimate[0], this.windEstimate[1]) >= 3;
     if (!this.inside)
       base = { ...base, maxTilt: this.phase === 'fly_through' && !windy ? FLY_THROUGH_TILT_RAD : OUTDOOR_TILT_RAD, gentleStops: this.gentleStops(windy) };
+    // Backing off after a contact retraces the breadcrumbs next to whatever it hit: slow enough that a
+    // second touch is a bump, not a crash (shared/constants.ts CRASH_SPEED).
+    if (this.phase === 'recover' && this.inside) base = { ...base, speedH: Math.min(base.speedH, RECOVER_SPEED), speedV: Math.min(base.speedV, RECOVER_SPEED) };
     const k = this.health?.speedScale ?? 1;
     return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
   }

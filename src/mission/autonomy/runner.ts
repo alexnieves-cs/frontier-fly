@@ -48,6 +48,9 @@ const SWAP_MIN_FLIGHT_SEC = 120;
  * left of the pack starts on a fresh one instead, so it is not cut short.
  */
 const VISIT_PCT_DEFAULT = 40;
+/** Indoor exit pricing for the battery budget (exitPct): average speed out, m/s, and the crossing, s. */
+const EXIT_MPS = 0.5;
+const EXIT_EXTRA_SEC = 60;
 /** Climbing clear in severe wind ends this close under cruise height, m. */
 const CLIMB_CLEAR_TOL_M = 0.5;
 /** ...and does not apply this close to home, m. */
@@ -376,6 +379,20 @@ class Runner implements MissionRunner {
     return this.distanceHome(pos) / 4 + climb / 1.2 + (this.c.inside ? 60 : 0) + 30;
   }
 
+  /**
+   * Energy to get out of the building the drone is in, usable %: the way back to the opening at
+   * EXIT_MPS, both ways round obstacles, plus EXIT_EXTRA_SEC for the crossing, all near hover power.
+   * costPct prices cruise flight, which indoors is far too cheap; on the small pack an exit from deep
+   * inside a building can take a tenth of it.
+   */
+  private exitPct(): number {
+    const opening = this.c.visit?.opening?.center as V3 | undefined;
+    if (!this.c.inside || !opening) return 0;
+    const sec = (dist(this.c.vehicle.pos, opening) * 2) / EXIT_MPS + EXIT_EXTRA_SEC;
+    const hoverW = this.c.battery.powerFor([0, 0, 0], [0, 0, 0]);
+    return Math.max(3, ((hoverW * sec) / 3600 / USABLE_WH) * 100);
+  }
+
   private checkBudgets(): void {
     if (this.c.returning || this.c.finished || this.c.phase === 'preflight') return;
     const pos = this.c.vehicle.pos;
@@ -386,7 +403,7 @@ class Runner implements MissionRunner {
       this.home.startReturn(`time budget (${fmt(this.c.maxSim - this.c.t, 0)} s left)`);
       return;
     }
-    const need = this.c.battery.costPct(d, climb) * 1.3 * (this.c.health?.costScale ?? 1) + (this.c.inside ? 3 : 0) + 3;
+    const need = this.c.battery.costPct(d, climb) * 1.3 * (this.c.health?.costScale ?? 1) + this.exitPct() + 3;
     if (this.c.battery.usedPct() + need >= this.c.mission.budgets.batteryPct) {
       const budget = `battery budget (${fmt(this.c.battery.usedPct(), 0)}% used of ${fmt(this.c.mission.budgets.batteryPct, 0)}%)`;
       if (this.canSwap(timeHome)) this.startSwapReturn(budget);

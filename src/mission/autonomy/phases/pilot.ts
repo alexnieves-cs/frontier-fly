@@ -151,7 +151,7 @@ export class Pilot {
           }
           const dir = sub(wp.pos, pos);
           const want = scaleTo(dir, speed, this.c.limits());
-          const vel = this.shielded(phase, want);
+          const vel = this.shielded(phase, want, wp.flown);
           const moving = Math.hypot(vel[0], vel[1]) > 0.3;
           // With a failed lidar arc, turn the middle of the healthy arc toward the direction of travel. The
           // wanted direction, not the shielded one: the shield treats the blind arc as blocked, so facing
@@ -180,13 +180,13 @@ export class Pilot {
    * Indoors on the sensor-only map, routed moves (re-views, the way out) pass through the same lidar
    * shield as the explorers: the map is young and a route can graze structure the lidar sees now.
    */
-  shielded(phase: Phase, vel: V3): V3 {
+  shielded(phase: Phase, vel: V3, flown = false): V3 {
     const v = this.c.visit;
     if (!this.c.inside || !v?.sensing || phase === 'fly_through') return vel;
     const local = toLocal(v.grid, this.c.navPos);
     v.sensing.sense(local, this.c.navVel, this.c.navYaw, this.c.t);
     const [vx, vy] = v.sensing.filter(vel[0], vel[1], this.c.navYaw);
-    const vz = vel[2] < 0 && !descentClear(v.sensing.lidar) ? 0 : vel[2];
+    const vz = vel[2] < 0 && !flown && !descentClear(v.sensing.lidar) ? 0 : vel[2];
     return [vx, vy, vz];
   }
 
