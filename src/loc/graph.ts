@@ -657,6 +657,18 @@ export class LoopCloser {
     return grid;
   }
 
+  /**
+   * The newest sweep's pose as the graph has it now, without a final optimisation: the newest keyframe's
+   * graph pose composed with the front end's motion since it. This is what a vehicle flying on the graph sees.
+   */
+  current(): Pose2 {
+    const i = this.sweepKey.length - 1;
+    if (i < 0) return [0, 0, 0];
+    const k = this.sweepKey[i]!;
+    const rel = between(this.keys[k]!.front, [this.sweepFront[i * 3]!, this.sweepFront[i * 3 + 1]!, this.sweepFront[i * 3 + 2]!]);
+    return compose(this.graph.pose(k), rel);
+  }
+
   /** Final optimisation; every sweep's pose (x, y, yaw per sweep). */
   finish(): Float64Array {
     const g = this.graph;
