@@ -314,7 +314,11 @@ export class IndoorPhase {
     const local = toLocal(v.grid, this.c.navPos);
     const goal = toLocal(v.grid, ft.start);
     const route = (from: V3): Waypoint[] | null => v.nav.path(from, goal)?.map((p) => ({ pos: toWorld(v.grid, p) })) ?? null;
-    let wps = route(local) ?? trailOut(this.c.crumbs, this.c.navPos, ft.start);
+    // Off the opening's level, the map's route down can cut a diagonal through a stairwell the descent
+    // check will not let the drone fly; the trail it climbed by is known flyable. On the level, the map's route is shorter.
+    const offLevel = Math.abs(this.c.navPos[2] - ft.start[2]) > 1;
+    const trail = () => trailOut(this.c.crumbs, this.c.navPos, ft.start);
+    let wps = (offLevel ? trail() : null) ?? route(local) ?? (offLevel ? null : trail());
     if (!wps) {
       // No route from here on the map (the drone can be somewhere the map calls blocked): retrace the
       // breadcrumbs, which the drone has already flown, until a route opens up. Never fly straight at the opening.

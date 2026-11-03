@@ -1,5 +1,5 @@
 import { FlyThrough } from '../planner/flythrough';
-import { columnClear, cruiseZ, dist, len, segmentClear, sub } from '../planner/geometry';
+import { SWEEP_RADIUS, columnClear, cruiseZ, dist, len, segmentClear, sub } from '../planner/geometry';
 import { toLocal } from '../planner/indoor';
 import { ApertureSensor } from '../openingSensor';
 import type { Phase, V3 } from '../contracts';
@@ -14,6 +14,9 @@ import { type Job, PLAN_ACCEL, SHIELD_STALL_SEC, type Waypoint, hold, scaleTo } 
  * primitive returns a Job and calls back when it ends; which phase comes next is the caller's
  * business, never the Pilot's.
  */
+/** Breadcrumbs kept, 0.3 m apart: about 600 m, enough to lead out of any building searched on one pack. */
+const MAX_CRUMBS = 2000;
+
 export class Pilot {
   constructor(private readonly c: MissionCore) {}
 
@@ -22,7 +25,7 @@ export class Pilot {
     const last = this.c.crumbs[this.c.crumbs.length - 1];
     if (!last || dist(last, p) >= 0.3) {
       this.c.crumbs.push([p[0], p[1], p[2]]);
-      if (this.c.crumbs.length > 400) this.c.crumbs.shift();
+      if (this.c.crumbs.length > MAX_CRUMBS) this.c.crumbs.shift();
     }
     const v = this.c.visit;
     if (v && !this.c.inside && v.standoff) {
@@ -31,7 +34,11 @@ export class Pilot {
     }
   }
 
-  /** Retrace flown positions (known clear) backwards until `enough` holds. String-pulled with casts. */
+  /**
+   * Retrace flown positions (known clear) backwards until `enough` holds. String-pulled with casts that
+   * clear solids by the same sweep every outdoor leg keeps: a shortcut is a new leg, flown by a vehicle
+   * that does not hold the straight line exactly.
+   */
   retrace(trail: readonly V3[], enough: (p: V3) => boolean): Waypoint[] {
     const out: Waypoint[] = [];
     let cur: V3 = this.c.navPos;
@@ -39,7 +46,7 @@ export class Pilot {
     for (let guard = 0; i >= 0 && guard < 400 && !enough(cur); guard++) {
       let j = i;
       for (let k = Math.max(0, i - 40); k < i; k++) {
-        if (segmentClear(this.c.physics, cur, trail[k]!, 0.25)) {
+        if (segmentClear(this.c.physics, cur, trail[k]!, SWEEP_RADIUS)) {
           j = k;
           break;
         }
