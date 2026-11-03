@@ -1,0 +1,82 @@
+name: pypi
+
+# Builds the frontierfly Python package (python/) with its bundled simulator, tests the wheel as a
+# user would install it, and, only when run by hand with `publish` set, uploads it to TestPyPI or
+# PyPI through trusted publishing (no API token in the repository).
+#
+# One-time setup on the index, by the account owner: add a trusted publisher for project
+# "frontierfly", owner alexnieves-cs, repository frontier-fly, workflow pypi.yml, and environment
+# "pypi" (or "testpypi" on test.pypi.org). See docs/RELEASING.md.
+on:
+  pull_request:
+    paths:
+      - python/**
+      - scripts/py/**
+      - .github/workflows/pypi.yml
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload after the build and tests pass
+        type: choice
+        options: [none, testpypi, pypi]
+        default: none
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - run: npm run build:py
+      - run: python -m pip install build twine
+      - run: python -m build python --outdir dist-py
+      - run: python -m twine check --strict dist-py/*
+      # A wheel without the simulator would install and then fail on first use.
+      - name: The wheel carries the simulator
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          names = zipfile.ZipFile(glob.glob("dist-py/*.whl")[0]).namelist()
+          for need in ["frontierfly/_server/server.mjs", "frontierfly/_server/assets/checkpoints/policy.bin", "frontierfly/_server/assets/plans/swiss-dwellings.json"]:
+              assert need in names, f"{need} missing from the wheel"
+          print("\n".join(names))
+          PY
+      - name: Test the installed wheel
+        run: |
+          python -m venv /tmp/wheel-env
+          /tmp/wheel-env/bin/pip install "$(ls dist-py/*.whl)[test]"
+          cd /tmp && /tmp/wheel-env/bin/python -m pytest "$GITHUB_WORKSPACE/python/tests" -q -p no:cacheprovider
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-dist
+          path: dist-py/
+
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'none'
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.publish }}
+      url: ${{ inputs.publish == 'pypi' && 'https://pypi.org/p/frontierfly' || 'https://test.pypi.org/p/frontierfly' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dist
+          path: dist-py/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-py/
+          repository-url: ${{ inputs.publish == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
