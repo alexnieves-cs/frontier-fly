@@ -681,7 +681,7 @@ The single-drone results above say coverage is limited by flight time. The direc
 
 ### Results
 
-Commit `86429a0`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.
+Commit `87c16f8`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.
 
 | Building | Team | Searched (95% CI) | vs 1 drone | Median time to 50% | Median time to 80% | Points per drone-minute | Overlap | Base knows at end | Packets through | Team battery, Wh | Points per Wh |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
