@@ -60,9 +60,17 @@ export class PhysicsWorld {
   private readonly ray: RAPIER.Ray;
   /** Collider handle -> SURFACE class for furniture parts. */
   private readonly furnitureSurface = new Map<number, number>();
+  /**
+   * Look the surface up just past the hit point, in the cell the ray entered. The plain lookup at the
+   * hit point lands in the free cell for a wall face the ray meets moving toward -x or -y, so those
+   * faces read as floor (wood) and never as glass. Buildings with hazards (gen/hazards.ts) use the
+   * exact lookup; the others keep the old one so every published number stays reproducible.
+   */
+  private readonly exactSurfaces: boolean;
 
   constructor(spec: BuildingSpec) {
     this.spec = spec;
+    this.exactSurfaces = spec.hazards != null;
     this.world = new RAPIER.World({ x: 0, y: 0, z: 0 });
     const body = this.world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
     for (const box of buildingAabbs(spec)) {
@@ -117,9 +125,10 @@ export class PhysicsWorld {
       const surface = this.furnitureSurface.get(hit.collider.handle);
       if (surface != null) return { dist, surface };
     }
+    const at = this.exactSurfaces ? dist + 1e-4 : dist;
     return {
       dist,
-      surface: this.surfaceAt(ox + this.ray.dir.x * dist, oy + this.ray.dir.y * dist, oz + this.ray.dir.z * dist),
+      surface: this.surfaceAt(ox + this.ray.dir.x * at, oy + this.ray.dir.y * at, oz + this.ray.dir.z * at),
     };
   }
 

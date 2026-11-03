@@ -14,6 +14,9 @@ import type { BuildingSpec, FurnitureBox, FurniturePlan, PropKind, PropPlacement
  * Thin legs are folded into one solid block: the drone (radius 0.15 m) cannot
  * pass between them anyway.
  */
+/** Length of an ajar door leaf, meters (a 1 m doorway less its stops). */
+export const DOOR_LEAF_M = 0.9;
+
 interface Part {
   /** Local center offset in the horizontal plane (renderer x, z). */
   ox: number;
@@ -43,6 +46,9 @@ export const PROP_PARTS: Record<PropKind, readonly Part[]> = {
   ],
   // Pot and foliage sphere (r 0.2 at 0.36).
   plant: [{ ox: 0, oz: 0, hx: 0.2, hz: 0.2, y0: 0.01, y1: 0.56 }],
+  // Ajar interior door (gen/hazards.ts): a 0.9 m leaf hinged at the prop origin, running along local
+  // +x, 5 cm thick and nearly floor-to-ceiling, so the drone cannot hop over it in a 3 m storey.
+  door: [{ ox: DOOR_LEAF_M / 2, oz: 0, hx: DOOR_LEAF_M / 2, hz: 0.025, y0: 0, y1: 2.9 }],
 };
 
 /**

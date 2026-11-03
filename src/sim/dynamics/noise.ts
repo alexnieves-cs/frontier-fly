@@ -63,6 +63,11 @@ export class SensorNoise {
     return meters;
   }
 
+  /** One uniform draw in [0, 1) from the sensor stream (smoke returns, sim/sensors.ts). */
+  uniform(): number {
+    return this.rng.next();
+  }
+
   /**
    * Delay by `latencyTicks`, holding the first sample.
    * output[k] = input[max(0, k - latencyTicks)]. latency 0 returns `value` immediately.

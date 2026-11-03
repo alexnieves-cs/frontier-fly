@@ -13,7 +13,9 @@ import { BRAKING_MARGIN, type BrakingModel, SAFETY_MARGIN, brakingFilter, filter
 import { EgoMaps, SeenMap } from '../../../../sim/seenMap';
 import { OccupancyMap, type SensorGrid, sensorLos } from '../../../../sim/sensorMap';
 import { type SensorFrame } from '../../../../sim/sensorPlanner';
-import { sense } from '../../../../sim/sensors';
+import { lastRingSurfaces, sense } from '../../../../sim/sensors';
+import { smokePath, smokeTransmittance } from '../../../../gen/hazards';
+import { SURFACE } from '../../../../shared/constants';
 import { type PhysicsWorld } from '../../../../sim/world';
 import { type OutdoorPhysics } from '../../../../world/outdoor/physics';
 import { type V3 } from '../../contracts';
@@ -40,14 +42,18 @@ export type LidarWorld = Pick<PhysicsWorld, 'cast'>;
 export function shellLidar(grid: IndoorGrid, cast: OutdoorPhysics['cast']): LidarWorld {
   const [ox, oy, oz] = grid.origin;
   const spec = grid.spec;
+  // Exact surface lookup (just past the hit, in the cell entered) for buildings with hazards; see
+  // PhysicsWorld.exactSurfaces for why the others keep the old lookup.
+  const nudge = spec.hazards ? 1e-4 : 0;
   return {
     cast(x, y, z, dx, dy, dz, maxDist) {
       const hit = cast(x + ox, y + oy, z + oz, dx, dy, dz, maxDist);
       if (!hit) return null;
       const len = Math.hypot(dx, dy, dz) || 1;
-      const hx = x + (dx / len) * hit.dist;
-      const hy = y + (dy / len) * hit.dist;
-      const f = clamp(Math.floor((z + (dz / len) * hit.dist) / spec.floorHeight), 0, spec.floors.length - 1);
+      const at = hit.dist + nudge;
+      const hx = x + (dx / len) * at;
+      const hy = y + (dy / len) * at;
+      const f = clamp(Math.floor((z + (dz / len) * at) / spec.floorHeight), 0, spec.floors.length - 1);
       const floor = spec.floors[f]!;
       const gx = clamp(Math.floor(hx / spec.cellSize), 0, floor.w - 1);
       const gy = clamp(Math.floor(hy / spec.cellSize), 0, floor.d - 1);
@@ -67,6 +73,11 @@ export function shellLidar(grid: IndoorGrid, cast: OutdoorPhysics['cast']): Lida
  * map the policy built. Nothing in here reads the floor plan for control:
  * spec is handed to sense() only as the world the simulated lidar hits.
  */
+/** The camera recognises a shut door within this range, meters. */
+export const DOOR_SEE_M = 4;
+/** In smoke the look estimate trusts the camera only where at least this much contrast is left. */
+export const LOOK_SMOKE_MIN_T = 0.6;
+
 /** Height above the floor the dark look estimate checks: a small object lying there. */
 const LOOK_POINT_Z = 0.25;
 
@@ -128,6 +139,15 @@ export class IndoorSensing implements SensorGrid {
   yawRate = 0;
   /** Stopping model of the airframe flying this building; when set, filter() is the braking filter. */
   braking: BrakingModel | null = null;
+  /**
+   * Hazard awareness (RunnerOptions.hazardAware). Doors: shut doors the camera recognised, by leaf
+   * cell, with the cell on the far side of each. Smoke: the drone sees where the cloud is (it is
+   * visible), not what is in it, and the look estimate only trusts lines of sight smoke leaves
+   * LOOK_SMOKE_MIN_T of the contrast on.
+   */
+  hazardAware = true;
+  /** Leaf cell key (floor, x, y) -> far-side cell key, for shut doors seen. */
+  readonly shutDoors = new Map<number, number>();
   /**
    * Called on the lidar ranges after every reading and before anything uses
    * them, so a fault model can rewrite them in place. A NaN range is a
@@ -243,6 +263,7 @@ export class IndoorSensing implements SensorGrid {
     );
     this.prevVel = [vel[0], vel[1], vel[2]];
     this.steps += 1;
+    if (this.hazardAware && this.grid.spec.hazards?.closedDoors.length) this.noteDoors(local, yaw);
     for (let i = 0; i < LIDAR_H; i++) this.lidar[i] = this.obs[OBS.lidar + i]! * LIDAR_MAX;
     this.rangeHook?.(this.lidar, tSec);
     this.velWorld[0] = vel[0];
@@ -273,6 +294,80 @@ export class IndoorSensing implements SensorGrid {
     return this.obs;
   }
 
+  /** Record shut doors the horizontal ring returned from within DOOR_SEE_M (the camera tells a door from a wall). */
+  private noteDoors(local: V3, yaw: number): void {
+    const surfaces = lastRingSurfaces();
+    const { w, d } = this.grid;
+    const f = floorOf(this.grid, local[2]);
+    for (let i = 0; i < LIDAR_H; i++) {
+      if (surfaces[i] !== SURFACE.DOOR) continue;
+      const r = this.obs[OBS.lidar + i]! * LIDAR_MAX;
+      if (r > DOOR_SEE_M) continue;
+      const ang = yaw + (i / LIDAR_H) * Math.PI * 2;
+      const dx = Math.cos(ang);
+      const dy = Math.sin(ang);
+      const gx = Math.floor((local[0] + dx * (r + 0.05)) / this.grid.cs);
+      const gy = Math.floor((local[1] + dy * (r + 0.05)) / this.grid.cs);
+      if (gx < 0 || gy < 0 || gx >= w || gy >= d) continue;
+      // The far side: across the leaf from the drone. The leaf's axis is the one whose near-side
+      // neighbour the drone's own map knows as free; a beam meets the leaf from that side.
+      const sx = Math.sign(dx) || 1;
+      const sy = Math.sign(dy) || 1;
+      const nearX = this.cellKnown(f, gx - sx, gy);
+      const nearY = this.cellKnown(f, gx, gy - sy);
+      const alongX = nearX && nearY ? Math.abs(dx) >= Math.abs(dy) : nearX || (!nearY && Math.abs(dx) >= Math.abs(dy));
+      const fx = alongX ? gx + sx : gx;
+      const fy = alongX ? gy : gy + sy;
+      if (fx < 0 || fy < 0 || fx >= w || fy >= d) continue;
+      const key = (f * d + gy) * w + gx;
+      if (!this.shutDoors.has(key)) this.shutDoors.set(key, (f * d + fy) * w + fx);
+    }
+  }
+
+  /** True when a voxel of grid cell (x, y) on floor f is flown or seen free in the drone's own map. */
+  private cellKnown(f: number, gx: number, gy: number): boolean {
+    const per = Math.round(this.grid.cs / VOXEL);
+    for (let vy = gy * per; vy < (gy + 1) * per; vy++) {
+      for (let vx = gx * per; vx < (gx + 1) * per; vx++) {
+        if (!inPlane(this, vx, vy)) continue;
+        const k = voxelIndex(this, f, vx, vy);
+        if (this.visited[k] || (this.seen[k] && !this.occupied[k])) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Shut doorways seen whose far side the drone never saw free or flew: space behind them nobody
+   * searched. Leaf cells next to each other count as one doorway.
+   */
+  unsearchedDoors(): number {
+    const { w, d } = this.grid;
+    const open = new Set<number>();
+    for (const [leaf, far] of this.shutDoors) {
+      const f = Math.floor(far / (w * d));
+      if (!this.cellKnown(f, far % w, Math.floor((far % (w * d)) / w))) open.add(leaf);
+    }
+    let n = 0;
+    const done = new Set<number>();
+    for (const leaf of open) {
+      if (done.has(leaf)) continue;
+      n += 1;
+      const stack = [leaf];
+      done.add(leaf);
+      while (stack.length) {
+        const k = stack.pop()!;
+        for (const m of [k + 1, k - 1, k + w, k - w]) {
+          if (open.has(m) && !done.has(m) && Math.floor(m / (w * d)) === Math.floor(k / (w * d))) {
+            done.add(m);
+            stack.push(m);
+          }
+        }
+      }
+    }
+    return n;
+  }
+
   /**
    * Mark known-free voxels inside the camera's trusted cone and range, with a
    * clear line of sight through the drone's own map, as looked at. This is
@@ -288,6 +383,7 @@ export class IndoorSensing implements SensorGrid {
     const y0 = Math.max(0, Math.floor((local[1] - r) / VOXEL));
     const y1 = Math.min(vd - 1, Math.floor((local[1] + r) / VOXEL));
     let fresh = 0;
+    const smoke = this.hazardAware ? (this.grid.spec.hazards?.smoke ?? null) : null;
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const k = base + y * vw + x;
@@ -301,6 +397,7 @@ export class IndoorSensing implements SensorGrid {
           if (coneAngle(local, yaw, cx, cy, f * this.grid.H + LOOK_POINT_Z) > this.lookCone) continue;
         } else if (d > 0.7 && Math.abs(wrapAngle(Math.atan2(cy - local[1], cx - local[0]) - yaw)) > this.lookHalf) continue;
         if (!sensorLos(this, f, local[0], local[1], cx, cy)) continue;
+        if (smoke && smokeTransmittance(smokePath(this.grid.spec, f, local[0], local[1], cx, cy), smoke.visibility) < LOOK_SMOKE_MIN_T) continue;
         this.looked[k] = 1;
         fresh += 1;
       }
