@@ -6,7 +6,7 @@ export class RewardChart {
   private xs: number[] = [];
   private ys: number[] = [];
 
-  constructor(el: HTMLElement, color = '#3dff9a') {
+  constructor(el: HTMLElement, color = '#3dff9a', label = 'Training chart') {
     this.plot = new uPlot(
       {
         width: Math.max(160, el.clientWidth || 420),
@@ -23,6 +23,8 @@ export class RewardChart {
       [[], []],
       el,
     );
+    this.plot.ctx.canvas.setAttribute('role', 'img');
+    this.plot.ctx.canvas.setAttribute('aria-label', label);
   }
 
   push(x: number, y: number): void {
