@@ -1,0 +1,81 @@
+name: train
+
+# Runs PPO fine-tunes (scripts/train-ppo.ts) on GitHub's runners: one runner per line of `runs`,
+# up to ~5.5 h each. An interactive cloud container is reclaimed when its session idles, so
+# multi-hour training lives here, like the long studies in study.yml. Nothing lands on main: each
+# run pushes its checkpoints (best + every validation point) and its log to
+# train/<run id>-<k>, which a PR then picks from like a local run.
+#
+#   gh workflow run train -f runs='--updates 400 --seed 23
+#   --updates 400 --seed 47 --crash-penalty -20'
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: One train:ppo argument line per run (newline or '|' separated); each gets its own runner
+        required: true
+        default: '--updates 400'
+      ref_note:
+        description: Free text recorded in each result commit (what this sweep is testing)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      runs: ${{ steps.plan.outputs.runs }}
+    steps:
+      - id: plan
+        env:
+          RUNS: ${{ inputs.runs }}
+        run: |
+          echo "runs=$(python3 -c 'import json,os,re; xs=[x.strip() for x in re.split(r"[\n|]", os.environ["RUNS"]) if x.strip()]; print(json.dumps(list(range(len(xs)))))')" >> "$GITHUB_OUTPUT"
+
+  train:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        k: ${{ fromJSON(needs.plan.outputs.runs) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The learner runs on tfjs-node when it is installed (scripts/lib/tfBackend.ts).
+      - run: npm install --no-save @tensorflow/tfjs-node@4.22.0
+      - name: Train
+        timeout-minutes: 320
+        env:
+          RUNS: ${{ inputs.runs }}
+          K: ${{ matrix.k }}
+        run: |
+          line=$(python3 -c 'import os,re; xs=[x.strip() for x in re.split(r"[\n|]", os.environ["RUNS"]) if x.strip()]; print(xs[int(os.environ["K"])])')
+          echo "args: $line"
+          mkdir -p train-out
+          echo "$line" > train-out/args.txt
+          # shellcheck disable=SC2086
+          npm run train:ppo -- --out train-out/ppo.bin $line 2>&1 | tee train-out/train.log
+      # Push even when the run hits the step timeout, so the checkpoints so far survive.
+      - name: Push checkpoints to train/<run id>-<k>
+        if: always()
+        env:
+          NOTE: ${{ inputs.ref_note }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
+          b="train/${{ github.run_id }}-${{ matrix.k }}"
+          git checkout -b "$b"
+          git add -f train-out
+          git commit -m "train:ppo run ${{ github.run_id }} #${{ matrix.k }}: $(cat train-out/args.txt) $NOTE"
+          git push origin "$b"
