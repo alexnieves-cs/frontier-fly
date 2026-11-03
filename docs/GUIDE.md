@@ -214,7 +214,6 @@ Landed, each with its own study in [REPORT.md](REPORT.md):
 
 Next:
 
-- Flying the drone with the loop closer, which is only tested on the real Intel log so far.
 - Train the policy on quadrotor dynamics. So far it has only been trained on the kinematic airframe.
 - Let a FrontierBench team entry fly its own pilot. Today every team drone runs the sensor-only planner.
 
