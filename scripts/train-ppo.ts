@@ -10,7 +10,7 @@
  *          [--bc 0.05] [--ppo 1] [--log-std -2.3] [--critic-warmup 8] [--imitate 0]
  *          [--eval-every 20] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
  *          [--crash-penalty 0] [--impact-penalty 0] [--crash-weight 0.2] [--quad 0] [--eval-quad]
- *          [--labels teacher|guard-teacher|guard-self]
+ *          [--labels teacher|guard-teacher|guard-self] [--guard-gain 1]
  *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|report|fresh] [--eval-quad]
  *
  * Crash rule (shared/constants.ts CRASH_SPEED): a crash ends the episode with REWARD.crash in the
@@ -213,6 +213,7 @@ async function main() {
       crashPenalty: num('crash-penalty', 0),
       impactSpeedPenalty: num('impact-penalty', 0),
       quadFraction: phase === 'imitate' ? 0 : quadFraction,
+      guardGain: num('guard-gain', 1),
       labels: (arg('labels') ?? 'teacher') as 'teacher' | 'guard-teacher' | 'guard-self',
     })) as SeqRolloutResult[];
     resetEnvs = false;
