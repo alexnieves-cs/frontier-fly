@@ -10,6 +10,7 @@ import { ClaimPenalty, DEFAULT_CLAIMS, type ClaimOptions } from './allocate';
 import { exchange, MeshNode, type MeshStats } from './mesh';
 import { basePosition, RadioModel, type RadioParams } from './radio';
 import { voxelCount, voxelLayout } from '../shared/voxels';
+import { DEFAULT_BATTERY } from '../mission/autonomy/battery';
 
 export type Role = 'explore' | 'relay';
 /** Coverage levels the time-to-clear metric is reported at, percent. */
@@ -40,6 +41,14 @@ export interface TeamOptions {
   sampleEvery?: number;
   /** Record every drone's track (for the page), one point per `traceEvery` steps. */
   traceEvery?: number;
+  /**
+   * Usable battery energy per drone, Wh. A drone turns back once the energy it has used plus
+   * `returnReserve` times its estimated way home would empty this. Default: the usable part of
+   * DEFAULT_BATTERY, which a few-minute search never comes close to.
+   */
+  packWh?: number;
+  /** Safety factor on the estimated energy home (default 1.5). */
+  returnReserve?: number;
 }
 
 export interface TeamResult {
@@ -71,10 +80,15 @@ export interface TeamResult {
   tracks?: number[][];
   /** Step each relay parked at (null if it never needed to). */
   relayParkedAt: (number | null)[];
+  /** Per drone: step it turned back for a low pack, and step it reached the entry (null if never). */
+  turnedBackAt: (number | null)[];
+  returnedAt: (number | null)[];
 }
 
 /** Separation the team keeps between drone centers, meters (two 0.15 m airframes plus air). */
 const SEPARATION = 0.45;
+/** Speed a drone flies home at for a low pack, m/s; the energy estimate prices the way home at it. */
+const HOME_SPEED = 1.5;
 
 /**
  * Cut the part of a world-frame velocity that closes on a nearby teammate, the
@@ -118,6 +132,13 @@ interface Drone {
   relay: 'explore' | 'return' | 'hold';
   relayTarget: number;
   relayParkedAt: number | null;
+  /** Low-pack return: every drone keeps its own way back to the entry. */
+  trail: { x: number; y: number; z: number }[];
+  /** Length of `trail` from the entry to its newest point, meters. */
+  trailLength: number;
+  home: 'search' | 'return' | 'landed';
+  turnedBackAt: number | null;
+  returnedAt: number | null;
 }
 
 /** What the page draws each frame. */
@@ -128,6 +149,8 @@ export interface TeamView {
   goal: ([number, number] | null)[];
   role: Role[];
   relay: Drone['relay'][];
+  /** Low-pack state per drone: searching, flying home, or landed at the entry. */
+  home: Drone['home'][];
   launched: boolean[];
   done: boolean[];
   base: [number, number, number];
@@ -176,6 +199,8 @@ export class TeamSim {
   private readonly out = new Float32Array(4);
   private t = 0;
   private finished = false;
+  private readonly packWh: number;
+  private readonly returnReserve: number;
 
   private constructor(spec: BuildingSpec, cfg: EpisodeConfig & { maxSteps: number }, opts: TeamOptions, seed: number) {
     this.spec = spec;
@@ -187,6 +212,8 @@ export class TeamSim {
     this.sampleEvery = opts.sampleEvery ?? 20;
     this.traceEvery = opts.traceEvery ?? 0;
     this.maxSteps = cfg.maxSteps;
+    this.packWh = opts.packWh ?? DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
+    this.returnReserve = opts.returnReserve ?? 1.5;
     this.rng = new RNG(seed, 'team');
     this.radio = new RadioModel(spec, opts.radio);
     this.base = basePosition(spec);
@@ -232,6 +259,11 @@ export class TeamSim {
         relay: 'explore',
         relayTarget: -1,
         relayParkedAt: null,
+        trail: [],
+        trailLength: 0,
+        home: 'search',
+        turnedBackAt: null,
+        returnedAt: null,
       });
     }
     sim.nodes.unshift(...sim.drones.map((d) => d.node));
@@ -279,10 +311,24 @@ export class TeamSim {
       d.claimSource.pos = d.node.pos;
       d.claimSource.step = t;
 
+      if (d.home === 'search') {
+        recordTrail(d, f.pos);
+        if (d.energyWh + this.returnReserve * homeEnergyWh(d, f.pos, t) >= this.packWh) {
+          d.home = 'return';
+          d.turnedBackAt = t;
+        }
+      }
       let cmd: SensorCommand;
-      if (d.role === 'relay' && comms !== 'none') cmd = relayAct(d, f, this.radio, this.base, this.relayMargin, t);
+      if (d.home === 'return') cmd = homeAct(d, f);
+      else if (d.role === 'relay' && comms !== 'none') cmd = relayAct(d, f, this.radio, this.base, this.relayMargin, t);
       else cmd = d.planner.act(f);
-      d.node.goal = d.relay === 'explore' ? d.planner.goalPoint : null;
+      if (d.home === 'landed') {
+        // At the entry with the pack still holding its reserve: the drone is down and out of the search.
+        d.returnedAt = t;
+        d.done = true;
+        continue;
+      }
+      d.node.goal = d.relay === 'explore' && d.home === 'search' ? d.planner.goalPoint : null;
       const others = poses.filter((_, j) => j !== i && drones[j]!.launched && !drones[j]!.done);
       [cmd.vx, cmd.vy] = separate(cmd.vx, cmd.vy, poses[i]!, others);
       const step = d.env.step(commandToAction(cmd, f.yaw, this.out));
@@ -343,6 +389,7 @@ export class TeamSim {
       goal: ds.map((d) => d.node.goal),
       role: ds.map((d) => d.role),
       relay: ds.map((d) => d.relay),
+      home: ds.map((d) => d.home),
       launched: ds.map((d) => d.launched),
       done: ds.map((d) => d.done),
       base: this.base,
@@ -379,6 +426,8 @@ export class TeamSim {
       overlap: this.unionCount > 0 ? own / this.unionCount : 1,
       packets: { ...this.packets },
       relayParkedAt: drones.map((d) => d.relayParkedAt),
+      turnedBackAt: drones.map((d) => d.turnedBackAt),
+      returnedAt: drones.map((d) => d.returnedAt),
     };
     if (this.tracks) result.tracks = this.tracks.map((tr) => [...tr]);
     return result;
@@ -407,6 +456,54 @@ function countOnes(a: Uint8Array): number {
 
 function round2(v: number): number {
   return Math.round(v * 100) / 100;
+}
+
+/** Add a point to a drone's way home once it is 0.5 m from the last one. */
+function recordTrail(d: Drone, pos: readonly number[]): void {
+  const last = d.trail[d.trail.length - 1];
+  if (last && Math.hypot(last.x - pos[0]!, last.y - pos[1]!, last.z - pos[2]!) <= 0.5) return;
+  if (last) d.trailLength += Math.hypot(last.x - pos[0]!, last.y - pos[1]!, last.z - pos[2]!);
+  d.trail.push({ x: pos[0]!, y: pos[1]!, z: pos[2]! });
+}
+
+/**
+ * Energy to fly home along the trail, Wh: the way back at HOME_SPEED, priced at the drone's own
+ * mean power so far (hover dominates indoors, so this is close to what the return draws).
+ */
+function homeEnergyWh(d: Drone, pos: readonly number[], t: number): number {
+  const last = d.trail[d.trail.length - 1];
+  if (!last || t <= 0) return 0;
+  const meters = d.trailLength + Math.hypot(last.x - pos[0]!, last.y - pos[1]!, last.z - pos[2]!);
+  const meanW = (d.energyWh * 3600) / (t * 0.05);
+  return (meanW * meters) / HOME_SPEED / 3600;
+}
+
+/**
+ * Fly back along the trail to the entry, newest point first, with the lidar filter on. Once the
+ * first trail point is reached the drone is home and lands.
+ */
+function homeAct(d: Drone, f: ReturnType<typeof sensorFrame>): SensorCommand {
+  const pos = f.pos;
+  while (d.trail.length > 1) {
+    const c = d.trail[d.trail.length - 1]!;
+    if (Math.hypot(c.x - pos[0], c.y - pos[1], c.z - pos[2]) > 0.4) break;
+    d.trail.pop();
+  }
+  const c = d.trail[d.trail.length - 1]!;
+  const ex = c.x - pos[0];
+  const ey = c.y - pos[1];
+  const el = Math.hypot(ex, ey);
+  let vz = Math.max(-0.6, Math.min(0.6, (c.z - pos[2]) * 2));
+  if (vz < 0 && !descentClear(f.lidar)) vz = 0;
+  if (d.trail.length === 1 && el < 0.3 && Math.abs(c.z - pos[2]) < 0.3) {
+    d.home = 'landed';
+    return { vx: 0, vy: 0, vz: 0, yawRate: 0, exploring: false };
+  }
+  const sp = Math.min(HOME_SPEED, el * 2);
+  let vx = el > 1e-6 ? (ex / el) * sp : 0;
+  let vy = el > 1e-6 ? (ey / el) * sp : 0;
+  [vx, vy] = filterVelocity(vx, vy, f.yaw, f.lidar);
+  return { vx, vy, vz, yawRate: 0, exploring: true };
 }
 
 /**

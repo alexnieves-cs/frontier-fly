@@ -29,7 +29,7 @@ npm run build
 npm run check:pages   # loads every built page without COOP/COEP headers, like GitHub Pages
 ```
 
-`npm run test:e2e` runs headless Chrome checks and writes its screenshots to `test-results/media/`. CI runs it on every pull request. To refresh the committed screenshots in `docs/media/`, run `UPDATE_MEDIA=1 npm run test:e2e`.
+`npm run test:e2e` runs headless Chrome checks and writes its screenshots to `test-results/media/`. CI runs it on every pull request. `tests/e2e/a11y.spec.ts` runs axe (WCAG 2.1 A/AA) on every page in the site nav and checks that each canvas is either `role="img"` with an `aria-label` or `aria-hidden`; add a new page to its list. To refresh the committed screenshots in `docs/media/`, run `UPDATE_MEDIA=1 npm run test:e2e`.
 
 If your change affects the policy, the simulator's speed, or what a page renders, refresh the measured numbers and commit the outputs:
 

@@ -130,11 +130,11 @@ function markup(): string {
     <section class="team-maps">
       <figure class="team-map">
         <figcaption><b>Truth</b><span class="muted">Floor flown by each drone; radio links</span></figcaption>
-        <canvas id="team-truth" aria-label="Top-down map of the building and the team"></canvas>
+        <canvas id="team-truth" role="img" aria-label="Top-down map of the building and the team"></canvas>
       </figure>
       <figure class="team-map">
         <figcaption><b>What the base sees</b><span class="muted">Floor reported to the base; each drone where it last reported</span></figcaption>
-        <canvas id="team-base" aria-label="The team map as the base station knows it"></canvas>
+        <canvas id="team-base" role="img" aria-label="The team map as the base station knows it"></canvas>
       </figure>
     </section>
 
@@ -151,7 +151,7 @@ function markup(): string {
       </div>
       <div class="team-panel">
         <span class="ctl-label">Searched (solid) and known at the base (faint)</span>
-        <canvas class="team-chart" id="team-chart" aria-label="Coverage over time"></canvas>
+        <canvas class="team-chart" id="team-chart" role="img" aria-label="Coverage over time"></canvas>
       </div>
     </section>
   </div>`;
