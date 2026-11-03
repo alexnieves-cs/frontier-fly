@@ -165,48 +165,48 @@ Recorded from `main@81c9adaee765fb02ad6594d89d7919aad1c6c70b` by `npm run media`
 
 ### On fresh seeds
 
-Each scenario's settings flown on 30 fresh world seeds (79201–79230) with each indoor explorer, from `src/eval/missions.ts` at `0227ba3`. The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around. The sensor-only planner reads only the drone's own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode. `compound-occupied` is the compound sweep with a person lying inside one building, so a sweep that declares that building clear is a false clear; its expected outcome is found. The quadrotor rows fly the policy and the planner on the rigid-body quadrotor airframe (`shared/airframe.ts`) under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield. The estimated-pose rows fly the same explorers indoors on the drone's own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator's pose, and the estimate starts at the doorway from the aperture tracker. Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.
+Each scenario's settings flown on 30 fresh world seeds (79201–79230) with each indoor explorer, from `src/eval/missions.ts` at `9896d45`. The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around. The sensor-only planner reads only the drone's own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode. `compound-occupied` is the compound sweep with a person lying inside one building, so a sweep that declares that building clear is a false clear; its expected outcome is found. The quadrotor rows fly the policy and the planner on the rigid-body quadrotor airframe (`shared/airframe.ts`) under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield. The estimated-pose rows fly the same explorers indoors on the drone's own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator's pose, and the estimate starts at the doorway from the aperture tracker. Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.
 
 | Scenario | Indoors | Expected outcome (95% CI) | Buildings entered | Handed to planner (95% CI) | Indoor coverage | Collisions per flight | Mean mission time | False clears | False alarms |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| cabin-day | Policy, sensor planner fallback | 100.0% (89–100%) | 30 | 0.0% (0–11%) | 94.0% | 0.00 | 3:03 | 0 | 0 |
+| cabin-day | Policy, sensor planner fallback | 100.0% (89–100%) | 30 | 0.0% (0–11%) | 93.5% | 0.00 | 3:05 | 0 | 0 |
 | cabin-day | Sensor-only planner | 100.0% (89–100%) | 30 | — | 93.5% | 0.00 | 3:03 | 0 | 0 |
 | cabin-day | Oracle planner (floor plan) | 100.0% (89–100%) | 30 | — | 91.3% | 0.00 | 3:00 | 0 | 0 |
-| cabin-day | Quadrotor: policy, planner fallback | 100.0% (89–100%) | 30 | 0.0% (0–11%) | 92.2% | 0.00 | 3:01 | 0 | 0 |
+| cabin-day | Quadrotor: policy, planner fallback | 100.0% (89–100%) | 30 | 0.0% (0–11%) | 91.4% | 0.00 | 2:55 | 0 | 0 |
 | cabin-day | Quadrotor: sensor-only planner | 100.0% (89–100%) | 30 | — | 93.1% | 0.00 | 3:00 | 0 | 0 |
-| cabin-day | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 30 | 0.0% (0–11%) | 92.6% | 0.00 | 3:03 | 0 | 0 |
+| cabin-day | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 30 | 0.0% (0–11%) | 93.0% | 0.00 | 3:01 | 0 | 0 |
 | cabin-day | Estimated pose: sensor-only planner | 100.0% (89–100%) | 30 | — | 93.4% | 0.00 | 3:06 | 0 | 0 |
 | cabin-day | Estimated pose, quadrotor: sensor-only planner | 100.0% (89–100%) | 30 | — | 91.1% | 0.00 | 2:59 | 0 | 0 |
-| compound-clear | Policy, sensor planner fallback | 90.0% (74–97%) | 86 | 52.3% (42–63%) | 96.7% | 0.00 | 17:53 | 0 | 0 |
+| compound-clear | Policy, sensor planner fallback | 93.3% (79–98%) | 84 | 64.3% (54–74%) | 97.4% | 0.00 | 17:56 | 0 | 0 |
 | compound-clear | Sensor-only planner | 93.3% (79–98%) | 76 | — | 97.4% | 0.00 | 16:13 | 0 | 0 |
 | compound-clear | Oracle planner (floor plan) | 93.3% (79–98%) | 60 | — | 97.3% | 0.00 | 8:59 | 0 | 0 |
-| compound-clear | Quadrotor: policy, planner fallback | 93.3% (79–98%) | 76 | 31.6% (22–43%) | 97.4% | 0.00 | 15:29 | 0 | 0 |
+| compound-clear | Quadrotor: policy, planner fallback | 93.3% (79–98%) | 77 | 63.6% (52–73%) | 97.4% | 0.00 | 15:50 | 0 | 0 |
 | compound-clear | Quadrotor: sensor-only planner | 93.3% (79–98%) | 71 | — | 97.4% | 0.00 | 14:03 | 0 | 0 |
-| compound-clear | Estimated pose: policy, planner fallback | 86.7% (70–95%) | 75 | 68.0% (57–77%) | 97.2% | 0.00 | 17:20 | 0 | 0 |
+| compound-clear | Estimated pose: policy, planner fallback | 90.0% (74–97%) | 74 | 79.7% (69–87%) | 97.1% | 0.00 | 16:48 | 0 | 0 |
 | compound-clear | Estimated pose: sensor-only planner | 93.3% (79–98%) | 69 | — | 97.4% | 0.00 | 15:01 | 0 | 0 |
 | compound-clear | Estimated pose, quadrotor: sensor-only planner | 83.3% (66–93%) | 61 | — | 95.6% | 0.33 | 12:29 | 0 | 0 |
-| backpack-night | Policy, sensor planner fallback | 100.0% (89–100%) | 30 | 10.0% (3–26%) | 88.8% | 0.00 | 3:35 | 0 | 0 |
+| backpack-night | Policy, sensor planner fallback | 100.0% (89–100%) | 30 | 6.7% (2–21%) | 87.9% | 0.00 | 3:29 | 0 | 0 |
 | backpack-night | Sensor-only planner | 100.0% (89–100%) | 30 | — | 90.0% | 0.00 | 3:28 | 0 | 0 |
 | backpack-night | Oracle planner (floor plan) | 93.3% (79–98%) | 30 | — | 87.8% | 0.00 | 3:15 | 0 | 0 |
-| backpack-night | Quadrotor: policy, planner fallback | 96.7% (83–99%) | 30 | 0.0% (0–11%) | 91.1% | 0.00 | 3:41 | 0 | 0 |
+| backpack-night | Quadrotor: policy, planner fallback | 96.7% (83–99%) | 30 | 10.0% (3–26%) | 89.7% | 0.00 | 3:34 | 0 | 0 |
 | backpack-night | Quadrotor: sensor-only planner | 100.0% (89–100%) | 30 | — | 90.0% | 0.00 | 3:23 | 0 | 0 |
-| backpack-night | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 30 | 26.7% (14–44%) | 90.6% | 0.00 | 3:37 | 0 | 0 |
+| backpack-night | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 30 | 26.7% (14–44%) | 88.9% | 0.00 | 3:39 | 0 | 0 |
 | backpack-night | Estimated pose: sensor-only planner | 100.0% (89–100%) | 30 | — | 91.1% | 0.00 | 3:31 | 0 | 0 |
 | backpack-night | Estimated pose, quadrotor: sensor-only planner | 100.0% (89–100%) | 30 | — | 92.3% | 0.00 | 3:23 | 0 | 0 |
-| compound-occupied | Policy, sensor planner fallback | 100.0% (89–100%) | 87 | 49.4% (39–60%) | 96.8% | 0.00 | 19:20 | 0 | 0 |
+| compound-occupied | Policy, sensor planner fallback | 100.0% (89–100%) | 88 | 61.4% (51–71%) | 97.4% | 0.10 | 19:43 | 0 | 0 |
 | compound-occupied | Sensor-only planner | 100.0% (89–100%) | 87 | — | 97.4% | 0.00 | 18:41 | 0 | 0 |
 | compound-occupied | Oracle planner (floor plan) | 100.0% (89–100%) | 60 | — | 97.4% | 0.00 | 9:21 | 0 | 0 |
-| compound-occupied | Quadrotor: policy, planner fallback | 100.0% (89–100%) | 84 | 32.1% (23–43%) | 96.8% | 0.10 | 17:28 | 0 | 0 |
+| compound-occupied | Quadrotor: policy, planner fallback | 100.0% (89–100%) | 87 | 48.3% (38–59%) | 97.4% | 0.00 | 18:10 | 0 | 0 |
 | compound-occupied | Quadrotor: sensor-only planner | 100.0% (89–100%) | 79 | — | 97.4% | 0.00 | 16:29 | 0 | 0 |
-| compound-occupied | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 83 | 71.1% (61–80%) | 97.0% | 0.13 | 19:41 | 0 | 0 |
+| compound-occupied | Estimated pose: policy, planner fallback | 100.0% (89–100%) | 83 | 77.1% (67–85%) | 97.3% | 0.00 | 19:54 | 0 | 0 |
 | compound-occupied | Estimated pose: sensor-only planner | 100.0% (89–100%) | 80 | — | 97.4% | 0.00 | 18:29 | 0 | 0 |
 | compound-occupied | Estimated pose, quadrotor: sensor-only planner | 96.7% (83–99%) | 69 | — | 95.7% | 0.30 | 15:04 | 0 | 0 |
-| **All** | Policy, sensor planner fallback | 97.5% (93–99%) | 233 | 39.1% (33–45%) | 94.1% | 0.00 | 10:58 | 0 | 0 |
+| **All** | Policy, sensor planner fallback | 98.3% (94–100%) | 232 | 47.4% (41–54%) | 94.1% | 0.03 | 11:03 | 0 | 0 |
 | **All** | Sensor-only planner | 98.3% (94–100%) | 223 | — | 94.6% | 0.00 | 10:21 | 0 | 0 |
 | **All** | Oracle planner (floor plan) | 96.7% (92–99%) | 180 | — | 93.4% | 0.00 | 6:09 | 0 | 0 |
-| **All** | Quadrotor: policy, planner fallback | 97.5% (93–99%) | 220 | 23.2% (18–29%) | 94.4% | 0.03 | 9:55 | 0 | 0 |
+| **All** | Quadrotor: policy, planner fallback | 97.5% (93–99%) | 224 | 42.0% (36–49%) | 94.0% | 0.00 | 10:07 | 0 | 0 |
 | **All** | Quadrotor: sensor-only planner | 98.3% (94–100%) | 210 | — | 94.5% | 0.00 | 9:14 | 0 | 0 |
-| **All** | Estimated pose: policy, planner fallback | 96.7% (92–99%) | 218 | 54.1% (47–61%) | 94.3% | 0.03 | 10:55 | 0 | 0 |
+| **All** | Estimated pose: policy, planner fallback | 97.5% (93–99%) | 217 | 60.4% (54–67%) | 94.1% | 0.00 | 10:50 | 0 | 0 |
 | **All** | Estimated pose: sensor-only planner | 98.3% (94–100%) | 209 | — | 94.8% | 0.00 | 10:02 | 0 | 0 |
 | **All** | Estimated pose, quadrotor: sensor-only planner | 95.0% (90–98%) | 190 | — | 93.6% | 0.16 | 8:29 | 0 | 0 |
 
@@ -218,24 +218,24 @@ Shut and ajar doors, glass and mirrors, and smoke; method and pass conditions in
 | --- | --- | --- | --- | --- |
 | Oracle teacher (reads the true map) | 61.8% (0) | 52.4% (10), ×0.85 | 61.8% (0), ×1.00 | 61.8% (0), ×1.00 |
 | Sensor-only planner | 64.0% (0) | 66.3% (0), ×1.04 | 64.5% (0), ×1.01 | 47.5% (0), ×0.74 |
-| Policy alone | 63.8% (17) | 38.4% (26), ×0.60 | 50.5% (21), ×0.79 | 58.6% (18), ×0.92 |
-| Policy + lidar guard | 70.5% (6) | 68.7% (3), ×0.97 | 68.2% (3), ×0.97 | 60.9% (1), ×0.86 |
+| Policy alone | 78.5% (1) | 44.4% (23), ×0.57 | 72.0% (9), ×0.92 | 73.1% (7), ×0.93 |
+| Policy + lidar guard | 71.7% (1) | 66.4% (6), ×0.93 | 76.2% (0), ×1.06 | 58.4% (2), ×0.81 |
 
 Missions on fresh worlds from 86501:
 
 | Scenario | Explorer | Person found (95% CI) | Ends as expected | Flights with a false clear (95% CI) | Shut door left unsearched | Flights with a collision |
 | --- | --- | --- | --- | --- | --- | --- |
 | Sweep with someone inside, shut and ajar doors | Sensor planner, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 1 | 0 |
-| Sweep with someone inside, shut and ajar doors | Policy, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 4 | 0 |
+| Sweep with someone inside, shut and ajar doors | Policy, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 1 | 0 |
 | Sweep with someone inside, shut and ajar doors | Sensor planner, unaware (control) | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 0 |
 | Sweep with someone inside, smoke | Sensor planner, hazard-aware | 12 of 30 (24.6–57.7) | 40.0% | 0 (0.0–11.4) | 0 | 1 |
-| Sweep with someone inside, smoke | Policy, hazard-aware | 13 of 30 (27.4–60.8) | 43.3% | 0 (0.0–11.4) | 0 | 3 |
+| Sweep with someone inside, smoke | Policy, hazard-aware | 12 of 30 (24.6–57.7) | 40.0% | 0 (0.0–11.4) | 0 | 2 |
 | Sweep with someone inside, smoke | Sensor planner, unaware (control) | 13 of 30 (27.4–60.8) | 43.3% | 0 (0.0–11.4) | 0 | 1 |
 | Injured hiker in a smoky cabin | Sensor planner, hazard-aware | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
 | Injured hiker in a smoky cabin | Policy, hazard-aware | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
 | Injured hiker in a smoky cabin | Sensor planner, unaware (control) | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
 | Injured hiker, glass rooms and mirrors | Sensor planner, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 3 |
-| Injured hiker, glass rooms and mirrors | Policy, hazard-aware | 26 of 30 (70.3–94.7) | 86.7% | 0 (0.0–11.4) | 0 | 6 |
+| Injured hiker, glass rooms and mirrors | Policy, hazard-aware | 26 of 30 (70.3–94.7) | 86.7% | 0 (0.0–11.4) | 0 | 7 |
 | Injured hiker, glass rooms and mirrors | Sensor planner, unaware (control) | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 3 |
 
 ## Reproduce
