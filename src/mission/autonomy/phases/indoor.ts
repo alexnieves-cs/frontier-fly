@@ -314,7 +314,7 @@ export class IndoorPhase {
     const local = toLocal(v.grid, this.c.navPos);
     const goal = toLocal(v.grid, ft.start);
     const route = (from: V3): Waypoint[] | null => v.nav.path(from, goal)?.map((p) => ({ pos: toWorld(v.grid, p) })) ?? null;
-    let wps = route(local);
+    let wps = route(local) ?? trailOut(this.c.crumbs, this.c.navPos, ft.start);
     if (!wps) {
       // No route from here on the map (the drone can be somewhere the map calls blocked): retrace the
       // breadcrumbs, which the drone has already flown, until a route opens up. Never fly straight at the opening.
@@ -376,4 +376,67 @@ export class IndoorPhase {
       ),
     );
   }
+}
+
+/** Crumbs this close (and on the same level) are joined: the drone flew through both. */
+const TRAIL_JOIN_M = 0.6;
+const TRAIL_JOIN_DZ = 0.25;
+/** The trail must pass this close to the opening's inside end to lead out. */
+const TRAIL_REACH_M = 1.5;
+
+/**
+ * The shortest way out along the breadcrumbs: a graph of the points already flown, consecutive
+ * crumbs linked and loops cut where the trail passed within TRAIL_JOIN_M of itself, searched from
+ * the drone to the crumb nearest the opening's inside end. Every leg is one the drone flew (or
+ * nearly), so the descents a stairwell needs are allowed. Null when the trail never reached the opening.
+ */
+export function trailOut(crumbs: readonly V3[], from: V3, goal: V3): Waypoint[] | null {
+  const n = crumbs.length;
+  if (n < 2) return null;
+  const d3 = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  let start = -1;
+  let end = -1;
+  let bestS = Infinity;
+  let bestE = TRAIL_REACH_M;
+  for (let i = 0; i < n; i++) {
+    const ds = d3(crumbs[i]!, from);
+    if (ds < bestS) {
+      bestS = ds;
+      start = i;
+    }
+    const de = d3(crumbs[i]!, goal);
+    if (de < bestE) {
+      bestE = de;
+      end = i;
+    }
+  }
+  if (end < 0 || bestS > TRAIL_REACH_M) return null;
+  const cost = new Float64Array(n).fill(Infinity);
+  const prev = new Int32Array(n).fill(-1);
+  const done = new Uint8Array(n);
+  cost[start] = 0;
+  for (;;) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && cost[i]! < Infinity && (u < 0 || cost[i]! < cost[u]!)) u = i;
+    if (u < 0 || u === end) break;
+    done[u] = 1;
+    const a = crumbs[u]!;
+    for (let w = 0; w < n; w++) {
+      if (done[w]) continue;
+      const b = crumbs[w]!;
+      const dd = d3(a, b);
+      const linked = Math.abs(w - u) === 1 || (dd < TRAIL_JOIN_M && Math.abs(a[2] - b[2]) < TRAIL_JOIN_DZ);
+      if (linked && cost[u]! + dd < cost[w]!) {
+        cost[w] = cost[u]! + dd;
+        prev[w] = u;
+      }
+    }
+  }
+  if (cost[end] === Infinity) return null;
+  const path: V3[] = [];
+  for (let i = end; i >= 0; i = prev[i]!) path.push(crumbs[i]!);
+  path.reverse();
+  const wps: Waypoint[] = path.map((p) => ({ pos: [p[0], p[1], p[2]] as V3, tol: 0.2, flown: true }));
+  wps.push({ pos: [goal[0], goal[1], goal[2]], flown: true });
+  return wps;
 }

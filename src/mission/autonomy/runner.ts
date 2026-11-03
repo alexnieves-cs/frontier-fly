@@ -459,6 +459,7 @@ class Runner implements MissionRunner {
     const b = this.unfinishedVisit();
     if (b && !this.search.pending.some((p) => p.id === b.id)) this.search.pending.unshift(b);
     this.c.swapping = true;
+    this.search.dropConfirm();
     this.home.startReturn(`${budget}, to swap the battery${b ? ` and come back for ${b.label}` : ''}`);
   }
 
