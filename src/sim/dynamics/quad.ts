@@ -3,6 +3,7 @@ import { AIRFRAME } from '../../shared/airframe';
 import { GRAVITY, MAX_SPEED_V, MAX_YAW_RATE } from '../../shared/constants';
 import { integrateQuat, quatFromEulerZXY, quatNormalize, quatToEulerInto, rotateBodyToWorld, rotateWorldToBody } from './spatial';
 import { AngleController } from './controller';
+import type { AeroModel } from './aero';
 
 const MOTOR_MAX = 1100;
 const ACCEL_MAX = 50;
@@ -61,6 +62,12 @@ export class QuadrotorDynamics implements Dynamics {
   private readonly euler = { roll: 0, pitch: 0, yaw: 0 };
   /** Air velocity in the world frame, m/s: drag acts on velocity relative to it. */
   readonly wind: [number, number, number] = [0, 0, 0];
+  /**
+   * Opt-in aerodynamics near surfaces and pack sag (src/sim/dynamics/aero.ts). Null keeps the
+   * model every checkpoint and benchmark was made with: a linear 8%-per-meter ground effect
+   * below 0.4 m of world height and a fixed motor ceiling.
+   */
+  aero: AeroModel | null = null;
   /** Per-motor thrust authority, 0..1 (a damaged prop or a weak motor). */
   readonly thrustScale = new Float64Array([1, 1, 1, 1]);
   /** Body rates of the last step, rad/s (what a gyro measures). */
@@ -142,7 +149,6 @@ export class QuadrotorDynamics implements Dynamics {
   step(cmd: Float32Array, dt: number): DroneState {
     const s = this.state;
     if (!s) throw new Error('QuadrotorDynamics.reset must be called before step');
-    const motors = s.motors;
 
     this.ctrl.compute(
       s.roll,
@@ -158,16 +164,51 @@ export class QuadrotorDynamics implements Dynamics {
       dt,
       this.wCmd,
     );
+    return this.stepPlant(this.wCmd, dt);
+  }
 
+  /**
+   * The rigid body alone: rotor speed commands in, one physics step out. `step` runs the angle-mode
+   * controller and then this; a foreign flight controller (PX4 through the SITL bridge, see
+   * src/px4/frontierPlant.ts) drives it directly, so the physics validation can fly PX4 on the same
+   * airframe the missions fly.
+   */
+  /** Rest on the ground: no motion, level, heading kept. For a host that models ground contact (the PX4 bridge). */
+  holdOnGround(): void {
+    const s = this.state;
+    if (!s) return;
+    s.vel[0] = 0;
+    s.vel[1] = 0;
+    s.vel[2] = 0;
+    this.omega[0] = 0;
+    this.omega[1] = 0;
+    this.omega[2] = 0;
+    quatFromEulerZXY(0, 0, s.yaw, s.quat);
+    s.roll = 0;
+    s.pitch = 0;
+    this.specificForce[0] = 0;
+    this.specificForce[1] = 0;
+    this.specificForce[2] = GRAVITY;
+  }
+
+  stepPlant(wCmd: ArrayLike<number>, dt: number): DroneState {
+    const s = this.state;
+    if (!s) throw new Error('QuadrotorDynamics.reset must be called before step');
+    const motors = s.motors;
+    const aero = this.aero;
     const lag = 1 - Math.exp(-dt / this.motorTau);
+    const wMax = aero ? MOTOR_MAX * aero.motorMaxScale : MOTOR_MAX;
     for (let i = 0; i < 4; i++) {
       const cur = motors[i] ?? 0;
-      motors[i] = clamp(cur + ((this.wCmd[i] ?? 0) - cur) * lag, 0, MOTOR_MAX);
+      motors[i] = clamp(cur + ((wCmd[i] ?? 0) - cur) * lag, 0, wMax);
     }
 
     const z = s.pos[2];
     let ge = 1;
-    if (z < 0.4) {
+    if (aero) {
+      aero.setPosition(s.pos[0], s.pos[1]);
+      ge = aero.thrustFactor(z);
+    } else if (z < 0.4) {
       const depth = z > 0 ? 0.4 - z : 0.4;
       ge = 1 + 0.08 * depth;
     }
