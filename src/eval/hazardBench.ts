@@ -8,8 +8,8 @@ import type { Scenario } from '../mission/autonomy/scenarios';
 import { SCENARIOS } from '../mission/autonomy/scenarios';
 import { flyMission, OCCUPIED_SWEEP, summarizeMissions, wilson, type MissionFlight } from './missions';
 
-/** Fresh block, never flown before this bench. 81901-81916 is the hazard development block. */
-export const HAZARD_MISSION_SEED_BASE = 81501;
+/** Fresh block, never flown before this bench. Development flights used 81901-81999 only. */
+export const HAZARD_MISSION_SEED_BASE = 86501;
 export const HAZARD_MISSION_SEEDS = 30;
 
 export const DOOR_HAZARDS: HazardParams = { closedDoors: 0.35, ajarDoors: 0.6 };
@@ -73,7 +73,7 @@ export interface HazardFlight extends MissionFlight {
 }
 
 /**
- * Pass conditions, fixed before the first flight on 81501+. With awareness on (sensor and policy):
+ * Pass conditions, fixed before the first flight on 86501+. With awareness on (sensor and policy):
  * no false clear in any sweep, the hiker found in at least `found` of the smoke and glass cabin flights.
  */
 export const HAZARD_MISSION_PASS = { modes: ['sensor', 'policy'] as HazardMode[], falseClears: 0, found: 0.8 } as const;

@@ -46,10 +46,10 @@ export interface Condition {
 
 /**
  * Hazard conditions (shut and ajar doors, glass and mirrors, smoke) and their paired control share one
- * fresh block, 81001-81030: each seed is the same stage-3 building with and without the hazard.
- * 81901-81916 is the hazard development block; nothing here was tuned on 81001+.
+ * fresh block, 86001-86030: each seed is the same stage-3 building with and without the hazard.
+ * Development runs used 81901-81999; nothing here was tuned on 86001+.
  */
-export const HAZARD_SEED_BASE = 81001;
+export const HAZARD_SEED_BASE = 86001;
 export const HAZARD_CONDITIONS: Condition[] = [
   { id: 'hazard-control', label: 'Hazard control: the same hard buildings, no hazards', stage: 3, seedBase: HAZARD_SEED_BASE, lighting: ['day'] },
   { id: 'doors', label: 'Shut and ajar interior doors', stage: 3, seedBase: HAZARD_SEED_BASE, lighting: ['day'], hazards: { closedDoors: 0.35, ajarDoors: 0.6 } },
@@ -59,7 +59,7 @@ export const HAZARD_CONDITIONS: Condition[] = [
 /** Pilots the hazard conditions fly: the privileged teacher as a reference, the planner, the policy alone and guarded. */
 export const HAZARD_PILOTS: PilotId[] = ['teacher', 'classical', 'policy', 'guarded'];
 /**
- * Pass conditions, fixed before the first run on 81001+. Each pilot below must, in every hazard
+ * Pass conditions, fixed before the first run on 86001+. Each pilot below must, in every hazard
  * condition: end at most HAZARD_PASS.maxCrashes of 30 flights in a crash, and cover at least
  * HAZARD_PASS.coverageRatio of its own coverage on the paired control.
  */
