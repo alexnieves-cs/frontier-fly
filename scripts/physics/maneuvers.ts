@@ -86,18 +86,18 @@ export const MANEUVERS: Maneuver[] = [
   ),
   {
     id: 'ceiling',
-    title: 'Creep up under a ceiling 6 m above the pad: hold 0.6 m below it, then 0.25 m',
+    title: 'Creep up under a ceiling 6 m above the pad: hold 0.6 m below it, then 0.12 m (about one rotor radius)',
     sims: ['bridge', 'native'],
     start: [0, 0, -5.4],
-    segments: [hold(5, -5.4), hold(8, -5.75), hold(5, -5.4)],
+    segments: [hold(5, -5.4), hold(8, -5.88), hold(5, -5.4)],
     aero: { ceilingM: 6 },
   },
   {
     id: 'ground',
-    title: 'Hover low over the ground: 2 m, then 0.3 m, then back to 2 m',
+    title: 'Hover low over the ground: 2 m, then 0.12 m (about one rotor radius), then back to 2 m',
     sims: ['bridge', 'native'],
     start: [0, 0, -2],
-    segments: [hold(4, -2), hold(8, -0.3), hold(5, -2)],
+    segments: [hold(4, -2), hold(8, -0.12), hold(5, -2)],
     aero: {},
   },
 ];

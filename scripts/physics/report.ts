@@ -106,6 +106,19 @@ function loadSih(path: string): Series | null {
   return fromRows('sih', rows, (r) => (r[0]! - t0) / 1000, starts, "PX4's estimate");
 }
 
+/** PX4's own estimate of a flight (LOCAL_POSITION_NED and ATTITUDE). */
+function loadEstimate(path: string): Series | null {
+  if (!existsSync(path)) return null;
+  const log = JSON.parse(readFileSync(path, 'utf8')) as Px4Log;
+  const t0 = log.t0Ms;
+  const att = new Map(log.att.map((r) => [r[0]!, r]));
+  const rows = log.local.map((r) => {
+    const a = att.get(r[0]!) ?? [0, 0, 0];
+    return [r[0]!, r[1]!, r[2]!, r[3]!, r[4]!, r[5]!, r[6]!, a[1]!, a[2]!, 0, 0, 0, 0, 0];
+  });
+  return fromRows('bridge', rows, (r) => (r[0]! - t0) / 1000, log.segmentStartsMs.map((ms) => (ms - t0) / 1000), "PX4's estimate");
+}
+
 function loadBridge(dir: string, id: string): Series | null {
   const path = join(dir, `${id}.bridge.json`);
   const plant = join(dir, `${id}.bridge.plant.json`);
@@ -171,13 +184,17 @@ function tiltDeg(s: Series, i: number): number {
 
 function hold(s: Series, a: number, b: number, at: [number, number, number]): Record<string, number> {
   const idx = window(s, a, b);
-  const h = idx.map((i) => Math.hypot(s.n[i]! - at[0], s.e[i]! - at[1]));
+  // About the mean position: a steady offset is the estimator's (PX4 holds where it thinks the point is), the wander is the controller's.
+  const mn = idx.reduce((acc, i) => acc + s.n[i]!, 0) / Math.max(1, idx.length);
+  const me = idx.reduce((acc, i) => acc + s.e[i]!, 0) / Math.max(1, idx.length);
+  const h = idx.map((i) => Math.hypot(s.n[i]! - mn, s.e[i]! - me));
   const v = idx.map((i) => Math.abs(s.d[i]! - at[2]));
   const sorted = [...h].sort((x, y) => x - y);
   const rms = (xs: number[]): number => Math.sqrt(xs.reduce((acc, x) => acc + x * x, 0) / Math.max(1, xs.length));
   let tilt = 0;
   for (const i of idx) tilt = Math.max(tilt, tiltDeg(s, i));
   return {
+    offsetM: round(Math.hypot(mn - at[0], me - at[1])),
     horizRms: round(rms(h)),
     horizP95: round(sorted[Math.floor(sorted.length * 0.95)] ?? NaN),
     horizMax: round(sorted[sorted.length - 1] ?? NaN),
@@ -216,7 +233,8 @@ function measure(m: Maneuver, s: Series): Record<string, number> {
     const go = step(s, up, 1, 1.5, 0.15);
     const stop = step(s, up, 2, 0, 0.15);
     let lateral = 0;
-    for (const i of window(s, s.starts[1]!, end)) lateral = Math.max(lateral, Math.hypot(s.n[i]!, s.e[i]!));
+    const j0 = window(s, s.starts[1]!, end)[0]!;
+    for (const i of window(s, s.starts[1]!, end)) lateral = Math.max(lateral, Math.hypot(s.n[i]! - s.n[j0]!, s.e[i]! - s.e[j0]!));
     return { riseSec: go.rise, t90Sec: go.t90, overshootPct: go.overshootPct, settleSec: go.settle, climbMps: go.end, stopSec: stop.settle, lateralDevM: round(lateral) };
   }
   if (m.id.startsWith('gust')) return hold(s, 5, end, m.start);
@@ -240,7 +258,16 @@ function measure(m: Maneuver, s: Series): Record<string, number> {
     const top = Math.max(...idx.map((i) => -s.d[i]!));
     const settled = idx.filter((i) => s.t[i]! >= s.starts[2]! - 3);
     const mean = settled.reduce((a, i) => a + -s.d[i]!, 0) / Math.max(1, settled.length);
-    return { minClearanceM: round(ceiling - top, 3), overshootM: round(top - 5.75, 3), heightErrM: round(mean - 5.75, 3) };
+    const target = -(m.segments[1]!.pos![2] as number);
+    // The model holds no ceiling: a rotor plane at or past it is contact, and what follows is not flight.
+    const hit = idx.find((i) => -s.d[i]! >= ceiling);
+    const contact = hit !== undefined;
+    return {
+      minClearanceM: round(Math.max(0, ceiling - top), 3),
+      contactSec: contact ? round(s.t[hit]! - s.starts[1]!, 2) : NaN,
+      overshootM: contact ? NaN : round(top - target, 3),
+      heightErrM: contact ? NaN : round(mean - target, 3),
+    };
   }
   if (m.id === 'ground') {
     const idx = window(s, s.starts[1]!, s.starts[2]!);
@@ -249,7 +276,8 @@ function measure(m: Maneuver, s: Series): Record<string, number> {
     const mean = settled.reduce((a, i) => a + -s.d[i]!, 0) / Math.max(1, settled.length);
     const back = window(s, s.starts[2]!, end);
     const top = Math.max(...back.map((i) => -s.d[i]!));
-    return { lowestM: round(low, 3), heightErrM: round(mean - 0.3, 3), climbOutOvershootM: round(top - 2, 3) };
+    const target = -(m.segments[1]!.pos![2] as number);
+    return { lowestM: round(low, 3), heightErrM: round(mean - target, 3), climbOutOvershootM: round(top - 2, 3) };
   }
   return {};
 }
@@ -331,13 +359,13 @@ function batteryDischarge(): Record<string, unknown> {
 
 const COLORS: Record<string, string> = { sih: '#d97706', bridge: '#2563eb', native: '#059669', shipped: '#9ca3af' };
 const LABELS: Record<string, string> = {
-  sih: "PX4 on PX4's simulator (SIH)",
-  bridge: "PX4 on frontier-fly's physics",
-  native: "frontier-fly's controller and physics",
+  sih: 'PX4 on SIH',
+  bridge: 'PX4 on frontier-fly physics',
+  native: 'frontier-fly controller',
   shipped: 'frontier-fly, shipped physics',
 };
 
-function svgPlot(title: string, yLabel: string, series: { key: string; t: number[]; y: number[] }[], t0: number, t1: number): string {
+function svgPlot(title: string, yLabel: string, series: { key: string; t: number[]; y: number[] }[], t0: number, t1: number, ref?: { y: number; label: string }): string {
   const W = 640;
   const Hh = 260;
   const L = 52;
@@ -377,6 +405,10 @@ function svgPlot(title: string, yLabel: string, series: { key: string; t: number
   for (const v of ticks(t0, t1, 8)) parts.push(`<text x="${x(v).toFixed(1)}" y="${Hh - B + 15}" text-anchor="middle" fill="#6b7280">${v}</text>`);
   parts.push(`<text x="${(L + W - R) / 2}" y="${Hh - B + 30}" text-anchor="middle" fill="#374151">seconds</text>`);
   parts.push(`<text transform="translate(14 ${(T + Hh - B) / 2}) rotate(-90)" text-anchor="middle" fill="#374151">${yLabel}</text>`);
+  if (ref && ref.y >= lo && ref.y <= hi) {
+    parts.push(`<line x1="${L}" x2="${W - R}" y1="${y(ref.y).toFixed(1)}" y2="${y(ref.y).toFixed(1)}" stroke="#111827" stroke-width="1.2"/>`);
+    parts.push(`<text x="${W - R - 4}" y="${(y(ref.y) - 4).toFixed(1)}" text-anchor="end" fill="#111827">${ref.label}</text>`);
+  }
   let lx = L;
   for (const s of series) {
     const pts: string[] = [];
@@ -385,7 +417,7 @@ function svgPlot(title: string, yLabel: string, series: { key: string; t: number
     parts.push(`<polyline fill="none" stroke="${COLORS[s.key]}" stroke-width="1.8"${dash} points="${pts.join(' ')}"/>`);
     parts.push(`<line x1="${lx}" x2="${lx + 18}" y1="${Hh - 10}" y2="${Hh - 10}" stroke="${COLORS[s.key]}" stroke-width="2.5"${dash}/>`);
     parts.push(`<text x="${lx + 22}" y="${Hh - 6}" fill="#374151">${LABELS[s.key]}</text>`);
-    lx += 34 + LABELS[s.key]!.length * 5.6;
+    lx += 40 + LABELS[s.key]!.length * 5.8;
   }
   parts.push('</svg>');
   return `${parts.join('\n')}\n`;
@@ -417,16 +449,24 @@ for (const m of MANEUVERS) {
   if (near) all.push(shipped(m));
   const r: Result = { id: m.id, title: m.title, sims: {} };
   for (const s of all) r.sims[s.sim] = { source: s.source, metrics: measure(m, s) };
+  if (m.wind && bridge && r.sims.bridge) {
+    // How well PX4 holds the point it believes it is at: the same hold measured on its own estimate.
+    const est = loadEstimate(join(inDir, `${m.id}.bridge.json`));
+    if (est) r.sims.bridge.metrics.estHorizRms = measure(m, est).horizRms!;
+  }
   results.push(r);
   const end = m.segments.reduce((a, g) => a + g.dur, 0);
   const pick = (f: (s: Series) => number[], scale = 1): { key: string; t: number[]; y: number[] }[] => all.map((s) => ({ key: s.sim, t: s.t, y: f(s).map((v) => v * scale) }));
   if (m.id === 'step-forward') plots[m.id] = svgPlot('Forward speed step: 4 m/s north, then stop', 'north speed, m/s', pick((s) => s.vn), -1, end);
   if (m.id === 'step-climb') plots[m.id] = svgPlot('Climb step: 1.5 m/s up, then hold', 'climb rate, m/s', pick((s) => s.vd, -1), -1, end);
   if (m.id === 'gust-moderate')
-    plots[m.id] = svgPlot('Position hold, 4 m/s wind with 1.5 m/s gusts', 'distance from hold point, m', all.map((s) => ({ key: s.sim, t: s.t, y: s.n.map((n, i) => Math.hypot(n - m.start[0], s.e[i]! - m.start[1])) })), 0, end);
+    plots[m.id] = svgPlot('Position hold, 4 m/s wind with 1.5 m/s gusts', 'north position about its mean, m', all.map((s) => {
+      const mean = s.n.reduce((a, x) => a + x, 0) / Math.max(1, s.n.length);
+      return { key: s.sim, t: s.t, y: s.n.map((n) => n - mean) };
+    }), 0, end);
   if (m.id === 'sag-8') plots[m.id] = svgPlot('Dash and climb on an 8% pack', 'height above pad, m', pick((s) => s.d, -1), -1, end);
-  if (m.id === 'ceiling') plots[m.id] = svgPlot('Creeping up under a ceiling at 6 m', 'height above pad, m', pick((s) => s.d, -1), -1, end);
-  if (m.id === 'ground') plots[m.id] = svgPlot('Low hover at 0.3 m', 'height above pad, m', pick((s) => s.d, -1), -1, end);
+  if (m.id === 'ceiling') plots[m.id] = svgPlot('Creeping up under a ceiling at 6 m, then holding 0.12 m below it', 'height above pad, m', pick((s) => s.d, -1), -1, end, { y: m.aero?.ceilingM ?? 6, label: 'ceiling (no contact model: above it is a hit)' });
+  if (m.id === 'ground') plots[m.id] = svgPlot('Low hover at 0.12 m', 'height above pad, m', pick((s) => s.d, -1), -1, end);
 }
 
 const out = {
@@ -467,9 +507,9 @@ md.push(table('step-climb', [['t90Sec', 'Time to 1.35 m/s (s)'], ['overshootPct'
 md.push('\n![Climb step](media/physics/step-climb.svg)\n');
 md.push('### Hover in gusts\n');
 md.push('Light wind (2 m/s, 0.75 m/s gusts):\n');
-md.push(table('gust-light', [['horizRms', 'Horizontal RMS (m)'], ['horizP95', 'p95 (m)'], ['horizMax', 'Max (m)'], ['vertRms', 'Vertical RMS (m)'], ['peakTiltDeg', 'Peak tilt (°)']]));
+md.push(table('gust-light', [['offsetM', 'Offset of the mean (m)'], ['horizRms', 'Wander RMS (m)'], ['estHorizRms', 'Wander RMS in PX4\'s own estimate (m)'], ['horizMax', 'Max wander (m)'], ['peakTiltDeg', 'Peak tilt (°)']]));
 md.push('\nModerate wind (4 m/s, 1.5 m/s gusts):\n');
-md.push(table('gust-moderate', [['horizRms', 'Horizontal RMS (m)'], ['horizP95', 'p95 (m)'], ['horizMax', 'Max (m)'], ['vertRms', 'Vertical RMS (m)'], ['peakTiltDeg', 'Peak tilt (°)']]));
+md.push(table('gust-moderate', [['offsetM', 'Offset of the mean (m)'], ['horizRms', 'Wander RMS (m)'], ['estHorizRms', 'Wander RMS in PX4\'s own estimate (m)'], ['horizMax', 'Max wander (m)'], ['peakTiltDeg', 'Peak tilt (°)']]));
 md.push('\n![Gust hold](media/physics/gust-moderate.svg)\n');
 md.push('### Battery sag\n');
 for (const id of ['sag-100', 'sag-30', 'sag-8']) {
@@ -486,9 +526,9 @@ md.push(`| True charge | Cell voltage under load (V) | PX4, voltage only (defaul
 md.push('### Ground and ceiling effect\n');
 md.push(`Thrust multiplier against the distance from the rotor to the surface, in rotor radii (R = ${airframe().rotorRadiusM} m):\n`);
 md.push(`| z / R | Shipped (linear, world height) | Ground, Cheeseman–Bennett | Ceiling, Sanchez-Cuevas fit |\n| --- | --- | --- | --- |\n${out.surfaces.map((s) => `| ${s.zr} | ${s.legacy} | ${s.ground} | ${s.ceiling} |`).join('\n')}\n`);
-md.push(table('ceiling', [['minClearanceM', 'Closest to ceiling (m)'], ['overshootM', 'Overshoot toward it (m)'], ['heightErrM', 'Settled height error (m)']]));
+md.push(table('ceiling', [['minClearanceM', 'Closest to ceiling (m)'], ['contactSec', 'Hit the ceiling after (s)'], ['overshootM', 'Overshoot toward it (m)'], ['heightErrM', 'Settled height error (m)']]));
 md.push('\n![Ceiling](media/physics/ceiling.svg)\n');
-md.push(table('ground', [['lowestM', 'Lowest (m)'], ['heightErrM', 'Settled height error at 0.3 m (m)'], ['climbOutOvershootM', 'Climb-out overshoot (m)']]));
+md.push(table('ground', [['lowestM', 'Lowest (m)'], ['heightErrM', 'Settled height error (m)'], ['climbOutOvershootM', 'Climb-out overshoot (m)']]));
 md.push('\n![Ground](media/physics/ground.svg)\n');
 const tables = md.join('\n');
 
