@@ -12,7 +12,7 @@ The same nine maneuvers are flown three ways, on one airframe:
 
 The first two rows share a controller, so any gap between them is a gap between the two physics models. The last two share the physics, so any gap there is a gap between the two flight controllers.
 
-The airframe is the 1.2 kg mission quad (`missionQuadParams()`, 10 inch props, thrust-to-weight 2.47, 4S 5000 mAh pack), the one the search-and-rescue missions fly. The one-airframe change that would swap it for a smaller quad is not merged yet; when it is, rerun this page.
+The numbers on this page were measured on the earlier 1.2 kg mission quad (10 inch props, thrust-to-weight 2.47, 4S 5000 mAh pack). The missions now fly one smaller airframe (`src/shared/airframe.ts`, 0.45 kg ducted quad on 3 inch props, 4S 2420 mAh), and `missionQuadParams()` returns it; this page is due a rerun on it.
 
 Everything runs in the cloud: PX4 SITL builds in CI (`.github/workflows/px4.yml`, job `physics`), and the numbers below came from the same scripts in the cloud container.
 

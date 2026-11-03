@@ -102,7 +102,7 @@ export const MANEUVERS: Maneuver[] = [
   },
 ];
 
-/** The airframe every simulator flies: the 1.2 kg mission quad on its 10 inch props. */
+/** The airframe every simulator flies: the one airframe (shared/airframe.ts) the missions fly. */
 export function airframe(): { dyn: DynParams; rotorRadiusM: number } {
   return { dyn: missionQuadParams(), rotorRadiusM: DEFAULT_BATTERY.rotorDiameterM / 2 };
 }
