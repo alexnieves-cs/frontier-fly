@@ -198,5 +198,22 @@ describe('team runs', () => {
     expect(again.energyWh).toEqual(duo.energyWh);
     for (const wh of duo.energyWh) expect(wh).toBeGreaterThan(1);
     expect(Math.max(...duo.energyWh)).toBeLessThan(10);
+    // A full pack never runs low in 45 s, so nobody turns back.
+    expect(duo.turnedBackAt).toEqual([null, null]);
+  });
+
+  it('sends each drone home along its own track before a small pack runs out', async () => {
+    const { spec, envSeed, cfg } = evalEpisodeSetup(3, 9101, 'day');
+    cfg.maxSteps = 1200;
+    const packWh = 1.2;
+    const r = await runTeam(spec, envSeed, cfg, { drones: 3, packWh }, 1);
+    for (let i = 0; i < 3; i++) {
+      expect(r.turnedBackAt[i]).not.toBeNull();
+      expect(r.returnedAt[i]).toBeGreaterThan(r.turnedBackAt[i]!);
+      expect(r.energyWh[i]).toBeLessThan(packWh);
+    }
+    // Everyone landed before the time ran out, so the run ended early.
+    expect(r.steps).toBeLessThan(cfg.maxSteps);
+    expect(r.collisions).toBe(0);
   });
 });

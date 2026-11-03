@@ -138,13 +138,13 @@ class Session {
     this.rebuild(this.launch.seed, false);
     this.resize();
     const chartHost = [
-      [this.q('#chart-return'), '#49f0a0'],
-      [this.q('#chart-cover'), '#3ee0c5'],
-      [this.q('#chart-entropy'), '#8ec5ff'],
+      [this.q('#chart-return'), '#49f0a0', 'Training return per update'],
+      [this.q('#chart-cover'), '#3ee0c5', 'Training coverage per update'],
+      [this.q('#chart-entropy'), '#8ec5ff', 'Policy entropy per update'],
     ] as const;
-    for (const [el, color] of chartHost) {
+    for (const [el, color, label] of chartHost) {
       try {
-        this.charts.push(new RewardChart(el, color));
+        this.charts.push(new RewardChart(el, color, label));
       } catch (error) {
         console.warn('chart init failed', error);
       }

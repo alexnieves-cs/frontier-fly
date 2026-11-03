@@ -64,6 +64,7 @@ export class FilmOverlay {
     this.spans = phaseSpans(log);
     this.root = el('div', 'film-overlay', parent);
     this.callouts = el('canvas', 'film-callouts', this.root);
+    this.callouts.setAttribute('aria-hidden', 'true');
 
     const top = el('div', 'film-top', this.root);
     const brand = el('div', 'film-brand', top);
@@ -93,6 +94,8 @@ export class FilmOverlay {
     const side = el('div', 'film-side', this.root);
     const mapBox = el('div', 'film-map', side);
     this.mapCanvas = el('canvas', 'film-map-canvas', mapBox);
+    this.mapCanvas.setAttribute('role', 'img');
+    this.mapCanvas.setAttribute('aria-label', 'Top-down mission map with the flight path');
     el('div', 'film-map-label', mapBox, 'MISSION MAP');
     this.map = new DemoMap(this.mapCanvas, world);
     this.logRows = el('div', 'film-log', side);

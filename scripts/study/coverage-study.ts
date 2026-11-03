@@ -10,6 +10,8 @@
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { evalEpisodeSetup, evalSteps } from '../../src/eval/coverage';
+import { applyHazards } from '../../src/gen/hazards';
+import type { HazardParams } from '../../src/shared/types';
 import { EpisodeFootprint, FOOTPRINT_META, summarizeFootprint, withoutCurve, type FootprintRecord } from '../../src/eval/footprint';
 import { OracleGain } from '../../src/eval/gainLabels';
 import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
@@ -38,13 +40,37 @@ export interface Condition {
   lighting: LightingPreset[];
   /** Quadrotor dynamics with domain randomization at this scale (mass, thrust, drag, motor lag, sensor noise, latency). */
   quad?: number;
+  /** Indoor hazards built into every building of the condition (gen/hazards.ts). */
+  hazards?: HazardParams;
 }
+
+/**
+ * Hazard conditions (shut and ajar doors, glass and mirrors, smoke) and their paired control share one
+ * fresh block, 86001-86030: each seed is the same stage-3 building with and without the hazard.
+ * Development runs used 81901-81999; nothing here was tuned on 86001+.
+ */
+export const HAZARD_SEED_BASE = 86001;
+export const HAZARD_CONDITIONS: Condition[] = [
+  { id: 'hazard-control', label: 'Hazard control: the same hard buildings, no hazards', stage: 3, seedBase: HAZARD_SEED_BASE, lighting: ['day'] },
+  { id: 'doors', label: 'Shut and ajar interior doors', stage: 3, seedBase: HAZARD_SEED_BASE, lighting: ['day'], hazards: { closedDoors: 0.35, ajarDoors: 0.6 } },
+  { id: 'glass', label: 'Glass rooms and mirrors', stage: 3, seedBase: HAZARD_SEED_BASE, lighting: ['day'], hazards: { glassRooms: 0.5, mirrors: 2 } },
+  { id: 'smoke', label: 'Smoke (visibility 1.5-4 m)', stage: 3, seedBase: HAZARD_SEED_BASE, lighting: ['day'], hazards: { smokeRooms: 0.4, smokeVisibility: [1.5, 4] } },
+];
+/** Pilots the hazard conditions fly: the privileged teacher as a reference, the planner, the policy alone and guarded. */
+export const HAZARD_PILOTS: PilotId[] = ['teacher', 'classical', 'policy', 'guarded'];
+/**
+ * Pass conditions, fixed before the first run on 86001+. Each pilot below must, in every hazard
+ * condition: end at most HAZARD_PASS.maxCrashes of 30 flights in a crash, and cover at least
+ * HAZARD_PASS.coverageRatio of its own coverage on the paired control.
+ */
+export const HAZARD_PASS = { pilots: ['classical', 'guarded'] as PilotId[], maxCrashes: 2, coverageRatio: 0.9 } as const;
 
 export const CONDITIONS: Condition[] = [
   { id: 'easy', label: 'Easy: one room (stage 0)', stage: 0, seedBase: 20001, lighting: ['day', 'night-dark'] },
   { id: 'hard', label: 'Hard: rooms, hallways, loops (stage 3)', stage: 3, seedBase: 30001, lighting: ['day', 'night-dark'] },
   { id: 'floors', label: 'Multi-floor with shafts (stage 4)', stage: 4, seedBase: 40001, lighting: ['day'] },
   { id: 'quad', label: 'Hard, quadrotor dynamics + noise', stage: 3, seedBase: 50001, lighting: ['day', 'night-dark'], quad: 1 },
+  ...HAZARD_CONDITIONS,
 ];
 
 export const PILOTS = [
@@ -104,12 +130,26 @@ export interface Result extends Job, Partial<FootprintRecord> {
   floors: number;
 }
 
+/** Whether a pilot flies a condition: hazard conditions fly HAZARD_PILOTS, the rest follow PILOT_CONDITIONS. */
+export function fliesIn(pilot: PilotId, c: Condition): boolean {
+  if (HAZARD_CONDITIONS.includes(c)) return HAZARD_PILOTS.includes(pilot);
+  return !PILOT_CONDITIONS[pilot] || PILOT_CONDITIONS[pilot].includes(c.id);
+}
+
+/** The building, env seed and config of a job, with the condition's hazards built in. */
+export function jobSetup(job: Job): ReturnType<typeof evalEpisodeSetup> {
+  const setup = evalEpisodeSetup(job.stage, job.seed, job.lighting);
+  const hazards = CONDITIONS.find((c) => c.id === job.condition)?.hazards;
+  if (hazards) setup.spec = applyHazards(setup.spec, hazards);
+  return setup;
+}
+
 export function jobs(): Job[] {
   const out: Job[] = [];
   for (const c of CONDITIONS) {
     for (let i = 0; i < SEEDS_PER_CONDITION; i++) {
       for (const lighting of c.lighting) {
-        for (const pilot of PILOTS) if (!PILOT_CONDITIONS[pilot] || PILOT_CONDITIONS[pilot].includes(c.id)) out.push({ condition: c.id, stage: c.stage, seed: c.seedBase + i, lighting, quad: c.quad ?? 0, pilot });
+        for (const pilot of PILOTS) if (fliesIn(pilot, c)) out.push({ condition: c.id, stage: c.stage, seed: c.seedBase + i, lighting, quad: c.quad ?? 0, pilot });
       }
     }
   }
@@ -141,7 +181,7 @@ export interface Episode {
 export async function startEpisode(
   job: Job,
   policy: (obs: Float32Array) => Float32Array,
-  setup: ReturnType<typeof evalEpisodeSetup> = evalEpisodeSetup(job.stage, job.seed, job.lighting),
+  setup: ReturnType<typeof evalEpisodeSetup> = jobSetup(job),
 ): Promise<Episode> {
   const env = await createEnv();
   const { spec, envSeed, cfg } = setup;
@@ -329,8 +369,16 @@ if (MAIN && process.argv.includes('--merge')) {
   const conditions = arg('conditions', '').split(',').filter(Boolean);
   const pilots = arg('pilots', '').split(',').filter(Boolean);
   const mine = jobs()
-    .filter((j) => (!conditions.length || conditions.includes(j.condition)) && (!pilots.length || pilots.includes(j.pilot)))
+    // The hazard conditions run only when named (docs/hazard-coverage.json), so docs/study.json keeps its rows.
+    .filter((j) => (conditions.length ? conditions.includes(j.condition) : !HAZARD_CONDITIONS.some((c) => c.id === j.condition)) && (!pilots.length || pilots.includes(j.pilot)))
     .filter((_, i) => shardOf(i, of) === shard);
+  // Development runs: `--dev-base 81901 --dev-seeds 8` flies the first seeds of another block instead.
+  const devBase = Number(arg('dev-base', '0'));
+  if (devBase) {
+    const keep = Number(arg('dev-seeds', String(SEEDS_PER_CONDITION)));
+    const base = (j: Job) => CONDITIONS.find((c) => c.id === j.condition)!.seedBase;
+    mine.splice(0, mine.length, ...mine.filter((j) => j.seed - base(j) < keep).map((j) => ({ ...j, seed: devBase + j.seed - base(j) })));
+  }
   const lines: string[] = [];
   const t0 = Date.now();
   for (let i = 0; i < mine.length; i++) {

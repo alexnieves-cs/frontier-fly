@@ -817,6 +817,64 @@ Both versions flew the same 2,000 fresh flights (seeds 250001-252000, plain Mont
 
 What it costs: a sweep with an unresolved person ends *incomplete* rather than *found*, so most of the former false clears became incomplete sweeps, not finds. Hiding people are found less often than before, and a few empty sweeps no longer clear. Every remaining false clear has a hiding person whose views averaged 0.66 to 0.69, inside the band decoys also reach: this detector cannot tell them from a mannequin, and only a better detector or more views would.
 
+## Doors, glass and smoke
+
+Until now every interior door stood open and door leaves were only drawn. Three hazards now change what the drone can fly through and what its sensors return, each with its own seed block, pass condition and bench row (`src/gen/hazards.ts`, applied after generation and seeded by the building):
+
+- **Doors.** A share of interior doorways is shut: the leaf becomes a wall cell with a door surface, and a shut door is never opened. A shut door that leaves less than half the building reachable is opened again. Most of the others get a thin leaf standing ajar at 30–75°, a collidable obstacle in the doorway. Coverage counts only what is reachable with the doors as they are.
+- **Glass and mirrors.** The inner walls of some rooms turn to glass, where a lidar beam drops out 35% of the time and reads as max range, and a few interior wall faces become mirrors that return the reflected path, so the wall reads further away than it is.
+- **Smoke.** Some rooms fill with smoke of visibility 1.5–4 m. A horizontal lidar beam crossing smoke can come back early, and the camera detector's recall falls with the smoke's transmittance along the line of sight.
+
+The explorers know hazards exist but not where. With hazard awareness on, a mission logs every shut door it sees whose far side it has not searched and will not call a building clear while one is left; it tells the operator a ground team is needed. It skips smoke-filled voxels when it scores a look, and it never rejects a contact seen in smoke: the contact is left unresolved, which blocks the clear. The unaware control flies the same code with all three switched off.
+
+**Coverage.** The hard-building coverage study flies each hazard on fresh stage-3 buildings 86001–86030 (day), paired with the same buildings without hazards. The pass condition, fixed before the run: the sensor-only planner and the guarded policy each keep at least 90% of their own no-hazard coverage and crash on at most 2 of 30 flights, in every hazard (crash = contact at 0.5 m/s or more). Cells give mean coverage, then crashes of 30 in brackets, then the ratio to the pilot's own control.
+
+| Pilot | No hazards | Doors | Glass and mirrors | Smoke |
+| --- | --- | --- | --- | --- |
+| Oracle teacher (reads the true map) | 61.8% (0) | 52.4% (10), ×0.85 | 61.8% (0), ×1.00 | 61.8% (0), ×1.00 |
+| Sensor-only planner | 64.0% (0) | 66.3% (0), ×1.04 | 64.5% (0), ×1.01 | 47.5% (0), ×0.74 |
+| Policy alone | 63.8% (17) | 38.4% (26), ×0.60 | 50.5% (21), ×0.79 | 58.6% (18), ×0.92 |
+| Policy + lidar guard | 70.5% (6) | 68.7% (3), ×0.97 | 68.2% (3), ×0.97 | 60.9% (1), ×0.86 |
+
+| Pilot | Hazard | Coverage vs its own control | Crashes of 30 | Pass |
+| --- | --- | --- | --- | --- |
+| Sensor-only planner | doors | ×1.04 (≥ 0.9) | 0 (≤ 2) | ✅ meets |
+| Sensor-only planner | glass | ×1.01 (≥ 0.9) | 0 (≤ 2) | ✅ meets |
+| Sensor-only planner | smoke | ×0.74 (≥ 0.9) | 0 (≤ 2) | ❌ misses |
+| Policy + lidar guard | doors | ×0.97 (≥ 0.9) | 3 (≤ 2) | ❌ misses |
+| Policy + lidar guard | glass | ×0.97 (≥ 0.9) | 3 (≤ 2) | ❌ misses |
+| Policy + lidar guard | smoke | ×0.86 (≥ 0.9) | 1 (≤ 2) | ❌ misses |
+
+**Missions.** Sweeps of an occupied compound with shut and ajar doors, the same with smoke, and the injured-hiker cabin with smoke or with glass rooms and mirrors, each flown on the first 30 seeds of a fresh block from 86501. The door and glass scenarios keep only seeds whose first building has an interior doorway, a rule fixed before the run (`doors-occupied`: 86501–86630 (30 seeds); `smoke-occupied`: 86501–86530 (30 seeds); `smoke-cabin`: 86501–86530 (30 seeds); `glass-cabin`: 86501–86630 (30 seeds)). The pass condition, fixed before the run: with awareness on, no false clear in any flight, and the hiker found in at least 80% of the cabin flights.
+
+| Scenario | Explorer | Person found (95% CI) | Ends as expected | Flights with a false clear (95% CI) | Shut door left unsearched | Flights with a collision |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sweep with someone inside, shut and ajar doors | Sensor planner, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 1 | 0 |
+| Sweep with someone inside, shut and ajar doors | Policy, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 4 | 0 |
+| Sweep with someone inside, shut and ajar doors | Sensor planner, unaware (control) | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 0 |
+| Sweep with someone inside, smoke | Sensor planner, hazard-aware | 12 of 30 (24.6–57.7) | 40.0% | 0 (0.0–11.4) | 0 | 8 |
+| Sweep with someone inside, smoke | Policy, hazard-aware | 11 of 30 (21.9–54.5) | 36.7% | 0 (0.0–11.4) | 0 | 7 |
+| Sweep with someone inside, smoke | Sensor planner, unaware (control) | 13 of 30 (27.4–60.8) | 43.3% | 0 (0.0–11.4) | 0 | 3 |
+| Injured hiker in a smoky cabin | Sensor planner, hazard-aware | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
+| Injured hiker in a smoky cabin | Policy, hazard-aware | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
+| Injured hiker in a smoky cabin | Sensor planner, unaware (control) | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
+| Injured hiker, glass rooms and mirrors | Sensor planner, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 3 |
+| Injured hiker, glass rooms and mirrors | Policy, hazard-aware | 26 of 30 (70.3–94.7) | 86.7% | 0 (0.0–11.4) | 0 | 6 |
+| Injured hiker, glass rooms and mirrors | Sensor planner, unaware (control) | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 3 |
+
+| Condition | Measured | Target | Pass |
+| --- | --- | --- | --- |
+| No false clear with hazard awareness on | 0 | 0 | ✅ meets |
+| Person found: Injured hiker in a smoky cabin, Sensor planner, hazard-aware | 46.7% | ≥ 80.0% | ❌ misses |
+| Person found: Injured hiker in a smoky cabin, Policy, hazard-aware | 46.7% | ≥ 80.0% | ❌ misses |
+| Person found: Injured hiker, glass rooms and mirrors, Sensor planner, hazard-aware | 90.0% | ≥ 80.0% | ✅ meets |
+| Person found: Injured hiker, glass rooms and mirrors, Policy, hazard-aware | 86.7% | ≥ 80.0% | ✅ meets |
+
+- **No false clear in 360 flights, but the control had none either.** So this bench does not show the hazard rules preventing a false clear; it shows they cost nothing where they did not bind. Aware flights stopped short of a clear because of a shut door they could not search behind in 5 flights. Every room of a mission shell also has its own outside opening, so a shut interior door slows the search but cannot hide anyone from a drone that goes round; a person truly sealed behind a door needs a building the generator does not make yet.
+- **Smoke is the gap.** The hiker in a smoky cabin is found on 14 of 30 flights by every explorer, aware or not, and occupied sweeps in smoke end incomplete on 17–19 of 30: the camera loses the person and the lidar's early returns shrink the free space the drone will fly into. Awareness keeps those flights honest (incomplete, not clear) but does not find the person; that needs a sensor that sees through smoke, such as thermal, which the drone does not carry.
+- **The crash bar was set below the guarded policy's own control.** It crashes on 6 of 30 of these buildings with no hazards at all, so its hazard misses on crashes say more about the bar than about the hazards; its coverage stays within 86.4% of the control. The bar is kept as it was set.
+- **Thin ajar leaves catch the oracle teacher.** It reads the true map and crashes on 10 of 30 door buildings against 0 without hazards; the ajar leaves are the only new obstacle there. The sensor-only planner, which sees them with its lidar, does not crash.
+
 ## Failure gallery
 
 Top-down views of chosen coverage episodes: walls dark, shafts orange, furniture grey, flown voxels light blue, the track blue, the start green, collisions red. The episodes are picked by rule from the coverage study (`scripts/study/gallery.ts`).
@@ -863,7 +921,7 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 - **Entry is conservative by design.** When no opening is safe enough, the drone does not enter and the sweep stays incomplete. That costs success rate and never a false clear.
 - **The lost-person prior is not what makes the outdoor search fast.** Sweep-width lanes, a distance ring and a flat prior all do about as well by day. The strategy weights and ring sizes are hand-set, not fitted to incident data, and the simulated walker that places the person was written alongside the prior, so even this agreement is optimistic.
 - **The search belief is miscalibrated.** It credits a building interior only once the drone leaves it, so by day it trails the outcomes early (78% predicted by 90 s against 87% found). It also trusts its prior: with the person placed uniformly it predicts 95% success and 77% of searches succeed.
-- **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: 2082 steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day. The bench reports battery energy, but no drone turns back for a low pack, since none comes close in 240 s.
+- **Teams fly a simple world.** Drones in a team cannot collide physically (they keep apart with a velocity filter, and the bench counts close passes: 2082 steps within 0.35 m over every team episode, mostly around the shared entry). They share a radio channel with no contention, all fly the kinematic airframe by day. The bench reports battery energy. A drone turns back along its own track once its energy used plus 1.5 times its estimated way home would empty the pack (`packWh` in `src/team/run.ts`), but none comes close in 240 s, so the bench never exercises it; a unit test does, with a 1.2 Wh pack.
 - **The quadrotor can't use a faster cruise.** The planner steers with pure pursuit and a velocity command, which suits a drone that changes velocity almost instantly. A simple corner-speed tracker didn't help, and the evidence points to the airframe's acceleration (about 3 m/s² at the controller's tilt limit) rather than the planner. A full minimum-time trajectory planner, or a stiffer airframe, is untested.
 - **The camera is a renderer, not a photograph.** People are one low-poly mannequin in ten poses with a coloured shirt, objects are boxes with a few details, and the detector trains and tests on the same renderer. Its scores say nothing about real images. Range comes from a perfect depth image plus 3% noise, and which space counts as looked at is still estimated geometrically, not from the detector.
 - **Phones are not found.** The detector's AP for phones is near zero; at 160×120 a phone is a few pixels. No mission asks for one.
@@ -901,6 +959,8 @@ floors building, seed 40012, day: 22.9% coverage, 0 collisions. No pilot in the 
 | Real floor plans ([REAL_PLANS.md](REAL_PLANS.md)) | 20 dev and 60 eval apartments; env seeds 74001+ and 75001+ (dev), 72001+ (reported) and 73001+ (matched generated controls) |
 | FrontierBench ([LEADERBOARD.md](LEADERBOARD.md)) | 81001+ (dev) and 82001+ (test); team track 83001+ and 83101+; apartments task 84001+ and 84101+ |
 | Real-data check (Intel Research Lab log) | Parameters picked on sweeps 0–2999 only; reported on the whole log and on the relations after sweep 2999 |
+| Tuning indoor hazards | Coverage buildings and mission worlds 81901–81999 |
+| Indoor hazards (reported) | Coverage 86001–86030 (stage 3, day); missions 86501+ (first 30 seeds per scenario) |
 | Fixed eval protocol ([BENCHMARKS.md](BENCHMARKS.md)) | 101, 202, 303, 404 and 4242, 5150, 6160 |
 
 ## Reproduce

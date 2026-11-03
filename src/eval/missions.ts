@@ -142,6 +142,8 @@ export interface MissionFlight {
   handoffs: string[];
   /** Indoor localization, for flights on the estimated pose that entered a building. */
   loc?: FlightLoc | null;
+  /** Shut doorways with unsearched space behind them, over the buildings searched (hazard bench). */
+  shutDoors?: number;
 }
 
 export interface MissionJob {
@@ -173,8 +175,10 @@ export async function flyMission(
   job: MissionJob,
   makeSource: SourceFactory = (world) => createPerceptionSource(world),
   onRun?: (run: Awaited<ReturnType<typeof runMission>>) => void,
+  /** Other benches fly their own scenarios (eval/hazardBench.ts) with extra runner options. */
+  bench: { scenarios?: readonly Scenario[]; runner?: Partial<RunnerOptions> } = {},
 ): Promise<MissionFlight> {
-  const scenario = BENCH_SCENARIOS.find((s) => s.id === job.scenario)!;
+  const scenario = (bench.scenarios ?? BENCH_SCENARIOS).find((s) => s.id === job.scenario)!;
   const world = buildMissionWorld({ ...scenario.world, seed: job.seed });
   const mission = missionForWorld(world, scenario.mission);
   const source = makeSource(world);
@@ -185,6 +189,7 @@ export async function flyMission(
     ...scenario.runner,
     operator: () => 'approve' as const,
     ...missionModeOptions(job.indoor, shipped ?? undefined),
+    ...bench.runner,
   };
   const run = await runMission(mission, world, source, options);
   onRun?.(run);
@@ -209,6 +214,7 @@ export async function flyMission(
     explorer: run.indoorExplorer,
     handoffs,
     ...(run.localization.length ? { loc: flightLoc(run.localization) } : {}),
+    ...(run.shutDoors ? { shutDoors: run.shutDoors.reduce((a, d) => a + d.count, 0) } : {}),
   };
 }
 

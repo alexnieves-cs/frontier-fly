@@ -60,6 +60,16 @@ Single-thread numbers are Node on the machine above. The worker rows use `node:w
 
 {{MISSION_BENCH_TABLE}}
 
+## Indoor hazards
+
+Shut and ajar doors, glass and mirrors, and smoke; method and pass conditions in [REPORT.md](REPORT.md#doors-glass-and-smoke). Coverage on fresh hard buildings 86001–86030 (mean coverage, crashes of 30, ratio to the pilot's own no-hazard run):
+
+{{HAZARD_COVERAGE_TABLE}}
+
+Missions on fresh worlds from 86501:
+
+{{HAZARD_MISSION_TABLE}}
+
 ## Reproduce
 
 ```bash

@@ -13,6 +13,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: 'coverage',
+      // A floor about one point under the 2026-11-02 numbers (lines 61.1, statements 60.4,
+      // functions 56.8, branches 57.9) so coverage can only rise. Raise it when it does.
+      thresholds: { lines: 60, statements: 59, functions: 55, branches: 56 },
     },
   },
 });
