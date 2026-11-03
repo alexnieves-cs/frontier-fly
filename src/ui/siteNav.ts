@@ -6,21 +6,31 @@ import './theme.css';
 
 export const REPO_URL = 'https://github.com/alexnieves-cs/frontier-fly';
 
+/** Who built the project, shown in the nav, on the homepage's About section and in the footer. */
+export const AUTHOR = {
+  name: 'Alex Nieves',
+  github: 'https://github.com/alexnieves-cs',
+  site: 'https://alexnieves.me',
+} as const;
+
 export type SitePage = 'home' | 'how' | 'film' | 'demo' | 'race' | 'team' | 'atlas' | 'sim' | 'outdoor' | 'mission' | 'px4';
 
-/** Named for what a visitor does there. `gap` starts the second group (tools) after a divider. */
-const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: string; gap?: boolean }> = [
+/**
+ * Named for what a visitor does there. Pages with `tryIt` sit in the "Try it" menu, so the bar keeps five page
+ * links; `gap` starts the tools inside that menu after a divider.
+ */
+const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: string; tryIt?: boolean; gap?: boolean }> = [
   { id: 'home', href: './index.html', label: 'Home', title: 'Project overview and results' },
   { id: 'how', href: './how.html', label: 'How it works', title: 'The autopilot explained in seven steps' },
   { id: 'film', href: './film.html', label: 'Watch', title: 'A full mission, replayed in 3D' },
-  { id: 'demo', href: './demo.html', label: 'Missions', title: 'Run a woods-to-building rescue mission' },
-  { id: 'race', href: './race.html', label: 'Race', title: 'Four pilots search the same building live' },
-  { id: 'team', href: './team.html', label: 'Team', title: 'Several drones search one building together' },
+  { id: 'demo', href: './demo.html', label: 'Missions', title: 'Run a woods-to-building rescue mission', tryIt: true },
+  { id: 'race', href: './race.html', label: 'Race', title: 'Four pilots search the same building live', tryIt: true },
+  { id: 'team', href: './team.html', label: 'Team', title: 'Several drones search one building together', tryIt: true },
+  { id: 'sim', href: './sim.html', label: 'Fly indoors', title: 'Fly or train the indoor drone yourself', tryIt: true, gap: true },
+  { id: 'outdoor', href: './outdoor.html', label: 'Fly outdoors', title: 'Fly the procedural forest site', tryIt: true },
+  { id: 'mission', href: './mission.html', label: 'Plan', title: 'Plan a mission and export it', tryIt: true },
+  { id: 'px4', href: './px4.html', label: 'PX4', title: 'PX4 SITL flies this simulator', tryIt: true },
   { id: 'atlas', href: './atlas.html', label: 'Safety', title: 'How often it fails, how, and the flights to prove it' },
-  { id: 'sim', href: './sim.html', label: 'Fly indoors', title: 'Fly or train the indoor drone yourself', gap: true },
-  { id: 'outdoor', href: './outdoor.html', label: 'Fly outdoors', title: 'Fly the procedural forest site' },
-  { id: 'mission', href: './mission.html', label: 'Plan', title: 'Plan a mission and export it' },
-  { id: 'px4', href: './px4.html', label: 'PX4', title: 'PX4 SITL flies this simulator' },
 ];
 
 /** Which site page a path shows (`/frontier-fly/` and `/frontier-fly/race.html` alike), or null for an unknown page. */
@@ -29,18 +39,37 @@ export function currentSitePage(pathname: string = location.pathname): SitePage 
   return PAGES.find((p) => p.href === `./${file}`)?.id ?? null;
 }
 
-/** The page links plus GitHub, with `aria-current` on the page being shown. */
+let menuIds = 0;
+
+/**
+ * The page links plus About and GitHub, with `aria-current` on the page being shown. The interactive pages fold
+ * into one "Try it" menu; on narrow screens (theme.css) that menu opens inline in the folded page list.
+ */
 export function siteNavLinks(current: SitePage): string {
-  const links = PAGES.map(
-    (p) =>
-      `${p.gap ? '<span class="site-nav-gap" aria-hidden="true"></span>' : ''}` +
-      `<a href="${p.href}" title="${p.title}"${p.id === current ? ' aria-current="page"' : ''}>${p.label}</a>`,
-  );
+  const link = (p: (typeof PAGES)[number]) =>
+    `${p.gap ? '<span class="site-nav-gap" aria-hidden="true"></span>' : ''}` +
+    `<a href="${p.href}" title="${p.title}"${p.id === current ? ' aria-current="page"' : ''}>${p.label}</a>`;
+  const tryIt = PAGES.filter((p) => p.tryIt);
+  const groupId = `site-try-${++menuIds}`;
+  const inGroup = tryIt.some((p) => p.id === current);
+  const group =
+    `<span class="site-group">` +
+    `<button type="button" class="site-group-toggle${inGroup ? ' has-current' : ''}" aria-expanded="false" aria-controls="${groupId}" data-site-group>Try it</button>` +
+    `<span class="site-group-menu" id="${groupId}">${tryIt.map(link).join('')}</span>` +
+    `</span>`;
+  const links: string[] = [];
+  let grouped = false;
+  for (const p of PAGES) {
+    if (!p.tryIt) links.push(link(p));
+    else if (!grouped) {
+      links.push(group);
+      grouped = true;
+    }
+  }
+  links.push(`<a href="./index.html#about" title="Who built frontier-fly">About</a>`);
   links.push(`<a href="${REPO_URL}" rel="noopener">GitHub</a>`);
   return links.join('');
 }
-
-let menuIds = 0;
 
 /** The page links, folded behind a "Pages" button on narrow screens (see theme.css). */
 export function siteNav(current: SitePage): string {
@@ -87,10 +116,30 @@ function closeMenus(except?: Element): void {
   }
 }
 
+function closeGroups(except?: Element): void {
+  for (const group of document.querySelectorAll('.site-group.open')) {
+    if (group === except) continue;
+    group.classList.remove('open');
+    group.querySelector('[data-site-group]')?.setAttribute('aria-expanded', 'false');
+  }
+}
+
 // One listener for every page's menu, so pages render the markup and nothing else.
 if (typeof document !== 'undefined') {
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
+    const groupToggle = target?.closest('[data-site-group]');
+    if (groupToggle) {
+      const group = groupToggle.closest('.site-group');
+      if (!group) return;
+      const open = !group.classList.contains('open');
+      closeGroups(group);
+      group.classList.toggle('open', open);
+      groupToggle.setAttribute('aria-expanded', String(open));
+      if (open) group.querySelector<HTMLElement>('.site-group-menu a')?.focus();
+      return;
+    }
+    if (!target?.closest('.site-group')) closeGroups();
     const toggle = target?.closest('[data-site-menu]');
     if (toggle) {
       const menu = toggle.closest('.site-menu');
@@ -106,6 +155,12 @@ if (typeof document !== 'undefined') {
   });
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    const group = document.querySelector('.site-group.open');
+    if (group) {
+      closeGroups();
+      group.querySelector<HTMLElement>('[data-site-group]')?.focus();
+      return;
+    }
     const open = document.querySelector('.site-menu.open');
     if (!open) return;
     closeMenus();
