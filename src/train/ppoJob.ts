@@ -14,10 +14,12 @@
  * part of what the critic sees, so a time-out is a real end, not a truncation.
  */
 import { evalEpisodeSetup } from '../eval/coverage';
+import { guardedAction } from '../eval/pilots';
 import { MemPolicy } from '../rl/memPolicy';
-import { ACT_DIM } from '../shared/constants';
+import { ACT_DIM, CRASH_SPEED } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { BuildingSpec } from '../shared/types';
+import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import { ExplorerEnv, policyEpisodeLimits } from '../sim/env';
 import { frontierAction, frontierDistance } from '../sim/frontier';
 import { lightingPreset } from '../sim/lighting';
@@ -45,6 +47,21 @@ export interface SeqRolloutPayload {
   seed: number;
   /** Start every env on a fresh episode (e.g. after a policy change that makes the old memory stale). */
   resetEnvs?: boolean;
+  /**
+   * Extra reward on a crash (CRASH_SPEED), on top of the env's REWARD.collision + REWARD.crash. The
+   * crash already ends the episode, so the lost future reward is most of the signal; this sharpens it.
+   */
+  crashPenalty?: number;
+  /** Share of episodes flown with quadrotor dynamics, domain-randomized at full scale (as the coverage study's quad condition). */
+  quadFraction?: number;
+  /**
+   * What the BC labels (the `teacher` rows) are: the frontier teacher's action (default), the teacher's
+   * action through the lidar guard (src/eval/pilots.ts guardedAction), or the policy's own action
+   * through the guard, which teaches the actor to brake the way the guard does so it needs no guard.
+   */
+  labels?: 'teacher' | 'guard-teacher' | 'guard-self';
+  /** Penalty per contact, in reward per m/s of impact speed above half the crash speed (0 = off). */
+  impactSpeedPenalty?: number;
 }
 
 export interface SeqEpisode {
@@ -52,6 +69,9 @@ export interface SeqEpisode {
   night: boolean;
   coverage: number;
   collisions: number;
+  /** The crash rule ended the episode. */
+  crashed: boolean;
+  quad: boolean;
   length: number;
   reward: number;
 }
@@ -87,6 +107,7 @@ interface EnvSlot {
   spec: BuildingSpec | null;
   stage: number;
   night: boolean;
+  quad: boolean;
   maxSteps: number;
   steps: number;
   reward: number;
@@ -101,6 +122,9 @@ interface WorkerState {
 }
 
 let worker: WorkerState | null = null;
+
+/** Contacts slower than this are free under --impact-speed-penalty: half the crash speed. */
+const CONTACT_FREE_SPEED = CRASH_SPEED / 2;
 
 function policyFor(spec: PolicySpec, obsDim: number): MemPolicy {
   const key = `${spec.hidden.join('x')}:${spec.memDim}`;
@@ -150,7 +174,13 @@ function resetSlot(ctx: JobContext, env: ExplorerEnv, slot: EnvSlot, p: SeqRollo
   const envSeed = rng.int(1_000_000_000);
   const night = rng.next() < p.nightFraction;
   // The DAgger training config (sampled noise per stage), with the eval lighting presets and episode limits.
-  const cfg = makeConfig(stage, envSeed, nRooms, 'kinematic');
+  const quad = rng.next() < (p.quadFraction ?? 0);
+  const cfg = makeConfig(stage, envSeed, nRooms, quad ? 'quad' : 'kinematic');
+  if (quad) {
+    const dr = new RNG(envSeed, 'ppo-dr');
+    cfg.dyn = sampleDynParams(dr, defaultDynParams(), 1);
+    cfg.noise = sampleNoise(dr, 1, night);
+  }
   cfg.lighting = lightingPreset(night ? 'night-dark' : 'day', nRooms);
   Object.assign(cfg, policyEpisodeLimits(stage));
   slot.obs = env.reset(spec, envSeed, cfg, world.physics);
@@ -159,6 +189,7 @@ function resetSlot(ctx: JobContext, env: ExplorerEnv, slot: EnvSlot, p: SeqRollo
   slot.spec = spec;
   slot.stage = stage;
   slot.night = night;
+  slot.quad = quad;
   slot.maxSteps = cfg.maxSteps!;
   slot.steps = 0;
   slot.reward = 0;
@@ -174,7 +205,7 @@ const seqRollout: JobFn = (ctx, raw) => {
   if (T % L !== 0) throw new Error('seqRollout: stepsPerEnv must be a multiple of seqLen');
   worker ??= { slots: [], state: new Float32Array(0), policy: null, key: '' };
   if (worker.slots.length !== E) {
-    worker.slots = ctx.envs.map(() => ({ obs: null, world: null, spec: null, stage: 0, night: false, maxSteps: 1, steps: 0, reward: 0, started: false }));
+    worker.slots = ctx.envs.map(() => ({ obs: null, world: null, spec: null, stage: 0, night: false, quad: false, maxSteps: 1, steps: 0, reward: 0, started: false }));
   }
   const policy = policyFor(p.policy, D);
   const m = policy.memDim;
@@ -225,6 +256,11 @@ const seqRollout: JobFn = (ctx, raw) => {
       const pose = env.snapshot();
       const teacher = frontierAction(slot.spec!, env.visitedGrid, pose.pos, pose.yaw);
       out.teacher.set(teacher.subarray(0, ACT_DIM), row * ACT_DIM);
+      if (p.labels === 'guard-teacher') {
+        const g = guardedAction(teacher, slot.obs!, env);
+        out.teacher[row * ACT_DIM] = g[0]!;
+        out.teacher[row * ACT_DIM + 1] = g[1]!;
+      }
       privileged(env, slot, teacher, collisions[i]!, out.priv, row * PRIV_DIM);
       if (m > 0 && t % L === 0) out.state0.set(worker.state.subarray(i * m, (i + 1) * m), (i * (T / L) + t / L) * m);
     }
@@ -235,10 +271,22 @@ const seqRollout: JobFn = (ctx, raw) => {
       const row = i * T + t;
       const action = act.action.subarray(i * ACT_DIM, (i + 1) * ACT_DIM);
       out.actions.set(action, row * ACT_DIM);
+      if (p.labels === 'guard-self') {
+        // Horizontal velocity only: the guard also holds a fixed height, which the policy should not copy.
+        const g = guardedAction(action, slot.obs!, env);
+        out.teacher.set(action, row * ACT_DIM);
+        out.teacher[row * ACT_DIM] = g[0]!;
+        out.teacher[row * ACT_DIM + 1] = g[1]!;
+      }
       out.logp[row] = act.logp[i]!;
       const step = env.step(action);
-      out.rewards[row] = step.reward;
-      slot.reward += step.reward;
+      let reward = step.reward;
+      if (step.info.crashed && step.done) reward += p.crashPenalty ?? 0;
+      if (p.impactSpeedPenalty && step.info.impactSpeed > CONTACT_FREE_SPEED) {
+        reward -= p.impactSpeedPenalty * (step.info.impactSpeed - CONTACT_FREE_SPEED);
+      }
+      out.rewards[row] = reward;
+      slot.reward += reward;
       slot.steps += 1;
       collisions[i] = step.info.collisions;
       slot.obs = step.obs;
@@ -249,6 +297,8 @@ const seqRollout: JobFn = (ctx, raw) => {
           night: slot.night,
           coverage: step.info.coverage,
           collisions: step.info.collisions,
+          crashed: step.info.crashed,
+          quad: slot.quad,
           length: slot.steps,
           reward: slot.reward,
         });
@@ -270,12 +320,13 @@ const seqRollout: JobFn = (ctx, raw) => {
 
 export interface SeqEvalPayload {
   policy: PolicySpec;
-  jobs: EvalJob[];
+  jobs: (EvalJob & { quad?: boolean })[];
 }
 
 export interface SeqEvalResult {
   coverage: number;
   collisions: number;
+  crashed: boolean;
   steps: number;
 }
 
@@ -291,9 +342,16 @@ const seqEval: JobFn = (ctx, raw) => {
   while (evalEnvs.length < p.jobs.length) evalEnvs.push(new ExplorerEnv());
   const live = p.jobs.map((job, k) => {
     const setup = evalEpisodeSetup(job.stage, job.seed, job.lighting);
+    if (job.quad) {
+      // As the coverage study's quad condition (scripts/study/coverage-study.ts startEpisode).
+      const dr = new RNG(job.seed, 'study-dr');
+      setup.cfg.dynamics = 'quad';
+      setup.cfg.dyn = sampleDynParams(dr, defaultDynParams(), 1);
+      setup.cfg.noise = sampleNoise(dr, 1, job.lighting !== 'day');
+    }
     const env = evalEnvs[k]!;
     const obs = env.reset(setup.spec, setup.envSeed, setup.cfg);
-    return { env, obs, maxSteps: setup.cfg.maxSteps, steps: 0, coverage: 0, collisions: 0, done: false, state: new Float32Array(m) };
+    return { env, obs, maxSteps: setup.cfg.maxSteps, steps: 0, coverage: 0, collisions: 0, crashed: false, done: false, state: new Float32Array(m) };
   });
   const rng = new RNG(1);
   for (;;) {
@@ -312,11 +370,12 @@ const seqEval: JobFn = (ctx, raw) => {
       e.obs = step.obs;
       e.coverage = step.info.coverage;
       e.collisions = step.info.collisions;
+      e.crashed = step.info.crashed;
       e.steps += 1;
       if (step.done) e.done = true;
     });
   }
-  const results: SeqEvalResult[] = live.map((e) => ({ coverage: e.coverage, collisions: e.collisions, steps: e.steps }));
+  const results: SeqEvalResult[] = live.map((e) => ({ coverage: e.coverage, collisions: e.collisions, crashed: e.crashed, steps: e.steps }));
   for (const e of live) e.env.dispose();
   return results;
 };

@@ -11,11 +11,12 @@
  * planner saw. --truth writes the true track (1 Hz) and the closest approach
  * to any tree, for the flight check report.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { buildMissionWorld } from '../../src/mission/autonomy/world';
 import { GEO_ORIGINS, type GeoPoint } from '../../src/mission/export/geo';
 import { Px4SimSession } from '../../src/px4/session';
+import { PhysicsRig, type RigOptions } from '../../src/px4/rig';
 import { sampleHeight } from '../../src/world/outdoor/terrain';
 import type { TreeInstance } from '../../src/world/outdoor/types';
 
@@ -28,6 +29,15 @@ const port = Number(opt('port') ?? 4560);
 const speed = Number(opt('speed') ?? 1);
 const planPath = opt('plan');
 const truthPath = opt('truth');
+/**
+ * --plant frontier puts PX4 on frontier-fly's own rigid body (the mission quad) instead of the Iris
+ * model; --rig takes a JSON RigOptions (wind, pack state of charge, near-surface aerodynamics) and
+ * --log writes a 50 Hz state log stamped with PX4's clock. Used by the physics validation
+ * (scripts/physics/run.sh).
+ */
+const plantKind = opt('plant') ?? 'iris';
+const rigJson = opt('rig');
+const logPath = opt('log');
 
 interface Meta {
   site: { kind: 'woods'; seed: number } | { kind: 'practice' };
@@ -73,9 +83,14 @@ let maxGroundTouchSpeed = 0;
 const server = createServer((socket) => {
   socket.setNoDelay(true);
   console.log(`PX4 connected from ${socket.remoteAddress}:${socket.remotePort}`);
-  const session = new Px4SimSession((bytes) => socket.write(bytes), { home, lockstepTimeoutMs: 100 });
+  const rig = plantKind === 'frontier' ? new PhysicsRig(rigJson ? (JSON.parse(rigJson) as RigOptions) : {}) : null;
+  const session = new Px4SimSession((bytes) => socket.write(bytes), { home, lockstepTimeoutMs: 100, quad: rig?.plant });
   session.quad.groundDown = groundDown;
+  const markerPath = logPath ? `${logPath}.t0` : null;
+  let gustT0Us: number | null = null;
+  let nextMarkerCheck = 0;
   let open = true;
+  activeRig = rig;
   socket.on('data', (chunk: Buffer) => session.receive(chunk));
   socket.on('close', () => {
     open = false;
@@ -91,7 +106,16 @@ const server = createServer((socket) => {
     let wasAirborne = false;
     while (open) {
       const vz = session.quad.s.vel[2];
+      if (rig) {
+        const px4Us = session.lastControls?.timeUsec ?? 0;
+        if (markerPath && gustT0Us === null && session.simTimeSec >= nextMarkerCheck) {
+          nextMarkerCheck = session.simTimeSec + 0.5;
+          if (existsSync(markerPath)) gustT0Us = Number(readFileSync(markerPath, 'utf8'));
+        }
+        rig.beforeStep(gustT0Us === null ? null : (px4Us - gustT0Us) * 1e-6);
+      }
       await session.step();
+      if (rig && logPath) rig.record(session.lastControls?.timeUsec ?? 0, session.motors);
       const t = session.simTimeSec;
       const s = session.quad.s;
       if (!s.onGround) wasAirborne = true;
@@ -121,7 +145,14 @@ const server = createServer((socket) => {
   })();
 });
 
+function writeLog(): void {
+  if (!logPath || !activeRig) return;
+  writeFileSync(logPath, `${JSON.stringify(activeRig.log())}\n`);
+}
+let activeRig: PhysicsRig | null = null;
+
 function writeTruth(): void {
+  writeLog();
   if (!truthPath) return;
   writeFileSync(
     truthPath,
