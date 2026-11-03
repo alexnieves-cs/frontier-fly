@@ -80,7 +80,7 @@ const CSS = `
   .lbl { font-size: 21px; line-height: 1.35; color: #b9c6d2; margin-top: 8px; }
   .links { font-size: 25px; line-height: 1.7; color: #b9c6d2; }
   .links b { color: #5ef0dc; font-weight: 600; }
-  .cap { position: absolute; left: 64px; right: 64px; bottom: 54px; display: flex; justify-content: center; }
+  .cap { position: absolute; left: 64px; right: 64px; bottom: 172px; display: flex; justify-content: center; }
   .cap span { background: rgba(8, 12, 16, 0.78); border-radius: 10px; padding: 14px 24px; font-size: 30px; line-height: 1.35; font-weight: 550;
     max-width: 1060px; text-align: center; box-shadow: 0 6px 30px rgba(0,0,0,0.35); }
   .tag { position: absolute; left: 64px; top: 46px; font-size: 18px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 650;
