@@ -86,8 +86,11 @@ describe('loop closer', () => {
         lc.add(odo, ringScan(log, i, 8).ranges);
       }
     }
-    const pose = lc.finish();
     const last = truth.length - 1;
+    // What a vehicle flying on the graph would see at the end, before the final optimisation.
+    const now = lc.current();
+    expect(Math.hypot(now[0] - truth[last]![0], now[1] - truth[last]![1])).toBeLessThan(0.1);
+    const pose = lc.finish();
     const odoErr = Math.hypot(odoTrack[last]![0] - truth[last]![0], odoTrack[last]![1] - truth[last]![1]);
     const err = Math.hypot(pose[last * 3]! - truth[last]![0], pose[last * 3 + 1]! - truth[last]![1]);
     expect(odoErr).toBeGreaterThan(1);
