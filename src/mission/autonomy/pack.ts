@@ -13,14 +13,17 @@
  *   Trans. Energy Conversion 21(2), 2006, eq. (3), fitted to a lithium-polymer
  *   cell: V_oc(s) = -1.031 e^(-35 s) + 3.685 + 0.2156 s - 0.1178 s^2 + 0.3201 s^3.
  *   It reads 4.10 V full and falls steeply below about 10%.
- * - Internal resistance: 6 mΩ per cell, an assumption for a new 5000 mAh
- *   hobby pack (PX4's own default, BAT1_R_INTERNAL, is 5 mΩ).
+ * - Internal resistance: 12 mΩ per cell, an assumption for a new 2420 mAh
+ *   pack (resistance scales roughly with 1 / capacity; a 5000 mAh hobby pack
+ *   is about 6 mΩ, and PX4's own default, BAT1_R_INTERNAL, is 5 mΩ).
  *
  * `px4StateOfCharge` is PX4 v1.15.4's estimator (src/lib/battery/battery.cpp,
  * Battery::calculateStateOfChargeVoltageBased and estimateStateOfCharge),
  * ported line for line with PX4's default parameters, so the validation can
  * ask what a real PX4 would report on this pack.
  */
+
+import { AIRFRAME } from '../../shared/airframe';
 
 export interface PackConfig {
   cells: number;
@@ -29,7 +32,8 @@ export interface PackConfig {
   rInternalOhm: number;
 }
 
-export const MISSION_PACK: PackConfig = { cells: 4, capacityAh: 5, rInternalOhm: 0.006 };
+/** The one airframe's pack (shared/airframe.ts). */
+export const MISSION_PACK: PackConfig = { cells: AIRFRAME.pack.cells, capacityAh: AIRFRAME.pack.mAh / 1000, rInternalOhm: 0.012 };
 
 /** Open-circuit cell voltage at state of charge s (0..1). */
 export function cellOcv(s: number): number {

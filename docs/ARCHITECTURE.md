@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (307 files, 59,629 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (307 files, 59,633 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -135,7 +135,7 @@ flowchart LR
   mission -->|6| loc
   mission -->|12| perception
   mission -->|4| rl
-  mission -->|35| shared
+  mission -->|36| shared
   mission -->|23| sim
   mission -->|12| targets
   mission -->|45| world_outdoor
@@ -227,7 +227,7 @@ flowchart LR
 | `src/gen` | 8 | 1,680 | `shared` | — | — |
 | `src/landing` | 2 | 323 | `film`, `ui` | — | — |
 | `src/loc` | 10 | 2,813 | `shared` | — | — |
-| `src/mission` | 63 | 15,050 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/mission` | 63 | 15,054 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 825 | `gen`, `shared`, `sim`, `targets` | — | — |
 | `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 8 | 1,618 | `mission`, `shared`, `sim`, `ui`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
