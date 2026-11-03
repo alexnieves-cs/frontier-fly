@@ -1,3 +1,5 @@
+import { AIRFRAME } from './airframe';
+
 export const CELL = {
   EMPTY: 0,
   WALL: 1,
@@ -24,7 +26,8 @@ export const ACT_DIM = 4;
 export const CELL_SIZE = 1;
 export const FLOOR_HEIGHT = 3;
 export const VOXEL = 0.5;
-export const DRONE_RADIUS = 0.15;
+/** Collision sphere radius, m: the airframe's (shared/airframe.ts). */
+export const DRONE_RADIUS = AIRFRAME.collisionRadiusM;
 
 export const MAX_SPEED_H = 2;
 export const MAX_SPEED_V = 1;

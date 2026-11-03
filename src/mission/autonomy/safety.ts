@@ -215,6 +215,10 @@ export function createSafetyMonitor(mission: Mission, world: MissionWorld, confi
   }
 
   return {
+    batterySwapped(): void {
+      reserveTripped = false;
+      criticalTripped = false;
+    },
     check(input: SafetyInput): SafetyAction {
       const { tSec, pose, predicted, phase, inside } = input;
       if (phase === 'land' || phase === 'done') return { kind: 'none', reason: '' };

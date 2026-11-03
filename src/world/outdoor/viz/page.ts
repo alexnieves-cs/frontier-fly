@@ -3,6 +3,7 @@ import { siteHeader } from '../../../ui/siteNav';
 import { createTouchSticks, type TouchSticks } from '../../../ui/touchSticks';
 import type { DynParams } from '../../../shared/types';
 import { makeDroneState, scaleAction } from '../../../sim/drone';
+import { defaultDynParams } from '../../../sim/dynamics/dr';
 import { KinematicDynamics } from '../../../sim/dynamics/kinematic';
 import { actionFromKeys } from '../../../sim/manual';
 import { generateOutdoor } from '../generate';
@@ -14,16 +15,8 @@ import { drawOutdoorMap } from './map';
 import { OutdoorView, type OutdoorCamera } from './scene';
 import { showStartError } from '../../../ui/startError';
 
-const DYN: DynParams = {
-  mass: 0.4,
-  inertia: [0.002, 0.002, 0.004],
-  arm: 0.1,
-  kf: 1e-5,
-  km: 1e-7,
-  motorTau: 0.03,
-  dragLin: [0.1, 0.1, 0.1],
-  dragQuad: [0.05, 0.05, 0.05],
-};
+/** The one airframe (shared/airframe.ts); the kinematic model reads only what it needs. */
+const DYN: DynParams = defaultDynParams();
 
 export async function startOutdoor(root: HTMLElement): Promise<void> {
   const params = new URLSearchParams(location.search);

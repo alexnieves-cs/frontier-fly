@@ -1,3 +1,4 @@
+import type { BatteryConfig } from '../mission/autonomy/battery';
 export type Cell = 0 | 1 | 2 | 3;
 
 export interface Room {
@@ -133,7 +134,7 @@ export interface StepInfo {
   newRoom: boolean;
   newFloor: boolean;
   success: boolean;
-  /** Electrical energy used so far by a 1.2 kg quad flying this track (mission/autonomy/battery.ts), Wh. */
+  /** Electrical energy used so far by the airframe flying this track (mission/autonomy/battery.ts; FrontierBench v2 keeps its own model), Wh. */
   energyWh: number;
   /** Progress penalties subtracted from this step's reward (see sim/reward.ts ProgressTracker). */
   penalty?: { stuck: number; still: number; flip: number; total: number };
@@ -213,6 +214,8 @@ export interface EpisodeConfig {
   maxCollisions?: number;
   /** Impact speed into a surface that counts as a crash and ends the episode, m/s. Defaults to CRASH_SPEED. */
   crashSpeed?: number;
+  /** Power model the reported energyWh is integrated with. Defaults to DEFAULT_BATTERY (shared/airframe.ts). */
+  energyModel?: BatteryConfig;
   /**
    * Horizontal speed a full action asks for, m/s. Defaults to MAX_SPEED_H
    * (2 m/s), which every shipped checkpoint was trained at.

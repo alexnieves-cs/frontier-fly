@@ -17,29 +17,18 @@ const PRECISE_SPEED = 0.5;
 const PRECISE_TILT_RAD = 0.7;
 
 /**
- * The mission airframe as a quadrotor: the 1.2 kg quad the battery model
- * describes (battery.ts), on the same rigid-body model and angle-mode flight
- * controller as the coverage env's micro quad (sim/dynamics). Motor speeds at
- * hover and the drag-to-mass ratio match that airframe, so thrust-to-weight is
- * the same; inertia grows with mass and the rate-loop gains with it, which is
- * what a flight controller tune does for a bigger frame.
+ * The mission airframe as a quadrotor: the one airframe (shared/airframe.ts) on the same
+ * rigid-body model and angle-mode flight controller the coverage env flies (sim/dynamics),
+ * and the same airframe the battery model prices (battery.ts).
  */
 export function missionQuadParams(): DynParams {
-  const mass = 1.2;
-  const p = defaultDynParams(mass);
-  const k = mass / 0.45;
-  return {
-    ...p,
-    inertia: [p.inertia[0] * k, p.inertia[1] * k, p.inertia[2] * k],
-    dragLin: [p.dragLin[0] * k, p.dragLin[1] * k, p.dragLin[2] * k],
-    dragQuad: [p.dragQuad[0] * k, p.dragQuad[1] * k, p.dragQuad[2] * k],
-  };
+  return defaultDynParams();
 }
 
 /**
  * Stopping model for the mission quad, which flies indoors at 1 m/s. The
- * coverage env's fit (QUAD_BRAKING) is from the same controller and the same
- * thrust-to-weight, so it carries over; a test checks it against this airframe.
+ * coverage env's fit (QUAD_BRAKING) is from the same airframe and controller;
+ * a test checks it against the mission vehicle.
  */
 export const MISSION_QUAD_BRAKING: BrakingModel = QUAD_BRAKING;
 

@@ -42,7 +42,7 @@ describe('quad mission vehicle', () => {
 
   it('holds position in strong wind with the outdoor tilt limit, and keeps its tilt inside it', () => {
     // Outdoors the runner sets a tilt limit (phases/core.ts limits()), which also turns on the velocity
-    // integral. The default 23° per axis holds only about 5 m/s on the 1.2 kg airframe.
+    // integral. The default 23° per axis holds only about 5 m/s on the mission airframe.
     const drift = (limits: typeof OUTDOOR_LIMITS, wind: V3) => {
       const q = new QuadVehicle(physics, createBattery(), aloft(), 0, world.outdoor);
       for (let i = 0; i < 40; i++) q.step({ vel: [0, 0, 0], yaw: null }, 0.05, limits);
@@ -110,7 +110,7 @@ describe('quad mission vehicle', () => {
   });
 
   it('stops within the braking model from indoor and outdoor speeds', () => {
-    // MISSION_QUAD_BRAKING was fitted on the coverage env's micro quad; check it holds on the 1.2 kg airframe.
+    // MISSION_QUAD_BRAKING was fitted on the coverage env's micro quad; check it holds on the mission airframe.
     for (const [limits, v0] of [
       [INDOOR_LIMITS, 1],
       [OUTDOOR_LIMITS, 2],

@@ -586,6 +586,16 @@ export class SearchPhase {
   }
 
   /**
+   * A battery-swap return cuts a re-view short: forget it, so the contact stays open and the next
+   * flight into that building re-views it again rather than waiting on a confirmation that never ends.
+   */
+  dropConfirm(): void {
+    if (this.confirmTrack) this.attempted.delete(this.confirmTrack.id);
+    this.confirmTrack = null;
+    this.resumeAfterConfirm = null;
+  }
+
+  /**
    * With hazard awareness: the contact sits in smoke the drone can see (gen/hazards.ts smoke cells),
    * so smoke takes contrast off every view of it and a lookalike-level score proves nothing.
    */

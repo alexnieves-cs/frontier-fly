@@ -22,7 +22,8 @@ async function fly(scene: SarScene, method: 'lanes' | 'poa'): Promise<{ run: Run
     runner.step();
     if (runner.snapshot().confirmed.some((c) => c.classId === 'person')) break;
   }
-  const sar = (runner as unknown as { sar: SarSearch | null }).sar;
+  // The runner keeps its search state on its MissionCore (phases/core.ts).
+  const sar = (runner as unknown as { c: { sar: SarSearch | null } }).c.sar;
   return { run: runner.record(), sar };
 }
 
