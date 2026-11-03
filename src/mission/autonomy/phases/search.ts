@@ -1,3 +1,4 @@
+import { inSmoke } from '../../../gen/hazards';
 import type { ClearScope, DronePose, MissionBuilding, V3 } from '../contracts';
 import { buildingAt, placeContact } from '../perception';
 import type { ClearReport } from '../../../perception/seenEmpty';
@@ -309,6 +310,12 @@ export class SearchPhase {
         free += f.free;
         if (f.free < CLEAR_MIN_FLOOR_VOXELS || f.looked < CLEAR_MIN_LOOKED * f.free) enough = false;
       }
+      // A shut door with unsearched space behind it: nobody can say what is there.
+      if (v.sensing.hazardAware) {
+        const shut = v.sensing.unsearchedDoors();
+        this.c.shutDoors.set(scope, shut);
+        if (shut > 0) enough = false;
+      }
     } else if (v.vis) {
       // Oracle reference: its own look estimate on the true floor plan.
       free = v.vis.cells.length;
@@ -334,6 +341,8 @@ export class SearchPhase {
     const bad = reports.find(({ r }) => r.status !== 'clear')!;
     if (bad.r.status === 'occupied') {
       this.c.log('warn', `${label} not clear: ${bad.r.occupied} ${bad.c} contact(s) still open or confirmed there.`);
+    } else if (scope !== 'outdoor' && (this.c.shutDoors.get(scope) ?? 0) > 0) {
+      this.c.log('warn', `${label} not cleared: ${this.c.shutDoors.get(scope)} shut door(s) with unsearched space behind them. Not declaring clear.`);
     } else {
       const floors = scope === 'outdoor' ? '' : (this.c.visit?.sensing?.lookStats().map((f) => `${f.looked}/${f.free}`).join(', ') ?? '');
       const why = scope === 'outdoor' ? '' : this.c.visit?.searchComplete ? ` (per floor ${floors})` : ` (search cut short; per floor ${floors})`;
@@ -558,7 +567,9 @@ export class SearchPhase {
             );
           } else if (track.status === 'open') {
             const mean = fmt(this.c.tracker.meanConfidence(track), 2);
-            if (this.c.tracker.close(track) === 'unresolved') {
+            const smoky = this.inSmoke(track);
+            if (smoky) this.c.log('warn', `${track.classId} contact at ${this.c.where(track.estimate)} is in smoke: its low confidence can be the smoke, so it is not rejected.`);
+            if (this.c.tracker.close(track, smoky) === 'unresolved') {
               this.c.log(
                 'warn',
                 `Unresolved ${track.classId} contact at ${this.c.where(track.estimate)}: ${track.views.length} view(s), mean confidence ${mean}, under the ${fmt(thresholdFor(this.c.mission, track.classId), 2)} to confirm but above what a lookalike scores. It blocks a clear there; flag it for a person to check.`,
@@ -572,6 +583,25 @@ export class SearchPhase {
         this.c.inside ? 0.2 : 1.5,
       ),
     );
+  }
+
+  /**
+   * With hazard awareness: the contact sits in smoke the drone can see (gen/hazards.ts smoke cells),
+   * so smoke takes contrast off every view of it and a lookalike-level score proves nothing.
+   */
+  inSmoke(track: ConfirmTrack): boolean {
+    if (this.c.options.hazardAware === false) return false;
+    const id = track.buildingId ?? buildingAt(this.c.world, track.estimate, CONTACT_FOOTPRINT_MARGIN_M);
+    const b = this.c.world.buildings.find((x) => x.id === id);
+    const spec = b?.shell.spec;
+    if (!b || !spec?.hazards?.smoke) return false;
+    const [ox, oy, oz] = b.shell.origin;
+    const f = Math.max(0, Math.min(spec.floors.length - 1, Math.floor((track.estimate[2] - oz) / spec.floorHeight)));
+    // The estimate carries range error: any smoke cell within a meter counts.
+    for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+      if (inSmoke(spec, f, track.estimate[0] - ox + dx, track.estimate[1] - oy + dy)) return true;
+    }
+    return false;
   }
 
   endConfirm(): void {

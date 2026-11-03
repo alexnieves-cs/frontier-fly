@@ -5,7 +5,8 @@
 //   node scripts/docs/generate.mjs --check   exit 1 if any file is out of date
 //
 // Inputs: the import graph under src/, docs/benchmarks.json (npm run bench),
-// docs/media/media.json (npm run media), and docs/missions.json when the mission runner writes one.
+// docs/media/media.json (npm run media), docs/missions.json when the mission runner writes one, and the
+// hazard benches (docs/hazard-coverage.json, docs/hazard-missions.json).
 // Numbers only come from those files. A missing file renders as "not measured".
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -16,6 +17,7 @@ import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
+import { hazardsSection } from './hazards.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -1238,6 +1240,7 @@ const values = {
   ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
   GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...atlasValues(readJson('docs/atlas.json')),
+  ...hazardsSection(readJson('docs/hazard-coverage.json'), readJson('docs/hazard-missions.json')).values,
   ...trackingValues(readJson('docs/atlas/mc-tracking.json'), readJson('docs/atlas/mc-tracking-control.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json'), readJson('docs/fault-bench-run4.json'), readJson('docs/fault-bench-run5.json'), readJson('docs/fault-bench-run6.json'), readJson('docs/fault-bench-run7.json')]),
 };
