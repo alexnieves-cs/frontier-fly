@@ -214,7 +214,7 @@ Landed, each with its own study in [REPORT.md](REPORT.md):
 
 Next:
 
-- Loop closure for the localizer, which tracks locally on the real log but drifts over its 45 minutes.
+- Flying the drone with the loop closer, which is only tested on the real Intel log so far.
 - Train the policy on quadrotor dynamics. So far it has only been trained on the kinematic airframe.
 - Let a FrontierBench team entry fly its own pilot. Today every team drone runs the sensor-only planner.
 

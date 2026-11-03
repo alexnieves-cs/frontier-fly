@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { odomFrame, parseFlaser, parseRelations, relationError, ringScan, type LaserLog, type Relation, type RelationError } from '../../src/loc/carmen';
 import { defaultEstimatorOptions, PoseEstimator, type EstimatorOptions } from '../../src/loc/estimator';
+import { LoopCloser, type LoopClosureOptions } from '../../src/loc/graph';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -27,6 +28,8 @@ interface Arm {
   maxRange: number;
   /** null: the raw wheel odometry, no estimator. */
   estimator: Partial<EstimatorOptions> | null;
+  /** Loop closure over the front end (the estimator, or the odometry when estimator is null). */
+  loop?: Partial<LoopClosureOptions>;
 }
 
 /**
@@ -45,6 +48,14 @@ const ARMS: Arm[] = [
   { id: 'fused', label: 'Shipped drone estimator, as is (20 cm cells, flow-sensor noise), lidar cut to 8 m', maxRange: 8, estimator: {} },
   { id: 'adapted', label: 'Same estimator, 10 cm cells and wheel-odometry noise (picked on the dev sweeps)', maxRange: 8, estimator: ADAPTED },
   { id: 'adapted-noManhattan', label: 'Adapted, without the Manhattan heading fix', maxRange: 8, estimator: { ...ADAPTED, manhattan: false } },
+  { id: 'adapted-loop', label: 'Adapted, with the same loop closure over its output', maxRange: 8, estimator: ADAPTED, loop: {} },
+  {
+    id: 'loop',
+    label: 'Estimator in odometry mode, with loop closure (pose graph; scan matching only in the graph)',
+    maxRange: 8,
+    estimator: { ...ADAPTED, mode: 'odometry' },
+    loop: {},
+  },
   { id: 'adapted-scan', label: 'Adapted, scan matching only (no odometry between sweeps)', maxRange: 8, estimator: { ...ADAPTED, mode: 'scan' } },
 ];
 
@@ -119,6 +130,7 @@ function runArm(log: LaserLog, arm: Arm, offset: [number, number]): { pose: Floa
   const pose = new Float64Array(log.n * 3);
   if (!arm.estimator) {
     pose.set(log.odom);
+    if (arm.loop) return closeLoops(log, arm, offset, pose, null, 0, t0);
     return { pose, stats: null, lost: 0, ms: performance.now() - t0 };
   }
   let x0 = Infinity;
@@ -148,7 +160,22 @@ function runArm(log: LaserLog, arm: Arm, offset: [number, number]): { pose: Floa
     pose[i * 3 + 1] = e.pos[1];
     pose[i * 3 + 2] = e.yaw;
   }
+  if (arm.loop) return closeLoops(log, arm, offset, pose, { ...est.stats }, lost, t0);
   return { pose, stats: { ...est.stats }, lost, ms: performance.now() - t0 };
+}
+
+/**
+ * The loop closer over a front end's trajectory. It runs online (sweep by sweep, closing loops as they
+ * come) but the scored trajectory is the one after the final optimisation, as for the published graph
+ * methods. Its stats are prefixed `loop.`.
+ */
+function closeLoops(log: LaserLog, arm: Arm, offset: [number, number], front: Float64Array, stats: Record<string, number> | null, lost: number, t0: number) {
+  const lc = new LoopCloser({ maxRange: arm.maxRange, gridShift: offset, ...arm.loop });
+  for (let i = 0; i < log.n; i++) lc.add(front.subarray(i * 3, i * 3 + 3), ringScan(log, i, arm.maxRange).ranges);
+  const pose = lc.finish();
+  const all: Record<string, number> = { ...(stats ?? {}) };
+  for (const [k, v] of Object.entries(lc.stats)) all[`loop.${k}`] = v;
+  return { pose, stats: all, lost, ms: performance.now() - t0 };
 }
 
 function loadLog(dir: string): { log: LaserLog; rels: Relation[] } {
