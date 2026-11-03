@@ -190,6 +190,7 @@ class Runner implements MissionRunner {
       log: this.c.logs.slice(),
       faults: this.c.faults ? this.c.faults.transitions().slice() : [],
       ...(this.closest ? { clearance: { ...this.closest } } : {}),
+      ...(this.c.shutDoors.size ? { shutDoors: [...this.c.shutDoors].map(([buildingId, count]) => ({ buildingId, count })) } : {}),
       ...(this.c.sar ? { search: { pos: this.c.sar.history.slice(), reachable: 1 - this.c.sar.prior.rest, replans: this.c.sar.replans } } : {}),
     };
   }

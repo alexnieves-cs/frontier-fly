@@ -5,7 +5,8 @@
 //   node scripts/docs/generate.mjs --check   exit 1 if any file is out of date
 //
 // Inputs: the import graph under src/, docs/benchmarks.json (npm run bench),
-// docs/media/media.json (npm run media), and docs/missions.json when the mission runner writes one.
+// docs/media/media.json (npm run media), docs/missions.json when the mission runner writes one, and the
+// hazard benches (docs/hazard-coverage.json, docs/hazard-missions.json).
 // Numbers only come from those files. A missing file renders as "not measured".
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -16,6 +17,7 @@ import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
+import { hazardsSection } from './hazards.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -1061,7 +1063,7 @@ function localizationTables(loc) {
  * against the published scores on the same relations.
  */
 function intelLabSection(intel) {
-  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_NOMAN', 'R_INTEL_NOMAN_BEST', 'R_INTEL_NOMAN_RANGE', 'R_INTEL_ADAPTED_RANGE', 'R_INTEL_SHIPPED_RANGE', 'R_INTEL_NOMAN_LOCAL', 'R_INTEL_SCAN', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN'];
+  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_NOMAN', 'R_INTEL_NOMAN_BEST', 'R_INTEL_NOMAN_RANGE', 'R_INTEL_ADAPTED_RANGE', 'R_INTEL_SHIPPED_RANGE', 'R_INTEL_NOMAN_LOCAL', 'R_INTEL_SCAN', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN', 'R_INTEL_LOOP', 'R_INTEL_LOOP_RANGE', 'R_INTEL_LOOP_HELD', 'R_INTEL_LOOP_LOCAL', 'R_INTEL_LOOP_LOOPS', 'R_INTEL_LOOP_WORST', 'R_INTEL_LOOP_MS', 'R_INTEL_LOOP_CLOSURES', 'R_INTEL_LOOP_KEYS', 'R_INTEL_ADLOOP', 'R_INTEL_ADLOOP_LOOPS'];
   if (!intel) return Object.fromEntries(keys.map((k) => [k, k.startsWith('R_') ? 'not measured' : '_Not measured yet. `npm run study:intel` writes `docs/intel-lab.json`._']));
   const arm = (id) => intel.arms.find((a) => a.id === id);
   const m = (v) => `${v.toFixed(3)} m`;
@@ -1074,7 +1076,7 @@ function intelLabSection(intel) {
     ['Graph FLIRT (as quoted by Hess et al. 2016)', '0.02 ± 0.02', '0.3 ± 0.3', '—', '—', '—'],
     ['Cartographer (Hess et al. 2016)', '0.0229 ± 0.0239', '0.453 ± 1.335', '0.0011 ± 0.0040', '1.986 ± 23.988', '—'],
   ].map(([name, ...v]) => [`${name}, published`, ...v]);
-  const ours = ['odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-scan']
+  const ours = ['loop', 'odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-loop', 'adapted-scan']
     .map(arm)
     .filter(Boolean)
     .map((a) => [
@@ -1085,7 +1087,7 @@ function intelLabSection(intel) {
       pm(a.error.rotSq, 1),
       a.error.transAbs.max.toFixed(3),
     ]);
-  const split = ['odom', 'fused', 'adapted', 'adapted-noManhattan'].map(arm).filter(Boolean).map((a) => [
+  const split = ['loop', 'odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-loop'].map(arm).filter(Boolean).map((a) => [
     a.label,
     `${a.quantiles.transMedian.toFixed(3)} m / ${a.quantiles.rotMedian.toFixed(2)}°`,
     `${a.quantiles.transP90.toFixed(3)} m / ${a.quantiles.rotP90.toFixed(2)}°`,
@@ -1099,7 +1101,21 @@ function intelLabSection(intel) {
   const od = arm('odom');
   const nm = arm('adapted-noManhattan');
   const range = (a) => `${m(a.transRange[0])} to ${m(a.transRange[1])}`;
+  const lp = arm('loop');
+  const al = arm('adapted-loop');
+  const ls = lp.stats;
   return {
+    R_INTEL_LOOP: `${m(lp.error.transAbs.mean)} and ${lp.error.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_LOOP_RANGE: range(lp),
+    R_INTEL_LOOP_HELD: `${m(lp.heldOut.transAbs.mean)} and ${lp.heldOut.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_LOOP_LOCAL: m(lp.local.transAbs.mean),
+    R_INTEL_LOOP_LOOPS: m(lp.loops.transAbs.mean),
+    R_INTEL_LOOP_WORST: m(lp.error.transAbs.max),
+    R_INTEL_LOOP_MS: `${fmt(lp.msPerSweep, 1)} ms`,
+    R_INTEL_LOOP_CLOSURES: `${fmt(ls['loop.loopAccepted'])} of ${fmt(ls['loop.loopTried'])}`,
+    R_INTEL_LOOP_KEYS: fmt(ls['loop.keyframes']),
+    R_INTEL_ADLOOP: m(al.error.transAbs.mean),
+    R_INTEL_ADLOOP_LOOPS: m(al.loops.transAbs.mean),
     R_INTEL_NOMAN: `${m(nm.error.transAbs.mean)} and ${nm.error.rotAbs.mean.toFixed(2)}°`,
     R_INTEL_NOMAN_BEST: m(nm.transRange[0]),
     R_INTEL_NOMAN_RANGE: range(nm),
@@ -1229,6 +1245,7 @@ const values = {
   ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
   GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...atlasValues(readJson('docs/atlas.json')),
+  ...hazardsSection(readJson('docs/hazard-coverage.json'), readJson('docs/hazard-missions.json')).values,
   ...trackingValues(readJson('docs/atlas/mc-tracking.json'), readJson('docs/atlas/mc-tracking-control.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json'), readJson('docs/fault-bench-run4.json'), readJson('docs/fault-bench-run5.json'), readJson('docs/fault-bench-run6.json'), readJson('docs/fault-bench-run7.json')]),
 };

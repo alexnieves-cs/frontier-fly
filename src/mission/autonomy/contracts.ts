@@ -14,7 +14,7 @@
  * Change this file only by agreement; every module codes against it.
  */
 import type { ClearReport } from '../../perception/seenEmpty';
-import type { SensorMode } from '../../shared/types';
+import type { HazardParams, SensorMode } from '../../shared/types';
 import type { ObjectId, PersonState, TargetCategory, TargetClass, TargetScene } from '../../targets/types';
 import type { BuildingShell, Opening, OutdoorWorld } from '../../world/outdoor/types';
 import type { Mission, MissionType, Point } from '../types';
@@ -82,6 +82,11 @@ export interface MissionWorldOptions {
    * Defaults to `seed`. The failure atlas varies the two independently.
    */
   placementSeed?: number;
+  /**
+   * Indoor hazards built into every building (gen/hazards.ts): shut and ajar doors, glass rooms,
+   * mirrors, smoke. Targets are planted first, so a person can be behind a door that is then shut.
+   */
+  hazards?: HazardParams;
 }
 
 export interface MissionForWorldOptions {
@@ -325,6 +330,8 @@ export interface RunRecord {
   search?: { pos: { tSec: number; pos: number }[]; reachable: number; replans: number };
   /** With RunnerOptions.measureClearance: the closest the airframe came to any solid but the ground. */
   clearance?: ClearanceRecord;
+  /** Per building searched: shut doors the camera recognised with space behind them the drone never saw. */
+  shutDoors?: { buildingId: string; count: number }[];
 }
 
 /** Closest approach of the drone's sphere to a solid (the ground excluded), and where it happened. */
@@ -406,6 +413,12 @@ export interface RunnerOptions {
   search?: OutdoorSearchOptions;
   /** Track the closest approach to any solid every tick (RunRecord.clearance). Off by default: it costs a query per tick. */
   measureClearance?: boolean;
+  /**
+   * Hazard awareness indoors, default on: a shut door with unsearched space behind it blocks a clear,
+   * and the look estimate only trusts the camera where smoke leaves it contrast. Off is the control
+   * the hazard bench compares against.
+   */
+  hazardAware?: boolean;
 }
 
 /**

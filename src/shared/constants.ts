@@ -13,6 +13,10 @@ export const SURFACE = {
   WOOD: 2,
   GLASS: 3,
   METAL: 4,
+  /** A shut interior door leaf (gen/hazards.ts). Solid; the camera recognises it as a door. */
+  DOOR: 5,
+  /** A wall-mounted mirror panel: the lidar measures the reflected path (sim/sensors.ts). */
+  MIRROR: 6,
 } as const;
 
 /** Observation contract version. v1 = 306 floats (the first shipped checkpoint). See src/sim/OBS_LAYOUT.md. */

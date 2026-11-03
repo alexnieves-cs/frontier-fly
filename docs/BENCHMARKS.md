@@ -210,6 +210,34 @@ Each scenario's settings flown on 30 fresh world seeds (79201–79230) with each
 | **All** | Estimated pose: sensor-only planner | 98.3% (94–100%) | 209 | — | 94.8% | 0.00 | 10:02 | 0 | 0 |
 | **All** | Estimated pose, quadrotor: sensor-only planner | 95.0% (90–98%) | 190 | — | 93.6% | 0.16 | 8:29 | 0 | 0 |
 
+## Indoor hazards
+
+Shut and ajar doors, glass and mirrors, and smoke; method and pass conditions in [REPORT.md](REPORT.md#doors-glass-and-smoke). Coverage on fresh hard buildings 86001–86030 (mean coverage, crashes of 30, ratio to the pilot's own no-hazard run):
+
+| Pilot | No hazards | Doors | Glass and mirrors | Smoke |
+| --- | --- | --- | --- | --- |
+| Oracle teacher (reads the true map) | 61.8% (0) | 52.4% (10), ×0.85 | 61.8% (0), ×1.00 | 61.8% (0), ×1.00 |
+| Sensor-only planner | 64.0% (0) | 66.3% (0), ×1.04 | 64.5% (0), ×1.01 | 47.5% (0), ×0.74 |
+| Policy alone | 63.8% (17) | 38.4% (26), ×0.60 | 50.5% (21), ×0.79 | 58.6% (18), ×0.92 |
+| Policy + lidar guard | 70.5% (6) | 68.7% (3), ×0.97 | 68.2% (3), ×0.97 | 60.9% (1), ×0.86 |
+
+Missions on fresh worlds from 86501:
+
+| Scenario | Explorer | Person found (95% CI) | Ends as expected | Flights with a false clear (95% CI) | Shut door left unsearched | Flights with a collision |
+| --- | --- | --- | --- | --- | --- | --- |
+| Sweep with someone inside, shut and ajar doors | Sensor planner, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 1 | 0 |
+| Sweep with someone inside, shut and ajar doors | Policy, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 4 | 0 |
+| Sweep with someone inside, shut and ajar doors | Sensor planner, unaware (control) | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 0 |
+| Sweep with someone inside, smoke | Sensor planner, hazard-aware | 12 of 30 (24.6–57.7) | 40.0% | 0 (0.0–11.4) | 0 | 8 |
+| Sweep with someone inside, smoke | Policy, hazard-aware | 11 of 30 (21.9–54.5) | 36.7% | 0 (0.0–11.4) | 0 | 7 |
+| Sweep with someone inside, smoke | Sensor planner, unaware (control) | 13 of 30 (27.4–60.8) | 43.3% | 0 (0.0–11.4) | 0 | 3 |
+| Injured hiker in a smoky cabin | Sensor planner, hazard-aware | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
+| Injured hiker in a smoky cabin | Policy, hazard-aware | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
+| Injured hiker in a smoky cabin | Sensor planner, unaware (control) | 14 of 30 (30.2–63.9) | 46.7% | 0 (0.0–11.4) | 0 | 0 |
+| Injured hiker, glass rooms and mirrors | Sensor planner, hazard-aware | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 3 |
+| Injured hiker, glass rooms and mirrors | Policy, hazard-aware | 26 of 30 (70.3–94.7) | 86.7% | 0 (0.0–11.4) | 0 | 6 |
+| Injured hiker, glass rooms and mirrors | Sensor planner, unaware (control) | 27 of 30 (74.4–96.5) | 90.0% | 0 (0.0–11.4) | 0 | 3 |
+
 ## Reproduce
 
 ```bash

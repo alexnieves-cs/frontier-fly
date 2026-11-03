@@ -142,6 +142,8 @@ export class MissionCore {
   readonly phases: RunRecord['phases'] = [];
   readonly confirmed: ConfirmedContact[] = [];
   readonly declaredClear: RunRecord['declaredClear'] = [];
+  /** Per building: shut doorways seen with unsearched space behind them, at the last check (RunRecord.shutDoors). */
+  readonly shutDoors = new Map<string, number>();
   readonly collisions: RunRecord['collisions'] = [];
   readonly entries: EntryRecord[] = [];
   readonly recent: Contact[] = [];

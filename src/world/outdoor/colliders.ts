@@ -52,6 +52,25 @@ function addBuilding(solids: Solid[], shell: BuildingShell): void {
       ...IDENTITY,
     });
   }
+  // Ajar interior door leaves (gen/hazards.ts). Other furniture stays out of the outdoor colliders.
+  const furniture = spec.furniture;
+  for (const box of furniture?.boxes ?? []) {
+    if (furniture!.props[box.prop]?.kind !== 'door') continue;
+    solids.push({
+      shape: 'cuboid',
+      tag: 'door',
+      cx: box.cx + shell.origin[0],
+      cy: box.cy + shell.origin[1],
+      cz: box.cz + shell.origin[2],
+      hx: box.hx,
+      hy: box.hy,
+      hz: box.hz,
+      qx: 0,
+      qy: 0,
+      qz: Math.sin(box.yaw / 2),
+      qw: Math.cos(box.yaw / 2),
+    });
+  }
   for (const opening of shell.openings) {
     if (opening.kind === 'roof_hatch') continue;
     addJambs(solids, shell, opening);
