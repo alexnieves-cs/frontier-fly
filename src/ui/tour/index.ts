@@ -3,6 +3,7 @@
 // nothing advances on its own, and Next, Skip and Exit always work, even while a page is still building its 3D view.
 // Loaded only when a tour is running (siteNav.ts imports it when the URL has ?tour, the Home button on click).
 import './tour.css';
+import { savingData } from '../network';
 import { REPO_URL, currentSitePage, type SitePage } from '../siteNav';
 import { buildClaims } from './claims';
 import { decideOnLoad, marker, nextStep, parseTour, withTour, type StepId } from './state';
@@ -256,8 +257,7 @@ class Tour {
 
 /** While the film plays, fetch the race page at idle so the next stop starts sooner. Not on data-saver links. */
 function prefetchNext(): void {
-  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
-  if (connection?.saveData || /2g/.test(connection?.effectiveType ?? '')) return;
+  if (savingData()) return;
   const add = () => {
     if (document.querySelector('link[data-tour-prefetch]')) return;
     const link = document.createElement('link');

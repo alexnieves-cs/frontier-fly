@@ -17,6 +17,33 @@ test('the homepage scrolls to its results and footer once the hero film has load
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 });
 
+test('the homepage hero shows the recorded flight at once, then hands over to the live replay', async ({ page }) => {
+  await page.goto('/index.html');
+  // The poster frame and the recorded loop come first: no 3D, no physics engine, no policy yet.
+  await expect.poll(() => page.evaluate(() => (document.querySelector('.hero-still') as HTMLImageElement | null)?.naturalWidth ?? 0), { timeout: 5_000 }).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => document.querySelector<HTMLVideoElement>('.hero-loop')?.currentTime ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect(page.locator('#poster-status')).toContainText('Recorded flight');
+  // The live replay builds behind it and fades in over it.
+  await expect(page.locator('#hero-poster')).toHaveClass(/hidden/, { timeout: 150_000 });
+  await expect(page.locator('#poster-status')).toContainText('Live');
+});
+
+test('with data saver on, the homepage keeps the poster and loads the live replay only on request', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'connection', { get: () => ({ saveData: true, effectiveType: '4g' }) });
+  });
+  const requests: string[] = [];
+  page.on('request', (r) => requests.push(r.url()));
+  await page.goto('/index.html');
+  const live = page.locator('#hero-live');
+  await expect(live).toBeVisible();
+  await page.waitForTimeout(2_000);
+  expect(requests.filter((u) => /policy\.bin|\/hero\/loop\.|\/textures\//.test(u))).toEqual([]);
+  await live.click();
+  await expect(live).toBeHidden();
+  await expect(page.locator('#hero-film canvas')).toBeAttached({ timeout: 120_000 });
+});
+
 test('on a phone the page links fold into a menu that opens, closes, and marks the current page', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/race.html');
