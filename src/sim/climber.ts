@@ -9,7 +9,8 @@
  * It reads only the sensor frame, so it stays sensor-only.
  */
 import { VOXEL } from '../shared/constants';
-import { SensorPlanner, type SensorCommand, type SensorFrame } from './sensorPlanner';
+import type { SensorCommand, SensorFrame } from './sensorPlanner';
+import type { Explorer } from './explorers/common';
 import { filterVelocity, SAFETY_MARGIN } from './lidarSafety';
 import { sensorPath } from './sensorMap';
 
@@ -76,9 +77,9 @@ export interface ClimberOptions {
   floorSteps?: number;
 }
 
-/** Sensor-only planner that also takes shafts between floors. */
+/** Sensor-only planner (or any Explorer) that also takes shafts between floors. */
 export class Climber {
-  readonly planner: SensorPlanner;
+  readonly planner: Explorer;
   readonly stallSteps: number;
   readonly speed: number;
   readonly floorSteps: number;
@@ -96,7 +97,7 @@ export class Climber {
   /** Floors entered by a climb or descent (diagnostics). */
   floorChanges = 0;
 
-  constructor(planner: SensorPlanner, opts: ClimberOptions = {}) {
+  constructor(planner: Explorer, opts: ClimberOptions = {}) {
     this.planner = planner;
     this.stallSteps = opts.stallSteps ?? Infinity;
     this.speed = opts.speed ?? 2;

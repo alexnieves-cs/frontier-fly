@@ -12,11 +12,27 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 | 2 | Sensor-only planner + momentum (baseline) | **67.8%** | 88.5% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 42.6% | 86.1% | 93% | `20aa664` |
 | 3 | Sensor-only planner (baseline) | **67.5%** | 87.0% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 41.1% | 85.5% | 94% | `20aa664` |
 | 4 | [Shipped policy (DAgger + PPO)](../bench/results/policy.json) | **67.4%** | 85.9% | 95.1% | 76.2% | 78.5% | 70.4% | 40.0% | 42.8% | 68.8% | 28% | `37e14d1` |
-| 5 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.7%** | 83.5% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 80.6% | 96% | `20aa664` |
-| 6 | Frontier waypoint follower (baseline) | **28.6%** | 61.6% | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 34.6% | 0% | `20aa664` |
-| 7 | Lidar wall-follower (baseline) | **17.0%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `20aa664` |
+| 5 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **66.7%** | 88.6% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 44.2% | 85.6% | 95% | `f0f5cab` |
+| 6 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.7%** | 83.5% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 41.6% | 80.6% | 96% | `20aa664` |
+| 7 | Frontier waypoint follower (baseline) | **28.6%** | 61.6% | 53.5% | 24.4% | 19.0% | 32.2% | 13.5% | 22.8% | 34.6% | 0% | `20aa664` |
+| 8 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **27.5%** | 90.5% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 25.8% | 31.1% | 98% | `f0f5cab` |
+| 9 | Lidar wall-follower (baseline) | **17.0%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `20aa664` |
+| 10 | Nearest frontier (Yamauchi 1997) (baseline) | **8.8%** | 73.9% | 3.3% | 10.0% | 11.6% | 10.3% | 4.6% | 10.2% | 11.9% | 99% | `f0f5cab` |
 
 The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. The last-but-one column is the share of all 240 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
+
+### Published methods
+
+Three baselines reimplement published exploration methods on the same sensor maps, flight layer and safety filter as the planner (`src/sim/explorers`): nearest frontier (Yamauchi 1997), receding-horizon next-best-view (NBVP, Bircher et al. 2016) and online boustrophedon coverage (BA\*, Viet et al. 2013). The two mapping methods stop once nothing in lidar range is unknown, so they rank low on flown coverage. Judge them on the footprint, where NBVP leads:
+
+| Pilot | Score (flown) | Footprint score | Footprint curve area | Half seen, s | Flights that touched nothing |
+| --- | --- | --- | --- | --- | --- |
+| Sensor-only planner (this repository) | 67.5% | 87.0% | 0.66 | 39.5 | 94% |
+| Nearest frontier (Yamauchi 1997) | 8.8% | 73.9% | 0.72 | 8.9 | 99% |
+| Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.5% | 90.5% | 0.84 | 10.5 | 98% |
+| Boustrophedon coverage (BA*, Viet et al. 2013) | 66.7% | 88.6% | 0.68 | 35.0 | 95% |
+
+[REPORT.md](REPORT.md#against-published-exploration-methods) describes each method and its adaptations.
 
 ## Tasks
 

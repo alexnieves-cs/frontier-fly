@@ -58,10 +58,40 @@ function teamBoard(root) {
   );
 }
 
+/** Baselines that reimplement published exploration methods (src/sim/explorers), beside the house planner. */
+const PUBLISHED = ['planner', 'yamauchi', 'nbvp', 'boustrophedon'];
+
+function publishedTable(rows) {
+  const by = Object.fromEntries(rows.filter((r) => r.baseline).map((r) => [r.source?.replace('baseline:', ''), r]));
+  const have = PUBLISHED.filter((id) => by[id]);
+  if (have.length < 2) return '_Run `npm run bench:board -- --only yamauchi,nbvp,boustrophedon`._';
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const over = (r, f) => {
+    const xs = Object.values(r.tasks).map(f).filter((v) => v !== null && v !== undefined);
+    return xs.length ? mean(xs) : null;
+  };
+  return table(
+    ['Pilot', 'Score (flown)', 'Footprint score', 'Footprint curve area', 'Half seen, s', 'Flights that touched nothing'],
+    have.map((id) => {
+      const r = by[id];
+      const area = over(r, (t) => t.area?.footprint);
+      const half = over(r, (t) => t.footprintHalfS);
+      return [
+        id === 'planner' ? `${r.name} (this repository)` : r.name,
+        pct(r.score),
+        r.footprintScore === undefined ? '—' : pct(r.footprintScore),
+        area === null ? '—' : area.toFixed(2),
+        half === null ? '—' : half.toFixed(1),
+        `${Math.round(r.safeShare * 100)}%`,
+      ];
+    }),
+  );
+}
+
 export function benchSection(root) {
   const rows = readResults(root).filter((r) => r.split === 'test');
   const tasks = rows.find((r) => r.taskDefs)?.taskDefs ?? [];
-  if (!rows.length) return { BENCH_BOARD: '_Run `npm run bench:board`._', BENCH_TASKS: '', BENCH_TEAM: teamBoard(root) };
+  if (!rows.length) return { BENCH_BOARD: '_Run `npm run bench:board`._', BENCH_TASKS: '', BENCH_PUBLISHED: publishedTable(rows), BENCH_TEAM: teamBoard(root) };
   rows.sort((a, b) => b.score - a.score);
   const board = rows.map((r, i) => [
     String(i + 1),
@@ -73,6 +103,7 @@ export function benchSection(root) {
     `\`${r.commit}\``,
   ]);
   return {
+    BENCH_PUBLISHED: publishedTable(rows),
     BENCH_TEAM: teamBoard(root),
     BENCH_BOARD: table(['#', 'Pilot', 'Score', 'Footprint score', ...tasks.map((t) => t.id), 'Flights that touched nothing', 'Commit'], board),
     BENCH_TASKS: table(

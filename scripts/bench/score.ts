@@ -3,7 +3,8 @@
 //   npm run bench:score -- --pilot planner --split dev
 //   npm run bench:score -- --pilot ./bench/entries/my-pilot/pilot.ts --split test --out bench/entries/my-pilot/result.json
 //
-// --pilot is a baseline id (planner, planner-momentum, policy, guarded, waypoint, heuristic) or a
+// --pilot is a baseline id (planner, planner-momentum, policy, guarded, waypoint, heuristic,
+// yamauchi, nbvp, boustrophedon) or a
 // module whose default export is a BenchPilotFactory (src/bench/pilot.ts). --tasks narrows the run.
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
