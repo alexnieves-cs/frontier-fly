@@ -73,7 +73,7 @@ function addBuilding(solids: Solid[], shell: BuildingShell): void {
   }
   for (const opening of shell.openings) {
     if (opening.kind === 'roof_hatch') continue;
-    addJambs(solids, shell, opening);
+    solids.push(...jambSolids(shell, opening));
     const pose = doorPose(opening);
     if (!pose) continue;
     solids.push({
@@ -91,10 +91,12 @@ function addBuilding(solids: Solid[], shell: BuildingShell): void {
       qw: pose.quat.w,
     });
   }
-  addRoof(solids, shell);
+  solids.push(...roofSolids(shell));
 }
 
-function addJambs(solids: Solid[], shell: BuildingShell, opening: Opening): void {
+/** The wall pieces left around a wall opening's hole: sill block, lintel and the two side jambs. */
+export function jambSolids(shell: BuildingShell, opening: Opening): Solid[] {
+  const solids: Solid[] = [];
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -123,9 +125,12 @@ function addJambs(solids: Solid[], shell: BuildingShell, opening: Opening): void
     push(solids, 'jamb', minX, minY, holeZ0, maxX, holeY0, holeZ1);
     push(solids, 'jamb', minX, holeY1, holeZ0, maxX, maxY, holeZ1);
   }
+  return solids;
 }
 
-function addRoof(solids: Solid[], shell: BuildingShell): void {
+/** The roof slab, split around a roof hatch when the shell has one. */
+export function roofSolids(shell: BuildingShell): Solid[] {
+  const solids: Solid[] = [];
   const floor = shell.spec.floors[0]!;
   const x0 = shell.origin[0];
   const y0 = shell.origin[1];
@@ -136,7 +141,7 @@ function addRoof(solids: Solid[], shell: BuildingShell): void {
   const hatch = shell.openings.find((opening) => opening.kind === 'roof_hatch');
   if (!hatch) {
     push(solids, 'roof', x0, y0, z0, x1, y1, z1);
-    return;
+    return solids;
   }
   const hx0 = hatch.center[0] - hatch.width / 2;
   const hx1 = hatch.center[0] + hatch.width / 2;
@@ -146,6 +151,7 @@ function addRoof(solids: Solid[], shell: BuildingShell): void {
   push(solids, 'roof', hx1, y0, z0, x1, y1, z1);
   push(solids, 'roof', hx0, y0, z0, hx1, hy0, z1);
   push(solids, 'roof', hx0, hy1, z0, hx1, y1, z1);
+  return solids;
 }
 
 function push(

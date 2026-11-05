@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { buildingAabbs } from '../../gen/parts';
 import { CELL } from '../../shared/constants';
 import { RNG } from '../../shared/rng';
@@ -9,6 +9,7 @@ import { sampleHeight } from '../../world/outdoor/terrain';
 import type { BuildingShell, OutdoorWorld, Solid, TreeInstance } from '../../world/outdoor/types';
 import { buildProps } from '../props';
 import type { MaterialSet } from '../three/materials';
+import { buildFacade, planarUv } from './facade';
 import { curtainTexture, groundDetailTexture, hatchTexture, shingleTexture, sidingTexture } from './textures';
 
 /** Weathered paint colours for exterior siding (cedar, sage, slate, oxblood). */
@@ -316,11 +317,12 @@ export class SiteDressing {
     bark.wrapS = THREE.RepeatWrapping;
     bark.wrapT = THREE.RepeatWrapping;
     const trunkMat = new THREE.MeshStandardMaterial({ map: bark, color: '#b59775', roughness: 0.92 });
-    const foliage = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.86, flatShading: true });
-    const rng = new RNG(this.opts.seed, far ? 'far-shapes' : 'tree-shapes');
     const low = this.opts.quality !== 'high';
-    const pineGeo = pineCanopy(rng, far || low ? 6 : 9);
-    const leafGeo = broadleafCanopy(rng, far || low ? 0 : 1);
+    const rich = !far && !low;
+    const foliage = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.86, flatShading: !rich, vertexColors: true });
+    const rng = new RNG(this.opts.seed, far ? 'far-shapes' : 'tree-shapes');
+    const pineGeo = pineCanopy(rng, far || low ? 6 : 10, rich);
+    const leafGeo = broadleafCanopy(rng, far || low ? 0 : 2);
     const bushGeo = broadleafCanopy(rng, 0);
     const trunkGeo = new THREE.CylinderGeometry(0.5, 0.62, 1, far ? 5 : 8, 1);
     trunkGeo.translate(0, 0.5, 0);
@@ -405,32 +407,108 @@ export class SiteDressing {
     );
     fence.renderOrder = 3;
     this.root.add(fence);
+    this.buildNoFly(outdoor);
+  }
+
+  /**
+   * No-fly zones as markings on the ground, the way a site survey would paint them: a hatched
+   * area draped over the terrain, a solid border, and banded posts at the corners.
+   */
+  private buildNoFly(outdoor: OutdoorWorld): void {
     const hatch = hatchTexture();
+    const red = this.night ? '#c23440' : '#e2384a';
+    const fill = new THREE.MeshBasicMaterial({ color: red, alphaMap: hatch, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, fog: false });
+    const edge = new THREE.MeshBasicMaterial({ color: red, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, fog: false });
+    const postRed = new THREE.MeshStandardMaterial({ color: '#c8323c', roughness: 0.6 });
+    const postWhite = new THREE.MeshStandardMaterial({ color: '#eeeeee', roughness: 0.6 });
+    const lift = 0.05;
     for (const zone of outdoor.noFly) {
-      const shape = new THREE.Shape(zone.polygon.map(([x, y]) => new THREE.Vector2(x, -y)));
-      const top = Math.min(zone.maxZ, 7);
-      const extrude = new THREE.ExtrudeGeometry(shape, { depth: top, bevelEnabled: false });
-      extrude.rotateX(-Math.PI / 2);
-      const z0 = this.groundAt(zone.polygon[0]![0], zone.polygon[0]![1]) - 0.5;
-      const box = new THREE.Mesh(
-        extrude,
-        new THREE.MeshBasicMaterial({ color: '#ff4f5e', transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide, fog: false }),
-      );
-      box.position.y = z0;
-      box.renderOrder = 3;
-      this.root.add(box);
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(extrude), new THREE.LineBasicMaterial({ color: '#ff6b77', transparent: true, opacity: 0.45, fog: false }));
-      edges.position.y = z0;
-      this.root.add(edges);
-      const floorHatch = new THREE.Mesh(
-        new THREE.ShapeGeometry(shape),
-        new THREE.MeshBasicMaterial({ color: '#ff4f5e', alphaMap: hatch, transparent: true, opacity: 0.5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, fog: false }),
-      );
-      floorHatch.rotation.x = -Math.PI / 2;
-      floorHatch.position.y = z0 + 0.62;
-      const uv = floorHatch.geometry.getAttribute('uv');
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 3, uv.getY(i) / 3);
-      this.root.add(floorHatch);
+      const poly = zone.polygon;
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
+      for (const [x, y] of poly) {
+        x0 = Math.min(x0, x);
+        y0 = Math.min(y0, y);
+        x1 = Math.max(x1, x);
+        y1 = Math.max(y1, y);
+      }
+      // Hatched fill: a draped grid of 0.5 m quads whose centres fall inside the zone.
+      const step = 0.5;
+      const pos: number[] = [];
+      const uv: number[] = [];
+      for (let y = y0; y < y1; y += step) {
+        for (let x = x0; x < x1; x += step) {
+          if (!insidePolygon(poly, x + step / 2, y + step / 2)) continue;
+          const q: [number, number][] = [
+            [x, y],
+            [x + step, y],
+            [x + step, y + step],
+            [x, y],
+            [x + step, y + step],
+            [x, y + step],
+          ];
+          for (const [qx, qy] of q) {
+            pos.push(qx, this.groundAt(qx, qy) + lift, qy);
+            uv.push(qx / 3, qy / 3);
+          }
+        }
+      }
+      const area = new THREE.BufferGeometry();
+      area.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      area.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      const areaMesh = new THREE.Mesh(area, fill);
+      areaMesh.renderOrder = 3;
+      this.root.add(areaMesh);
+      // Border: a 0.3 m stripe just inside each edge, draped every 0.5 m.
+      const bpos: number[] = [];
+      const cx = poly.reduce((a, p) => a + p[0], 0) / poly.length;
+      const cy = poly.reduce((a, p) => a + p[1], 0) / poly.length;
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i]!;
+        const b = poly[(i + 1) % poly.length]!;
+        const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        let nx = -(b[1] - a[1]) / len;
+        let ny = (b[0] - a[0]) / len;
+        // Point the offset into the zone.
+        if (nx * (cx - a[0]) + ny * (cy - a[1]) < 0) {
+          nx = -nx;
+          ny = -ny;
+        }
+        const segs = Math.max(1, Math.ceil(len / 0.5));
+        for (let k = 0; k < segs; k++) {
+          const t0 = k / segs;
+          const t1 = (k + 1) / segs;
+          const p0x = a[0] + (b[0] - a[0]) * t0;
+          const p0y = a[1] + (b[1] - a[1]) * t0;
+          const p1x = a[0] + (b[0] - a[0]) * t1;
+          const p1y = a[1] + (b[1] - a[1]) * t1;
+          const w = 0.3;
+          const v = (x: number, y: number) => bpos.push(x, this.groundAt(x, y) + lift + 0.01, y);
+          v(p0x, p0y);
+          v(p1x, p1y);
+          v(p1x + nx * w, p1y + ny * w);
+          v(p0x, p0y);
+          v(p1x + nx * w, p1y + ny * w);
+          v(p0x + nx * w, p0y + ny * w);
+        }
+      }
+      const border = new THREE.BufferGeometry();
+      border.setAttribute('position', new THREE.Float32BufferAttribute(bpos, 3));
+      const borderMesh = new THREE.Mesh(border, edge);
+      borderMesh.renderOrder = 3;
+      this.root.add(borderMesh);
+      // Banded marker posts at the corners.
+      for (const [x, y] of poly) {
+        const g = this.groundAt(x, y);
+        for (let band = 0; band < 4; band++) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.3, 10), band % 2 ? postWhite : postRed);
+          post.position.set(x, g + 0.15 + band * 0.3, y);
+          post.castShadow = true;
+          this.root.add(post);
+        }
+      }
     }
   }
 
@@ -464,7 +542,9 @@ export class SiteDressing {
         root.add(slab);
         continue;
       }
-      const inner = box.kind === 'window' ? mats.glass : mats.wall;
+      const onBorder = box.cx - box.hx <= eps || box.cx + box.hx >= W - eps || box.cy - box.hy <= eps || box.cy + box.hy >= D - eps;
+      // Exterior glass gets a framed window from buildFacade; the cell behind it is solid wall.
+      const inner = box.kind === 'window' && !onBorder ? mats.glass : mats.wall;
       // BoxGeometry groups: +x, -x, +y, -y, +z, -z (Three axes; Three z is sim y).
       const faces = [
         box.cx + box.hx >= W - eps ? siding : inner,
@@ -475,9 +555,9 @@ export class SiteDressing {
         box.cy - box.hy <= eps ? siding : inner,
       ];
       const geo = new THREE.BoxGeometry(box.hx * 2, box.hz * 2, box.hy * 2);
-      tileUv(geo, box.hx * 2, box.hy * 2, 1, box.hz * 2);
       const mesh = new THREE.Mesh(geo, faces);
       mesh.position.set(box.cx, box.cz, box.cy);
+      planarUv(geo, mesh.position, 1);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       root.add(mesh);
@@ -509,7 +589,10 @@ export class SiteDressing {
       ceilings.push(ceil);
     });
     root.add(buildProps(spec, mats));
-    const roof = this.buildRoof(shell, root, W, D, top);
+    const trim = new THREE.MeshStandardMaterial({ color: this.night ? '#b9b4ab' : '#efe9dd', roughness: 0.6 });
+    const facade = buildFacade(shell, { siding, wall: mats.wall, cap, trim, door: mats.door, night: this.night, seed: this.opts.seed, flush: this.opts.quality !== 'high' });
+    root.add(facade.group);
+    const roof = [...this.buildRoof(shell, root, W, D, top), ...facade.roof];
     this.cheapen(root);
     return { root, roof, ceilings, width: W, depth: D, height: top };
   }
@@ -564,13 +647,8 @@ export class SiteDressing {
     const hatch = shell.openings.some((o) => o.kind === 'roof_hatch');
     const parts: THREE.Object3D[] = [];
     const shingles = new THREE.MeshStandardMaterial({ map: shingleTexture(this.opts.seed + shell.id * 7), roughness: 0.78, side: THREE.DoubleSide });
-    if (hatch) {
-      const slab = new THREE.Mesh(new THREE.BoxGeometry(W, 0.12, D), shingles);
-      slab.position.set(W / 2, top + 0.06, D / 2);
-      slab.castShadow = true;
-      root.add(slab);
-      return [slab];
-    }
+    // A flat roof with its hatch is drawn by buildFacade.
+    if (hatch) return [];
     const o = 0.4;
     const x0 = -o;
     const x1 = W + o;
@@ -624,12 +702,12 @@ export class SiteDressing {
   }
 
   private buildOpenings(colliders: Solid[]): void {
-    const trim = new THREE.MeshStandardMaterial({ color: '#f1ece2', roughness: 0.6 });
     const door = new THREE.MeshStandardMaterial({ color: '#6d4429', roughness: 0.55 });
     const geo = new THREE.BoxGeometry(1, 1, 1);
     for (const solid of colliders) {
-      if (solid.shape !== 'cuboid' || (solid.tag !== 'jamb' && solid.tag !== 'door')) continue;
-      const mesh = new THREE.Mesh(geo, solid.tag === 'door' ? door : trim);
+      // Jambs are drawn per shell by buildFacade, with siding and casing; only door leaves here.
+      if (solid.shape !== 'cuboid' || solid.tag !== 'door') continue;
+      const mesh = new THREE.Mesh(geo, door);
       // The sim-to-Three axis swap is a reflection, so the rotation angle flips sign.
       const q = new THREE.Quaternion(-solid.qx, -solid.qz, -solid.qy, solid.qw);
       mesh.position.set(solid.cx, solid.cz, solid.cy);
@@ -640,6 +718,17 @@ export class SiteDressing {
       this.root.add(mesh);
     }
   }
+}
+
+/** Even-odd point-in-polygon test in the sim's horizontal plane. */
+function insidePolygon(poly: readonly (readonly [number, number])[], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]!;
+    const [xj, yj] = poly[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 function segmentDistance(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
@@ -668,7 +757,6 @@ function tileUv(geo: THREE.BoxGeometry, sx: number, sz: number, scale: number, s
   uv.needsUpdate = true;
 }
 
-/** Stacked, jittered cones: one pine canopy, unit radius and unit height, base at y = 0. */
 /** A sky sphere shaded from zenith to horizon, centred on the site. Cheap enough for software GL. */
 function gradientDome(mid: number, [top, middle, horizon]: [string, string, string]): THREE.Mesh {
   const gradient = document.createElement('canvas');
@@ -691,39 +779,120 @@ function gradientDome(mid: number, [top, middle, horizon]: [string, string, stri
   return dome;
 }
 
-function pineCanopy(rng: RNG, segments: number): THREE.BufferGeometry {
-  const tiers = 4;
-  const parts: THREE.BufferGeometry[] = [];
-  for (let i = 0; i < tiers; i++) {
-    const t = i / tiers;
-    const radius = 1 - t * 0.62;
-    const height = 0.42 - t * 0.04;
-    const cone = new THREE.ConeGeometry(radius, height, segments, 1, true);
-    cone.translate(0, t * 0.62 + height / 2, 0);
-    jitter(cone, rng, 0.07);
-    parts.push(cone.toNonIndexed());
+/** One pine canopy, unit radius and unit height, base at y = 0. */
+function pineCanopy(rng: RNG, segments: number, rich: boolean): THREE.BufferGeometry {
+  if (!rich) {
+    const tiers = 4;
+    const parts: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < tiers; i++) {
+      const t = i / tiers;
+      const radius = 1 - t * 0.62;
+      const height = 0.42 - t * 0.04;
+      const cone = new THREE.ConeGeometry(radius, height, segments, 1, true);
+      cone.translate(0, t * 0.62 + height / 2, 0);
+      jitter(cone, rng, 0.07);
+      parts.push(cone.toNonIndexed());
+    }
+    const merged = mergeGeometries(parts)!;
+    merged.computeVertexNormals();
+    return withShade(merged);
   }
-  const merged = mergeGeometries(parts)!;
-  merged.computeVertexNormals();
-  return merged;
+  // Rich pine: seven drooping tiers whose rims alternate branch tips and gaps, each with an
+  // underside, smooth shaded and darker toward the trunk, so it reads as a mass of boughs.
+  const tiers = 7;
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const n = segments * 2;
+  for (let i = 0; i < tiers; i++) {
+    const t = i / (tiers - 1);
+    const radius = (1 - t * 0.82) * rng.range(0.92, 1.06);
+    const base = t * 0.74;
+    const h = 0.3 - t * 0.08;
+    const twist = rng.range(0, Math.PI * 2);
+    const start = pos.length / 3;
+    pos.push(rng.range(-0.03, 0.03), base + h, rng.range(-0.03, 0.03));
+    col.push(0.6, 0.6, 0.6);
+    for (let k = 0; k < n; k++) {
+      const a = twist + (k / n) * Math.PI * 2;
+      const tip = k % 2 === 0;
+      const r = radius * (tip ? rng.range(0.95, 1.08) : rng.range(0.62, 0.74));
+      const y = base + (tip ? -0.06 * radius : 0.02) + rng.range(-0.02, 0.02);
+      pos.push(Math.cos(a) * r, y, Math.sin(a) * r);
+      const c = tip ? rng.range(1.0, 1.12) : 0.85;
+      col.push(c, c, c);
+    }
+    // Underside ring, tucked in toward the trunk.
+    const inner = pos.length / 3;
+    for (let k = 0; k < segments; k++) {
+      const a = twist + (k / segments) * Math.PI * 2;
+      pos.push(Math.cos(a) * radius * 0.3, base + 0.07, Math.sin(a) * radius * 0.3);
+      col.push(0.45, 0.45, 0.45);
+    }
+    for (let k = 0; k < n; k++) {
+      const r0 = start + 1 + k;
+      const r1 = start + 1 + ((k + 1) % n);
+      idx.push(start, r1, r0);
+      const u0 = inner + (Math.floor(k / 2) % segments);
+      const u1 = inner + (Math.floor((k + 1) / 2) % segments);
+      idx.push(r0, r1, u1);
+      if (u0 !== u1) idx.push(r0, u1, u0);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
 }
 
 /** A few overlapping blobs: one broadleaf canopy of about unit radius. */
 function broadleafCanopy(rng: RNG, detail: number): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
-  const blobs = 4;
+  const rich = detail > 1;
+  const blobs = rich ? 11 : 4;
   for (let i = 0; i < blobs; i++) {
-    const r = i === 0 ? 0.8 : rng.range(0.45, 0.62);
-    const g = new THREE.IcosahedronGeometry(r, detail);
-    const a = (i / blobs) * Math.PI * 2 + rng.range(-0.4, 0.4);
-    const off = i === 0 ? 0 : 0.42;
-    g.translate(Math.cos(a) * off, i === 0 ? 0 : rng.range(-0.15, 0.25), Math.sin(a) * off);
-    jitter(g, rng, 0.08);
+    const r = i === 0 ? (rich ? 0.68 : 0.8) : rich ? rng.range(0.3, 0.5) : rng.range(0.45, 0.62);
+    const g = new THREE.IcosahedronGeometry(r, rich && i > 0 ? 1 : detail);
+    const a = (i / blobs) * Math.PI * 2 * (rich ? 2.3 : 1) + rng.range(-0.4, 0.4);
+    const off = i === 0 ? 0 : rich ? rng.range(0.35, 0.62) : 0.42;
+    g.translate(Math.cos(a) * off, i === 0 ? 0 : rich ? rng.range(-0.3, 0.45) : rng.range(-0.15, 0.25), Math.sin(a) * off);
+    jitter(g, rng, rich ? r * 0.16 : 0.08);
     parts.push(g);
   }
-  const merged = mergeGeometries(parts)!;
+  let merged = mergeGeometries(parts)!;
+  if (detail > 1) {
+    // Smooth shading: weld the blobs' vertices so normals average across faces.
+    merged.deleteAttribute('normal');
+    merged.deleteAttribute('uv');
+    merged = mergeVertices(merged, 1e-4);
+  }
   merged.computeVertexNormals();
-  return merged;
+  return withShade(merged);
+}
+
+/** Vertex colours as cheap self-shadowing: darker underneath and toward the middle. */
+function withShade(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+  const nor = geo.getAttribute('normal') as THREE.BufferAttribute;
+  const col = new Float32Array(pos.count * 3);
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    minY = Math.min(minY, pos.getY(i));
+    maxY = Math.max(maxY, pos.getY(i));
+  }
+  for (let i = 0; i < pos.count; i++) {
+    const up = (pos.getY(i) - minY) / Math.max(1e-6, maxY - minY);
+    const facing = nor.getY(i) * 0.5 + 0.5;
+    const c = 0.55 + 0.3 * up + 0.25 * facing;
+    col[i * 3] = c;
+    col[i * 3 + 1] = c;
+    col[i * 3 + 2] = c;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
 }
 
 function jitter(geo: THREE.BufferGeometry, rng: RNG, amount: number): void {
