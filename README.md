@@ -22,11 +22,11 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 <!-- generated:headline:start -->
 | Question | Measured | On |
 | --- | --- | --- |
-| How much of a new building does the trained policy search? | 76.4% (72.5–80.0%) under its lidar guard, 1 of 30 flights ended by a crash; alone 63.0%, 19 of 30 flights ended by a crash; its teacher 64.5%, the sensor-only planner 65.5% with none | 30 fresh hard buildings |
-| Does it work in the dark? | 71.8% at night with the lights off, 94.0% of day | the same buildings |
+| How much of a new building does the trained policy search? | 75.1% (70.6–79.5%) under its lidar guard, 1 of 30 flights ended by a crash; alone 67.5%, 7 of 30 flights ended by a crash; its teacher 64.5%, the sensor-only planner 65.5% with none | 30 fresh hard buildings |
+| Does it work in the dark? | 77.0% at night with the lights off, 102.5% of day | the same buildings |
 | Do whole missions end the right way? | 97.5% (92.9–99.1%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
-| **How often does it call a building clear with someone inside?** | **0.30% per flight** (0.14–0.65%), down from 4.05% before unconfirmed people blocked a clear | 2,000 fresh flights from the failure atlas's mix, both versions on the same seeds (atlas at v1.0.0: 3.55%) |
-| How often does it hit something? | 2.70% per flight (1.99–3.41%) | 2,000 importance-sampled flights |
+| **How often does it call a building clear with someone inside?** | **0.30% per flight** (0.14–0.65%), down from 4.05% before unconfirmed people blocked a clear | 2,000 fresh flights from the failure atlas's mix, both versions on the same seeds (importance-sampled atlas on the current code: 0.25%; 3.55% at v1.0.0) |
+| How often does it hit something? | 1.00% per flight (0.65–1.54%) | 2,000 importance-sampled flights |
 | Does it get home when something breaks? | 98.6% (97.7–99.2%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
 <!-- generated:headline:end -->
 
