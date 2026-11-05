@@ -27,7 +27,7 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 | Do whole missions end the right way? | 97.5% (92.9–99.1%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
 | **How often does it call a building clear with someone inside?** | **0.30% per flight** (0.14–0.65%), down from 4.05% before unconfirmed people blocked a clear | 2,000 fresh flights from the failure atlas's mix, both versions on the same seeds (atlas at v1.0.0: 3.55%) |
 | How often does it hit something? | 2.70% per flight (1.99–3.41%) | 2,000 importance-sampled flights |
-| Does it get home when something breaks? | 97.9% (96.8–98.6%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
+| Does it get home when something breaks? | 98.6% (97.7–99.2%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
 <!-- generated:headline:end -->
 
 Every number comes from seeds no model or setting was tuned on, with 95% intervals, and is regenerated from the study's JSON by `npm run docs`. The false-clear rate is the one to read first: it is why this is a research simulator and not a product. The [project guide](docs/GUIDE.md#honest-limits) lists the other limits.

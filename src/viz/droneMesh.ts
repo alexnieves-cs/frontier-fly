@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AIRFRAME } from '../shared/airframe';
 
 export interface DroneRig {
   group: THREE.Group;
@@ -8,7 +9,10 @@ export interface DroneRig {
   updateWash: (time: number, thrust: number) => void;
 }
 
-/** Original quadrotor mesh, about 0.3 m across. Prop wash is a local particle system. */
+/**
+ * Original ducted quadrotor mesh at the airframe's size (shared/airframe.ts): motors on a 0.2 m diagonal,
+ * 3 inch props inside ducts, about 0.29 m across. Prop wash is a local particle system.
+ */
 export function buildDrone(): DroneRig {
   const group = new THREE.Group();
   const carbon = new THREE.MeshStandardMaterial({ color: '#1a1e24', roughness: 0.45, metalness: 0.55 });
@@ -45,17 +49,20 @@ export function buildDrone(): DroneRig {
   }
   const rotors: THREE.Mesh[] = [];
   const blurMat = new THREE.MeshBasicMaterial({ map: propBlurTexture(), color: '#b9c2cc', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+  const m = AIRFRAME.armM * Math.SQRT1_2;
+  const propR = AIRFRAME.propDiameterM / 2;
   const offsets: [number, number][] = [
-    [0.09, -0.09],
-    [-0.09, -0.09],
-    [-0.09, 0.09],
-    [0.09, 0.09],
+    [m, -m],
+    [-m, -m],
+    [-m, m],
+    [m, m],
   ];
+  const duct = new THREE.TorusGeometry(propR + AIRFRAME.ductWallM / 2, AIRFRAME.ductWallM / 2 + 0.002, 8, 28);
   offsets.forEach(([x, z], index) => {
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.008, 0.13, 8), carbon);
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.008, AIRFRAME.armM, 8), carbon);
     arm.rotation.z = Math.PI / 2;
-    arm.rotation.y = Math.atan2(z, x);
-    arm.position.set(x * 0.48, 0.012, z * 0.48);
+    arm.rotation.y = -Math.atan2(z, x);
+    arm.position.set(x * 0.5, 0.012, z * 0.5);
     arm.castShadow = true;
     group.add(arm);
     const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.018, 0.016, 16), alloy);
@@ -63,7 +70,7 @@ export function buildDrone(): DroneRig {
     bell.castShadow = true;
     group.add(bell);
     const prop = new THREE.Mesh(
-      new THREE.BoxGeometry(0.11, 0.004, 0.018),
+      new THREE.BoxGeometry(AIRFRAME.propDiameterM, 0.004, 0.014),
       new THREE.MeshStandardMaterial({
         color: index % 2 === 0 ? '#9aa3ad' : '#d0d5db',
         roughness: 0.35,
@@ -74,9 +81,14 @@ export function buildDrone(): DroneRig {
     );
     prop.position.set(x, 0.032, z);
     group.add(prop);
+    const ring = new THREE.Mesh(duct, plastic);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(x, 0.03, z);
+    ring.castShadow = true;
+    group.add(ring);
     rotors.push(prop);
     // Motion blur of the spinning blades: a faint disc, darker toward the tips.
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.056, 32), blurMat);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(propR, 32), blurMat);
     disc.rotation.x = -Math.PI / 2;
     disc.position.set(x, 0.033, z);
     disc.renderOrder = 2;

@@ -1,10 +1,13 @@
+import { AIRFRAME, ROTORS } from '../../shared/airframe';
 import type { BatteryModel, V3 } from './contracts';
 
 /**
  * Small-quad energy model from rotor momentum theory.
  *
- * Airframe defaults describe a 1.2 kg quad on 10 inch props with a 4S
- * 5000 mAh pack (14.8 V x 5 Ah = 74 Wh). Sources:
+ * Defaults price the one airframe (shared/airframe.ts): a 0.45 kg ducted quad
+ * on four 3 inch props with a 4S 2420 mAh pack (35.71 Wh). At hover this model
+ * draws about 100 W, so the usable 85% lasts about 18 minutes, the reference
+ * airframe's rated flight time. Sources:
  * - Ideal hover power P = T^1.5 / sqrt(2 rho A): Leishman, Principles of
  *   Helicopter Aerodynamics, 2nd ed., ch. 2 (momentum theory).
  * - Forward-flight induced velocity from Glauert's relation
@@ -14,8 +17,7 @@ import type { BatteryModel, V3 } from './contracts';
  * - Motor plus ESC efficiency about 0.75 at hover throttle (typical outrunner
  *   bench data); 4S LiPo usable energy about 85% of nominal for a long pack
  *   life (do not drain below ~3.5 V per cell).
- * - Parasite drag area CdA about 0.03 m^2 for a ~0.06 m^2 frontal body at
- *   Cd ~0.5.
+ * - Parasite drag area: see AIRFRAME.cdaM2.
  *
  * Percentages (remainingPct, usedPct, costPct) are of the usable energy, the
  * number a flight controller's battery gauge shows. Everything is
@@ -53,14 +55,14 @@ export interface BatteryConfig {
 }
 
 export const DEFAULT_BATTERY: BatteryConfig = {
-  massKg: 1.2,
-  rotors: 4,
-  rotorDiameterM: 0.254,
+  massKg: AIRFRAME.massKg,
+  rotors: ROTORS,
+  rotorDiameterM: AIRFRAME.propDiameterM,
   figureOfMerit: 0.6,
   electricalEfficiency: 0.75,
   avionicsW: 8,
-  cdaM2: 0.03,
-  capacityWh: 74,
+  cdaM2: AIRFRAME.cdaM2,
+  capacityWh: AIRFRAME.pack.capacityWh,
   usableFraction: 0.85,
   // The outdoor speed limit (OUTDOOR_LIMITS.speedH): return legs never fly faster, so energy per meter is priced there.
   cruiseMps: 5.5,
@@ -148,6 +150,9 @@ export function createBattery(config?: Partial<BatteryConfig> | number): Battery
     },
     costPct(distanceM, climbM) {
       return (legEnergyWh(cfg, distanceM, climbM) / usableWh) * 100;
+    },
+    swap() {
+      usedWh = 0;
     },
   };
 }

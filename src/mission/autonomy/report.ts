@@ -224,7 +224,7 @@ export function buildReport(run: RunRecord, source: LiveDetectionSource, world?:
     falseAlarms,
     missed,
     collisions: run.collisions.length,
-    batteryUsedPct: Math.max(0, run.batteryStartPct - run.batteryEndPct),
+    batteryUsedPct: Math.max(0, run.batteryStartPct - run.batteryEndPct) + (run.swappedUsedPct ?? 0),
     landedHome: run.landedHome,
     entries: run.entries,
     safetyEvents: run.safetyEvents.length,

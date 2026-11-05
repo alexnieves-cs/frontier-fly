@@ -1,7 +1,7 @@
 import { defaultEstimatorOptions, PoseEstimator, type EstimatorOptions } from './estimator';
 import { LocScorer, type LocMetrics } from './metrics';
 import { LocSensors, locNoise, type Caster, type LocNoise, type TruthSample } from './sensors';
-import type { V3 } from './types';
+import type { LocFrame, V3 } from './types';
 import { RNG } from '../shared/rng';
 
 /** A flown trajectory: truth pose and world velocity every tick. */
@@ -42,7 +42,7 @@ export interface ReplayOptions {
   initSigmaXY?: number;
   initSigmaYaw?: number;
   /** Called every tick with the truth and the estimate (study hooks, maps). */
-  onTick?: (truth: TruthSample, est: ReturnType<PoseEstimator['step']>, i: number) => void;
+  onTick?: (truth: TruthSample, est: ReturnType<PoseEstimator['step']>, i: number, frame: LocFrame) => void;
   /**
    * Kidnapped robot: at this tick the estimate jumps by this offset with its
    * covariance unchanged, as if the drone were displaced (a collision spin, a
@@ -93,9 +93,10 @@ export function replay(
       est.y += opts.kidnap.offset[1];
       est.yaw += opts.kidnap.yaw ?? 0;
     }
-    const e = est.step(sensors.read(truth));
+    const frame = sensors.read(truth);
+    const e = est.step(frame);
     scorer.add(truth, e);
-    opts.onTick?.(truth, e, i);
+    opts.onTick?.(truth, e, i, frame);
   }
   return { metrics: scorer.result(), stats: { ...est.stats } };
 }

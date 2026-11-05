@@ -98,7 +98,9 @@ export const SCENARIOS: readonly Scenario[] = [
       targets: [{ id: 'tgt-clear', kind: 'clearance', label: 'Confirm both buildings are clear', minCount: 1, minConfidence: null }],
       requiredConfidence: 0.8,
       entryPolicy: 'ask',
-      budgets: { batteryPct: 85, timeSec: 1200 },
+      // 25 minutes: two buildings take more than one 17-minute pack (shared/airframe.ts), so the
+      // sweep is planned as two flights with a battery swap at home between them (runner.ts).
+      budgets: { batteryPct: 85, timeSec: 1500 },
     },
     runner: { dt: 0.05, indoor: 'auto', operator: approve },
     expect: { outcome: 'clear', allBuildingsClear: true, entryDecision: 'approved', landedHome: true },

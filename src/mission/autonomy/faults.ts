@@ -374,6 +374,11 @@ export class FaultInjector {
         return Math.min(100, battery.usedPct() + extraUsedPct);
       },
       costPct: (d, climb) => battery.costPct(d, climb),
+      swap: () => {
+        // A sag is the pack's fault: the fresh pack does not carry it.
+        battery.swap();
+        extraUsedPct = 0;
+      },
     };
   }
 
