@@ -6,22 +6,22 @@ Every number elsewhere in this repository comes from buildings the generator mad
 
 ## Result
 
-On real apartments the planners hold up better than the learned policy. The sensor-only planner covers 85.5% of a real apartment, 8 points less than on a generated building of the same size. The policy (the PPO fine-tuned checkpoint, see [REPORT.md](REPORT.md#fine-tuning-on-its-own-flights)) covers 74.3%, 20 points less than on the same-size generated buildings, and 101 of its 180 real-apartment flights end at the 16-collision limit (6 of 180 on the generated controls). The lidar guard removes almost all of those collisions and recovers 6 points, and the guarded policy trails the planner by 5 points.
+Under the crash rule ([REPORT.md](REPORT.md#the-crash-rule)), real apartments are where the learned policy breaks. The sensor-only planner covers 85.5% of a real apartment, 8 points less than on a generated building of the same size, and never crashes. The policy alone (the checkpoint retrained under the crash rule, see [REPORT.md](REPORT.md#retraining-under-the-crash-rule)) covers 36.1% against 92.9% on the same-size generated buildings: 170 of its 180 real-apartment flights end in a crash. The lidar guard cuts that to 30 crashes and lifts it to 67.0%, still 18 points behind the planner.
 
-| Pilot | Real, day (95% CI) | Real, night | Collisions | Generated, same size, day (95% CI) | Collisions | Real − generated, paired (95% CI) |
+| Pilot | Real, day (95% CI) | Real, night | Crashes, day (of 180) | Generated, same size, day (95% CI) | Crashes (of 180) | Real − generated, paired (95% CI) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Teacher (privileged frontier planner) | 88.0% (84.8–91.0) | 88.0% | 0.8 | 83.6% (76.5–90.7) | 0.1 | +4.4 (-3.0 to +12.2) |
-| Sensor-only planner | 85.5% (82.3–88.4) | 85.7% | 0.0 | 93.8% (92.8–94.6) | 0.0 | -8.3 (-11.0 to -5.8) |
-| Learned policy | 74.3% (69.3–79.0) | 72.6% | 14.1 | 94.8% (94.0–95.2) | 4.1 | -20.5 (-25.4 to -15.8) |
-| Policy + lidar guard | 80.7% (76.9–84.1) | 81.5% | 0.6 | 94.4% (93.3–95.2) | 0.2 | -13.7 (-17.0 to -10.6) |
-| Waypoint follower | 34.6% (28.3–41.5) | 34.6% | 5.8 | 43.1% (36.9–49.7) | 2.2 | -8.5 (-16.8 to -0.1) |
-| Lidar heuristic | 9.9% (8.0–11.9) | 11.0% | 0.5 | 26.1% (23.8–28.4) | 0.0 | -16.2 (-19.0 to -13.4) |
+| Teacher (privileged frontier planner) | 71.9% (64.5–78.7) | 71.9% | 75 | 82.3% (74.1–89.3) | 6 | -10.4 (-19.1 to -1.1) |
+| Sensor-only planner | 85.5% (82.1–88.4) | 85.7% | 0 | 93.8% (92.8–94.7) | 0 | -8.3 (-11.3 to -5.9) |
+| Learned policy | 36.1% (30.6–41.6) | 37.9% | 170 | 92.9% (90.5–94.7) | 21 | -56.8 (-62.5 to -50.9) |
+| Policy + lidar guard | 67.0% (62.5–71.3) | 68.9% | 30 | 93.4% (91.6–94.8) | 9 | -26.4 (-30.8 to -22.0) |
+| Waypoint follower | 22.5% (18.3–27.3) | 22.5% | 177 | 39.3% (33.8–44.8) | 174 | -16.8 (-22.8 to -10.8) |
+| Lidar heuristic | 9.9% (7.9–11.9) | 11.0% | 0 | 26.1% (23.9–28.2) | 0 | -16.2 (-19.2 to -13.3) |
 
-Coverage is the share of reachable 0.5 m voxels flown within 2,400 steps (the stage-3 protocol). Each of the 60 apartments is flown three times per lighting with different env seeds, and so is its generated control. Collisions are per flight, day. Intervals are bootstrap intervals over apartments (each apartment's mean over its three flights); the last column pairs each apartment with its own generated control. Night uses the `night-dark` preset. The teacher and the waypoint follower read the true map, so their night numbers equal their day numbers.
+Coverage is the share of reachable 0.5 m voxels flown within 2,400 steps (the stage-3 protocol), counted until the flight ends. A crash is any contact faster than 0.5 m/s into a surface, and it ends the flight. Each of the 60 apartments is flown three times per lighting with different env seeds, and so is its generated control. Intervals are bootstrap intervals over apartments (each apartment's mean over its three flights); the last column pairs each apartment with its own generated control. Night uses the `night-dark` preset. The teacher and the waypoint follower read the true map, so their night numbers equal their day numbers.
 
-Against the targets: the policy meets the 60% hard-building coverage goal on real apartments (74.3%, interval 69.3–79.0%), and so does the guarded policy (80.7%). Night is 98% of day for the policy and 101% for the guarded policy, so the night-to-day target holds.
+Against the targets: the bare policy misses the 60% hard-building coverage goal on real apartments (36.1%, interval 30.6–41.6%); the guarded policy meets it (67.0%, interval 62.5–71.3%). Night is 105% of day for the policy and 103% for the guarded policy.
 
-Before the PPO fine-tune, the DAgger policy covered 54.5% (49.8–59.3%) of the real apartments and 69.1% under the guard, and missed the 60% goal. That policy was measured the same way; the table above was re-run once with the new checkpoint.
+Earlier versions of this page, measured before the crash rule, let the drone slide along walls at any speed. Under those rules the previous checkpoint covered 74.3% alone and 80.7% guarded, and the teacher 88.0%. Those numbers are not comparable with the table above: the rule also ends 75 of the teacher's 180 flights. FrontierBench's apartment task still leaves contacts free, and there the retrain cost a few points: 72.8% to 68.8% for the policy alone, 79.4% to 72.4% guarded ([LEADERBOARD.md](LEADERBOARD.md)).
 
 One flight per apartment was not enough. With the DAgger policy, the first run, with one flight each, put it at 60.4% on one seed block and 52.3% on another; the three-flight means per repeat were 52.3%, 55.4% and 55.7%. The numbers above are from the three-flight run only.
 
