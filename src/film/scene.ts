@@ -107,6 +107,14 @@ export class FilmScene {
     this.syncTargets(0);
   }
 
+  /** Each building as [x, y, z, width, height, depth]: its min corner and size in Three axes. */
+  shellBounds(): [number, number, number, number, number, number][] {
+    return this.shells.map((s) => {
+      const b = new THREE.Box3().setFromObject(s.root);
+      return [b.min.x, b.min.y, b.min.z, b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z];
+    });
+  }
+
   resize(width: number, height: number): void {
     this.renderer.setSize(width, height, false);
   }
@@ -225,19 +233,21 @@ export class FilmScene {
   }
 
   private buildDroneRig(): void {
-    this.drone.group.scale.setScalar(1.6);
+    // True size: the mesh is about 0.3 m across, the same as the 0.15 m collision sphere.
+    this.drone.group.scale.setScalar(1);
     this.droneRoot.add(this.drone.group);
     const glow = glowTexture();
     const colors = ['#ff3344', '#33ff88', '#ffffff', '#ffffff'];
+    // Port and starboard on the arm tips, a strobe on top, a white light under the camera.
     const offsets: [number, number, number][] = [
-      [-0.02, 0.02, -0.17],
-      [-0.02, 0.02, 0.17],
-      [-0.13, 0.05, 0],
-      [0.14, -0.04, 0],
+      [-0.01, 0.025, -0.12],
+      [-0.01, 0.025, 0.12],
+      [-0.07, 0.04, 0],
+      [0.09, -0.02, 0],
     ];
     colors.forEach((c, i) => {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: c, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-      sprite.scale.setScalar((i === 2 ? 0.3 : 0.17) * (this.night ? 0.7 : 1));
+      sprite.scale.setScalar((i === 2 ? 0.2 : 0.11) * (this.night ? 0.7 : 1));
       sprite.position.set(...offsets[i]!);
       this.droneRoot.add(sprite);
       this.navLights.push(sprite);
