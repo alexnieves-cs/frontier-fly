@@ -1,5 +1,5 @@
 import { FlyThrough } from '../planner/flythrough';
-import { columnClear, cruiseZ, dist, len, segmentClear, sub } from '../planner/geometry';
+import { SWEEP_RADIUS, columnClear, cruiseZ, dist, len, segmentClear, sub } from '../planner/geometry';
 import { toLocal } from '../planner/indoor';
 import { ApertureSensor } from '../openingSensor';
 import type { Phase, V3 } from '../contracts';
@@ -14,6 +14,9 @@ import { type Job, PLAN_ACCEL, SHIELD_STALL_SEC, type Waypoint, hold, scaleTo } 
  * primitive returns a Job and calls back when it ends; which phase comes next is the caller's
  * business, never the Pilot's.
  */
+/** Breadcrumbs kept, 0.3 m apart: about 600 m, enough to lead out of any building searched on one pack. */
+const MAX_CRUMBS = 2000;
+
 export class Pilot {
   constructor(private readonly c: MissionCore) {}
 
@@ -22,7 +25,7 @@ export class Pilot {
     const last = this.c.crumbs[this.c.crumbs.length - 1];
     if (!last || dist(last, p) >= 0.3) {
       this.c.crumbs.push([p[0], p[1], p[2]]);
-      if (this.c.crumbs.length > 400) this.c.crumbs.shift();
+      if (this.c.crumbs.length > MAX_CRUMBS) this.c.crumbs.shift();
     }
     const v = this.c.visit;
     if (v && !this.c.inside && v.standoff) {
@@ -31,7 +34,11 @@ export class Pilot {
     }
   }
 
-  /** Retrace flown positions (known clear) backwards until `enough` holds. String-pulled with casts. */
+  /**
+   * Retrace flown positions (known clear) backwards until `enough` holds. String-pulled with casts that
+   * clear solids by the same sweep every outdoor leg keeps: a shortcut is a new leg, flown by a vehicle
+   * that does not hold the straight line exactly.
+   */
   retrace(trail: readonly V3[], enough: (p: V3) => boolean): Waypoint[] {
     const out: Waypoint[] = [];
     let cur: V3 = this.c.navPos;
@@ -39,7 +46,7 @@ export class Pilot {
     for (let guard = 0; i >= 0 && guard < 400 && !enough(cur); guard++) {
       let j = i;
       for (let k = Math.max(0, i - 40); k < i; k++) {
-        if (segmentClear(this.c.physics, cur, trail[k]!, 0.25)) {
+        if (segmentClear(this.c.physics, cur, trail[k]!, SWEEP_RADIUS)) {
           j = k;
           break;
         }
@@ -151,7 +158,7 @@ export class Pilot {
           }
           const dir = sub(wp.pos, pos);
           const want = scaleTo(dir, speed, this.c.limits());
-          const vel = this.shielded(phase, want);
+          const vel = this.shielded(phase, want, wp.flown);
           const moving = Math.hypot(vel[0], vel[1]) > 0.3;
           // With a failed lidar arc, turn the middle of the healthy arc toward the direction of travel. The
           // wanted direction, not the shielded one: the shield treats the blind arc as blocked, so facing
@@ -180,13 +187,13 @@ export class Pilot {
    * Indoors on the sensor-only map, routed moves (re-views, the way out) pass through the same lidar
    * shield as the explorers: the map is young and a route can graze structure the lidar sees now.
    */
-  shielded(phase: Phase, vel: V3): V3 {
+  shielded(phase: Phase, vel: V3, flown = false): V3 {
     const v = this.c.visit;
     if (!this.c.inside || !v?.sensing || phase === 'fly_through') return vel;
     const local = toLocal(v.grid, this.c.navPos);
     v.sensing.sense(local, this.c.navVel, this.c.navYaw, this.c.t);
     const [vx, vy] = v.sensing.filter(vel[0], vel[1], this.c.navYaw);
-    const vz = vel[2] < 0 && !descentClear(v.sensing.lidar) ? 0 : vel[2];
+    const vz = vel[2] < 0 && !flown && !descentClear(v.sensing.lidar) ? 0 : vel[2];
     return [vx, vy, vz];
   }
 

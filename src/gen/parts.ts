@@ -9,7 +9,7 @@ export interface Aabb {
   hy: number;
   hz: number;
   surface: number;
-  kind: 'wall' | 'window' | 'slab' | 'door';
+  kind: 'wall' | 'window' | 'slab' | 'door' | 'mirror';
 }
 
 interface Rect {
@@ -44,14 +44,17 @@ function merge(mask: Uint8Array, w: number, d: number): Rect[] {
   return rects;
 }
 
-/** Merged cuboids for colliders and the renderer. Windows stay blocking. */
+/**
+ * Merged cuboids for colliders and the renderer. Windows stay blocking. Shut doors and mirrors
+ * (gen/hazards.ts) are wall cells with their own surface class, so they come out as their own boxes.
+ */
 export function buildingAabbs(spec: BuildingSpec): Aabb[] {
   const out: Aabb[] = [];
   const cs = spec.cellSize;
   const H = spec.floorHeight;
   for (let f = 0; f < spec.floors.length; f++) {
     const floor = spec.floors[f]!;
-    for (const surface of [SURFACE.DRYWALL, SURFACE.CONCRETE, SURFACE.GLASS, SURFACE.METAL]) {
+    for (const surface of [SURFACE.DRYWALL, SURFACE.CONCRETE, SURFACE.GLASS, SURFACE.METAL, SURFACE.DOOR, SURFACE.MIRROR]) {
       const mask = new Uint8Array(floor.w * floor.d);
       for (let i = 0; i < mask.length; i++) {
         if (floor.cells[i] !== CELL.WALL) continue;
@@ -67,7 +70,7 @@ export function buildingAabbs(spec: BuildingSpec): Aabb[] {
           hy: (rect.d * cs) / 2,
           hz: H / 2,
           surface,
-          kind: surface === SURFACE.GLASS ? 'window' : 'wall',
+          kind: surface === SURFACE.GLASS ? 'window' : surface === SURFACE.DOOR ? 'door' : surface === SURFACE.MIRROR ? 'mirror' : 'wall',
         });
       }
     }

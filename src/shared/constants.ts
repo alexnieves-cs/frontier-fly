@@ -1,3 +1,5 @@
+import { AIRFRAME } from './airframe';
+
 export const CELL = {
   EMPTY: 0,
   WALL: 1,
@@ -11,6 +13,10 @@ export const SURFACE = {
   WOOD: 2,
   GLASS: 3,
   METAL: 4,
+  /** A shut interior door leaf (gen/hazards.ts). Solid; the camera recognises it as a door. */
+  DOOR: 5,
+  /** A wall-mounted mirror panel: the lidar measures the reflected path (sim/sensors.ts). */
+  MIRROR: 6,
 } as const;
 
 /** Observation contract version. v1 = 306 floats (the first shipped checkpoint). See src/sim/OBS_LAYOUT.md. */
@@ -20,7 +26,8 @@ export const ACT_DIM = 4;
 export const CELL_SIZE = 1;
 export const FLOOR_HEIGHT = 3;
 export const VOXEL = 0.5;
-export const DRONE_RADIUS = 0.15;
+/** Collision sphere radius, m: the airframe's (shared/airframe.ts). */
+export const DRONE_RADIUS = AIRFRAME.collisionRadiusM;
 
 export const MAX_SPEED_H = 2;
 export const MAX_SPEED_V = 1;

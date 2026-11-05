@@ -97,7 +97,7 @@ export function shell(): string {
       <section class="stage-col">
         <div class="stage-wrap" id="stage-wrap">
           <canvas id="view" role="img" aria-label="3D view of the drone in the building"></canvas>
-          <canvas id="hud"></canvas>
+          <canvas id="hud" aria-hidden="true"></canvas>
           <div class="readout" id="readout"></div>
           <p class="error" id="boot-note">Spinning up the building…</p>
           <p class="stage-caption" id="stage-caption">The learned policy is searching a building it has never seen. Pick a pilot, camera or sensor on the left, or press WASD to take over.</p>
@@ -133,7 +133,7 @@ export function shell(): string {
       <aside class="side">
         <div class="pip-wrap">
           <canvas id="pip" role="img" aria-label="Drone camera feed"></canvas>
-          <canvas id="pip-hud"></canvas>
+          <canvas id="pip-hud" aria-hidden="true"></canvas>
         </div>
         <section class="panel detect-panel">
           <div class="panel-head"><h2>Detections</h2><span class="live" id="detect-count">0</span></div>
@@ -153,7 +153,7 @@ export function shell(): string {
         </section>
         <section class="panel" id="policy-panel" style="flex:1" hidden>
           <div class="panel-head"><h2>Policy map</h2></div>
-          <canvas class="heat-canvas" id="heat" width="300" height="220"></canvas>
+          <canvas class="heat-canvas" id="heat" role="img" aria-label="Coverage heat map" width="300" height="220"></canvas>
         </section>
       </aside>
     </main>

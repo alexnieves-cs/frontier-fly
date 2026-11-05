@@ -1,4 +1,7 @@
-import type { BuildingSpec, FloorGrid, FurniturePlan } from './types';
+import type { BuildingSpec, FloorGrid, FurniturePlan, HazardLayout } from './types';
+
+/** HazardLayout with the smoke masks as plain arrays. */
+type HazardJson = Omit<HazardLayout, 'smoke'> & { smoke: { visibility: number; cells: (number[] | Uint8Array)[] } | null };
 
 interface FloorJson {
   w: number;
@@ -16,6 +19,7 @@ interface BuildingJson {
   spawn: [number, number, number] | number[];
   reachableVoxels: number;
   furniture?: FurniturePlan;
+  hazards?: HazardJson;
 }
 
 export function buildingFromJson(raw: BuildingJson): BuildingSpec {
@@ -30,6 +34,21 @@ export function buildingFromJson(raw: BuildingJson): BuildingSpec {
           furniture: {
             props: raw.furniture.props.map((prop) => ({ ...prop })),
             boxes: raw.furniture.boxes.map((box) => ({ ...box })),
+          },
+        }
+      : {}),
+    ...(raw.hazards
+      ? {
+          hazards: {
+            ...raw.hazards,
+            params: { ...raw.hazards.params },
+            closedDoors: raw.hazards.closedDoors.map((door) => ({ floor: door.floor, cells: [...door.cells] })),
+            smoke: raw.hazards.smoke
+              ? {
+                  visibility: raw.hazards.smoke.visibility,
+                  cells: raw.hazards.smoke.cells.map((c) => (c instanceof Uint8Array ? c : Uint8Array.from(c))),
+                }
+              : null,
           },
         }
       : {}),
@@ -60,6 +79,16 @@ export function buildingToJson(spec: BuildingSpec): BuildingJson {
           furniture: {
             props: spec.furniture.props.map((prop) => ({ ...prop })),
             boxes: spec.furniture.boxes.map((box) => ({ ...box })),
+          },
+        }
+      : {}),
+    ...(spec.hazards
+      ? {
+          hazards: {
+            ...spec.hazards,
+            params: { ...spec.hazards.params },
+            closedDoors: spec.hazards.closedDoors.map((door) => ({ floor: door.floor, cells: [...door.cells] })),
+            smoke: spec.hazards.smoke ? { visibility: spec.hazards.smoke.visibility, cells: spec.hazards.smoke.cells.map((c) => Array.from(c)) } : null,
           },
         }
       : {}),

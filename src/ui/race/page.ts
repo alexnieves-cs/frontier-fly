@@ -183,14 +183,14 @@ function markup(): string {
 function laneMarkup(pilot: RacePilot, index: number): string {
   const info = PILOT_INFO[pilot];
   return `
-    <article class="lane" data-lane="${index}" style="--lane:${info.color}" tabindex="0" role="button" aria-label="Inspect the ${esc(info.name)}" aria-pressed="false">
+    <article class="lane" data-lane="${index}" style="--lane:${info.color}" tabindex="0" role="button" title="Inspect the ${esc(info.name)}" aria-pressed="false">
       <header class="lane-head">
         <span class="lane-dot" aria-hidden="true"></span>
         <span class="lane-name"><span class="long">${esc(info.name)}</span><span class="short">${esc(info.short)}</span></span>
         <span class="lane-cov" data-f="cov">0.0%</span>
       </header>
       <div class="lane-view">
-        <canvas class="lane-canvas" aria-label="Top-down view of the ${esc(info.name)}"></canvas>
+        <canvas class="lane-canvas" aria-hidden="true"></canvas>
         <span class="lane-floor" data-f="floor" hidden></span>
         <span class="lane-end" data-f="end" hidden></span>
       </div>

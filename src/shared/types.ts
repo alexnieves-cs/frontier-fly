@@ -1,3 +1,4 @@
+import type { BatteryConfig } from '../mission/autonomy/battery';
 export type Cell = 0 | 1 | 2 | 3;
 
 export interface Room {
@@ -13,11 +14,12 @@ export interface FloorGrid {
   d: number;
   cells: Uint8Array;
   rooms: Room[];
-  /** Per-cell surface class: 0 drywall, 1 concrete, 2 wood, 3 glass, 4 metal. */
+  /** Per-cell surface class: 0 drywall, 1 concrete, 2 wood, 3 glass, 4 metal, 5 shut door, 6 mirror. */
   surfaces?: Uint8Array;
 }
 
-export type PropKind = 'table' | 'chair' | 'shelf' | 'plant' | 'sofa';
+/** `door` is an ajar interior door leaf placed by gen/hazards.ts, not by the furniture planner. */
+export type PropKind = 'table' | 'chair' | 'shelf' | 'plant' | 'sofa' | 'door';
 
 /** One furniture piece, in renderer convention: x and z horizontal (z = sim y), y up, rot about +y. */
 export interface PropPlacement {
@@ -68,6 +70,49 @@ export interface BuildingSpec {
   reachableVoxels: number;
   /** Solid furniture. Absent on hand-written fixtures and older JSON: those buildings are empty. */
   furniture?: FurniturePlan;
+  /** Shut and ajar doors, glass rooms, mirrors and smoke (gen/hazards.ts). Absent: none of them. */
+  hazards?: HazardLayout;
+}
+
+/** What gen/hazards.ts asks for. Shares are 0..1; a missing field adds none of that hazard. */
+export interface HazardParams {
+  /** Share of interior doorways shut (never below HAZARD_MIN_REACHABLE of the building's reachable cells). */
+  closedDoors?: number;
+  /** Share of the doorways left open that get a leaf swung part-way into the opening. */
+  ajarDoors?: number;
+  /** Share of rooms walled in glass (the interior side; the outer wall keeps its windows). */
+  glassRooms?: number;
+  /** Mirror panels per floor, on interior walls. */
+  mirrors?: number;
+  /** Share of rooms filled with smoke. */
+  smokeRooms?: number;
+  /** Visibility range in the smoke, meters, drawn once per building from [min, max]. */
+  smokeVisibility?: [number, number];
+}
+
+/** A shut doorway: its leaf cells (now walls with SURFACE.DOOR) on one floor. */
+export interface ClosedDoor {
+  floor: number;
+  /** Cell indices (z * w + x) of the leaf. */
+  cells: number[];
+}
+
+/** Smoke: per-floor cell masks (1 = smoke) and the visibility in it. */
+export interface SmokeField {
+  /** Meteorological visibility, meters: contrast falls to 2% over this distance. */
+  visibility: number;
+  cells: Uint8Array[];
+}
+
+/** The hazards a building was given, recorded on the spec so every sensor model and renderer agrees. */
+export interface HazardLayout {
+  params: HazardParams;
+  closedDoors: ClosedDoor[];
+  /** Ajar leaves added to spec.furniture (prop kind 'door'). */
+  ajarDoors: number;
+  glassRooms: number;
+  mirrors: number;
+  smoke: SmokeField | null;
 }
 
 export interface GenParams {
@@ -89,7 +134,7 @@ export interface StepInfo {
   newRoom: boolean;
   newFloor: boolean;
   success: boolean;
-  /** Electrical energy used so far by a 1.2 kg quad flying this track (mission/autonomy/battery.ts), Wh. */
+  /** Electrical energy used so far by the airframe flying this track (mission/autonomy/battery.ts; FrontierBench v2 keeps its own model), Wh. */
   energyWh: number;
   /** Progress penalties subtracted from this step's reward (see sim/reward.ts ProgressTracker). */
   penalty?: { stuck: number; still: number; flip: number; total: number };
@@ -169,6 +214,8 @@ export interface EpisodeConfig {
   maxCollisions?: number;
   /** Impact speed into a surface that counts as a crash and ends the episode, m/s. Defaults to CRASH_SPEED. */
   crashSpeed?: number;
+  /** Power model the reported energyWh is integrated with. Defaults to DEFAULT_BATTERY (shared/airframe.ts). */
+  energyModel?: BatteryConfig;
   /**
    * Horizontal speed a full action asks for, m/s. Defaults to MAX_SPEED_H
    * (2 m/s), which every shipped checkpoint was trained at.

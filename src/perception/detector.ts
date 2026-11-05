@@ -3,6 +3,7 @@ import type { BuildingSpec, SensorMode } from '../shared/types';
 import type { Aabb, ResolvedTarget, TargetClass, Vec3 } from '../targets/types';
 import { projectAabb, type CameraView } from './camera';
 import { occlusionFraction } from './occlusion';
+import { smokePath, smokeTransmittance } from '../gen/hazards';
 import { CLASS_PROFILE, CONFUSION, DECOY_FP_BASE, FLASH_HALF, illuminationOf, recallProbability } from './model';
 import { clamp, dist, dot, norm, sub } from './vec';
 
@@ -61,6 +62,15 @@ function jitter(bbox: Detection['bbox'], rng: RNG): Detection['bbox'] {
   return { x, y, w: Math.min(bbox.w, 1 - x), h: Math.min(bbox.h, 1 - y) };
 }
 
+/** Contrast the smoke along the camera-to-target line leaves, 1 without smoke. Building-local frame. */
+function smokeFactor(req: DetectRequest, center: readonly number[]): number {
+  const smoke = req.spec?.hazards?.smoke;
+  if (!req.spec || !smoke) return 1;
+  const cam = req.camera.position;
+  const f = Math.max(0, Math.min(req.spec.floors.length - 1, Math.floor(cam[2] / req.spec.floorHeight)));
+  return smokeTransmittance(smokePath(req.spec, f, cam[0], cam[1], center[0]!, center[1]!), smoke.visibility);
+}
+
 /**
  * Simulated camera detector. The same seed, pose, and targets always
  * return the same detections. False positives are draws on decoys, so
@@ -92,7 +102,9 @@ export function detect(req: DetectRequest): Detection[] {
       sensorMode: req.lighting.sensorMode,
     });
     const area = projected?.area ?? 0;
-    const recall = projected
+    // Smoke (gen/hazards.ts) takes contrast off the line of sight: recall scales by what is left.
+    const smoke = smokeFactor(req, target.center);
+    const recall = smoke * (projected
       ? recallProbability({
           classId: target.classId,
           distance: seenDistance,
@@ -102,9 +114,9 @@ export function detect(req: DetectRequest): Detection[] {
           cameraSpeed,
           area,
         })
-      : 0;
+      : 0);
     const lookalike = target.looksLike;
-    const lookRecall = projected && lookalike
+    const lookRecall = smoke * (projected && lookalike
       ? recallProbability({
           classId: lookalike,
           distance: seenDistance,
@@ -114,7 +126,7 @@ export function detect(req: DetectRequest): Detection[] {
           cameraSpeed,
           area,
         })
-      : 0;
+      : 0);
     const uSee = rng.next();
     const uFp = rng.next();
     const label = sampleLabel(target.classId, rng);

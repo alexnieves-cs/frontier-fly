@@ -96,8 +96,11 @@ export class IndoorPhase {
     const lidar = shellLidar(v.grid, (...a) => this.c.physics.cast(...a));
     if (this.c.options.localization === 'estimated') this.startLocalization(lighting, lidar);
     this.c.aperture = null;
-    v.sensing = new IndoorSensing(v.grid, this.c.loc ? this.c.loc.frameLidar(lidar) : lidar, lighting, this.c.world.seed);
+    // Back after a battery swap, the visit carries the maps of the first one (EntryPhase.startBuilding).
+    if (v.sensing) this.c.log('info', `Resuming the search of ${v.b.label} on the maps from the first visit.`);
+    v.sensing ??= new IndoorSensing(v.grid, this.c.loc ? this.c.loc.frameLidar(lidar) : lidar, lighting, this.c.world.seed);
     v.sensing.lastNewVoxelSec = this.c.t;
+    v.sensing.hazardAware = this.c.options.hazardAware ?? true;
     if (this.c.vehicle instanceof QuadVehicle) v.sensing.braking = this.c.vehicle.braking;
     v.sensing.rangeHook = (lidar) => this.pilot.lidarHook(lidar);
     // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
@@ -265,6 +268,11 @@ export class IndoorPhase {
     const v = this.c.visit!;
     // An open contact in this building gets one more look before leaving.
     if (!this.c.returning && this.go.lastLook(v.b.id)) return;
+    if (v.sensing?.hazardAware) {
+      const shut = v.sensing.unsearchedDoors();
+      this.c.shutDoors.set(v.b.id, shut);
+      if (shut > 0) this.c.log('warn', `${v.b.label}: ${shut} shut door${shut > 1 ? 's' : ''} with space behind that the drone cannot search. A ground team has to open ${shut > 1 ? 'them' : 'it'}.`);
+    }
     if (v.vis) this.c.log('info', `${v.b.label} explored: ${fmt(v.vis.coverage() * 100, 0)}% of cells seen by the oracle planner.`);
     else if (v.sensing)
       this.c.log(
@@ -312,7 +320,11 @@ export class IndoorPhase {
     const local = toLocal(v.grid, this.c.navPos);
     const goal = toLocal(v.grid, ft.start);
     const route = (from: V3): Waypoint[] | null => v.nav.path(from, goal)?.map((p) => ({ pos: toWorld(v.grid, p) })) ?? null;
-    let wps = route(local);
+    // Off the opening's level, the map's route down can cut a diagonal through a stairwell the descent
+    // check will not let the drone fly; the trail it climbed by is known flyable. On the level, the map's route is shorter.
+    const offLevel = Math.abs(this.c.navPos[2] - ft.start[2]) > 1;
+    const trail = () => trailOut(this.c.crumbs, this.c.navPos, ft.start);
+    let wps = (offLevel ? trail() : null) ?? route(local) ?? (offLevel ? null : trail());
     if (!wps) {
       // No route from here on the map (the drone can be somewhere the map calls blocked): retrace the
       // breadcrumbs, which the drone has already flown, until a route opens up. Never fly straight at the opening.
@@ -321,7 +333,7 @@ export class IndoorPhase {
       const crumbs = this.c.crumbs;
       for (let i = crumbs.length - 1; i >= 0; i--) {
         const p = crumbs[i]!;
-        wps.push({ pos: p, tol: 0.2 });
+        wps.push({ pos: p, tol: 0.2, flown: true });
         const rest = (crumbs.length - 1 - i) % 5 === 4 || i === 0 ? route(toLocal(v.grid, p)) : null;
         if (rest) {
           wps.push(...rest);
@@ -374,4 +386,67 @@ export class IndoorPhase {
       ),
     );
   }
+}
+
+/** Crumbs this close (and on the same level) are joined: the drone flew through both. */
+const TRAIL_JOIN_M = 0.6;
+const TRAIL_JOIN_DZ = 0.25;
+/** The trail must pass this close to the opening's inside end to lead out. */
+const TRAIL_REACH_M = 1.5;
+
+/**
+ * The shortest way out along the breadcrumbs: a graph of the points already flown, consecutive
+ * crumbs linked and loops cut where the trail passed within TRAIL_JOIN_M of itself, searched from
+ * the drone to the crumb nearest the opening's inside end. Every leg is one the drone flew (or
+ * nearly), so the descents a stairwell needs are allowed. Null when the trail never reached the opening.
+ */
+export function trailOut(crumbs: readonly V3[], from: V3, goal: V3): Waypoint[] | null {
+  const n = crumbs.length;
+  if (n < 2) return null;
+  const d3 = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  let start = -1;
+  let end = -1;
+  let bestS = Infinity;
+  let bestE = TRAIL_REACH_M;
+  for (let i = 0; i < n; i++) {
+    const ds = d3(crumbs[i]!, from);
+    if (ds < bestS) {
+      bestS = ds;
+      start = i;
+    }
+    const de = d3(crumbs[i]!, goal);
+    if (de < bestE) {
+      bestE = de;
+      end = i;
+    }
+  }
+  if (end < 0 || bestS > TRAIL_REACH_M) return null;
+  const cost = new Float64Array(n).fill(Infinity);
+  const prev = new Int32Array(n).fill(-1);
+  const done = new Uint8Array(n);
+  cost[start] = 0;
+  for (;;) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && cost[i]! < Infinity && (u < 0 || cost[i]! < cost[u]!)) u = i;
+    if (u < 0 || u === end) break;
+    done[u] = 1;
+    const a = crumbs[u]!;
+    for (let w = 0; w < n; w++) {
+      if (done[w]) continue;
+      const b = crumbs[w]!;
+      const dd = d3(a, b);
+      const linked = Math.abs(w - u) === 1 || (dd < TRAIL_JOIN_M && Math.abs(a[2] - b[2]) < TRAIL_JOIN_DZ);
+      if (linked && cost[u]! + dd < cost[w]!) {
+        cost[w] = cost[u]! + dd;
+        prev[w] = u;
+      }
+    }
+  }
+  if (cost[end] === Infinity) return null;
+  const path: V3[] = [];
+  for (let i = end; i >= 0; i = prev[i]!) path.push(crumbs[i]!);
+  path.reverse();
+  const wps: Waypoint[] = path.map((p) => ({ pos: [p[0], p[1], p[2]] as V3, tol: 0.2, flown: true }));
+  wps.push({ pos: [goal[0], goal[1], goal[2]], flown: true });
+  return wps;
 }

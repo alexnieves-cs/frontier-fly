@@ -14,7 +14,7 @@
  * Change this file only by agreement; every module codes against it.
  */
 import type { ClearReport } from '../../perception/seenEmpty';
-import type { SensorMode } from '../../shared/types';
+import type { HazardParams, SensorMode } from '../../shared/types';
 import type { ObjectId, PersonState, TargetCategory, TargetClass, TargetScene } from '../../targets/types';
 import type { BuildingShell, Opening, OutdoorWorld } from '../../world/outdoor/types';
 import type { Mission, MissionType, Point } from '../types';
@@ -82,6 +82,11 @@ export interface MissionWorldOptions {
    * Defaults to `seed`. The failure atlas varies the two independently.
    */
   placementSeed?: number;
+  /**
+   * Indoor hazards built into every building (gen/hazards.ts): shut and ajar doors, glass rooms,
+   * mirrors, smoke. Targets are planted first, so a person can be behind a door that is then shut.
+   */
+  hazards?: HazardParams;
 }
 
 export interface MissionForWorldOptions {
@@ -166,6 +171,8 @@ export interface BatteryModel {
   usedPct(): number;
   /** Percent of the pack needed to fly `distanceM` horizontally and climb `climbM`, at cruise. */
   costPct(distanceM: number, climbM: number): number;
+  /** Fit a fresh pack: on the ground at home, between flights of one mission. */
+  swap(): void;
 }
 
 // --------------------------------------------------------------- safety
@@ -220,6 +227,8 @@ export interface SafetyMonitor {
   /** The strongest action needed now. `none` when flight is nominal. */
   check(input: SafetyInput): SafetyAction;
   events(): SafetyEvent[];
+  /** A fresh pack is in: the battery reserve and critical alarms re-arm for the next flight. */
+  batterySwapped(): void;
 }
 
 // -------------------------------------------------------------- planner
@@ -303,6 +312,9 @@ export interface RunRecord {
   safetyEvents: SafetyEvent[];
   batteryStartPct: number;
   batteryEndPct: number;
+  /** Packs swapped at home mid-mission, and the usable % drawn from them before they came out. */
+  batterySwaps?: number;
+  swappedUsedPct?: number;
   /** True when the drone landed within 1.5 m of home. */
   landedHome: boolean;
   indoorExplorer: 'policy' | 'frontier' | 'oracle' | null;
@@ -318,6 +330,8 @@ export interface RunRecord {
   search?: { pos: { tSec: number; pos: number }[]; reachable: number; replans: number };
   /** With RunnerOptions.measureClearance: the closest the airframe came to any solid but the ground. */
   clearance?: ClearanceRecord;
+  /** Per building searched: shut doors the camera recognised with space behind them the drone never saw. */
+  shutDoors?: { buildingId: string; count: number }[];
 }
 
 /** Closest approach of the drone's sphere to a solid (the ground excluded), and where it happened. */
@@ -368,7 +382,7 @@ export interface RunnerOptions {
   policy?: ActingPolicy;
   /**
    * Airframe model. 'kinematic' (default) follows commands within the
-   * acceleration caps; 'quad' flies a 1.2 kg quadrotor on rigid-body dynamics
+   * acceleration caps; 'quad' flies the airframe (shared/airframe.ts) as a quadrotor on rigid-body dynamics
    * and an angle-mode flight controller, and indoors uses the braking filter.
    */
   vehicle?: 'kinematic' | 'quad';
@@ -399,6 +413,12 @@ export interface RunnerOptions {
   search?: OutdoorSearchOptions;
   /** Track the closest approach to any solid every tick (RunRecord.clearance). Off by default: it costs a query per tick. */
   measureClearance?: boolean;
+  /**
+   * Hazard awareness indoors, default on: a shut door with unsearched space behind it blocks a clear,
+   * and the look estimate only trusts the camera where smoke leaves it contrast. Off is the control
+   * the hazard bench compares against.
+   */
+  hazardAware?: boolean;
 }
 
 /**

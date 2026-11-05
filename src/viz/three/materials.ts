@@ -89,7 +89,8 @@ export function materialFor(set: MaterialSet, surface: number, kind: string): TH
   if (kind === 'window' || surface === SURFACE.GLASS) return set.glass;
   if (kind === 'slab') return set.floor;
   if (surface === SURFACE.CONCRETE) return set.concrete;
-  if (surface === SURFACE.METAL) return set.metal;
+  if (surface === SURFACE.METAL || surface === SURFACE.MIRROR) return set.metal;
+  if (surface === SURFACE.DOOR) return set.door;
   if (surface === SURFACE.WOOD) return set.floor;
   return set.wall;
 }

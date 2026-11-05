@@ -29,7 +29,7 @@ npm run build
 npm run check:pages   # loads every built page without COOP/COEP headers, like GitHub Pages
 ```
 
-`npm run test:e2e` runs headless Chrome checks and writes its screenshots to `test-results/media/`. CI runs it on every pull request. To refresh the committed screenshots in `docs/media/`, run `UPDATE_MEDIA=1 npm run test:e2e`.
+`npm run test:e2e` runs headless Chrome checks and writes its screenshots to `test-results/media/`. CI runs it on every pull request. `tests/e2e/a11y.spec.ts` runs axe (WCAG 2.1 A/AA) on every page in the site nav and checks that each canvas is either `role="img"` with an `aria-label` or `aria-hidden`; add a new page to its list. To refresh the committed screenshots in `docs/media/`, run `UPDATE_MEDIA=1 npm run test:e2e`.
 
 If your change affects the policy, the simulator's speed, or what a page renders, refresh the measured numbers and commit the outputs:
 
@@ -39,7 +39,7 @@ npm run media    # docs/media/*.mp4, *.gif, media.json (needs ffmpeg)
 npm run docs     # docs/ARCHITECTURE.md, docs/BENCHMARKS.md, README tables
 ```
 
-The films (`npm run media:film`) take about six hours on one machine. The `media` workflow re-renders the films, clips and screenshots on GitHub's runners instead, splitting each film over several of them, and pushes the result to a `media/<run id>` branch to review and merge in a pull request: `gh workflow run media` (inputs pick the films, clips and runner count).
+The films (`npm run media:film`) take about six hours on one machine. Re-rendering the cabin film also refreshes the homepage hero's poster frame and recorded loop in `public/hero/` (`npm run media:hero` redoes just that from `docs/media/film-hero.mp4`). The `media` workflow re-renders the films, clips and screenshots on GitHub's runners instead, splitting each film over several of them, and pushes the result to a `media/<run id>` branch to review and merge in a pull request: `gh workflow run media` (inputs pick the films, clips and runner count).
 
 Never edit the generated tables by hand. Edit `scripts/docs/*.template.md` for prose. Report numbers you measured, including the ones that miss a target.
 

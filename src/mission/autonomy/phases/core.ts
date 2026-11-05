@@ -48,9 +48,13 @@ import {
   type Visit,
   fmt,
 } from './shared';
+import { CRASH_SPEED } from '../../../shared/constants';
+
+/** Indoor speed cap while backing off after a contact, m/s. */
+const RECOVER_SPEED = 0.6 * CRASH_SPEED;
 
 /**
- * Outdoor tilt limit, rad (55°). The 1.2 kg quad has a thrust-to-weight of 2.5, so 55° leaves 30% of thrust
+ * Outdoor tilt limit, rad (55°). The mission quad (shared/airframe.ts) has a thrust-to-weight of 2.5, so 55° leaves 30% of thrust
  * for altitude and attitude. Indoors keeps the default 23° the close-in planners are tuned around.
  */
 const OUTDOOR_TILT_RAD = 0.96;
@@ -115,6 +119,11 @@ export class MissionCore {
   /** The crash rule ended the flight (shared/constants.ts CRASH_SPEED). */
   crashed = false;
   returning = false;
+  /** The return home is to swap the battery and fly on, not the end of the mission. */
+  swapping = false;
+  batterySwaps = 0;
+  /** Usable % drawn from packs already swapped out. */
+  swappedUsedPct = 0;
   landingEmergency = false;
   inside: string | null = null;
   lastCollided = false;
@@ -133,6 +142,8 @@ export class MissionCore {
   readonly phases: RunRecord['phases'] = [];
   readonly confirmed: ConfirmedContact[] = [];
   readonly declaredClear: RunRecord['declaredClear'] = [];
+  /** Per building: shut doorways seen with unsearched space behind them, at the last check (RunRecord.shutDoors). */
+  readonly shutDoors = new Map<string, number>();
   readonly collisions: RunRecord['collisions'] = [];
   readonly entries: EntryRecord[] = [];
   readonly recent: Contact[] = [];
@@ -203,12 +214,15 @@ export class MissionCore {
   limits(): VehicleLimits {
     let base = this.baseLimits();
     // Outdoors the airframe may lean to 55° (PX4's MPC_TILTMAX_AIR allows up to 89°). The default 23° holds
-    // about 5 m/s of wind on the 1.2 kg quad and 40° about 8 m/s, so at 40° an 8 m/s wind left no headway home.
+    // about 5 m/s of wind on the mission quad and 40° about 8 m/s, so at 40° an 8 m/s wind left no headway home.
     // The limit is fixed rather than scheduled on the wind estimate: the estimate lags a wind front by a second
     // or two, and that is when the drone is blown into walls. Fly-throughs keep 40° unless it is windy.
     const windy = Math.hypot(this.windEstimate[0], this.windEstimate[1]) >= 3;
     if (!this.inside)
       base = { ...base, maxTilt: this.phase === 'fly_through' && !windy ? FLY_THROUGH_TILT_RAD : OUTDOOR_TILT_RAD, gentleStops: this.gentleStops(windy) };
+    // Backing off after a contact retraces the breadcrumbs next to whatever it hit: slow enough that a
+    // second touch is a bump, not a crash (shared/constants.ts CRASH_SPEED).
+    if (this.phase === 'recover' && this.inside) base = { ...base, speedH: Math.min(base.speedH, RECOVER_SPEED), speedV: Math.min(base.speedV, RECOVER_SPEED) };
     const k = this.health?.speedScale ?? 1;
     return k < 1 ? { ...base, speedH: base.speedH * k, speedV: base.speedV * Math.max(0.5, k) } : base;
   }

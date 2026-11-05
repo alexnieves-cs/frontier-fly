@@ -271,10 +271,11 @@ export class ConfirmTracker {
 
   /**
    * Closes a track that ran out of re-views without confirming: rejected when its views score no
-   * better than a lookalike's (under unresolvedFloor), else unresolved.
+   * better than a lookalike's (under unresolvedFloor), else unresolved. `neverReject` keeps it
+   * unresolved whatever it scored: its confidence says nothing (seen through smoke).
    */
-  close(track: ConfirmTrack): TrackStatus {
-    if (track.status === 'open') track.status = this.meanConfidence(track) >= this.unresolvedFloor ? 'unresolved' : 'rejected';
+  close(track: ConfirmTrack, neverReject = false): TrackStatus {
+    if (track.status === 'open') track.status = neverReject || this.meanConfidence(track) >= this.unresolvedFloor ? 'unresolved' : 'rejected';
     return track.status;
   }
 

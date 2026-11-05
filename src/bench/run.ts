@@ -9,6 +9,10 @@ import type { BuildingSpec, EpisodeConfig, StepResult } from '../shared/types';
 import type { BenchContext, BenchPilot } from './pilot';
 import { planEpisodeSetup } from '../plans';
 import type { BenchRun, BenchTask } from './tasks';
+import { DEFAULT_BATTERY, type BatteryConfig } from '../mission/autonomy/battery';
+
+/** FrontierBench v2's power model: the mission quad before the one-airframe change (shared/airframe.ts). */
+export const FRONTIERBENCH_V2_ENERGY: BatteryConfig = { ...DEFAULT_BATTERY, massKg: 1.2, rotors: 4, rotorDiameterM: 0.254, cdaM2: 0.03, capacityWh: 74 };
 
 export interface BenchEpisode {
   task: string;
@@ -41,6 +45,8 @@ export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: Build
   // FrontierBench v2 predates the crash rule (shared/constants.ts CRASH_SPEED): its scores count
   // contacts instead of ending the flight, so submitted results stay comparable.
   cfg.crashSpeed = Infinity;
+  // Its energy column prices the 1.2 kg, 10 inch, 74 Wh quad the mission model described when v2 was frozen.
+  cfg.energyModel = FRONTIERBENCH_V2_ENERGY;
   if (task.dynamics === 'quad' && task.dr > 0) {
     const rng = new RNG(seed, 'bench-dr');
     cfg.dyn = sampleDynParams(rng, defaultDynParams(), task.dr);

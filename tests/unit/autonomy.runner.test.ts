@@ -112,4 +112,29 @@ describe('mission runner', () => {
     expect(r.indoorExplorer === 'policy' || r.indoorExplorer === 'frontier').toBe(true);
     if (r.indoorExplorer === 'frontier') expect(r.log.some((l) => l.message.includes('Falling back')), r.log.filter((l) => /olicy/.test(l.message)).map((l) => l.message).join(' | ')).toBe(true);
   }, 60_000);
+
+  it('lands for a fresh battery when the pack runs low and finishes the sweep on the next one', async () => {
+    const world = buildMissionWorld({ seed: 37, buildings: 2, timeOfDay: 10.5, interiorLights: 'on', targets: [], decoys: 2 });
+    const mission = missionForWorld(world, {
+      missionType: 'safety_sweep',
+      targets: [{ id: 'tgt-clear', kind: 'clearance', label: 'Clear', minCount: 1, minConfidence: null }],
+      requiredConfidence: 0.8,
+      entryPolicy: 'auto',
+      budgets: { batteryPct: 85, timeSec: 1200 },
+    });
+    const source = await createFakeSource(world);
+    const runner = await createMissionRunner(mission, world, source, { dt: 0.05 });
+    for (let i = 0; i < 40_000 && !runner.done; i++) runner.step();
+    const r = runner.record();
+    const swap = r.log.find((l) => l.message.startsWith('Battery swap 1'));
+    expect(swap, r.log.map((l) => l.message).join(' | ')).toBeDefined();
+    expect(r.batterySwaps).toBe(1);
+    // It landed for the swap at home, then flew on with most of the new pack left.
+    expect(r.log.some((l) => l.message === 'Landed at home.' && l.tSec <= swap!.tSec)).toBe(true);
+    expect(r.log.some((l) => l.message === 'Taking off to resume the search.')).toBe(true);
+    expect(r.swappedUsedPct).toBeGreaterThan(70);
+    expect(r.outcome).toBe('clear');
+    expect(r.landedHome).toBe(true);
+    expect(r.collisions).toHaveLength(0);
+  }, 60_000);
 });

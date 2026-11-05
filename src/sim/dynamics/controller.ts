@@ -1,4 +1,5 @@
 import type { DynParams } from '../../shared/types';
+import { AIRFRAME } from '../../shared/airframe';
 import { GRAVITY, MAX_SPEED_H, MAX_SPEED_V, MAX_YAW_RATE } from '../../shared/constants';
 
 /** Direct P gains. Positive pitch is nose-down, so +vx error commands +pitch. */
@@ -38,9 +39,10 @@ function wrapPi(a: number): number {
  * Allocation-free; writes `wCmd`.
  */
 export class AngleController {
-  private mass = 0.45;
+  // Placeholders until setParams() loads the vehicle's DynParams (shared/airframe.ts).
+  private mass = AIRFRAME.massKg;
   private kf = 1e-5;
-  private a = 0.0707;
+  private a = AIRFRAME.armM * Math.SQRT1_2;
   private b = 0.02;
   private fMax = 1;
   private integZ = 0;

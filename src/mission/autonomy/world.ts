@@ -2,6 +2,7 @@ import { OBJECT_IDS } from '../../targets/catalog';
 import { placeIndoor, placeOutdoor } from '../../targets/placement';
 import type { OutdoorArea, PlacedTarget, TargetScene } from '../../targets/types';
 import { RNG } from '../../shared/rng';
+import { applyHazards } from '../../gen/hazards';
 import { generateOutdoor } from '../../world/outdoor/generate';
 import { MAX_BUILDINGS } from '../../world/outdoor/constants';
 import { sampleHeight } from '../../world/outdoor/terrain';
@@ -329,6 +330,14 @@ export function buildMissionWorld(options: MissionWorldOptions): MissionWorld {
       interiorLightsOn: lightsFor(shell, options.interiorLights ?? 'on', placement),
     };
   });
+  // Hazards go in after the targets, so the people are planted in the open building. The shell objects are shared with
+  // world.outdoor, so the colliders, the renderer and the sensors all see the hazard building.
+  if (options.hazards) {
+    const hazards = options.hazards;
+    outdoor.buildings.forEach((shell, index) => {
+      shell.spec = applyHazards(shell.spec, hazards, index + 1);
+    });
+  }
   return {
     seed,
     outdoor,

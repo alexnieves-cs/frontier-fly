@@ -22,6 +22,7 @@ function fakeBattery(remaining: number, costPerM = 0): BatteryModel {
     capacityWh: 74,
     powerFor: () => 0,
     draw: () => undefined,
+    swap: () => undefined,
     remainingPct: () => remaining,
     usedPct: () => 100 - remaining,
     costPct: (d) => d * costPerM,
@@ -60,9 +61,10 @@ describe('battery model', () => {
   });
 
   it('gives a plausible hover endurance and drains deterministically', () => {
+    // The airframe (shared/airframe.ts) is rated for 18 minutes on its pack.
     const minutes = hoverEnduranceMin();
-    expect(minutes).toBeGreaterThan(20);
-    expect(minutes).toBeLessThan(35);
+    expect(minutes).toBeGreaterThan(15);
+    expect(minutes).toBeLessThan(20);
     const b = createBattery();
     const p = hoverPowerW(DEFAULT_BATTERY);
     for (let i = 0; i < 600; i++) b.draw(p, 0.1);
@@ -78,8 +80,17 @@ describe('battery model', () => {
     expect(b.costPct(100, 0)).toBeLessThan(b.costPct(100, 10));
     // 1 km at cruise is a handful of percent, not most of the pack.
     expect(b.costPct(1000, 0)).toBeGreaterThan(2);
-    expect(b.costPct(1000, 0)).toBeLessThan(15);
+    expect(b.costPct(1000, 0)).toBeLessThan(25);
     expect(createBattery(60).capacityWh).toBe(60);
+  });
+
+  it('starts a swapped-in pack full', () => {
+    const b = createBattery();
+    b.draw(hoverPowerW(DEFAULT_BATTERY), 300);
+    expect(b.usedPct()).toBeGreaterThan(20);
+    b.swap();
+    expect(b.usedPct()).toBe(0);
+    expect(b.remainingPct()).toBe(100);
   });
 });
 

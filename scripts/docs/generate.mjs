@@ -5,7 +5,8 @@
 //   node scripts/docs/generate.mjs --check   exit 1 if any file is out of date
 //
 // Inputs: the import graph under src/, docs/benchmarks.json (npm run bench),
-// docs/media/media.json (npm run media), and docs/missions.json when the mission runner writes one.
+// docs/media/media.json (npm run media), docs/missions.json when the mission runner writes one, and the
+// hazard benches (docs/hazard-coverage.json, docs/hazard-missions.json).
 // Numbers only come from those files. A missing file renders as "not measured".
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -16,6 +17,7 @@ import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
+import { hazardsSection } from './hazards.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -339,7 +341,7 @@ function reportInline(study, bench) {
   const keys4 = ['R_MQ_SENSOR', 'R_MQ_POLICY', 'R_MQ_COLL', 'R_MQ_ALL'];
   const keys5 = ['R_CLIMB_FLOORS', 'R_CLIMB_FLOORS_CI', 'R_PLANNER_FLOORS', 'R_PLANNER_FLOORS_CI', 'R_CLIMB_REACHED', 'R_CLIMB_COLL', 'R_PRED_HARD', 'R_PRED_HARD_CI', 'R_ORACLEGAIN_HARD', 'R_PRED_FLOORS', 'R_ORACLEGAIN_FLOORS', 'R_PLANNER_FLOORS_N'];
   const keys6 = ['R_MP_R2', 'R_MP_BASE_R2', 'R_MP_MAE', 'R_MP_BASE_MAE', 'R_MP_TRAIN', 'R_MP_VAL'];
-  const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL'];
+  const keys2 = ['R_M_SENSOR', 'R_M_ORACLE', 'R_M_POLICY', 'R_M_FLIGHTS', 'R_M_COLL', 'R_M_HANDOFF', 'R_M_NIGHT_SENSOR', 'R_M_NIGHT_ORACLE', 'R_M_COMPOUND', 'R_M_ALL', 'R_M_SWAP_FLIGHTS', 'R_M_SWAP_COMPOUND'];
   for (const k of [...keys, ...keys2, ...keys3, ...keys4, ...keys5, ...keys6]) out[k] = 'n/a';
   const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
   const mp = readJson('public/models/mappred.json');
@@ -425,6 +427,11 @@ function reportInline(study, bench) {
     out.R_M_NIGHT_SENSOR = pct(m.sensor['backpack-night'].expectedOutcome);
     out.R_M_NIGHT_ORACLE = pct(m.oracle['backpack-night'].expectedOutcome);
     out.R_M_COMPOUND = pct(m.sensor['compound-clear'].expectedOutcome);
+    // Battery swaps (runner.ts): flights that landed for a fresh pack, over every mode.
+    const fl = bench.flights ?? [];
+    out.R_M_SWAP_FLIGHTS = `${fl.filter((f) => f.swaps).length} of ${fl.length}`;
+    const compound = fl.filter((f) => f.scenario.startsWith('compound'));
+    out.R_M_SWAP_COMPOUND = `${compound.filter((f) => f.swaps).length} of ${compound.length}`;
     if (m.sensorLoc?.all.loc) {
       const all = ['sensorLoc', 'policyLoc', 'sensorQuadLoc'].filter((k) => m[k]?.all.loc);
       const flights = all.reduce((a, k) => a + m[k].all.flights, 0);
@@ -661,7 +668,7 @@ function benchmarks() {
       'The policy flies first under a lidar guard and hands a building to the sensor-only planner after 8 s without new coverage or on a collision; the planner always does the look-around.',
       'The sensor-only planner reads only the drone\'s own lidar, range finders and camera estimate. The oracle planner reads the true floor plan and is a reference, not a flyable mode.',
       '`compound-occupied` is the compound sweep with a person lying inside one building, so a sweep that declares that building clear is a false clear; its expected outcome is found.',
-      'The quadrotor rows fly the policy and the planner on a 1.2 kg rigid-body quadrotor under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
+      'The quadrotor rows fly the policy and the planner on the rigid-body quadrotor airframe (`shared/airframe.ts`) under an angle-mode flight controller instead of the kinematic airframe, with the braking filter as the indoor shield.',
       'The estimated-pose rows fly the same explorers indoors on the drone\'s own pose estimate (lidar scan matching, IMU and optical flow, `src/loc`) instead of the simulator\'s pose, and the estimate starts at the doorway from the aperture tracker.',
       'Marginal openings ask an operator even under auto entry, and the bench approves every ask. Intervals are Wilson 95%.',
     ].join(' ');
@@ -1056,7 +1063,7 @@ function localizationTables(loc) {
  * against the published scores on the same relations.
  */
 function intelLabSection(intel) {
-  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_NOMAN', 'R_INTEL_NOMAN_BEST', 'R_INTEL_NOMAN_RANGE', 'R_INTEL_ADAPTED_RANGE', 'R_INTEL_SHIPPED_RANGE', 'R_INTEL_NOMAN_LOCAL', 'R_INTEL_SCAN', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN'];
+  const keys = ['INTEL_TABLE', 'INTEL_SPLIT_TABLE', 'R_INTEL_NOMAN', 'R_INTEL_NOMAN_BEST', 'R_INTEL_NOMAN_RANGE', 'R_INTEL_ADAPTED_RANGE', 'R_INTEL_SHIPPED_RANGE', 'R_INTEL_NOMAN_LOCAL', 'R_INTEL_SCAN', 'R_INTEL_SHIPPED', 'R_INTEL_ADAPTED', 'R_INTEL_ADAPTED_ROT', 'R_INTEL_ODOM', 'R_INTEL_LOCAL', 'R_INTEL_ODOM_LOCAL', 'R_INTEL_LOOPS', 'R_INTEL_MEDIAN', 'R_INTEL_HELD', 'R_INTEL_MS', 'R_INTEL_COMMIT', 'R_INTEL_SWEEPS', 'R_INTEL_RELS', 'R_INTEL_MIN', 'R_INTEL_LOOP', 'R_INTEL_LOOP_RANGE', 'R_INTEL_LOOP_HELD', 'R_INTEL_LOOP_LOCAL', 'R_INTEL_LOOP_LOOPS', 'R_INTEL_LOOP_WORST', 'R_INTEL_LOOP_MS', 'R_INTEL_LOOP_CLOSURES', 'R_INTEL_LOOP_KEYS', 'R_INTEL_ADLOOP', 'R_INTEL_ADLOOP_LOOPS'];
   if (!intel) return Object.fromEntries(keys.map((k) => [k, k.startsWith('R_') ? 'not measured' : '_Not measured yet. `npm run study:intel` writes `docs/intel-lab.json`._']));
   const arm = (id) => intel.arms.find((a) => a.id === id);
   const m = (v) => `${v.toFixed(3)} m`;
@@ -1069,7 +1076,7 @@ function intelLabSection(intel) {
     ['Graph FLIRT (as quoted by Hess et al. 2016)', '0.02 ± 0.02', '0.3 ± 0.3', '—', '—', '—'],
     ['Cartographer (Hess et al. 2016)', '0.0229 ± 0.0239', '0.453 ± 1.335', '0.0011 ± 0.0040', '1.986 ± 23.988', '—'],
   ].map(([name, ...v]) => [`${name}, published`, ...v]);
-  const ours = ['odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-scan']
+  const ours = ['loop', 'odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-loop', 'adapted-scan']
     .map(arm)
     .filter(Boolean)
     .map((a) => [
@@ -1080,7 +1087,7 @@ function intelLabSection(intel) {
       pm(a.error.rotSq, 1),
       a.error.transAbs.max.toFixed(3),
     ]);
-  const split = ['odom', 'fused', 'adapted', 'adapted-noManhattan'].map(arm).filter(Boolean).map((a) => [
+  const split = ['loop', 'odom', 'fused', 'adapted', 'adapted-noManhattan', 'adapted-loop'].map(arm).filter(Boolean).map((a) => [
     a.label,
     `${a.quantiles.transMedian.toFixed(3)} m / ${a.quantiles.rotMedian.toFixed(2)}°`,
     `${a.quantiles.transP90.toFixed(3)} m / ${a.quantiles.rotP90.toFixed(2)}°`,
@@ -1094,7 +1101,21 @@ function intelLabSection(intel) {
   const od = arm('odom');
   const nm = arm('adapted-noManhattan');
   const range = (a) => `${m(a.transRange[0])} to ${m(a.transRange[1])}`;
+  const lp = arm('loop');
+  const al = arm('adapted-loop');
+  const ls = lp.stats;
   return {
+    R_INTEL_LOOP: `${m(lp.error.transAbs.mean)} and ${lp.error.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_LOOP_RANGE: range(lp),
+    R_INTEL_LOOP_HELD: `${m(lp.heldOut.transAbs.mean)} and ${lp.heldOut.rotAbs.mean.toFixed(2)}°`,
+    R_INTEL_LOOP_LOCAL: m(lp.local.transAbs.mean),
+    R_INTEL_LOOP_LOOPS: m(lp.loops.transAbs.mean),
+    R_INTEL_LOOP_WORST: m(lp.error.transAbs.max),
+    R_INTEL_LOOP_MS: `${fmt(lp.msPerSweep, 1)} ms`,
+    R_INTEL_LOOP_CLOSURES: `${fmt(ls['loop.loopAccepted'])} of ${fmt(ls['loop.loopTried'])}`,
+    R_INTEL_LOOP_KEYS: fmt(ls['loop.keyframes']),
+    R_INTEL_ADLOOP: m(al.error.transAbs.mean),
+    R_INTEL_ADLOOP_LOOPS: m(al.loops.transAbs.mean),
     R_INTEL_NOMAN: `${m(nm.error.transAbs.mean)} and ${nm.error.rotAbs.mean.toFixed(2)}°`,
     R_INTEL_NOMAN_BEST: m(nm.transRange[0]),
     R_INTEL_NOMAN_RANGE: range(nm),
@@ -1141,7 +1162,7 @@ function faultBench(bench, first) {
         .slice(0, 3)
         .map(([id, s]) => `\`${id}\` ${pct(s.safeRate)}`)
         .join(', ');
-      return `| ${i + 1} | \`${run.commit}\` | ${run.seedBase}–${run.seedBase + run.seedsPerScenario - 1} | ${pct(r.all.safeRate)} (${pct(r.all.safeRateCi[0])}–${pct(r.all.safeRateCi[1])}) | ${r.all.collisions} | ${worst} | \`docs/fault-bench-run${i + 1}.json\` |`;
+      return `| ${i + 1} | \`${run.commit}\` | ${run.seedBase}–${run.seedBase + run.seedsPerScenario - 1} | ${pct(r.all.safeRate)} (${pct(r.all.safeRateCi[0])}–${pct(r.all.safeRateCi[1])}) | ${r.all.collisions} | ${worst} | \`results/archive/fault-bench/fault-bench-run${i + 1}.json\` |`;
     };
     return [
       '**Earlier evaluations.** Runs 1 and 2 flew the 9800 block. After run 1, its failures were reproduced and fixed on the development seeds only (emergency landings pick an open column and use range-finder ground, landings cut the motors at 0.4 m, and leaving a building without a map route retraces the flown path), then the same seeds were flown again. Looking at a run\'s aggregate numbers before the next is still a form of selection, so each later run flies a block that no earlier run, tuning pass or study has touched. The wind work of run 3 was developed on 9101–9116 only, and the work of runs 4 to 8 on 78001–78030 only (the candidates for run 8 were also compared on blocks 77501, 77601 and 77701, which the published bench does not fly).',
@@ -1224,8 +1245,9 @@ const values = {
   ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
   GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...atlasValues(readJson('docs/atlas.json')),
+  ...hazardsSection(readJson('docs/hazard-coverage.json'), readJson('docs/hazard-missions.json')).values,
   ...trackingValues(readJson('docs/atlas/mc-tracking.json'), readJson('docs/atlas/mc-tracking-control.json')),
-  ...faultBench(readJson('docs/fault-bench.json'), [readJson('docs/fault-bench-run1.json'), readJson('docs/fault-bench-run2.json'), readJson('docs/fault-bench-run3.json'), readJson('docs/fault-bench-run4.json'), readJson('docs/fault-bench-run5.json'), readJson('docs/fault-bench-run6.json'), readJson('docs/fault-bench-run7.json')]),
+  ...faultBench(readJson('docs/fault-bench.json'), [readJson('results/archive/fault-bench/fault-bench-run1.json'), readJson('results/archive/fault-bench/fault-bench-run2.json'), readJson('results/archive/fault-bench/fault-bench-run3.json'), readJson('results/archive/fault-bench/fault-bench-run4.json'), readJson('results/archive/fault-bench/fault-bench-run5.json'), readJson('results/archive/fault-bench/fault-bench-run6.json'), readJson('results/archive/fault-bench/fault-bench-run7.json')]),
 };
 const header = '<!-- Generated by scripts/docs/generate.mjs. Edit the template in scripts/docs/, not this file. -->\n\n';
 const outputs = {
