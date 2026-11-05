@@ -870,7 +870,7 @@ function readmeHeadline(study, mb, atlas, faults, tracking) {
         ? [
             '**How often does it call a building clear with someone inside?**',
             `**${pct2(tracking.now.rates.falseClear.p)} per flight** (${ci2(tracking.now.rates.falseClear.ci)}), down from ${pct2(tracking.ctrl.rates.falseClear.p)} before unconfirmed people blocked a clear`,
-            `${fmt(tracking.now.flights)} fresh flights from the failure atlas's mix, both versions on the same seeds (atlas at v1.0.0: ${pct2(fc.p)})`,
+            `${fmt(tracking.now.flights)} fresh flights from the failure atlas's mix, both versions on the same seeds (importance-sampled atlas on the current code: ${pct2(fc.p)}; 3.55% at v1.0.0)`,
           ]
         : [
             '**How often does it call a building clear with someone inside?**',
