@@ -10,8 +10,8 @@
  *          [--bc 0.05] [--ppo 1] [--log-std -2.3] [--critic-warmup 8] [--imitate 0]
  *          [--eval-every 20] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
  *          [--crash-penalty 0] [--impact-penalty 0] [--crash-weight 0.2] [--quad 0] [--eval-quad]
- *          [--labels teacher|guard-teacher|guard-self]
- *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|report|fresh] [--eval-quad]
+ *          [--labels teacher|guard-teacher|guard-self] [--guard-gain 1]
+ *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|tune-wide|report|fresh] [--eval-quad]
  *
  * Crash rule (shared/constants.ts CRASH_SPEED): a crash ends the episode with REWARD.crash in the
  * env. --crash-penalty adds more on that step, --impact-penalty charges every contact per m/s above
@@ -65,11 +65,13 @@ function schedule(name: string, fallback: string): (frac: number) => number {
  * (69001+, first used for the crash-rule retrain) are only ever reported. With `quad`, 16 more
  * stage-3 episodes fly quadrotor dynamics with full domain randomization (base + 301..316).
  */
-export function seedSet(name: 'tune' | 'report' | 'fresh', quad = false): (EvalJob & { quad?: boolean })[] {
-  const base = name === 'tune' ? 66_000 : name === 'report' ? 68_000 : 69_000;
+export function seedSet(name: 'tune' | 'tune-wide' | 'report' | 'fresh', quad = false): (EvalJob & { quad?: boolean })[] {
+  const base = name === 'tune' || name === 'tune-wide' ? 66_000 : name === 'report' ? 68_000 : 69_000;
+  // 'tune-wide' is the tuning block at 3x the hard episodes, to separate close checkpoints.
+  const wide = name === 'tune-wide' ? 3 : 1;
   const jobs: (EvalJob & { quad?: boolean })[] = [];
-  for (let i = 1; i <= 32; i++) jobs.push({ stage: 3, seed: base + i, lighting: 'day' });
-  for (let i = 1; i <= 8; i++) jobs.push({ stage: 3, seed: base + 100 + i, lighting: 'night-dark' });
+  for (let i = 1; i <= 32 * wide; i++) jobs.push({ stage: 3, seed: base + i, lighting: 'day' });
+  for (let i = 1; i <= 8 * wide; i++) jobs.push({ stage: 3, seed: base + 100 + i, lighting: 'night-dark' });
   for (let i = 1; i <= 6; i++) jobs.push({ stage: 0, seed: base + 200 + i, lighting: 'day' });
   for (let i = 1; i <= 2; i++) jobs.push({ stage: 0, seed: base + 250 + i, lighting: 'night-dark' });
   if (quad) for (let i = 1; i <= 16; i++) jobs.push({ stage: 3, seed: base + 300 + i, lighting: i > 12 ? 'night-dark' : 'day', quad: true });
@@ -158,7 +160,7 @@ async function main() {
   const validateOnly = arg('validate-only');
   if (validateOnly) {
     const c = parseCheckpoint(readFileSync(validateOnly));
-    const set = (arg('set') ?? 'tune') as 'tune' | 'report' | 'fresh';
+    const set = (arg('set') ?? 'tune') as 'tune' | 'tune-wide' | 'report' | 'fresh';
     const s = await evaluate(pool, workers, MemPolicy.fromCheckpoint(c), seedSet(set, args.includes('--eval-quad')));
     console.log(`${validateOnly} [${set}] ${fmt(s)}`);
     await pool.close();
@@ -213,6 +215,7 @@ async function main() {
       crashPenalty: num('crash-penalty', 0),
       impactSpeedPenalty: num('impact-penalty', 0),
       quadFraction: phase === 'imitate' ? 0 : quadFraction,
+      guardGain: num('guard-gain', 1),
       labels: (arg('labels') ?? 'teacher') as 'teacher' | 'guard-teacher' | 'guard-self',
     })) as SeqRolloutResult[];
     resetEnvs = false;

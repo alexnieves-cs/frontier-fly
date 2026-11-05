@@ -64,7 +64,7 @@ export function results() {
       pilot('waypoint', 'Frontier follower (no learning)', 'base'),
       pilot('heuristic', 'Lidar heuristic', 'base'),
     ],
-    /** The policy alone crashes more than under its guard (it learned before the crash rule). */
+    /** The policy alone crashes more than under its guard. */
     guardSaves: policy.crashes !== null && guarded.crashes !== null && policy.crashes > guarded.crashes,
     easy: cell('easy', 'day', 'guarded').coverage,
     nightOverDay: cell('hard', 'night-dark', 'guarded').coverage / guarded.value,

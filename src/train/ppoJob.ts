@@ -60,6 +60,8 @@ export interface SeqRolloutPayload {
    * through the guard, which teaches the actor to brake the way the guard does so it needs no guard.
    */
   labels?: 'teacher' | 'guard-teacher' | 'guard-self';
+  /** With labels 'guard-self': the label moves this many times the guard's horizontal change (1 = the guard's action). */
+  guardGain?: number;
   /** Penalty per contact, in reward per m/s of impact speed above half the crash speed (0 = off). */
   impactSpeedPenalty?: number;
 }
@@ -122,6 +124,8 @@ interface WorkerState {
 }
 
 let worker: WorkerState | null = null;
+
+const clamp1 = (v: number) => Math.max(-1, Math.min(1, v));
 
 /** Contacts slower than this are free under --impact-speed-penalty: half the crash speed. */
 const CONTACT_FREE_SPEED = CRASH_SPEED / 2;
@@ -274,9 +278,11 @@ const seqRollout: JobFn = (ctx, raw) => {
       if (p.labels === 'guard-self') {
         // Horizontal velocity only: the guard also holds a fixed height, which the policy should not copy.
         const g = guardedAction(action, slot.obs!, env);
+        // guardGain > 1 pulls harder where the guard brakes (the label moves k times the guard's change).
+        const k = p.guardGain ?? 1;
         out.teacher.set(action, row * ACT_DIM);
-        out.teacher[row * ACT_DIM] = g[0]!;
-        out.teacher[row * ACT_DIM + 1] = g[1]!;
+        out.teacher[row * ACT_DIM] = clamp1(action[0]! + k * (g[0]! - action[0]!));
+        out.teacher[row * ACT_DIM + 1] = clamp1(action[1]! + k * (g[1]! - action[1]!));
       }
       out.logp[row] = act.logp[i]!;
       const step = env.step(action);

@@ -8,10 +8,10 @@ How often the shipped autopilot (`policyQuad`: the trained policy indoors with t
 
 | Event | Importance sampling | Flights | Plain Monte Carlo | Flights |
 | --- | --- | --- | --- | --- |
-| False clear | 3.55% (95% CI 3.21% to 3.88%) | 2000 (594 failing, ESS 790) | 3.40% (2.97% to 3.89%) | 6000 (204 failing) |
-| Collision | 2.70% (95% CI 1.99% to 3.41%) | 2000 (54 failing, ESS 2000) | 2.72% (2.33% to 3.16%) | 6000 (163 failing) |
+| False clear | 0.25% (95% CI 0.16% to 0.34%) | 2000 (29 failing, ESS 772) | 0.22% (0.13% to 0.37%) | 6000 (13 failing) |
+| Collision | 1.00% (95% CI 0.65% to 1.54%) | 2000 (20 failing, ESS 2000) | 1.15% (0.91% to 1.45%) | 6000 (69 failing) |
 
-On missions with someone or something to find (the rest are sweeps of empty sites, which cannot false-clear), the plain Monte Carlo false-clear rate is 4.25% (3.71% to 4.86%, 204 of 4801); on sweeps of an occupied site it is 13.18% (11.58% to 14.95%).
+On missions with someone or something to find (the rest are sweeps of empty sites, which cannot false-clear), the plain Monte Carlo false-clear rate is 0.27% (0.16% to 0.47%, 13 of 4772); on sweeps of an occupied site it is 0.89% (0.52% to 1.52%).
 
 ## Where the failures are
 
@@ -21,25 +21,25 @@ Conditional rates from the plain Monte Carlo flights, the five values with the h
 
 | Dimension | Value | Rate | Flights |
 | --- | --- | --- | --- |
-| Mission | sweep-occupied | 13.2% (11.6% to 15.0%) | 1548 |
-| Person pose | walking | 10.1% (8.5% to 12.0%) | 1184 |
-| Time of day | 21:36-24:00 | 6.6% (4.9% to 8.9%) | 605 |
-| Person pose | hiding | 6.4% (5.2% to 8.0%) | 1198 |
-| Fault | lidar-noise | 5.5% (3.4% to 8.7%) | 291 |
+| Fault | lidar-noise | 1.1% (0.4% to 3.1%) | 281 |
+| Person pose | hiding | 1.0% (0.6% to 1.8%) | 1182 |
+| Mission | sweep-occupied | 0.9% (0.5% to 1.5%) | 1453 |
+| Target building (share of the list) | 0.5-0.6 | 0.8% (0.4% to 1.9%) | 606 |
+| Time of day | 02:24-04:48 | 0.8% (0.3% to 1.9%) | 622 |
 
 **Collision**
 
 | Dimension | Value | Rate | Flights |
 | --- | --- | --- | --- |
-| Fault | battery-sag | 5.7% (3.6% to 9.0%) | 296 |
-| Mean wind, m/s | 0.1-0.2 | 4.9% (3.4% to 6.9%) | 613 |
-| Fault onset (share of its window) | 0.2-0.3 | 4.7% (3.3% to 6.7%) | 612 |
-| Fault | lidar-silent | 4.5% (2.6% to 7.5%) | 289 |
-| Fault bearing or motor | 0-36 | 4.4% (3.0% to 6.4%) | 589 |
+| Mean wind, m/s | 4.9-6.0 | 2.5% (1.6% to 4.1%) | 629 |
+| Wind arrives, s | 96-120 | 2.5% (1.5% to 4.1%) | 565 |
+| Fault | gnss-loss | 2.4% (1.2% to 4.8%) | 295 |
+| Gusts, share of the mean | 0.44-0.48 | 2.0% (1.2% to 3.5%) | 586 |
+| Fault bearing or motor | 0-36 | 2.0% (1.2% to 3.4%) | 648 |
 
 ## Method
 
 - **Operating distribution.** Every flight is a draw from a declared distribution over 16 dimensions (src/eval/atlas/space.ts): mission kind (find a person 35%, sweep an occupied site 25%, sweep an empty site 20%, find an object 20%), 1-3 buildings, the person's pose, the object, decoys, interior lights, time of day (uniform; flashlight on at night), mean wind 6u² m/s with direction, gusts and arrival time, and a sensor or airframe fault on 40% of flights with its onset, severity and bearing. The layout and target placement come from two seeds that are never searched. The rates are rates under this distribution; the conditional rates let a reader re-weight it.
 - **Search.** Cross-entropy method: each generation of 400 flights keeps the top 10% by a score that reaches 1 exactly on the event, weights each kept flight by its likelihood ratio to the nominal, and refits only the dimensions where the kept flights differ clearly from their batch (chi-square at 0.999; smoothing 0.7, floor 0.01). The collision score is how close the drone came to any solid but the ground. The false-clear score rewards a target seen but never confirmed, plus the share of buildings declared clear; a first search (seeds 200001+) scored a target never seen at all highest and climbed toward flights that saw nothing, so it was re-run with that score on seeds 205001+. 6800 search flights in all.
 - **Importance sampling.** Fresh flights from a mixture of 30% nominal and the learned proposal, so no weight exceeds 3.3; the rate is the mean weighted indicator with a normal 95% interval. Plain Monte Carlo draws from the nominal itself on its own seeds, as a check.
-- **Seeds.** Search 205001 and 200001+, importance sampling false clear 210001+, collision 215001+, Monte Carlo 220001+. No other study uses these blocks, and nothing was tuned on them.
+- **Seeds.** Search 205001 and 200001+, importance sampling false clear 255001+, collision 258001+, Monte Carlo 261001+. No other study uses these blocks, and nothing was tuned on them.
