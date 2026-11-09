@@ -60,7 +60,7 @@ frontier-fly is built by [Alex Nieves](https://alexnieves.me) ([GitHub](https://
 What turned out to be hard, and what the repository does about it:
 
 - **A good average hides rare failures.** The mission bench looked fine, but the failure atlas found the drone calling a building clear with a walking person inside on 3.5% of flights. Tracking people across views took that to 0.3%.
-- **Free contacts teach bad habits.** The learned policy covered the most of any pilot, then a crash rule showed it was sliding along walls. The lidar guard keeps it safe today, and retraining under the rule is under way.
+- **Free contacts teach bad habits.** The learned policy covered the most of any pilot, then a crash rule showed it was sliding along walls. Retraining under the rule cut the policy's own crashes from 19 of 30 flights to 7, and the lidar guard takes that to 1.
 - **Small fixed evaluations flatter.** The early 86% was partly seed luck. Every headline now comes from fresh seeds with 95% intervals, and the generated docs fail CI if a number drifts from its JSON.
 - **Simulators lie in specific ways.** Kinematic drones stop instantly and quadrotors don't. A braking filter, a quad-aware tracker and PX4 SITL in CI keep the gap visible.
 

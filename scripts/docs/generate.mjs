@@ -607,7 +607,8 @@ function benchmarks() {
         String(m.falseAlarms),
         String(m.missed),
         String(m.collisions),
-        `${m.batteryUsedPct}%`,
+        // Over 100% means the drone landed at home for a fresh pack mid-mission (runner.ts battery swaps).
+        m.batteryUsedPct > 100 ? `${m.batteryUsedPct}% (pack swapped at home)` : `${m.batteryUsedPct}%`,
         m.landedHome,
       ]),
     );

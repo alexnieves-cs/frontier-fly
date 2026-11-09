@@ -217,6 +217,9 @@ jobs:
           git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
           b="media/${{ github.run_id }}"
           git checkout -b "$b"
-          git add docs/media docs/missions.json public/hero
+          # The generated docs quote media.json and missions.json; an unregenerated BENCHMARKS.md
+          # fails docs:check on main and blocks the Pages deploy (it did after media run 42087774970).
+          npm run docs
+          git add docs README.md public/hero
           git commit -m "Media re-rendered from ${MEDIA_SOURCE} (media run ${{ github.run_id }})"
           git push origin "$b"
