@@ -119,13 +119,41 @@ function boxesOverlap(a: Aabb, b: Aabb): boolean {
   return a.min[0] < b.max[0] && a.max[0] > b.min[0] && a.min[1] < b.max[1] && a.max[1] > b.min[1] && a.min[2] < b.max[2] && a.max[2] > b.min[2];
 }
 
-function draftBox(item: Draft): Aabb {
-  return bodyAabb(item.feet, item.yaw, item.size.hx, item.size.hy, item.size.height);
+/**
+ * Every pose a walker takes on its loop, PATH_STEP apart, facing along the leg (followPath in
+ * motion.ts walks the same closed loop). A target with no path has the one pose.
+ */
+export function sweptPoses(feet: Vec3, yaw: number, path?: Vec3[]): Array<{ at: Vec3; yaw: number }> {
+  if (!path || path.length < 2) return [{ at: feet, yaw }];
+  const out: Array<{ at: Vec3; yaw: number }> = [];
+  for (let i = 0; i < path.length; i++) {
+    const a = path[i]!;
+    const b = path[(i + 1) % path.length]!;
+    const face = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / PATH_STEP));
+    for (let k = 0; k <= n; k++) {
+      const t = k / n;
+      out.push({ at: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t], yaw: face });
+    }
+  }
+  return out;
 }
 
-function hitsPlaced(placed: Draft[], feet: Vec3, yaw: number, size: Size): boolean {
-  const box = bodyAabb(feet, yaw, size.hx, size.hy, size.height);
-  return placed.some((item) => boxesOverlap(box, draftBox(item)));
+/** Spacing of the poses checked along a walker's path, m (a person is about 0.5 m across). */
+const PATH_STEP = 0.2;
+
+function sweptBoxes(feet: Vec3, yaw: number, size: Size, path?: Vec3[]): Aabb[] {
+  return sweptPoses(feet, yaw, path).map((p) => bodyAabb(p.at, p.yaw, size.hx, size.hy, size.height));
+}
+
+function draftBoxes(item: Draft): Aabb[] {
+  return sweptBoxes(item.feet, item.yaw, item.size, item.state === 'walking' ? item.path : undefined);
+}
+
+/** True when any pose of the new target, along its path, overlaps any pose of a placed one. */
+function hitsPlaced(placed: Draft[], feet: Vec3, yaw: number, size: Size, path?: Vec3[]): boolean {
+  const mine = sweptBoxes(feet, yaw, size, path);
+  return placed.some((item) => draftBoxes(item).some((other) => mine.some((box) => boxesOverlap(box, other))));
 }
 
 function wallNeighbor(spec: BuildingSpec, cell: CellRef): boolean {
@@ -214,16 +242,9 @@ function commit(
   const poseFeet = path?.[0] ?? feet;
   const poseYaw = path && path.length > 1 ? Math.atan2(path[1]![1] - path[0]![1], path[1]![0] - path[0]![0]) : yaw;
   if (!coversFit(spec, masks, floor, poseFeet, poseYaw, size)) return false;
-  if (hitsPlaced(placed, poseFeet, poseYaw, size)) return false;
-  if (path) {
-    for (let i = 0; i < path.length; i++) {
-      const a = path[i]!;
-      const b = path[(i + 1) % path.length]!;
-      const face = Math.atan2(b[1] - a[1], b[0] - a[0]);
-      const mid: Vec3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, a[2]];
-      if (!coversFit(spec, masks, floor, a, face, size) || !coversFit(spec, masks, floor, mid, face, size)) return false;
-    }
-  }
+  if (hitsPlaced(placed, poseFeet, poseYaw, size, path)) return false;
+  // The whole walk must stay on open floor, clear of walls and furniture.
+  if (path) for (const p of sweptPoses(poseFeet, poseYaw, path)) if (!coversFit(spec, masks, floor, p.at, p.yaw, size)) return false;
   placed.push({ classId, state, feet: poseFeet, yaw: poseYaw, size, floor, roomIndex, path, occluders });
   return true;
 }
@@ -235,12 +256,9 @@ function walkPath(rng: RNG, spec: BuildingSpec, masks: Uint8Array[], cells: Cell
     if (Math.abs(next.ix - start.ix) + Math.abs(next.iy - start.iy) < 2) continue;
     const a = cellPos(spec, start.f, start.ix, start.iy);
     const b = cellPos(spec, next.f, next.ix, next.iy);
-    const yaw = Math.atan2(b[1] - a[1], b[0] - a[0]);
-    const mid: Vec3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, a[2]];
-    if (!coversFit(spec, masks, start.f, a, yaw, size)) continue;
-    if (!coversFit(spec, masks, start.f, b, yaw, size)) continue;
-    if (!coversFit(spec, masks, start.f, mid, yaw, size)) continue;
-    return [a, b];
+    const path = [a, b];
+    if (sweptPoses(a, 0, path).some((p) => !coversFit(spec, masks, start.f, p.at, p.yaw, size))) continue;
+    return path;
   }
   return null;
 }
@@ -400,14 +418,10 @@ export function placeOutdoor(area: OutdoorArea, options: PlaceOptions): TargetSc
   const accept = (classId: TargetClass, state: PersonState | 'static', feet: Vec3, yaw: number, path?: Vec3[]): boolean => {
     const size = sizeOfClass(classId, state);
     const samples = path && path.length > 1 ? path : [feet];
-    for (let i = 0; i < samples.length; i++) {
-      const point = samples[i]!;
-      const nxt = samples[(i + 1) % samples.length]!;
-      const face = samples.length > 1 ? Math.atan2(nxt[1] - point[1], nxt[0] - point[0]) : yaw;
-      const box = bodyAabb(point, face, size.hx, size.hy, size.height);
-      if (outdoorBlocked(area, box)) return false;
-      if (hitsPlaced(placed, point, face, size)) return false;
-    }
+    const walk = samples.length > 1 ? samples : undefined;
+    // Every pose along the walk stays inside the area and off obstacles and other targets.
+    for (const p of sweptPoses(samples[0]!, yaw, walk)) if (outdoorBlocked(area, bodyAabb(p.at, p.yaw, size.hx, size.hy, size.height))) return false;
+    if (hitsPlaced(placed, samples[0]!, yaw, size, walk)) return false;
     const pose = samples[0]!;
     const poseYaw = samples.length > 1 ? Math.atan2(samples[1]![1] - pose[1], samples[1]![0] - pose[0]) : yaw;
     placed.push({
@@ -434,7 +448,10 @@ export function placeOutdoor(area: OutdoorArea, options: PlaceOptions): TargetSc
         const route = area.paths?.[i % Math.max(1, area.paths?.length ?? 1)];
         if (route && route.length >= 2) path = route.map(([x, y]) => [x, y, area.groundZ]);
         else {
-          const b: Vec3 = [rng.range(area.minX, area.maxX), rng.range(area.minY, area.maxY), area.groundZ];
+          // A short walk (3 to 12 m) somewhere in the woods: a long one almost always crosses a tree.
+          const heading = rng.range(-Math.PI, Math.PI);
+          const length = rng.range(3, 12);
+          const b: Vec3 = [feet[0] + Math.cos(heading) * length, feet[1] + Math.sin(heading) * length, area.groundZ];
           path = [feet, b];
         }
         feet = path[0]!;
