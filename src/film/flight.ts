@@ -60,6 +60,20 @@ function samePlan(a: V3[], b: V3[]): boolean {
   return true;
 }
 
+const FLIGHT_SLICE_MS = 12;
+
+/** Yield to the event loop. A message channel, not setTimeout, which a hidden tab throttles to 1 s. */
+function breathe(): Promise<void> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
+}
+
 /**
  * Fly a scenario headless and keep every tick. The run is the same seeded
  * mission the demo page flies, so the film shows a real run, not a script.
@@ -108,9 +122,16 @@ export async function recordFlight(id: string, policy: NormalizedPolicy | null):
     });
   };
   capture();
+  // The compound sweep is about 22,000 ticks, several seconds of work: hand the main thread back
+  // every few milliseconds so the page (the landing hero included) keeps scrolling and painting.
+  let sliceStart = performance.now();
   for (let i = 0; i < limit && !runner.done; i++) {
     runner.step();
     capture();
+    if (performance.now() - sliceStart > FLIGHT_SLICE_MS) {
+      await breathe();
+      sliceStart = performance.now();
+    }
   }
   const record = runner.record();
   const report = buildReport(record, loaded.source, loaded.world);

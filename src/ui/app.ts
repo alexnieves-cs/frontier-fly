@@ -419,7 +419,12 @@ class Session {
     this.q<HTMLInputElement>('#file').addEventListener('change', () => {
       const file = this.q<HTMLInputElement>('#file').files?.[0];
       if (!file) return;
-      void file.arrayBuffer().then((bytes) => this.applyCheckpoint(parseCheckpoint(bytes)));
+      file
+        .arrayBuffer()
+        .then((bytes) => this.applyCheckpoint(parseCheckpoint(bytes)))
+        .catch((error: unknown) => window.alert(`That file is not a frontier-fly checkpoint: ${error instanceof Error ? error.message : String(error)}`))
+        // Cleared so that choosing the same file again fires change.
+        .finally(() => (this.q<HTMLInputElement>('#file').value = ''));
     });
     window.addEventListener('keydown', (event) => {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;

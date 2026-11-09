@@ -710,7 +710,15 @@ export function mountMissionEditor(root: HTMLElement): void {
         if (selection?.zoneId === zone.id) selection = null;
         syncPlan();
       });
-      card.addEventListener('click', () => {
+      card.addEventListener('click', (event) => {
+        // Rebuilding the cards destroys the field that was just clicked: a click on a field or a
+        // button of the selected zone must leave the cards alone, or the field can never take focus.
+        const already = selection?.kind === 'nofly' && selection.zoneId === zone.id;
+        if (already || (event.target instanceof Element && event.target.closest('input, textarea, select, button'))) {
+          selection = { kind: 'nofly', zoneId: zone.id };
+          for (const other of zoneList.children) other.classList.toggle('selected', other === card);
+          return;
+        }
         selection = { kind: 'nofly', zoneId: zone.id };
         zoneSignature = '';
         syncPlan();

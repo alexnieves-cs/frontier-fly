@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 const pct = (v) => `${(v * 100).toFixed(1)}%`;
 /** An entry's name is its author's text: keep it from adding links, HTML or table cells. */
-const plain = (name) => String(name).replace(/[|\[\]<>`\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+const plain = (name) => String(name).replace(/[|[\]<>`\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
 
 function table(head, rows) {
   const line = (cells) => `| ${cells.join(' | ')} |`;

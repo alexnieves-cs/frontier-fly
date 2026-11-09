@@ -468,7 +468,7 @@ class Demo {
   private bind(): void {
     for (const scenario of SCENARIOS) {
       this.el(`scenario-${scenario.id}`).addEventListener('click', () => {
-        if (this.scenario === scenario.id && this.runner && !this.snapshot?.tSec) return;
+        if (this.scenario === scenario.id && !this.atlas && this.runner && !this.snapshot?.tSec) return;
         this.scenario = scenario.id;
         this.atlas = null;
         this.syncScenarioCards();
@@ -508,7 +508,8 @@ class Demo {
       );
     });
     window.addEventListener('keydown', (event) => {
-      if (event.target instanceof HTMLInputElement) return;
+      // Space on a focused control is that control's key (the operator prompt focuses "Approve entry").
+      if (event.target instanceof Element && event.target.closest('button, a, select, input, textarea')) return;
       if (event.code === 'Space') {
         event.preventDefault();
         if (this.running) this.pause();

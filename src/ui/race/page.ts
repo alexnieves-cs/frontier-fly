@@ -566,7 +566,8 @@ class RacePage {
     if (!msg || !this.spec) return;
     const now = performance.now();
     // Keep collision rings fading while paused or finished, otherwise redraw only on new data.
-    const animating = this.views.length > 0 && msg.lanes.some((l) => l.collisions > 0);
+    // (Rings last 1.2 s; asking "has any lane ever collided" kept a finished race repainting for good.)
+    const animating = this.views.some((v) => v.flashing);
     if (!this.dirty && !animating) return;
     this.dirty = false;
     this.views.forEach((v, i) => v.draw(msg.lanes[i] ?? null, msg.visited[i] ?? null, msg.seen[i] ?? null, now));

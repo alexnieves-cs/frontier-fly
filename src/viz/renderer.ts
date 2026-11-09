@@ -41,6 +41,8 @@ export class ThreeView implements Renderer {
   private readonly rays = makeLidarLines();
   private readonly trailGeom = new THREE.BufferGeometry();
   private readonly trail = new THREE.Line(this.trailGeom, new THREE.LineBasicMaterial({ color: '#7dffe1' }));
+  private trailCount = -1;
+  private trailLast: [number, number, number] | undefined;
   private readonly visited: THREE.InstancedMesh;
   private readonly beam: THREE.Mesh;
   private readonly flash: THREE.SpotLight;
@@ -281,6 +283,11 @@ export class ThreeView implements Renderer {
   }
 
   setTrail(points: Array<[number, number, number]>): void {
+    // Called every frame; the trail only changes when a point is added or the flight restarts.
+    const last = points[points.length - 1];
+    if (points.length === this.trailCount && last === this.trailLast) return;
+    this.trailCount = points.length;
+    this.trailLast = last;
     const arr = new Float32Array(points.length * 3);
     for (let i = 0; i < points.length; i++) {
       const p = points[i]!;
@@ -288,7 +295,10 @@ export class ThreeView implements Renderer {
       arr[i * 3 + 1] = p[2];
       arr[i * 3 + 2] = p[1];
     }
+    this.trailGeom.dispose();
     this.trailGeom.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    // The bounding sphere is computed once from the first points; without this the trail is culled as soon as it leaves them.
+    this.trail.frustumCulled = false;
     this.trail.visible = points.length > 1;
   }
 
