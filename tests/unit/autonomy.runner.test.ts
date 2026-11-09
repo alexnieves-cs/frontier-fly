@@ -137,4 +137,27 @@ describe('mission runner', () => {
     expect(r.landedHome).toBe(true);
     expect(r.collisions).toHaveLength(0);
   }, 60_000);
+
+  it('swaps the pack before a building it could not finish on what is left, instead of leaving mid-search', async () => {
+    const world = buildMissionWorld({ seed: 37, buildings: 2, timeOfDay: 10.5, interiorLights: 'on', targets: [], decoys: 2 });
+    const mission = missionForWorld(world, {
+      missionType: 'safety_sweep',
+      targets: [{ id: 'tgt-clear', kind: 'clearance', label: 'Clear', minCount: 1, minConfidence: null }],
+      requiredConfidence: 0.8,
+      entryPolicy: 'auto',
+      budgets: { batteryPct: 60, timeSec: 2400 },
+    });
+    const source = await createFakeSource(world);
+    const runner = await createMissionRunner(mission, world, source, { dt: 0.05 });
+    for (let i = 0; i < 60_000 && !runner.done; i++) runner.step();
+    const r = runner.record();
+    const log = r.log.map((l) => l.message);
+    // It turns back at the door of the second building, not halfway through it: one entry per building.
+    expect(log.some((m) => m.includes('so swapping the battery before')), log.join(' | ')).toBe(true);
+    expect(r.batterySwaps).toBe(1);
+    expect(r.entries).toHaveLength(2);
+    expect(r.outcome).toBe('clear');
+    expect(r.landedHome).toBe(true);
+    expect(r.collisions).toHaveLength(0);
+  }, 60_000);
 });

@@ -1,8 +1,6 @@
 // Shared by the bench scripts: loading a pilot and summarizing its flights.
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { BASELINES, policyPilot } from '../../src/bench/baselines';
-import type { BenchPilot, BenchPilotFactory } from '../../src/bench/pilot';
+import type { BenchPilot } from '../../src/bench/pilot';
 import { readFileSync } from 'node:fs';
 import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
 import { parsePlanSet, PLAN_SET_PATH, type PlanSet } from '../../src/plans';
@@ -10,16 +8,17 @@ import type { ExplorerEnv } from '../../src/sim/env';
 import { BENCH_TASKS, benchRuns, SAFE_COLLISIONS, type BenchSplit } from '../../src/bench/tasks';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { bootstrapCi, loadPolicy } from '../study/common';
+import { sandboxedPilot } from './sandbox';
 
-export async function loadPilot(id: string): Promise<{ make: () => Promise<BenchPilot>; source: string }> {
+/** A baseline by id, or a submitted pilot module, which runs in the sandbox (sandbox.ts). Call `close` when done. */
+export async function loadPilot(id: string): Promise<{ make: () => Promise<BenchPilot & { close?: () => Promise<void> }>; source: string }> {
   if (id === 'policy' || id === 'guarded') {
     const policy = loadPolicy(SHIPPED_CHECKPOINT_PATH);
     const name = id === 'policy' ? 'Shipped policy (DAgger + PPO)' : 'Shipped policy (DAgger + PPO) under the lidar guard';
     return { make: async () => policyPilot(name, policy, id === 'guarded'), source: `baseline:${id}` };
   }
   if (BASELINES[id]) return { make: async () => BASELINES[id]!(), source: `baseline:${id}` };
-  const mod = (await import(pathToFileURL(resolve(id)).href)) as { default: BenchPilotFactory };
-  return { make: async () => mod.default(), source: id };
+  return { make: () => sandboxedPilot(id), source: id };
 }
 
 export function summarize(episodes: BenchEpisode[]) {

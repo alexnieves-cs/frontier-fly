@@ -12,7 +12,7 @@ import { flyAll, loadPilot, mismatches, summarize } from './lib';
 const args = process.argv.slice(2).filter((a) => a !== '--');
 const dirs = args.length ? args : readdirSync('bench/entries').map((d) => join('bench/entries', d));
 const env = await createEnv();
-// Until every entry has been judged, an early exit (a pilot calling process.exit, a crash) is a failure.
+// Until every entry has been judged, an early exit (a crash, a pilot that throws or hangs) is a failure.
 process.exitCode = 1;
 let failed = 0;
 for (const dir of dirs) {
@@ -28,7 +28,9 @@ for (const dir of dirs) {
   const claimed = JSON.parse(readFileSync(resultPath, 'utf8')) as { bench: number; split: string; score: number; name?: string; baseline?: boolean } & Record<string, unknown>;
   const { make } = await loadPilot(pilotPath);
   const pilot = await make();
+  // The pilot runs in a worker thread (sandbox.ts), so it cannot reach this env or the scorer.
   const episodes = flyAll(env, pilot, 'test');
+  await pilot.close?.();
   const got = summarize(episodes);
   // Flights are deterministic, so a re-score matches to rounding. The leaderboard prints more than
   // the score (per-task coverage, footprint, the share of flights that touched nothing, the name),

@@ -27,6 +27,7 @@ const episodes = flyAll(env, pilot, split, only, (task, rs) =>
   console.log(`${task}: ${((rs.reduce((a, e) => a + e.coverage, 0) / rs.length) * 100).toFixed(1)}% over ${rs.length} flights (${Math.round((Date.now() - t0) / 1000)} s)`),
 );
 env.dispose();
+await pilot.close?.();
 const result = {
   bench: BENCH_VERSION,
   name: pilot.name,

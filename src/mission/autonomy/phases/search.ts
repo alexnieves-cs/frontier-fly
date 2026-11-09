@@ -585,6 +585,12 @@ export class SearchPhase {
     );
   }
 
+  /** The building being searched while one of its contacts is having a re-view, else null. */
+  confirmingBuilding(): MissionBuilding | null {
+    const v = this.c.visit;
+    return this.confirmTrack && v && this.confirmTrack.buildingId === v.b.id && this.c.phase !== 'exit' ? v.b : null;
+  }
+
   /**
    * A battery-swap return cuts a re-view short: forget it, so the contact stays open and the next
    * flight into that building re-views it again rather than waiting on a confirmation that never ends.

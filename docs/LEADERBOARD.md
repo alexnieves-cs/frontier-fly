@@ -79,7 +79,7 @@ It never sees the floor plan. It returns the env's action: forward, left, up and
 1. Copy [`bench/entries/example`](../bench/entries/example) to `bench/entries/<your-name>/` and write your pilot in `pilot.ts` (default export: a function returning a `BenchPilot`). It may import anything under `src/`.
 2. Tune on dev: `npm run bench:score -- --pilot bench/entries/<your-name>/pilot.ts --split dev`.
 3. Score on test once: `npm run bench:score -- --pilot bench/entries/<your-name>/pilot.ts --split test --out bench/entries/<your-name>/result.json`.
-4. Run `npm run docs` and open a pull request. CI re-scores the entry and fails if the result differs. The re-score checks every number the table prints, but it runs your pilot in the scorer's own process, so it is a consistency check and not a sandbox: a maintainer reads each entry's code before it is merged, and an entry that reaches into the scorer or the building's ground truth is refused.
+4. Run `npm run docs` and open a pull request. CI re-scores the entry and fails if the result differs. The re-score checks every number the table prints, and it runs your pilot in a worker thread of its own (`scripts/bench/sandbox.ts`): the pilot gets a copy of each observation and sensor frame and hands back four numbers, so it cannot reach the scorer, the env or the building it is flying, and it sees no environment variables. That is not the whole defence. The test seeds are public, so a maintainer still reads each entry's code before it is merged, and an entry built around answers worked out offline is refused. Team-track entries (`team.ts`) still run in the scorer's process.
 
 Learned pilots can ship their weights in the entry folder. Keep each file under a few MB.
 

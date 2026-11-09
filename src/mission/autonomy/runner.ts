@@ -115,7 +115,8 @@ class Runner implements MissionRunner {
     this.home = new HomePhase(c, pilot, {
       startExit: (after) => this.indoor.startExit(after),
       // An operator abort during a swap return ends the mission on the pad: it must not take off again.
-      finish: () => (this.c.swapping && this.c.landedHome && !this.c.aborted ? this.swapBattery() : this.finish()),
+      // Neither does a fault that showed up on the way home (canSwap's rule: a faulted flight stays home).
+      finish: () => (this.c.swapping && this.c.landedHome && !this.c.aborted && !this.c.health?.flags.size ? this.swapBattery() : this.finish()),
     });
     c.job = pilot.holdJob('preflight', 1, () => this.search.startCoverage());
     c.recordTrack();
@@ -447,7 +448,10 @@ class Runner implements MissionRunner {
     const home = this.c.battery.costPct(centerDist(b, this.c.world.home), 0) * 1.3 + 6;
     const budget = this.c.mission.budgets.batteryPct;
     // Only when a fresh pack would cover it, or the drone would shuttle between pad and building.
-    if (!this.c.sar && used + est + home >= budget && est + home < budget - used && this.canSwap(this.timeHome(), b)) {
+    // (Until 2026-11 the second test read `est + home < budget - used`, which can never hold with the
+    // first, so this swap never happened and the drone always started the search on the old pack.)
+    // A fresh pack has to fly out to the building too (about what `home` prices), or the drone would swap again on arrival.
+    if (!this.c.sar && used + est + home >= budget && 2 * home + est < budget && this.canSwap(this.timeHome(), b)) {
       this.search.pending.unshift(b);
       this.c.swapping = true;
       this.home.startReturn(`battery: ${fmt(used, 0)}% used and a building search takes about ${fmt(est, 0)}%, so swapping the battery before ${b.label}`);
@@ -465,7 +469,9 @@ class Runner implements MissionRunner {
 
   private startSwapReturn(budget: string): void {
     // A building cut short goes back in the queue: the next flight searches it from the start.
-    const b = this.unfinishedVisit();
+    // A building whose search is finished but whose open contact is having its last look has not been
+    // declared either way yet: it goes back in the queue too, or it would end the mission undecided.
+    const b = this.unfinishedVisit() ?? this.search.confirmingBuilding();
     if (b && !this.search.pending.some((p) => p.id === b.id)) this.search.pending.unshift(b);
     this.c.swapping = true;
     this.search.dropConfirm();
