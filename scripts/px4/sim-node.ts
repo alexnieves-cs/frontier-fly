@@ -171,4 +171,5 @@ for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   });
 }
 
-server.listen(port, () => console.log(`waiting for PX4 on TCP ${port}`));
+// Loopback only: PX4 SITL connects from this machine, and nothing on the network should reach the port.
+server.listen(port, '127.0.0.1', () => console.log(`waiting for PX4 on TCP ${port}`));

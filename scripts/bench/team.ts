@@ -10,6 +10,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { flyTeam, summarizeTeam, TEAM_BASELINES, TEAM_BENCH_TASKS, TEAM_BENCH_VERSION, type TeamEntry } from '../../src/bench/team';
 import type { BenchSplit } from '../../src/bench/tasks';
+import { mismatches } from './lib';
 
 const argv = process.argv.slice(2).filter((a) => a !== '--');
 const flag = (k: string) => {
@@ -56,10 +57,10 @@ if (argv.includes('--board')) {
       failed += 1;
       continue;
     }
-    const claimed = JSON.parse(readFileSync(resultPath, 'utf8')) as { teamBench: number; split: string; score: number };
+    const claimed = JSON.parse(readFileSync(resultPath, 'utf8')) as { teamBench: number; split: string; score: number; baseline?: boolean; name?: string; tasks?: unknown };
     const got = await score(await loadEntry(entryPath), 'test', entryPath, false);
     // Team flights are deterministic too, so a re-score matches to rounding.
-    const ok = claimed.teamBench === TEAM_BENCH_VERSION && claimed.split === 'test' && Math.abs(got.score - claimed.score) < 1e-6;
+    const ok = claimed.teamBench === TEAM_BENCH_VERSION && claimed.split === 'test' && !claimed.baseline && claimed.name === got.name && mismatches({ score: got.score, tasks: got.tasks }, claimed).length === 0;
     console.log(`${dir}: claimed ${(claimed.score * 100).toFixed(2)}%, re-scored ${(got.score * 100).toFixed(2)}% ${ok ? 'ok' : 'MISMATCH'}`);
     if (!ok) failed += 1;
   }
