@@ -111,3 +111,40 @@ test('editor, live approval, and report screenshots', async ({ page }) => {
   await page.screenshot({ path: `${out}/mission-report.png` });
   expect(readFileSync(`${out}/mission-report.png`).length).toBeGreaterThan(20_000);
 });
+
+test('on a touch screen the drawing tools pinch to zoom, drag to pan and tap to place', async ({ page }) => {
+  await openMission(page, '?blank=1&seed=11');
+  await page.locator('[data-testid=tool-geofence]').click();
+  const canvas = page.locator('[data-testid=mission-map]');
+  const view = () => canvas.evaluate((el) => ({ cx: Number((el as HTMLElement).dataset.cx), cy: Number((el as HTMLElement).dataset.cy), mpp: Number((el as HTMLElement).dataset.mpp) }));
+  const touch = (type: string, id: number, x: number, y: number) =>
+    canvas.evaluate(
+      (el, e) => {
+        const r = el.getBoundingClientRect();
+        el.dispatchEvent(new PointerEvent(e.type, { pointerId: e.id, pointerType: 'touch', isPrimary: e.id === 11, button: 0, buttons: e.type === 'pointerup' ? 0 : 1, clientX: r.left + e.x, clientY: r.top + e.y, bubbles: true }));
+      },
+      { type, id, x, y },
+    );
+  const before = await view();
+  // Two fingers moving apart zoom in, and place nothing.
+  await touch('pointerdown', 11, 300, 300);
+  await touch('pointerdown', 12, 400, 300);
+  await touch('pointermove', 11, 250, 300);
+  await touch('pointermove', 12, 450, 300);
+  await touch('pointerup', 11, 250, 300);
+  await touch('pointerup', 12, 450, 300);
+  const zoomed = await view();
+  expect(zoomed.mpp).toBeCloseTo(before.mpp / 2, 5);
+  await expect(page.locator('#app')).toHaveAttribute('data-draft', '0');
+  // One finger dragging pans, and places nothing.
+  await touch('pointerdown', 11, 300, 300);
+  await touch('pointermove', 11, 360, 300);
+  await touch('pointerup', 11, 360, 300);
+  const panned = await view();
+  expect(panned.cx).toBeCloseTo(zoomed.cx - 60 * zoomed.mpp, 3);
+  await expect(page.locator('#app')).toHaveAttribute('data-draft', '0');
+  // A tap places a corner.
+  await touch('pointerdown', 11, 320, 320);
+  await touch('pointerup', 11, 320, 320);
+  await expect(page.locator('#app')).toHaveAttribute('data-draft', '1');
+});

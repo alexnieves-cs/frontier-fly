@@ -1,5 +1,5 @@
 import type { CameraMode, QualityPreset, SensorMode } from '../shared/types';
-import { readRendererChoice, type RendererChoice } from '../viz/quality';
+import { readRendererChoice, type QualityChoice, type RendererChoice } from '../viz/quality';
 
 export interface LaunchParams {
   seed: number;
@@ -10,7 +10,10 @@ export interface LaunchParams {
   stage: number | 'auto';
   flashlight: boolean;
   lights: boolean;
+  /** The preset in use; the page updates it once `qualityChoice` 'auto' has resolved. */
   quality: QualityPreset;
+  /** What the URL asked for. */
+  qualityChoice: QualityChoice;
   /** WebGL2 unless the URL opts in with `?renderer=webgpu`. */
   renderer: RendererChoice;
   sensor: SensorMode;
@@ -68,7 +71,10 @@ export function readLaunchParams(search = window.location.search): LaunchParams 
   }
   const stageRaw = q.get('stage');
   const stage = stageRaw == null || stageRaw === 'auto' ? 'auto' : Math.max(0, Math.min(5, Number(stageRaw) || 0));
-  const quality: QualityPreset = q.get('quality') === 'low' ? 'low' : 'high';
+  // No `?quality=`: the page picks (low on software or slow GL, else high). Stills (`?shot=`) keep the full look.
+  const qualityRaw = q.get('quality');
+  const qualityChoice: QualityChoice = qualityRaw === 'low' || qualityRaw === 'high' ? qualityRaw : shot ? 'high' : 'auto';
+  const quality: QualityPreset = qualityChoice === 'low' ? 'low' : 'high';
   const sensorRaw = q.get('sensor');
   let sensor: SensorMode = sensorRaw === 'ir' || sensorRaw === 'depth' ? sensorRaw : 'rgb';
   if (shot === 'night' || shot === 'fpv') sensor = q.get('sensor') === 'ir' ? 'ir' : 'rgb';
@@ -86,6 +92,7 @@ export function readLaunchParams(search = window.location.search): LaunchParams 
     flashlight,
     lights,
     quality,
+    qualityChoice,
     renderer: readRendererChoice(search),
     sensor,
     pilot,

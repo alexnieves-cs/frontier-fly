@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readLaunchParams } from '../../src/ui/controls';
 import { isSoftwareRendererName, readRendererChoice, resolveQuality, shouldTryWebGPU } from '../../src/viz/quality';
 
 describe('quality preset', () => {
@@ -6,6 +7,14 @@ describe('quality preset', () => {
     expect(resolveQuality('auto')).toBe('high');
     expect(resolveQuality('auto', false)).toBe('high');
     expect(resolveQuality('auto', true)).toBe('low');
+  });
+
+  it('lets the page pick unless the URL names a preset; stills keep the full look', () => {
+    expect(readLaunchParams('').qualityChoice).toBe('auto');
+    expect(readLaunchParams('?quality=low').qualityChoice).toBe('low');
+    expect(readLaunchParams('?quality=high').qualityChoice).toBe('high');
+    expect(readLaunchParams('?shot=day').qualityChoice).toBe('high');
+    expect(readLaunchParams('?shot=day&quality=low').qualityChoice).toBe('low');
   });
 
   it('honors an explicit preset', () => {

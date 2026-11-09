@@ -1,13 +1,13 @@
 import './styles.css';
 import { generateBuilding } from '../gen/building';
 import { parsePlanSet, PLAN_SET_URL, PLAN_STAGE, planBuilding, type PlanRecord, type PlanSet } from '../plans';
-import { OBS_DIM } from '../shared/constants';
+import { ACT_DIM, HIDDEN, OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { MetricsPayload } from '../shared/messages';
 import type { BuildingSpec, CameraMode, DroneState, LightingState, QualityPreset, SensorMode } from '../shared/types';
 import { actorOnly, checkpointMismatch, parseCheckpoint, SHIPPED_POLICY_URL, saveCheckpointIdb, loadCheckpointIdb, type Checkpoint } from '../rl/checkpoint';
-import type { InferPolicy } from '../rl/infer';
-import type { RunningNorm } from '../rl/normalize';
+import { InferPolicy } from '../rl/infer';
+import { RunningNorm, type RunningNormState } from '../rl/normalize';
 import { makeDroneState } from '../sim/drone';
 import { createEnv, type ExplorerEnv } from '../sim/env';
 import { heuristicAction } from '../sim/heuristic';
@@ -48,7 +48,8 @@ export async function startApp(root: HTMLElement = document.querySelector('#app'
   const view = new ThreeView(viewCanvas, pipCanvas);
   const bootNote = must<HTMLElement>(root, '#boot-note');
   try {
-    await view.init(launch.quality, launch.renderer);
+    await view.init(launch.qualityChoice, launch.renderer);
+    launch.quality = view.activeQuality;
     const env = await createEnv();
     const session = new Session(root, view, env, launch);
     await session.boot();
@@ -85,6 +86,8 @@ class Session {
   /** The loaded checkpoint had no value head; saves and downloads leave it out too. */
   private actorOnly = false;
   private pool: TrainPool | null = null;
+  /** The latest network from in-tab training, not yet copied into `policy` (see adoptTrained). */
+  private trained: { weights: ArrayBuffer[]; norm: RunningNormState } | null = null;
   private training = false;
   private paused = false;
   private pilot: LaunchParams['pilot'];
@@ -132,6 +135,13 @@ class Session {
     this.bind();
     this.view.addSceneObject(this.targetView.group);
     this.view.setCamera(this.camera);
+    this.view.onAutoLow = () => {
+      this.launch.quality = 'low';
+      this.syncButtons();
+      const link = this.q('#link');
+      link.textContent = 'Low quality';
+      link.title = 'Frames were slow on this device, so the page switched to the light look. The High button switches back.';
+    };
     this.syncButtons();
     await this.loadShipped();
     if (this.launch.plan) await this.loadPlans();
@@ -465,6 +475,7 @@ class Session {
     if (this.training) {
       this.pool?.pause();
       this.training = false;
+      this.adoptTrained();
       this.syncButtons();
       return;
     }
@@ -488,6 +499,9 @@ class Session {
         onMetrics: (metrics) => this.onMetrics(metrics),
         onHeatmap: (msg) => {
           this.heatmap = { w: msg.w, d: msg.d, values: msg.values, arrows: msg.arrows };
+        },
+        onWeights: (weights, norm) => {
+          this.trained = { weights, norm };
         },
       });
       this.pool.start(this.launch.seed);
@@ -593,6 +607,8 @@ class Session {
       return;
     }
     const { policy, norm, rawObs } = policyFromCheckpoint(checkpoint);
+    // A checkpoint loaded by hand wins over what training produced so far (until its next update).
+    this.trained = null;
     this.policy = policy;
     this.norm = norm;
     this.rawObs = rawObs;
@@ -606,7 +622,27 @@ class Session {
     if (checkpoint) downloadCheckpoint(checkpoint);
   }
 
+  /**
+   * Make the network the training workers last produced the page's own policy: the drone flies it
+   * once training pauses, and Save writes it. Until 2026-11 the trained weights never left the
+   * workers, so Save wrote the checkpoint that was loaded before training started.
+   */
+  private adoptTrained(): void {
+    if (!this.trained) return;
+    const policy = new InferPolicy(OBS_DIM, ACT_DIM, HIDDEN, 1);
+    policy.setWeights(this.trained.weights.map((buf) => buf.slice(0)));
+    const norm = new RunningNorm(OBS_DIM);
+    norm.load(this.trained.norm);
+    this.policy = policy;
+    this.norm = norm;
+    this.rawObs = false;
+    this.actorOnly = false;
+    this.trained = null;
+    if (this.pilot !== 'keys') this.pilot = 'policy';
+  }
+
   private currentCheckpoint(): Checkpoint | null {
+    this.adoptTrained();
     if (!this.policy || !this.norm) return null;
     const checkpoint = checkpointFrom(this.policy, this.norm, this.stageNumber());
     return this.actorOnly ? actorOnly(checkpoint) : checkpoint;

@@ -8,7 +8,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { policyFromFile, type NormalizedPolicy } from '../mission/autonomy/policy';
 import { SHIPPED_POLICY_URL } from '../rl/checkpoint';
 import { DEFAULT_SCENARIO, isScenarioId, SCENARIOS, type ScenarioId } from '../mission/autonomy/scenarios';
-import { buildTimeline, Director, FILM_FPS, type FilmFrame } from './director';
+import { buildTimeline, Director, FILM_FPS, type DirectorState, type FilmFrame } from './director';
 import { recordFlight, sampleFlight, type FlightLog } from './flight';
 import { FilmOverlay } from './overlay';
 import { FilmScene } from './scene';
@@ -48,6 +48,8 @@ const GradeShader = {
 };
 
 export interface FilmApi {
+  /** Camera frames the last `render` had to step through (1 when playing forward). */
+  stepped?: number;
   ready: boolean;
   frames: number;
   fps: number;
@@ -127,7 +129,8 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     ? Math.min(1, Math.max(0.25, Number(params.get('scale') ?? 1) || 1))
     : embed
       ? Math.min(1, Math.max(0.25, options.renderScale ?? (root.clientWidth < 700 ? 0.5 : 0.75)))
-      : 1;
+      : // The standalone film: no more pixels than the screen shows (a phone was rendering the full 1920x1080).
+        Math.min(1, Math.max(0.5, (Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1)) / STAGE_W));
   const flightSec = Number(params.get('length')) || undefined;
   const api: FilmApi = { ready: false, frames: 0, fps: FILM_FPS, scenario, status: 'flying', render: () => undefined };
   const status = (next: FilmStatus, message: string) => {
@@ -200,13 +203,28 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
     composer.addPass(new SMAAPass(STAGE_W * renderScale, STAGE_H * renderScale));
     const timeline = buildTimeline(log, flightSec);
     let cursor = -1;
+    // The camera's state after every KEY_EVERY-th frame, so scrubbing backwards resumes from the nearest
+    // one instead of replaying the whole film from frame 0 (seconds per drag event on a long flight).
+    const KEY_EVERY = 30;
+    const keys = new Map<number, DirectorState>();
+    const start = director.snapshot();
+    const step = (k: number) => {
+      director.frame(timeline[k]!);
+      if (k % KEY_EVERY === 0 && !keys.has(k)) keys.set(k, director.snapshot());
+    };
     const show = (i: number) => {
       const target = Math.max(0, Math.min(timeline.length - 1, i));
       // The camera springs are stateful: replay any skipped frames without rendering them.
-      if (target < cursor) cursor = -1;
-      for (let k = cursor + 1; k < target; k++) director.frame(timeline[k]!);
+      if (target <= cursor) {
+        let key = Math.floor((target - 1) / KEY_EVERY) * KEY_EVERY;
+        while (key >= 0 && !keys.has(key)) key -= KEY_EVERY;
+        director.restore(key >= 0 ? keys.get(key)! : start);
+        cursor = key >= 0 ? key : -1;
+      }
+      api.stepped = target - cursor;
+      for (let k = cursor + 1; k < target; k++) step(k);
       const f = timeline[target]!;
-      director.frame(f);
+      step(target);
       apply(scene, log, f);
       composer.render();
       overlay.update(f, director.camera);

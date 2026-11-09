@@ -60,6 +60,22 @@ jobs:
         with:
           path: dist
 
+  # The browser tests, on what main actually holds. They do not gate the deploy (a flaky browser
+  # test should not hold the site back), but a red run here says a merge broke a page that the
+  # pull request's own checks did not catch, for example a merge of two green branches.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --trace off
+
   deploy:
     needs: [test, lint, build]
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'

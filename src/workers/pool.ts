@@ -8,6 +8,8 @@ export interface PoolHandlers {
   onShowcase: (snap: ShowcaseSnap) => void;
   onMetrics: (metrics: MetricsPayload) => void;
   onHeatmap: (msg: { id: number; floor: number; w: number; d: number; values: Float32Array; arrows: Float32Array }) => void;
+  /** The network after each update (InferPolicy.setWeights buffers) and the observation norm it was trained with. */
+  onWeights?: (weights: ArrayBuffer[], norm: RunningNormState) => void;
 }
 
 interface PendingRollout {
@@ -230,6 +232,8 @@ export class TrainPool {
       };
       this.handlers.onMetrics(metrics);
       this.broadcast(msg.weights, msg.norm);
+      // The page keeps the latest network too, so Save and the page's own drone use what was trained.
+      this.handlers.onWeights?.(msg.weights, msg.norm);
       this.pending = null;
     }
   }
