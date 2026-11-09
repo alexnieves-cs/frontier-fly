@@ -26,6 +26,8 @@ const LAND_SEARCH_WINDY_M = 40;
  * time limit.
  */
 const LAND_ALIGN_TIMEOUT_S = 10;
+/** Longest hold over the pad waiting for a GNSS fix before landing where the ground is clear, s. */
+const GNSS_PAD_HOLD_SEC = 60;
 const LAND_LOOKAHEAD_S = 1.5;
 /** Height a weak airframe may lose on the way to its landing column, m. */
 const LAND_SINK_M = 2;
@@ -102,6 +104,7 @@ export class HomePhase {
     let moveOpen = false;
     let movingLogged = false;
     let gnssHoldLogged = false;
+    let gnssHoldSince: number | null = null;
     this.c.setJob({
       phase: 'land',
       plan: () => [target],
@@ -140,7 +143,14 @@ export class HomePhase {
           }
           c.vel[2] = Math.max(c.vel[2]!, 0);
           aligned = false;
-        }
+          // The failsafe and the safety monitor both stand down once the phase is 'land', so nothing
+          // else ends this hold: without a limit the drone hovers and drifts until the time budget.
+          gnssHoldSince ??= this.c.t;
+          if (this.c.t - gnssHoldSince >= GNSS_PAD_HOLD_SEC) {
+            this.startLand(`no GNSS fix for ${fmt(GNSS_PAD_HOLD_SEC, 0)} s over the pad`);
+            return { vel: [0, 0, 0] };
+          }
+        } else gnssHoldSince = null;
         for (let i = 0; i < 2; i++) {
           trim[i] = Math.max(-LAND_TRIM_MAX, Math.min(LAND_TRIM_MAX, trim[i]! + (target[i]! - pos[i]!) * LAND_TRIM_KI * this.c.dt));
           c.vel[i] = c.vel[i]! + trim[i]!;
