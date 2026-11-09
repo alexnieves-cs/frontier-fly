@@ -3,6 +3,7 @@ import { reachableMasks } from '../gen/validate';
 import type { BuildingSpec } from '../shared/types';
 import { bodyAabb } from './motion';
 import { resolveTarget } from './motion';
+import { sweptPoses } from './placement';
 import type { Aabb, PlacedTarget, TargetScene, Vec3 } from './types';
 
 function cellsOf(spec: BuildingSpec, floor: number, box: Aabb): Array<{ ix: number; iy: number; cell: number; reachable: number }> {
@@ -28,15 +29,9 @@ function cellsOf(spec: BuildingSpec, floor: number, box: Aabb): Array<{ ix: numb
   return out;
 }
 
-function samples(target: PlacedTarget): Vec3[] {
-  if (!target.path || target.path.length < 2 || target.state !== 'walking') return [target.feet];
-  const points = [...target.path];
-  for (let i = 0; i < target.path.length; i++) {
-    const a = target.path[i]!;
-    const b = target.path[(i + 1) % target.path.length]!;
-    points.push([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]);
-  }
-  return points;
+function samples(target: PlacedTarget): Array<{ at: Vec3; yaw: number }> {
+  const walking = target.state === 'walking' && target.path && target.path.length >= 2;
+  return sweptPoses(target.feet, target.yaw, walking ? target.path : undefined);
 }
 
 function outdoorHit(scene: TargetScene, box: Aabb): string | null {
@@ -55,13 +50,13 @@ function outdoorHit(scene: TargetScene, box: Aabb): string | null {
 /** Human-readable placement problems. An empty list means the scene is valid. */
 export function placementIssues(scene: TargetScene, spec?: BuildingSpec): string[] {
   const issues: string[] = [];
-  const boxes: Aabb[] = [];
+  const boxes: Aabb[][] = [];
   for (const target of scene.targets) {
-    for (const point of samples(target)) {
-      const yaw = target.path && target.path.length > 1
-        ? Math.atan2(target.path[1]![1] - target.path[0]![1], target.path[1]![0] - target.path[0]![0])
-        : target.yaw;
-      const box = bodyAabb(point, yaw, target.hx, target.hy, target.height);
+    const poses = samples(target);
+    const swept: Aabb[] = [];
+    for (const { at, yaw } of poses) {
+      const box = bodyAabb(at, yaw, target.hx, target.hy, target.height);
+      swept.push(box);
       if (scene.space === 'outdoor') {
         const problem = outdoorHit(scene, box);
         if (problem) issues.push(`${target.id} ${problem}`);
@@ -84,15 +79,27 @@ export function placementIssues(scene: TargetScene, spec?: BuildingSpec): string
         else if (!cell.reachable) issues.push(`${target.id} is not reachable at ${cell.ix},${cell.iy}`);
       }
     }
-    const resolved = resolveTarget(target, 0);
-    for (const other of boxes) {
-      const a = resolved.aabb;
-      const overlap = a.min[0] < other.max[0] - 0.05 && a.max[0] > other.min[0] + 0.05
-        && a.min[1] < other.max[1] - 0.05 && a.max[1] > other.min[1] + 0.05
-        && a.min[2] < other.max[2] && a.max[2] > other.min[2];
-      if (overlap) issues.push(`${target.id} overlaps another target`);
+    // A walker is checked at every pose of its walk; anything else where it stands.
+    const mine = target.state === 'walking' && poses.length > 1 ? swept : [resolveTarget(target, 0).aabb];
+    if (scene.space === 'indoor' && spec) {
+      for (const part of spec.furniture?.boxes ?? []) {
+        if (part.floor !== target.floor) continue;
+        const c = Math.abs(Math.cos(part.yaw));
+        const sn = Math.abs(Math.sin(part.yaw));
+        const ex = c * part.hx + sn * part.hy;
+        const ey = sn * part.hx + c * part.hy;
+        const solid: Aabb = { min: [part.cx - ex, part.cy - ey, part.cz - part.hz], max: [part.cx + ex, part.cy + ey, part.cz + part.hz] };
+        if (mine.some((a) => overlaps(a, solid, 0.02))) issues.push(`${target.id} passes through furniture`);
+      }
     }
-    boxes.push(resolved.aabb);
+    for (const other of boxes) if (other.some((b) => mine.some((a) => overlaps(a, b, 0.05)))) issues.push(`${target.id} overlaps another target`);
+    boxes.push(mine);
   }
-  return issues;
+  return [...new Set(issues)];
+}
+
+function overlaps(a: Aabb, b: Aabb, slack: number): boolean {
+  return a.min[0] < b.max[0] - slack && a.max[0] > b.min[0] + slack
+    && a.min[1] < b.max[1] - slack && a.max[1] > b.min[1] + slack
+    && a.min[2] < b.max[2] && a.max[2] > b.min[2];
 }

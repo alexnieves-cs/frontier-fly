@@ -95,19 +95,19 @@ These are listed so nobody assumes they are covered.
 
 **Protocol.** Each fault scenario in `faultScenarios.ts` runs on the three mission scenarios with fresh seeds (a block no other study uses), flying the quadrotor with the sensor-only frontier explorer indoors. Fault timing and parameters come from the flight seed. Per scenario the bench reports: safe-outcome rate with a Wilson 95% interval, the share of flights that produced the intended response, detection latency (first failsafe event minus fault start), collisions per flight, false clears, false alarms, entries made while the link was down, and landings away from home.
 
-**Results.** 20 fresh world seeds (77801–77820) per mission scenario, 960 flights on the quadrotor airframe (`vehicle: 'quad'`), frontier planner indoors, from `src/eval/faults.ts` at `a14ef8a`. No parameter was tuned on these seeds, and no earlier run or study flew them; development used 9101–9116 and 78001–78030. Safe: the response is one the scenario allows, with no collision, false clear, or operator-approved entry while the link was down. "Hit" counts flights whose fault trigger fired (an indoor fault cannot fire on a flight that never entered). Intended: the response the failsafe is designed for. Mission done: normal outcome and landed home. Detect: median time from the fault starting to the first failsafe event, over flights that raised one. Intervals are Wilson 95%.
+**Results.** 20 fresh world seeds (77801–77820) per mission scenario, 960 flights on the quadrotor airframe (`vehicle: 'quad'`), frontier planner indoors, from `src/eval/faults.ts` at `0944176`. No parameter was tuned on these seeds, and no earlier run or study flew them; development used 9101–9116 and 78001–78030. Safe: the response is one the scenario allows, with no collision, false clear, or operator-approved entry while the link was down. "Hit" counts flights whose fault trigger fired (an indoor fault cannot fire on a flight that never entered). Intended: the response the failsafe is designed for. Mission done: normal outcome and landed home. Detect: median time from the fault starting to the first failsafe event, over flights that raised one. Intervals are Wilson 95%.
 
 | Fault scenario | Hazards | Flights | Safe | Intended response | Mission done | Detect | Unsafe flights |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `nominal` | – | 60 | 100.0% (94.0%–100.0%) | complete: 100.0% | 100.0% | – | – |
-| `lidar-flagged-indoor` | H3 | 60 | 100.0% (94.0%–100.0%) | return home: 76.7% | 23.3% | 0.3 s (max 5.8) | – |
-| `lidar-silent-indoor` | H3 | 60 | 100.0% (94.0%–100.0%) | return home: 70.0% | 30.0% | 2.2 s (max 27.3) | – |
+| `lidar-flagged-indoor` | H3 | 60 | 100.0% (94.0%–100.0%) | return home: 78.3% | 21.7% | 0.3 s (max 5.8) | – |
+| `lidar-silent-indoor` | H3 | 60 | 100.0% (94.0%–100.0%) | return home: 70.0% | 30.0% | 2.3 s (max 27.3) | – |
 | `lidar-noise` | H3 | 60 | 100.0% (94.0%–100.0%) | complete: 98.3% | 98.3% | – | – |
 | `camera-short` | H4 | 60 | 100.0% (94.0%–100.0%) | complete: 98.3% | 98.3% | 1.0 s (max 1.0) | – |
 | `camera-lost` | H4 | 60 | 100.0% (94.0%–100.0%) | return home: 100.0% | 0.0% | 1.0 s (max 1.0) | – |
 | `gnss-short` | H5 | 60 | 100.0% (94.0%–100.0%) | complete: 100.0% | 100.0% | 0.0 s (max 0.0) | – |
 | `gnss-lost` | H5 | 60 | 98.3% (91.1%–99.7%) | return home: 100.0% | 0.0% | 0.0 s (max 0.0) | 1 collision |
-| `motor-weak` | H6 | 60 (59 hit) | 100.0% (94.0%–100.0%) | return home: 84.7% | 16.7% | 0.3 s (max 0.3) | – |
+| `motor-weak` | H6 | 60 (59 hit) | 100.0% (94.0%–100.0%) | return home: 86.4% | 15.0% | 0.3 s (max 0.3) | – |
 | `motor-severe` | H6 | 60 | 95.0% (86.3%–98.3%) | land: 98.3% | 1.7% | 0.3 s (max 0.3) | 3 collision |
 | `battery-sag` | H7 | 60 (55 hit) | 100.0% (94.0%–100.0%) | return home: 36.4% | 66.7% | 0.0 s (max 0.0) | – |
 | `comms-short` | H1 | 60 | 100.0% (94.0%–100.0%) | complete: 96.7% | 96.7% | 2.0 s (max 2.0) | – |

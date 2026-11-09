@@ -95,6 +95,10 @@ export class SensorExplorer {
   private phase: 'sweep' | 'look' | 'shaft' | 'done';
   private route: V3[] = [];
   private spin = 0;
+  /** Voxels the camera had looked at on this floor when the current spin began. */
+  private spinFrom = 0;
+  /** Viewpoints whose spin showed too little (smoke, or a map that promised more than the camera saw): not picked again. */
+  private readonly spent: Array<[number, number, number]> = [];
   private entryFloor = -1;
   private readonly floorsDone = new Set<number>();
   /** Shaft leg: hover point (local xy) and the floor to reach. */
@@ -191,12 +195,13 @@ export class SensorExplorer {
     if (d < this.followBest - 0.03) {
       this.followBest = d;
       this.followStall = 0;
-    } else if ((this.followStall += 1) > FOLLOW_STALL_TICKS && this.route.length > 1) {
+    } else if ((this.followStall += 1) > FOLLOW_STALL_TICKS) {
+      // The last waypoint counts as reached from where the drone stalled, so it never hovers out the budget.
       this.route.shift();
       this.followBest = Infinity;
       this.followStall = 0;
       out.cmd = { vel: [0, 0, this.hold(local)], yawRate: 0 };
-      return false;
+      return this.route.length === 0;
     }
     if (d < (this.route.length === 1 ? 0.12 : 0.2)) {
       this.route.shift();
@@ -217,18 +222,32 @@ export class SensorExplorer {
     const f = floorOf(this.grid, local[2]);
     if (this.spin > 0) {
       this.spin -= 1;
+      // A full turn that showed almost nothing: the estimate behind this viewpoint was wrong, and
+      // would be wrong again, so the spot is not offered a second time.
+      if (this.spin === 0 && this.lookedOn(f) - this.spinFrom < MIN_LOOK_GAIN) this.spent.push([f, local[0], local[1]]);
       this.sensing.yawRate = MAX_YAW_RATE_INDOOR;
       return { vel: [0, 0, this.hold(local)], yawRate: MAX_YAW_RATE_INDOOR };
     }
     if (!this.route.length) {
-      const goal = bestViewpoint(this.sensing, f, local);
+      const goal = bestViewpoint(this.sensing, f, local, this.spent);
       const path = goal ? sensorPath(this.sensing, f, [local[0], local[1]], [goal[0], goal[1]]) : null;
       if (!path) return this.floorDone(local, yaw);
       this.route = path.map(([x, y]) => [x, y, f * this.grid.H + INDOOR_FLY_Z] as V3);
     }
     const out: { cmd: PolicyCommand | null } = { cmd: null };
-    if (this.follow(local, yaw, out)) this.spin = Math.ceil((Math.PI * 2) / MAX_YAW_RATE_INDOOR / 0.05) + 2;
+    if (this.follow(local, yaw, out)) {
+      this.spin = Math.ceil((Math.PI * 2) / MAX_YAW_RATE_INDOOR / 0.05) + 2;
+      this.spinFrom = this.lookedOn(f);
+    }
     return out.cmd!;
+  }
+
+  private lookedOn(floor: number): number {
+    const { vw, vd, looked } = this.sensing;
+    const base = floor * vw * vd;
+    let n = 0;
+    for (let k = 0; k < vw * vd; k++) n += looked[base + k]!;
+    return n;
   }
 
   /** This floor is searched: pick a shaft to an unsearched floor, or head back to the entry floor, or stop. */
@@ -343,15 +362,20 @@ const CLIMB_STALL_TICKS = 60;
 /** Ticks without progress toward a route waypoint before it is skipped (not the last one). */
 const FOLLOW_STALL_TICKS = 60;
 
+/** A viewpoint within this distance of one whose spin showed too little is not picked, m. */
+const SPENT_RADIUS = 0.6;
+
 /** Yaw rate for turning in place indoors, rad/s (the vehicle's indoor limit). */
 const MAX_YAW_RATE_INDOOR = Math.PI / 2;
 
 /**
  * The reachable known-free voxel that would show the most unlooked voxels
  * per meter of travel (gain / (1 + 0.3 * path length)), judged on the
- * drone's own map. Null when no voxel would show MIN_LOOK_GAIN.
+ * drone's own map. Null when no voxel would show MIN_LOOK_GAIN. `spent`
+ * lists [floor, x, y] viewpoints already tried without result; nothing near
+ * them is offered.
  */
-export function bestViewpoint(sensing: IndoorSensing, floor: number, from: V3): [number, number] | null {
+export function bestViewpoint(sensing: IndoorSensing, floor: number, from: V3, spent: ReadonlyArray<readonly [number, number, number]> = []): [number, number] | null {
   const { vw, vd } = sensing;
   const base = floor * vw * vd;
   const open = (x: number, y: number) => {
@@ -397,6 +421,7 @@ export function bestViewpoint(sensing: IndoorSensing, floor: number, from: V3): 
     if (sensorClearance(sensing, floor, (x + 0.5) * VOXEL, (y + 0.5) * VOXEL) < 2 * VOXEL) continue;
     const px = (x + 0.5) * VOXEL;
     const py = (y + 0.5) * VOXEL;
+    if (spent.some(([sf, tx, ty]) => sf === floor && Math.hypot(tx - px, ty - py) < SPENT_RADIUS)) continue;
     let gain = 0;
     for (const u of unlooked) {
       const ux = ((u % vw) + 0.5) * VOXEL;

@@ -122,3 +122,19 @@ describe('humanoid asset', () => {
     expect(json.asset.extras.license).toBe('CC0-1.0');
   });
 });
+
+describe('walking people', () => {
+  it('walk only through open floor, clear of furniture and other targets, at every step', async () => {
+    const { evalEpisodeSetup } = await import('../../src/eval/coverage');
+    const { placeIndoor } = await import('../../src/targets/placement');
+    let walkers = 0;
+    // Practice seeds; before the swept check about 2 in 5 of these scenes had a walker through something.
+    for (let seed = 9101; seed < 9131; seed++) {
+      const spec = evalEpisodeSetup(3, seed, 'day').spec;
+      const scene = placeIndoor(spec, { seed, people: 5 });
+      walkers += scene.targets.filter((t) => t.state === 'walking').length;
+      expect(placementIssues(scene, spec), `seed ${seed}`).toEqual([]);
+    }
+    expect(walkers).toBe(30);
+  });
+});
