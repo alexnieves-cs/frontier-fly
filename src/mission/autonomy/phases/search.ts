@@ -141,6 +141,13 @@ export class SearchPhase {
       this.continueMission();
       return;
     }
+    if (this.covIndex >= wps.length) {
+      // Every lane is already flown (a re-view that started on the last waypoint resumes here): nothing
+      // is left to cover. Reading the next waypoint used to throw and end the whole run.
+      this.coverageDone = true;
+      this.continueMission();
+      return;
+    }
     const pos = this.c.vehicle.pos;
     const climb: Waypoint[] = [];
     if (this.covIndex === 0 && pos[2] < cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - 1) {
