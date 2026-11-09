@@ -84,6 +84,24 @@ function lawnmower(w: MissionWorld, mission: Mission, agl: number, spacing: numb
 describe('report metrics', () => {
   const find = missionForWorld(world, { missionType: 'find_person' });
 
+  it('counts a building the sweep never declared when the mission ends clear', () => {
+    const sweep = missionForWorld(world, { missionType: 'safety_sweep' });
+    const declared = (scope: string) => ({ scope, tSec: 100 });
+    // Both buildings and the grounds declared: nothing is missing.
+    const whole = buildReport(run(sweep, { outcome: 'clear', declaredClear: [declared('outdoor'), declared(b0), declared(b1)] }), fakeSource([]), world);
+    expect(whole.undeclaredBuildings).toBe(0);
+    expect(whole.falseClears).toBe(0);
+    // The second building never declared, with a person inside it: the clear is false.
+    const inB1: TruthTarget = { ...PERSON, buildingId: b1 };
+    const partial = buildReport(run(sweep, { outcome: 'clear', declaredClear: [declared('outdoor'), declared(b0)] }), fakeSource([inB1]), world);
+    expect(partial.undeclaredBuildings).toBe(1);
+    expect(partial.falseClears).toBe(1);
+    // A sweep that did not end clear makes no claim about the rest of the site.
+    const stopped = buildReport(run(sweep, { outcome: 'incomplete', declaredClear: [declared('outdoor'), declared(b0)] }), fakeSource([inB1]), world);
+    expect(stopped.undeclaredBuildings).toBe(0);
+    expect(stopped.falseClears).toBe(0);
+  });
+
   it('computes time to find from the first confirmed true positive', () => {
     const r = buildReport(
       run(find, {

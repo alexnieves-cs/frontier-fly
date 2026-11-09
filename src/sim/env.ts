@@ -75,6 +75,9 @@ export class ExplorerEnv implements Env {
   private collisions = 0;
   private hard = 0;
   private inContact = false;
+  /** World axes that were blocked during the previous policy step (the surfaces the drone is resting on or sliding along). */
+  private readonly touching = [false, false, false];
+  private readonly blockedNow = [false, false, false];
   /** An impact faster than the crash speed ended this episode (shared/constants.ts CRASH_SPEED). */
   private crashed = false;
   /** Speed into the surface of a contact that started this step, m/s; 0 without one. */
@@ -151,6 +154,7 @@ export class ExplorerEnv implements Env {
     this.crashed = false;
     this.impactSpeed = 0;
     this.inContact = false;
+    this.touching.fill(false);
     this.steps = 0;
     this.stall = 0;
     this.done = false;
@@ -191,6 +195,10 @@ export class ExplorerEnv implements Env {
     let hit = false;
     // Fastest approach into a solid this step: the velocity component along each blocked axis before it is zeroed.
     let normalSpeed = 0;
+    // The same, but only along axes that were free last step: a new surface struck while already touching another.
+    let freshSpeed = 0;
+    const blockedNow = this.blockedNow;
+    blockedNow.fill(false);
     const substeps = this.cfg.dynamics === 'quad' ? PHYSICS_SUBSTEPS : 1;
     const dt = this.cfg.dynamics === 'quad' ? PHYSICS_DT : POLICY_DT;
     for (let i = 0; i < substeps; i++) {
@@ -213,7 +221,13 @@ export class ExplorerEnv implements Env {
       this.state.pos[2] = resolved.pos[2];
       if (resolved.hit) {
         hit = true;
-        for (let k = 0; k < 3; k++) if (resolved.blocked[k]) normalSpeed = Math.max(normalSpeed, Math.abs(this.state.vel[k]!));
+        for (let k = 0; k < 3; k++) {
+          if (!resolved.blocked[k]) continue;
+          const speed = Math.abs(this.state.vel[k]!);
+          normalSpeed = Math.max(normalSpeed, speed);
+          if (!this.touching[k] && !blockedNow[k]) freshSpeed = Math.max(freshSpeed, speed);
+          blockedNow[k] = true;
+        }
         if (resolved.blocked[0]) this.state.vel[0] = 0;
         if (resolved.blocked[1]) this.state.vel[1] = 0;
         if (resolved.blocked[2]) this.state.vel[2] = 0;
@@ -244,18 +258,27 @@ export class ExplorerEnv implements Env {
       this.floorsSeen.add(floor);
       newFloor = true;
     }
-    const impact = hit && !this.inContact;
-    this.impactSpeed = impact ? normalSpeed : 0;
+    const crashSpeed = this.cfg.crashSpeed ?? CRASH_SPEED;
+    // A hard hit on a second surface while still touching the first is a contact of its own. With one
+    // flag for "touching anything", sliding along a wall into the far wall at full speed went uncounted.
+    const second = hit && this.inContact && freshSpeed > crashSpeed;
+    const impact = (hit && !this.inContact) || second;
+    this.impactSpeed = impact ? (second ? freshSpeed : normalSpeed) : 0;
+    let crashedNow = false;
     if (hit) {
       if (impact) {
         this.hard += 1;
         this.collisions += 1;
-        if (normalSpeed > (this.cfg.crashSpeed ?? CRASH_SPEED)) this.crashed = true;
+        if (this.impactSpeed > crashSpeed) {
+          this.crashed = true;
+          crashedNow = true;
+        }
       }
       this.inContact = true;
     } else {
       this.inContact = false;
     }
+    for (let k = 0; k < 3; k++) this.touching[k] = blockedNow[k]!;
     if (newVoxels > 0) this.stall = 0;
     else this.stall += 1;
 
@@ -268,7 +291,7 @@ export class ExplorerEnv implements Env {
       newRoom,
       newFloor,
       impact,
-      crash: impact && this.crashed,
+      crash: crashedNow,
       inContact: hit && !impact,
       action,
       prevAction: this.prevAction,

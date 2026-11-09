@@ -204,7 +204,8 @@ export async function flyMission(
     scenario: job.scenario,
     seed: world.seed,
     indoor: job.indoor,
-    expected: run.outcome === scenario.expect.outcome,
+    // 'clear' is only right when every building on the site was declared: one the drone never found is not clear.
+    expected: run.outcome === scenario.expect.outcome && report.undeclaredBuildings === 0,
     outcome: run.outcome,
     durationSec: Math.round(run.tSec),
     indoorCoverage: report.indoorCoverage,

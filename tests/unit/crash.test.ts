@@ -59,6 +59,25 @@ describe('crash rule', () => {
     expect(last.info.collisions).toBeGreaterThan(0);
   });
 
+  it('counts a fast hit on a second wall while still touching the first', async () => {
+    // Touch the -x wall gently, then slide along it at full speed into the side wall. With one
+    // flag for "in contact" the second hit was neither a collision nor a crash.
+    const env = await createEnv();
+    env.reset(spec, 1, config());
+    const slow = (0.4 * CRASH_SPEED) / MAX_SPEED_H;
+    let last = env.step(new Float32Array([-slow, 0, 0, 0]));
+    for (let i = 0; i < 400 && last.info.collisions === 0; i++) last = env.step(new Float32Array([-slow, 0, 0, 0]));
+    expect(last.info.collisions).toBe(1);
+    expect(last.info.crashed).toBe(false);
+    const slide = new Float32Array([-slow, 1, 0, 0]);
+    for (let i = 0; i < 400 && !last.done; i++) last = env.step(slide);
+    env.dispose();
+    expect(last.done).toBe(true);
+    expect(last.info.crashed).toBe(true);
+    expect(last.info.impactSpeed).toBeGreaterThan(CRASH_SPEED);
+    expect(last.info.collisions).toBeGreaterThanOrEqual(2);
+  });
+
   it('can be switched off per episode (FrontierBench v2 and the golden traces)', async () => {
     const { first } = await flyIntoWall(1, Infinity);
     expect(first!.info.impactSpeed).toBeGreaterThan(CRASH_SPEED);

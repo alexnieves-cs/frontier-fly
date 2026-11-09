@@ -165,6 +165,19 @@ export function buildReport(run: RunRecord, source: LiveDetectionSource, world?:
     if (truth.some((t) => t.buildingId === where && swept.includes(t.category as ClearCategory))) falseClears++;
   }
 
+  // A sweep that ends 'clear' speaks for the whole site. A building the drone never declared (it
+  // never found it, or never finished it) with someone inside is a false clear of the mission,
+  // even though no scope was wrongly declared.
+  let undeclaredBuildings = 0;
+  if (world && mission.missionType === 'safety_sweep' && run.outcome === 'clear') {
+    for (const b of world.buildings) {
+      if (scopes.has(b.id)) continue;
+      undeclaredBuildings += 1;
+      if (truth.some((t) => t.buildingId === b.id && swept.includes(t.category as ClearCategory))) falseClears++;
+    }
+    if (undeclaredBuildings > 0) notes.push(`The mission ended clear with ${undeclaredBuildings} building(s) on the site never declared.`);
+  }
+
   // Indoor coverage.
   const buildingIds = enteredBuildings(run);
   if (mission.missionType === 'safety_sweep') {
@@ -221,6 +234,7 @@ export function buildReport(run: RunRecord, source: LiveDetectionSource, world?:
     indoorCoverage,
     perBuildingCoverage,
     falseClears,
+    undeclaredBuildings,
     falseAlarms,
     missed,
     collisions: run.collisions.length,

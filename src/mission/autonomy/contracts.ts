@@ -472,6 +472,8 @@ export interface AutonomyReport {
   /** Truth targets of a mission class that were never confirmed. */
   missed: number;
   collisions: number;
+  /** Buildings on the site that a sweep ending 'clear' never declared (scoring only; the drone does not know them). */
+  undeclaredBuildings: number;
   batteryUsedPct: number;
   landedHome: boolean;
   entries: EntryRecord[];

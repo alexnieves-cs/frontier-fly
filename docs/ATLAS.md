@@ -8,10 +8,10 @@ How often the shipped autopilot (`policyQuad`: the trained policy indoors with t
 
 | Event | Importance sampling | Flights | Plain Monte Carlo | Flights |
 | --- | --- | --- | --- | --- |
-| False clear | 0.25% (95% CI 0.16% to 0.34%) | 2000 (29 failing, ESS 772) | 0.22% (0.13% to 0.37%) | 6000 (13 failing) |
-| Collision | 1.00% (95% CI 0.65% to 1.54%) | 2000 (20 failing, ESS 2000) | 1.15% (0.91% to 1.45%) | 6000 (69 failing) |
+| False clear | 0.24% (95% CI 0.15% to 0.33%) | 2000 (28 failing, ESS 772) | 0.23% (0.14% to 0.39%) | 6000 (14 failing) |
+| Collision | 1.10% (95% CI 0.73% to 1.66%) | 2000 (22 failing, ESS 2000) | 1.15% (0.91% to 1.45%) | 6000 (69 failing) |
 
-On missions with someone or something to find (the rest are sweeps of empty sites, which cannot false-clear), the plain Monte Carlo false-clear rate is 0.27% (0.16% to 0.47%, 13 of 4772); on sweeps of an occupied site it is 0.89% (0.52% to 1.52%).
+On missions with someone or something to find (the rest are sweeps of empty sites, which cannot false-clear), the plain Monte Carlo false-clear rate is 0.29% (0.17% to 0.49%, 14 of 4772); on sweeps of an occupied site it is 0.96% (0.57% to 1.61%).
 
 ## Where the failures are
 
@@ -21,9 +21,9 @@ Conditional rates from the plain Monte Carlo flights, the five values with the h
 
 | Dimension | Value | Rate | Flights |
 | --- | --- | --- | --- |
+| Person pose | hiding | 1.1% (0.6% to 1.9%) | 1182 |
 | Fault | lidar-noise | 1.1% (0.4% to 3.1%) | 281 |
-| Person pose | hiding | 1.0% (0.6% to 1.8%) | 1182 |
-| Mission | sweep-occupied | 0.9% (0.5% to 1.5%) | 1453 |
+| Mission | sweep-occupied | 1.0% (0.6% to 1.6%) | 1453 |
 | Target building (share of the list) | 0.5-0.6 | 0.8% (0.4% to 1.9%) | 606 |
 | Time of day | 02:24-04:48 | 0.8% (0.3% to 1.9%) | 622 |
 
@@ -31,11 +31,11 @@ Conditional rates from the plain Monte Carlo flights, the five values with the h
 
 | Dimension | Value | Rate | Flights |
 | --- | --- | --- | --- |
-| Mean wind, m/s | 4.9-6.0 | 2.5% (1.6% to 4.1%) | 629 |
-| Wind arrives, s | 96-120 | 2.5% (1.5% to 4.1%) | 565 |
+| Mean wind, m/s | 4.9-6.0 | 2.4% (1.5% to 3.9%) | 629 |
 | Fault | gnss-loss | 2.4% (1.2% to 4.8%) | 295 |
-| Gusts, share of the mean | 0.44-0.48 | 2.0% (1.2% to 3.5%) | 586 |
-| Fault bearing or motor | 0-36 | 2.0% (1.2% to 3.4%) | 648 |
+| Fault bearing or motor | 0-36 | 2.2% (1.3% to 3.6%) | 648 |
+| Wind arrives, s | 96-120 | 2.1% (1.2% to 3.7%) | 565 |
+| Wind arrives, s | 24-48 | 1.9% (1.0% to 3.3%) | 592 |
 
 ## Method
 
