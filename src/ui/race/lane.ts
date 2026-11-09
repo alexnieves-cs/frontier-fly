@@ -79,6 +79,11 @@ export class LaneView {
     this.lastCollisions = frame.collisions;
   }
 
+  /** A collision ring is still fading, so the lane needs another frame. */
+  get flashing(): boolean {
+    return this.flashes.length > 0;
+  }
+
   draw(frame: LaneFrame | null, visited: Uint8Array | null, seen: Uint8Array | null, now: number): void {
     const spec = this.spec;
     const image = this.image;

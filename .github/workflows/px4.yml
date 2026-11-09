@@ -11,9 +11,12 @@ name: px4
 #               the WebSocket bridge.
 # 3. Check each flight against its plan (scripts/px4/flight_check.py).
 on:
+  # Pull requests only: see ci.yml for why there is no push trigger.
   pull_request:
+  # Also on main, so the PX4 build cache is saved where every pull request can read it
+  # (a cache saved on a pull request is visible to that pull request only).
   push:
-    branches-ignore: [main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +32,6 @@ env:
 
 jobs:
   build-px4:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:

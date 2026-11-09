@@ -4,6 +4,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const pct = (v) => `${(v * 100).toFixed(1)}%`;
+/** An entry's name is its author's text: keep it from adding links, HTML or table cells. */
+const plain = (name) => String(name).replace(/[|[\]<>`\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
 
 function table(head, rows) {
   const line = (cells) => `| ${cells.join(' | ')} |`;
@@ -46,7 +48,7 @@ function teamBoard(root) {
     ['#', 'Team', 'Drones', 'Score', ...tasks.flatMap((t) => [t.id, `${t.id}: base knows`, `${t.id}: 80% in`]), 'Commit'],
     rows.map((r, i) => [
       String(i + 1),
-      r.baseline ? `${r.name} (baseline)` : `[${r.name}](../${r.path})`,
+      r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`,
       String(r.entry.drones),
       `**${pct(r.score)}**`,
       ...tasks.flatMap((t) => {
@@ -95,7 +97,7 @@ export function benchSection(root) {
   rows.sort((a, b) => b.score - a.score);
   const board = rows.map((r, i) => [
     String(i + 1),
-    r.baseline ? `${r.name} (baseline)` : `[${r.name}](../${r.path})`,
+    r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`,
     `**${pct(r.score)}**`,
     r.footprintScore === undefined ? '—' : pct(r.footprintScore),
     ...tasks.map((t) => (r.tasks[t.id] ? pct(r.tasks[t.id].coverage) : '—')),

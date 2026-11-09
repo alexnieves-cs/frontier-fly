@@ -33,11 +33,26 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
     steps:
+      # Inputs reach the shell only through the environment, and are checked here once: the merge
+      # job holds a write token, so nothing typed into the form may be pasted into a script.
       - id: plan
-        run: echo "shards=$(python3 -c 'import json,sys; print(json.dumps(list(range(int(sys.argv[1])))))' '${{ inputs.shards }}')" >> "$GITHUB_OUTPUT"
+        env:
+          STUDY: ${{ inputs.study }}
+          OUT: ${{ inputs.out }}
+          SHARDS: ${{ inputs.shards }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, os, re
+          assert re.fullmatch(r'[a-z0-9-]+', os.environ['STUDY']), 'study: lower-case letters, digits and - only'
+          assert re.fullmatch(r'docs/[A-Za-z0-9_./-]+\.json', os.environ['OUT']) and '..' not in os.environ['OUT'], 'out: a .json path under docs/'
+          n = int(os.environ['SHARDS'])
+          assert 1 <= n <= 16, 'shards: 1 to 16'
+          print('shards=' + json.dumps(list(range(n))))
+          EOF
 
   shard:
     needs: plan
@@ -49,6 +64,10 @@ jobs:
         shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     env:
       STUDY_ENTRY: ${{ inputs.study }}
+      STUDY: ${{ inputs.study }}
+      SHARDS: ${{ inputs.shards }}
+      SHARD: ${{ matrix.shard }}
+      STUDY_ARGS: ${{ inputs.args }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -62,11 +81,12 @@ jobs:
         run: |
           # Each runner splits its shard again over its 4 cores: shard s of n becomes shards 4s..4s+3 of 4n.
           c=4
-          n=$(( ${{ inputs.shards }} * c ))
+          n=$(( SHARDS * c ))
           mkdir -p shards
           for i in $(seq 0 $((c - 1))); do
-            k=$(( ${{ matrix.shard }} * c + i ))
-            npx vite-node scripts/study/${{ inputs.study }}.ts -- --shard "$k" --of "$n" --out "shards/shard-$k.jsonl" ${{ inputs.args }} &
+            k=$(( SHARD * c + i ))
+            # STUDY_ARGS is split into words on purpose (e.g. "--base 79301"); it is never evaluated.
+            npx vite-node "scripts/study/$STUDY.ts" -- --shard "$k" --of "$n" --out "shards/shard-$k.jsonl" $STUDY_ARGS &
             pids+=($!)
           done
           for p in "${pids[@]}"; do wait "$p"; done
@@ -79,10 +99,15 @@ jobs:
   merge:
     needs: shard
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: write
     env:
       STUDY_ENTRY: ${{ inputs.study }}
+      STUDY: ${{ inputs.study }}
+      OUT: ${{ inputs.out }}
+      STUDY_ARGS: ${{ inputs.args }}
+      RUN_ID: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -96,17 +121,17 @@ jobs:
           pattern: shard-*
           path: shards
           merge-multiple: true
-      - run: npx vite-node scripts/study/${{ inputs.study }}.ts -- --merge shards/*.jsonl --out ${{ inputs.out }} ${{ inputs.args }}
+      - run: npx vite-node "scripts/study/$STUDY.ts" -- --merge shards/*.jsonl --out "$OUT" $STUDY_ARGS
       # Also push the result to its own branch: some clients (the cloud container's proxy) can fetch
       # git but not artifact or log downloads, which are served from blob storage.
       - name: Push the result to study/<study>-<run id>
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
-          b="study/${{ inputs.study }}-${{ github.run_id }}"
+          b="study/$STUDY-$RUN_ID"
           git checkout -b "$b"
-          git add -f ${{ inputs.out }}
-          git commit -m "${{ inputs.study }} result from study run ${{ github.run_id }}"
+          git add -f -- "$OUT"
+          git commit -m "$STUDY result from study run $RUN_ID"
           git push origin "$b"
       - uses: actions/upload-artifact@v7
         with:

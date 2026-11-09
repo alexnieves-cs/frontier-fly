@@ -64,8 +64,10 @@ jobs:
 
   publish:
     needs: build
-    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'none'
+    # Only main can publish: a dispatch from another branch builds and tests but uploads nothing.
+    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'none' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment:
       name: ${{ inputs.publish }}
       url: ${{ inputs.publish == 'pypi' && 'https://pypi.org/p/frontierfly' || 'https://test.pypi.org/p/frontierfly' }}

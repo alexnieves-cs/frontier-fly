@@ -44,6 +44,8 @@ class Planner:
         self.lines: list[str] = []
         self.cv = threading.Condition()
         threading.Thread(target=self._pump, daemon=True).start()
+        self.sent = 0
+        self.taken = 0
         first = self._next(60.0)
         if not first or not json.loads(first).get('ready'):
             raise RuntimeError(f'planner did not start: {first!r}')
@@ -61,10 +63,24 @@ class Planner:
             return self.lines.pop(0) if self.lines else None
 
     def ask(self, reading: dict, timeout: float) -> dict | None:
+        """The reply to this reading, or None if it is not back in time.
+
+        The planner answers every reading in order, so replies are counted: one that arrives after
+        its timeout is dropped when the next reading is asked, never handed back as that reading's
+        answer. Without the count a single slow step left every later command one step stale, and
+        the caller stamped each as fresh, which hid them from the guard's stale-command watchdog.
+        """
         self.p.stdin.write(json.dumps(reading) + '\n')
         self.p.stdin.flush()
-        line = self._next(timeout)
-        return json.loads(line) if line else None
+        self.sent += 1
+        deadline = time.monotonic() + timeout
+        while True:
+            line = self._next(max(0.0, deadline - time.monotonic()))
+            if line is None:
+                return None
+            self.taken += 1
+            if self.taken == self.sent:
+                return json.loads(line)
 
     def close(self):
         try:

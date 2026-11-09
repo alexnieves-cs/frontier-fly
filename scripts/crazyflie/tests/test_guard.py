@@ -106,3 +106,18 @@ def test_frames():
     # Took off at (1, 2) facing +y: estimate +x (forward) is arena +y.
     x, y, yaw = estimate_to_arena(1.0, 0.0, 10.0, {'x': 1.0, 'y': 2.0, 'yaw': math.pi / 2})
     assert math.isclose(x, 1.0, abs_tol=1e-9) and math.isclose(y, 3.0) and math.isclose(yaw, 100.0)
+
+
+def test_non_finite_telemetry_lands():
+    # NaN compares false with everything, so without an explicit check it passes every limit.
+    for bad in (dict(x=math.nan), dict(z=math.inf), dict(vbat=math.nan), dict(roll_deg=math.nan)):
+        v = g().check(tel(**bad), Command(0.2, 0.0, 0.0, 0.5), 0.0)
+        assert v.action == 'land', bad
+        assert math.isfinite(v.command.z)
+
+
+def test_non_finite_or_missing_command_height_never_reaches_the_radio():
+    v = g().check(tel(), Command(0.2, 0.0, 0.0, math.nan), 0.0)
+    assert v.action == 'hover' and v.command.z == 0.5
+    v = g().check(tel(), Command(None, 0.0, 0.0, 0.5), 0.0)
+    assert v.action == 'hover'

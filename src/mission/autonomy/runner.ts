@@ -114,7 +114,8 @@ class Runner implements MissionRunner {
     });
     this.home = new HomePhase(c, pilot, {
       startExit: (after) => this.indoor.startExit(after),
-      finish: () => (this.c.swapping && this.c.landedHome ? this.swapBattery() : this.finish()),
+      // An operator abort during a swap return ends the mission on the pad: it must not take off again.
+      finish: () => (this.c.swapping && this.c.landedHome && !this.c.aborted ? this.swapBattery() : this.finish()),
     });
     c.job = pilot.holdJob('preflight', 1, () => this.search.startCoverage());
     c.recordTrack();
@@ -137,6 +138,12 @@ class Runner implements MissionRunner {
   abort(): void {
     if (this.c.finished || this.c.aborted) return;
     this.c.aborted = true;
+    this.c.swapping = false;
+    // A landing in place (a fault's last resort) is not traded for a flight home.
+    if (this.c.landingEmergency) {
+      this.c.log('warn', 'Operator abort. Already landing in place.');
+      return;
+    }
     this.c.log('warn', 'Operator abort. Returning home.');
     this.home.startReturn('operator abort');
   }
@@ -395,7 +402,8 @@ class Runner implements MissionRunner {
   }
 
   private checkBudgets(): void {
-    if (this.c.returning || this.c.finished || this.c.phase === 'preflight') return;
+    // landingEmergency: a landing in place stays a landing; a budget must not turn it into a flight home.
+    if (this.c.returning || this.c.finished || this.c.landingEmergency || this.c.phase === 'preflight') return;
     const pos = this.c.vehicle.pos;
     const d = this.distanceHome(pos);
     const climb = Math.max(0, cruiseZ(this.c.air, pos[0], pos[1], this.c.agl) - pos[2]);

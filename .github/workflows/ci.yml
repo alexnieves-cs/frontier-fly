@@ -1,11 +1,12 @@
 name: ci
 
-# Informational checks for pull requests and non-main branches.
+# Informational checks for pull requests.
 # A failure here does not publish GitHub Pages and is not a merge gate.
+# Runs on every pull request, including ones whose branch a workflow pushed (media/*, study/*,
+# train/*): a push made with GITHUB_TOKEN starts no push run, so a push trigger would leave those
+# pull requests with no checks at all. A branch with no pull request can be run from Run workflow.
 on:
   pull_request:
-  push:
-    branches-ignore: [main]
   workflow_dispatch:
 
 permissions:
@@ -17,9 +18,8 @@ concurrency:
 
 jobs:
   test:
-    # Same-repo PR pushes already run via the push event. Fork PRs have no push on this repo.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -32,8 +32,8 @@ jobs:
   # The same unit tests, instrumented (wall-clock budgets off); the summary goes on the run page.
   # Fails below the floor in vitest.config.ts (coverage.thresholds).
   coverage:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -54,8 +54,8 @@ jobs:
   # The Python package (python/): build the simulator bundle, install the package as a user
   # would (not editable), and run its tests, including bit-identical bench parity.
   python:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     strategy:
       matrix:
         python: ['3.10', '3.13']
@@ -74,8 +74,8 @@ jobs:
       - run: python -m pytest python/tests -q
 
   lint:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -90,8 +90,8 @@ jobs:
       - run: npx vite-node scripts/px4/report.ts -- --check
 
   build:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -102,7 +102,6 @@ jobs:
       - run: npm run build
 
   e2e:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -134,10 +133,15 @@ jobs:
         with:
           fetch-depth: 0
       - id: changed
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
-          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          base="$BASE"
           if [ -z "$base" ] || ! git cat-file -e "$base" 2>/dev/null; then base=$(git rev-parse HEAD~1); fi
           # Entry folders that still exist, with plain names only (letters, digits, - and _).
+          # A folder with any other name would skip the re-score below and still reach the leaderboard.
+          bad=$(git diff --name-only --diff-filter=d "$base" HEAD -- bench/entries | cut -d/ -f1-3 | sort -u | { grep -vE '^bench/entries/[A-Za-z0-9_-]+$' || true; })
+          if [ -n "$bad" ]; then echo "Entry folders may only use letters, digits, - and _: $bad"; exit 1; fi
           dirs=$(git diff --name-only "$base" HEAD -- bench/entries | cut -d/ -f1-3 | sort -u | { grep -E '^bench/entries/[A-Za-z0-9_-]+$' || true; } | while read -r d; do if [ -d "$d" ]; then echo "$d"; fi; done | tr '\n' ' ')
           echo "dirs=$dirs" >> "$GITHUB_OUTPUT"
       - if: steps.changed.outputs.dirs != ''

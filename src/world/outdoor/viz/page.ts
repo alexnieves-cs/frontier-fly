@@ -167,11 +167,15 @@ class Session {
 
   private bind(): void {
     window.addEventListener('keydown', (event) => {
+      // Typing a seed must not fly the drone or switch cameras.
+      if (event.target instanceof Element && event.target.closest('input, select, textarea')) return;
       this.keys.add(event.code);
       if (event.code === 'Digit1') this.setCamera('fpv');
       if (event.code === 'Digit2') this.setCamera('chase');
     });
     window.addEventListener('keyup', (event) => this.keys.delete(event.code));
+    // A key held while the window loses focus never sends its keyup.
+    window.addEventListener('blur', () => this.keys.clear());
     must<HTMLButtonElement>(this.root, '#cam-fpv').addEventListener('click', () => this.setCamera('fpv'));
     must<HTMLButtonElement>(this.root, '#cam-chase').addEventListener('click', () => this.setCamera('chase'));
   }

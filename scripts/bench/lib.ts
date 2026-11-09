@@ -79,3 +79,11 @@ export function flyAll(env: ExplorerEnv, pilot: BenchPilot, split: BenchSplit, o
   });
   return episodes;
 }
+
+/** Paths where a re-scored summary and a claimed one differ: numbers to 1e-6, everything else exactly. */
+export function mismatches(got: unknown, claimed: unknown, path = ''): string[] {
+  if (typeof got === 'number') return typeof claimed === 'number' && Math.abs(got - claimed) < 1e-6 ? [] : [path];
+  if (got === null || typeof got !== 'object') return got === claimed ? [] : [path];
+  if (claimed === null || typeof claimed !== 'object') return [path];
+  return Object.entries(got).flatMap(([k, v]) => mismatches(v, (claimed as Record<string, unknown>)[k], path ? `${path}.${k}` : k));
+}

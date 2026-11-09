@@ -48,9 +48,11 @@ jobs:
 
   upload:
     needs: stage
-    if: github.event_name == 'workflow_dispatch' && inputs.upload
+    # Only main can upload: a dispatch from another branch stages the files and stops.
+    if: github.event_name == 'workflow_dispatch' && inputs.upload && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: huggingface
+    timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v8
         with:

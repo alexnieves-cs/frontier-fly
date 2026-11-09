@@ -95,7 +95,15 @@ class Guard:
         L = self.limits
         if self.takeoff_t is None:
             self.takeoff_t = tel.t
-        hold_z = min(max(cmd.z if cmd else tel.z, L.min_height), L.max_height)
+        # NaN makes every comparison below false, so a non-finite sample would pass the fence,
+        # ceiling, fly-away and jump checks. Sanitise the hold height first (max(nan, x) is nan).
+        want_z = cmd.z if cmd is not None and isinstance(cmd.z, (int, float)) and math.isfinite(cmd.z) else tel.z
+        if not (isinstance(want_z, (int, float)) and math.isfinite(want_z)):
+            want_z = L.min_height
+        hold_z = min(max(want_z, L.min_height), L.max_height)
+        state = (tel.x, tel.y, tel.z, tel.yaw_deg, tel.vx, tel.vy, tel.roll_deg, tel.pitch_deg, tel.vbat)
+        if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in state):
+            return self._stop('land', 'non-finite telemetry', hold_z)
 
         tilt = max(abs(tel.roll_deg), abs(tel.pitch_deg))
         if tilt > L.tilt_kill_deg:
@@ -132,7 +140,7 @@ class Guard:
             return Verdict('hover', Command(0.0, 0.0, 0.0, hold_z), 'planner late')
 
         vx, vy = cmd.vx, cmd.vy
-        if not (math.isfinite(vx) and math.isfinite(vy) and math.isfinite(cmd.yaw_rate) and math.isfinite(cmd.z)):
+        if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (vx, vy, cmd.yaw_rate, cmd.z)):
             return Verdict('hover', Command(0.0, 0.0, 0.0, hold_z), 'non-finite command')
         sp = math.hypot(vx, vy)
         if sp > L.max_speed:
