@@ -149,6 +149,16 @@ test.describe('guided tour', () => {
     const [sheet, controls] = await Promise.all([card(page).boundingBox(), page.locator('.film-controls').boundingBox()]);
     expect(sheet!.y + sheet!.height).toBeLessThanOrEqual(controls!.y + 1);
     expect(sheet!.height).toBeLessThanOrEqual(844 * 0.4 + 1);
+    // A phone renders the film at its own resolution, not the full 1920x1080 stage.
+    expect(await page.evaluate(() => document.querySelector<HTMLCanvasElement>('.film-stage canvas, canvas')!.width)).toBeLessThan(1920);
+    // Scrubbing backwards resumes from a saved camera state instead of replaying the film from its first frame.
+    const stepped = await page.evaluate(() => {
+      const film = (window as unknown as { __film: { render(i: number): void; stepped?: number } }).__film;
+      film.render(400);
+      film.render(200);
+      return film.stepped;
+    });
+    expect(stepped).toBeLessThanOrEqual(30);
     await context.close();
   });
 });

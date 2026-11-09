@@ -102,6 +102,18 @@ interface Pose {
  * Picks a shot per frame and moves a camera toward it with critically damped
  * springs. Stateful, so frames must be rendered in order (the recorder does).
  */
+export interface DirectorState {
+  pos: number[];
+  look: number[];
+  fov: number;
+  cutaway: number;
+  started: boolean;
+  heading: number;
+  lastShot: ShotKind | null;
+  pull: number;
+  crampedUntil: number;
+}
+
 export class Director {
   readonly camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.05, 3000);
   shot: ShotKind = 'intro';
@@ -134,6 +146,23 @@ export class Director {
   }
 
   /** Place the camera for one film frame. */
+  /** The camera's whole state between frames, so a seek backwards can resume from a saved point. */
+  snapshot(): DirectorState {
+    return { pos: this.pos.toArray(), look: this.look.toArray(), fov: this.fov, cutaway: this.cutaway, started: this.started, heading: this.heading, lastShot: this.lastShot, pull: this.pull, crampedUntil: this.crampedUntil };
+  }
+
+  restore(s: DirectorState): void {
+    this.pos.fromArray(s.pos);
+    this.look.fromArray(s.look);
+    this.fov = s.fov;
+    this.cutaway = s.cutaway;
+    this.started = s.started;
+    this.heading = s.heading;
+    this.lastShot = s.lastShot;
+    this.pull = s.pull;
+    this.crampedUntil = s.crampedUntil;
+  }
+
   frame(f: FilmFrame): void {
     const { pos, yaw, frame } = sampleFlight(this.log, f.t);
     const drone = toThree(pos);

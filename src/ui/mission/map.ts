@@ -87,6 +87,11 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
   let panning: { x: number; y: number } | null = null;
   let pendingInsert: MapSelection | null = null;
   let downScreen: { x: number; y: number } | null = null;
+  // Touch: fingers on the map, the two-finger pinch in progress, and a one-finger touch that is a tap
+  // (acts on release) unless it moves, in which case it pans. So drawing tools can pan and zoom on a phone.
+  const touches = new Map<number, { x: number; y: number }>();
+  let pinch: { dist: number; mid: { x: number; y: number } } | null = null;
+  let touchTap: { x: number; y: number } | null = null;
   let pendingFit: Point[] | null = null;
   let ready = false;
 
@@ -485,14 +490,93 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     event.preventDefault();
     const screen = localPoint(event);
     const world = screenToWorld(screen.x, screen.y);
-    mpp = Math.min(8, Math.max(0.05, mpp * (event.deltaY > 0 ? 1.12 : 1 / 1.12)));
+    mpp = clampMpp(mpp * (event.deltaY > 0 ? 1.12 : 1 / 1.12));
     cx = world.x - (screen.x - width / 2) * mpp;
     cy = world.y + (screen.y - height / 2) * mpp;
     redraw();
   }, { passive: false });
 
+  const clampMpp = (v: number): number => Math.min(8, Math.max(0.05, v));
+  const TAP_SLOP = 8;
+
+  function pinchState(): { dist: number; mid: { x: number; y: number } } {
+    const [a, b] = [...touches.values()] as [{ x: number; y: number }, { x: number; y: number }];
+    return { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } };
+  }
+
+  /** What a tap does in the current tool (a mouse does the same on press and release). */
+  function tapAt(screen: { x: number; y: number }): void {
+    const world = screenToWorld(screen.x, screen.y);
+    if (tool === 'geofence' || tool === 'nofly') {
+      if (nearFirstDraft(screen)) handlers.onClose();
+      else handlers.onPoint(snapWorld(world, screen));
+    } else if (tool === 'start') {
+      handlers.onPlaceStart(snapWorld(world, screen));
+    } else if (tool === 'edit') {
+      const edge = hitEdge(screen);
+      if (edge) handlers.onInsertVertex(edge, snapWorld(world, screen));
+      else handlers.onSelect(null);
+    }
+  }
+
+  function touchDown(event: PointerEvent, screen: { x: number; y: number }): void {
+    touches.set(event.pointerId, screen);
+    try {
+      canvas.setPointerCapture(event.pointerId);
+    } catch {
+      /* a pointer that is already gone cannot be captured; the gesture still works inside the map */
+    }
+    if (touches.size >= 2) {
+      // A second finger turns whatever the first one started into a pinch.
+      if (touches.size === 2) pinch = pinchState();
+      drag = null;
+      panning = null;
+      touchTap = null;
+      return;
+    }
+    if (tool === 'edit') {
+      const vertex = hitVertex(screen);
+      if (vertex && (vertex.kind === 'start' || vertex.vertex != null)) {
+        drag = { selection: vertex };
+        handlers.onSelect(vertex);
+        return;
+      }
+    }
+    panning = screen;
+    if (tool !== 'view') touchTap = screen;
+  }
+
+  function touchMove(event: PointerEvent, screen: { x: number; y: number }): boolean {
+    if (!touches.has(event.pointerId)) return false;
+    touches.set(event.pointerId, screen);
+    if (!pinch || touches.size < 2) return false;
+    const next = pinchState();
+    // The ground under the old midpoint stays under the new one: zoom and pan in one gesture.
+    const world = screenToWorld(pinch.mid.x, pinch.mid.y);
+    mpp = clampMpp((mpp * pinch.dist) / next.dist);
+    cx = world.x - (next.mid.x - width / 2) * mpp;
+    cy = world.y + (next.mid.y - height / 2) * mpp;
+    pinch = next;
+    redraw();
+    return true;
+  }
+
+  function touchUp(event: PointerEvent, screen: { x: number; y: number }, cancelled: boolean): void {
+    touches.delete(event.pointerId);
+    if (touches.size < 2) pinch = null;
+    const tap = touchTap;
+    if (touches.size === 0) touchTap = null;
+    drag = null;
+    panning = null;
+    if (!cancelled && tap && touches.size === 0 && Math.hypot(screen.x - tap.x, screen.y - tap.y) < TAP_SLOP) tapAt(screen);
+  }
+
   canvas.addEventListener('pointerdown', (event) => {
     const screen = localPoint(event);
+    if (event.pointerType === 'touch') {
+      touchDown(event, screen);
+      return;
+    }
     if (event.button === 1 || event.button === 2 || (tool === 'view' && event.button === 0)) {
       panning = screen;
       canvas.setPointerCapture(event.pointerId);
@@ -531,6 +615,7 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
 
   canvas.addEventListener('pointermove', (event) => {
     const screen = localPoint(event);
+    if (event.pointerType === 'touch' && touchMove(event, screen)) return;
     if (panning && (tool === 'view' || event.buttons === 2 || event.buttons === 4 || event.buttons === 1)) {
       cx -= (screen.x - panning.x) * mpp;
       cy += (screen.y - panning.y) * mpp;
@@ -553,6 +638,10 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
 
   canvas.addEventListener('pointerup', (event) => {
     const screen = localPoint(event);
+    if (event.pointerType === 'touch') {
+      touchUp(event, screen, false);
+      return;
+    }
     if (pendingInsert && downScreen && Math.hypot(screen.x - downScreen.x, screen.y - downScreen.y) < 4) {
       handlers.onInsertVertex(pendingInsert, snapWorld(screenToWorld(screen.x, screen.y), screen));
     }
@@ -560,6 +649,10 @@ export function createMissionMap(canvas: HTMLCanvasElement, handlers: MapHandler
     panning = null;
     pendingInsert = null;
     downScreen = null;
+  });
+
+  canvas.addEventListener('pointercancel', (event) => {
+    if (event.pointerType === 'touch') touchUp(event, localPoint(event), true);
   });
 
   canvas.addEventListener('pointerleave', () => {

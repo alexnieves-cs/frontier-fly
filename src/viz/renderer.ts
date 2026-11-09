@@ -27,6 +27,11 @@ export interface ViewHooks {
  * default. WebGPU is opt-in (`?renderer=webgpu`) because that path skips the
  * HDRI, shadows, and post stack.
  */
+/** Auto quality: frames skipped, frames timed, and the mean frame time (ms) above which it steps down (about 14 fps). */
+const AUTO_SKIP = 20;
+const AUTO_FRAMES = 45;
+const AUTO_SLOW_MS = 70;
+
 export class ThreeView implements Renderer {
   private gl: THREE.WebGLRenderer | null = null;
   private gpu: { domElement: HTMLCanvasElement; render: (s: THREE.Scene, c: THREE.Camera) => void; setSize: (w: number, h: number, u?: boolean) => void; dispose: () => void; setPixelRatio: (n: number) => void } | null = null;
@@ -56,6 +61,12 @@ export class ThreeView implements Renderer {
   private post: PostStack | null = null;
   private mode: CameraMode = 'chase';
   private quality: QualityPreset = 'high';
+  private autoWatch = false;
+  private autoLast = 0;
+  private autoSeen = 0;
+  private autoSum = 0;
+  /** Called when auto quality steps down to low after measuring slow frames. */
+  onAutoLow: (() => void) | null = null;
   private sensor: LightingState['sensorMode'] = 'rgb';
   private theta = 0.8;
   private phi = 0.9;
@@ -113,6 +124,9 @@ export class ThreeView implements Renderer {
     const gpuOk = shouldTryWebGPU(renderer, quality) ? await this.tryWebGPU() : false;
     if (!gpuOk) this.makeWebGL();
     this.quality = resolveQuality(quality, this.softwareGL());
+    // Auto also watches the first seconds of real frames: a weak GPU that is not a software rasterizer by name
+    // (old integrated graphics, some phones) still gets the light look instead of a slideshow.
+    this.autoWatch = quality === 'auto' && this.quality === 'high';
     this.pip = new THREE.WebGLRenderer({ canvas: this.pipCanvas, antialias: true, alpha: true });
     this.pip.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     this.pip.outputColorSpace = THREE.SRGBColorSpace;
@@ -270,8 +284,15 @@ export class ThreeView implements Renderer {
   }
 
   setQuality(q: QualityPreset): void {
+    // A choice made by hand ends the automatic watch.
+    this.autoWatch = false;
     this.quality = q;
     if (this.spec) this.load(this.spec);
+  }
+
+  /** The preset in use now (auto resolves at init, and may step down once; see `onAutoLow`). */
+  get activeQuality(): QualityPreset {
+    return this.quality;
   }
 
   setLidar(ranges: ArrayLike<number> | null): void {
@@ -447,8 +468,30 @@ export class ThreeView implements Renderer {
     }
   }
 
+  /**
+   * In auto quality, time frames once a building is up: skip the first AUTO_SKIP (shader compiles),
+   * then average AUTO_FRAMES frame times. Slower than AUTO_SLOW_MS a frame means the full look is
+   * too heavy here, so step down to low once. Gaps over a second (a hidden tab) are not frames.
+   */
+  private watchAuto(now: number): void {
+    if (!this.autoWatch || !this.built) return;
+    const dt = now - this.autoLast;
+    this.autoLast = now;
+    if (dt <= 0 || dt > 1000) return;
+    this.autoSeen += 1;
+    if (this.autoSeen <= AUTO_SKIP) return;
+    this.autoSum += dt;
+    if (this.autoSeen < AUTO_SKIP + AUTO_FRAMES) return;
+    this.autoWatch = false;
+    if (this.autoSum / AUTO_FRAMES > AUTO_SLOW_MS) {
+      this.setQuality('low');
+      this.onAutoLow?.();
+    }
+  }
+
   private paint(): void {
     const now = performance.now();
+    this.watchAuto(now);
     this.fpsCount += 1;
     if (now - this.lastFps > 500) {
       this.fps = (this.fpsCount * 1000) / (now - this.lastFps);
