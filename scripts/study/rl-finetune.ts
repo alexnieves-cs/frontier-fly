@@ -63,11 +63,13 @@ function jobs(): (EvalJob & { set: string })[] {
 /** Validation lines of a train:ppo log: "init ..." and "  val ppo N ..." / "  val imitate N ...". */
 function curveOf(log: string): { update: number; small: number; large: number; collisions: number; score: number }[] {
   const out: { update: number; small: number; large: number; collisions: number; score: number }[] = [];
-  const re = /^(?:init|\s+val (?:ppo|imitate) (\d+)) small ([\d.]+)% large ([\d.]+)% \(night [\d.]+%\) coll ([\d.]+) score ([\d.]+)%/;
+  const re = /^(?:init|\s+val (?:ppo|imitate) (\d+)) small ([\d.]+)% large ([\d.]+)% \(night [\d.]+%\) coll ([\d.]+)(?: crash [\d.]+%)?(?: quad [\d.]+% \(crash [\d.]+%\))? score (-?[\d.]+)%/;
   for (const line of log.split('\n')) {
     const m = re.exec(line);
     if (m) out.push({ update: m[1] ? Number(m[1]) : 0, small: Number(m[2]) / 100, large: Number(m[3]) / 100, collisions: Number(m[4]), score: Number(m[5]) / 100 });
   }
+  // A log with no validation line means the format moved again: an empty curve must not pass quietly.
+  if (!out.length) throw new Error('rl-finetune: no validation lines matched in a train:ppo log (did its format change?)');
   return out;
 }
 
