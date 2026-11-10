@@ -11,7 +11,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 - **No part of a mission reads ground truth.** Confirm-clear now decides from the drone's own tracks and maps, openings are measured by a depth-camera model, the fly-through tracks the aperture it sees, contacts are placed with the drone's own pose, and outdoor flight carries GNSS noise. On the same fresh worlds, the three kinematic explorers together meet the expected outcome in 97.8% of 270 flights against 96.3% for the code that still read truth, on the three scenarios that code could fly. The cost is honest false clears: in a new sweep with a person lying in one building, 0 of 240 flights declared that building clear, which could not happen when confirm-clear read the true cells. The one traced was a person the detector saw and the confirmation rule rejected, because a lying person scores like the decoys ([Confirm-clear](#confirm-clear-without-ground-truth)).
 - **Over a declared mix of conditions, the shipped autopilot declares a building clear with someone inside on 0.25% of flights** (95% CI 0.16% to 0.35%), and touches something on 1.15%. Every false clear is on a sweep of an occupied site, where the rate is 0.8%, and almost all are a person walking or hiding: the detector sees them, but repeated views never lift the mean confidence past the confirm bar. The mission bench above missed this because its occupied sweep only placed a person lying still ([Failure atlas](#failure-atlas)). Since then a person the drone saw strongly but could not confirm stays unresolved and blocks the clear, and person tracks follow a walker: on 2,000 fresh flights from the same mix, flown by both versions on the same seeds, false clears fell from 4.05% to 0.30% of flights, and walking people were found 63 of 251 times against 27 ([Unresolved contacts](#unresolved-contacts)).
 - **Under the crash rule, the guarded policy covers the most and the planner never crashes.** A contact that starts faster than 0.5 m/s now ends the flight ([crash rule](#the-crash-rule)). On 30 fresh hard buildings the sensor-only planner covers 65.5% with no collisions. The learned policy under its lidar guard covers 75.1%, with 1 of 30 flights ended by a crash. Retrained under the rule, the bare policy covers 67.5% with 7 of 30 of its flights ended by a crash; the checkpoint trained before the rule crashed in 19 of 30 and covered 63.0% ([Retraining under the crash rule](#retraining-under-the-crash-rule)). The oracle teacher it imitates covers 64.5%.
-- **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps change little. DAgger adds 11 points over behavior cloning, and PPO on the policy's own flights adds +19.7 more on 106 held-out hard flights (61.0% to 80.8%).
+- **What the policy learns from is the frontier waypoint and the local maps.** Removing the navigation block costs 14 points of coverage and removing the local maps 7, with twice the collisions; the coarse maps change little. DAgger adds 11 points over behavior cloning, and PPO on the policy's own flights adds +38.8 more on 106 held-out hard flights (36.5% to 75.3%).
 - **Outdoors, a probability search finds a lost person much sooner than the lane sweep the drone used to fly**: 62 s restricted mean time against 277 s over 100 fresh daytime scenes, a paired difference of -215 s (95% CI -278 to -156 s). Most of that gain is not the prior: lanes spaced at the computed sweep width with buildings left for last differ from it by only -12 s (95% CI -33 to +5 s), and the lost-person map features add nothing measurable over a bare distance ring. When the person is placed with no regard to the prior, the behavior prior costs time (+129 s (95% CI +29 to +230 s) against the sweep-width lanes).
 - **On a quadrotor, only the quad-aware planner survives the crash rule.** With rigid-body dynamics and sensor noise, the pilots built for the kinematic drone overshoot into walls: the planner covers 23.1%, the policy 11.9% and the oracle teacher 2.2%, and most of their flights end in a crash. With the braking filter and the quad-aware tracker the planner covers 46.9% with 0 crashes. Whole missions flown on the quadrotor, which slow to 1 m/s indoors behind the braking filter, meet the expected outcome in 99.2% (planner) and 98.3% (policy) of flights. An earlier run lost a third of the quadrotor compound sweeps to a stop-point time-out after the outdoor tilt limit went to 55°; the fix keeps 40° for slow moves around a building in calm air ([run 6](#confirm-clear-without-ground-truth)).
 - **The planner now climbs.** Given the up and down range finders and a share of the budget per floor, the sensor-only planner takes shafts in the coverage environment. It reaches another floor in 30 of 30 fresh multi-floor buildings and covers 41.8% of them against 37.7% without climbing, with 0.00 collisions per episode. The policy and the teacher still stay on the ground floor.
@@ -72,7 +72,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 
 Until this rule, contacts cost the drone a small reward penalty and nothing else: the env stopped the motion into the wall and let the drone slide along it. The policy learned to use that, touching walls 3.4 times per flight on fresh hard buildings. Now every contact is measured by the airframe's speed into the surface at the moment it starts, the velocity the surface takes away. Faster than 0.5 m/s is a crash: the flight ends where it hit, and coverage counts what was flown until then. Slower touches are contacts, which a prop-guarded airframe survives; they are still counted and penalized. The limit is deliberately strict, a quarter of the env's 2 m/s cruise. The same rule ends missions (outcome `crashed`), and the fault bench counts a crash as unsafe. Training adds a crash penalty, and the shipped checkpoint has been retrained under the rule ([Retraining under the crash rule](#retraining-under-the-crash-rule)); FrontierBench v2 keeps contacts free so its submitted scores stay comparable.
 
-On the 30 fresh hard buildings, the bare policy's contacts start at a median 0.03 m/s, so the rule ends 7 of 30 of its flights; under its lidar guard the median is 0.38 m/s and 1 of 30 flights crash. The ablations and the drone teams below were measured before the rule and still treat contacts as free; the speed study and the real floor plans were re-run under it.
+On the 30 fresh hard buildings, the bare policy's contacts start at a median 0.03 m/s, so the rule ends 7 of 30 of its flights; under its lidar guard the median is 0.38 m/s and 1 of 30 flights crash. Every study below runs under the rule. The ablation arms were trained and flown again under it, the fine-tuning table flies each earlier checkpoint under it, and the drone teams, the speed study and the real floor plans fly under it as well.
 
 ### One airframe
 
@@ -547,24 +547,26 @@ The DAgger policy only ever learned to copy its teacher. Here it learns from its
 - **Little exploration noise.** The policy's action noise is cut to a standard deviation of 0.1 (pre-tanh). At 0.2 the sampled flights crash into the 16-collision limit, and PPO learns from wrecks.
 - **A small imitation term on a replay, or none.** The teacher labels every state the policy reaches, and a BC term on a reservoir of those labels (weight 0.05) keeps the policy near the teacher where PPO has no signal. Imitating only the current batch, or imitating without PPO at all, wrecks the policy within 20 updates: on its own states the teacher's labels pull toward walls the student cannot see the way the teacher does.
 
-Every number below is on buildings that played no part in training or in picking the checkpoint (picked on the tuning block 66001–66299). Each cell is coverage, the paired change against the DAgger checkpoint in points, and collisions per episode. The last row pools every hard flight with a bootstrap 95% interval on the paired change. From `scripts/study/rl-finetune.ts` at `820e541`.
+Every number below is on buildings that played no part in training or in picking the checkpoint (picked on the tuning block 66001–66299). Each cell is coverage, the paired change against the DAgger checkpoint in points, collisions per episode, and the flights ended by a crash. Every flight runs under the crash rule (a contact faster than 0.5 m/s ends it), whichever rule the checkpoint was trained under. The last row pools every hard flight with a bootstrap 95% interval on the paired change. From `scripts/study/rl-finetune.ts` at `9b3cb49`.
 
-| Set, buildings, light (flights) | dagger | ppo | ppoSeed2 | ppo260 | gru260 | ppo800 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Eval protocol, easy, day (4) | 95.1% · 0.0 | 95.1% · 4.0 | 95.1% · 0.0 | 95.1% · 1.3 | 95.1% · 0.0 | 95.1% · 0.0 |
-| Eval protocol, hard, day (3) | 67.3% · 8.7 | 78.6% (+11.4) · 0.0 | 81.8% (+14.6) · 0.3 | 71.5% (+4.2) · 1.7 | 80.3% (+13.0) · 1.3 | 86.1% (+18.8) · 0.7 |
-| Coverage study, hard, day (30) | 60.7% · 6.4 | 75.2% (+14.5) · 2.1 | 75.1% (+14.3) · 2.6 | 72.5% (+11.8) · 2.5 | 71.5% (+10.7) · 2.9 | 80.0% (+19.2) · 3.4 |
-| Eval protocol, easy, night (4) | 95.1% · 1.8 | 95.1% · 2.5 | 95.1% · 0.0 | 95.1% · 0.0 | 95.1% · 0.0 | 95.1% · 0.0 |
-| Eval protocol, hard, night (3) | 67.4% · 0.3 | 81.2% (+13.9) · 0.3 | 80.1% (+12.7) · 1.7 | 81.2% (+13.8) · 6.3 | 79.1% (+11.8) · 0.3 | 87.7% (+20.4) · 1.0 |
-| Coverage study, hard, night (30) | 59.6% · 5.6 | 74.1% (+14.5) · 2.8 | 74.1% (+14.5) · 2.6 | 71.2% (+11.6) · 2.8 | 71.3% (+11.6) · 1.5 | 80.0% (+20.3) · 2.9 |
-| Coverage study, easy, day (30) | 94.0% · 0.1 | 94.3% · 2.9 | 95.1% · 0.0 | 94.7% · 0.8 | 95.1% · 0.0 | 95.1% · 0.0 |
-| Report block, hard, day (32) | 62.7% · 4.3 | 75.0% (+12.2) · 2.2 | 75.1% (+12.4) · 2.8 | 72.5% (+9.8) · 2.9 | 71.8% (+9.1) · 1.7 | 80.8% (+18.0) · 3.5 |
-| Report block, hard, night (8) | 55.7% · 8.6 | 76.2% (+20.6) · 3.9 | 74.6% (+18.9) · 4.9 | 72.9% (+17.2) · 3.4 | 73.8% (+18.2) · 3.0 | 82.0% (+26.3) · 5.9 |
-| Report block, easy, day (6) | 95.1% · 0.0 | 95.1% · 2.8 | 95.1% · 0.0 | 95.1% · 0.5 | 95.1% · 0.0 | 95.1% · 0.0 |
-| Report block, easy, night (2) | 95.1% · 0.0 | 95.1% · 3.0 | 95.1% · 0.0 | 95.1% · 0.0 | 95.1% · 0.0 | 95.1% · 0.0 |
-| **All hard flights (106)** | **61.0%** · 5.6 | **75.2%** (+12.1 to +16.5) · 2.3 | **75.1%** (+12.0 to +16.4) · 2.8 | **72.4%** (+9.2 to +13.9) · 2.9 | **72.2%** (+9.0 to +13.3) · 2.0 | **80.8%** (+17.7 to +21.9) · 3.3 |
+| Set, buildings, light (flights) | dagger | ppo800 | retrained |
+| --- | --- | --- | --- |
+| Eval protocol, easy, day (4) | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed |
+| Eval protocol, hard, day (3) | 49.3% · 1.3 · 2 crashed | 84.8% (+35.5) · 0.3 · 1 crashed | 90.1% (+40.8) · 6.7 · 1 crashed |
+| Coverage study, hard, day (30) | 30.0% · 1.1 · 28 crashed | 63.0% (+33.0) · 1.1 · 19 crashed | 67.5% (+37.5) · 4.9 · 7 crashed |
+| Eval protocol, easy, night (4) | 94.8% · 0.5 · 2 crashed | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed |
+| Eval protocol, hard, night (3) | 66.6% · 0.3 · 1 crashed | 84.2% (+17.5) · 0.7 · 2 crashed | 77.0% (+10.4) · 7.0 · 0 crashed |
+| Coverage study, hard, night (30) | 30.0% · 1.1 · 25 crashed | 60.7% (+30.6) · 1.0 · 21 crashed | 76.3% (+46.3) · 3.7 · 6 crashed |
+| Coverage study, easy, day (30) | 93.3% · 0.1 · 2 crashed | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed |
+| Report block, hard, day (32) | 46.4% · 0.7 · 20 crashed | 61.5% (+15.2) · 0.9 · 20 crashed | 78.6% (+32.2) · 3.2 · 4 crashed |
+| Report block, hard, night (8) | 30.1% · 1.1 · 8 crashed | 47.0% (+16.9) · 1.3 · 8 crashed | 81.4% (+51.3) · 0.8 · 3 crashed |
+| Report block, easy, day (6) | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed |
+| Report block, easy, night (2) | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed | 95.1% · 0.0 · 0 crashed |
+| **All hard flights (106)** | **36.5%** · 1.0 · 84 crashed | **61.9%** (+20.7 to +30.0) · 1.0 · 71 crashed | **75.3%** (+34.6 to +42.9) · 3.8 · 21 crashed |
 
-The fine-tuned policy covers 80.8% of the hard buildings against 61.0% for the DAgger checkpoint it started from, a paired change of +19.7 points (95% interval +17.7 to +21.9) over 106 flights, and collides 3.3 times per episode instead of 5.6. On the coverage study's hard buildings it covers 80.0% against 60.7% by day and 80.0% against 59.6% at night, more than the oracle teacher it imitated. The teacher is a greedy nearest-frontier rule and PPO optimizes coverage over the whole episode; this report does not measure where the extra coverage comes from.
+Every flight in this table runs under the crash rule, whichever rule its checkpoint was trained under. On the 106 held-out hard flights the DAgger checkpoint covers 36.5%, and 84 of its flights end in a crash. The first PPO fine-tune, trained while contacts were free, covers 61.9%, a paired change of +25.4 points (95% interval +20.7 to +30.0), with 71 crashes. The shipped checkpoint, fine-tuned again under the rule ([next section](#retraining-under-the-crash-rule)), covers 75.3% (+38.8 points against DAgger, +34.6 to +42.9) with 21 crashes, and touches walls 3.8 times per flight below the crash speed. On the coverage study's hard buildings it covers 67.5% against 30.0% for DAgger by day, and 76.3% against 30.0% at night.
+
+When contacts were free, as this section first reported, the first fine-tune covered 80.8% of the same 106 flights against 61.0% for DAgger (a paired +19.7 points), more than the oracle teacher it imitated. The teacher is a greedy nearest-frontier rule and PPO optimizes coverage over the whole episode. Under the rule both checkpoints lose: the fine-tune falls from 80.8% to 61.9% and DAgger from 61.0% to 36.5%. PPO's gain over DAgger holds, but both had leaned on contacts being free, flying into walls and sliding along them.
 
 ### Retraining under the crash rule
 
@@ -594,7 +596,7 @@ The runs behind it, with hard coverage on the tuning block (66001–66299, the o
 
 **Memory did not help.** The same recipe with a small recurrent memory (a 64-unit GRU feeding the second layer, starting from zero so it changes nothing at first) reaches 72.2% on the held-out hard flights after 260 updates, against 72.4% for the feed-forward run at the same point, with fewer collisions (2.0 against 2.9 per flight). It trains about three times slower, so the shipped policy has no memory. Both runs are in the table above.
 
-Every bench in this report that flies the policy was re-run once with the new weights: the coverage study, the speed study, the mission bench, the real-floor-plan bench and the camera bench. The ablation runs above and the FrontierBench baseline in [BENCHMARKS.md](BENCHMARKS.md) keep the DAgger policy they were measured with.
+Every bench in this report that flies the policy was re-run once with the new weights: the coverage study, the speed study, the mission bench, the real-floor-plan bench and the camera bench. The ablation arms above were trained again under the rule afterwards, and the fine-tuning table flies the two earlier checkpoints under it (`results/archive/checkpoints/`).
 
 ## Outdoor search for a lost person
 
@@ -714,7 +716,7 @@ The single-drone results above say coverage is limited by flight time. The direc
 
 ### Results
 
-Commit `87c16f8`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.
+Commit `9b3cb49`. 30 fresh buildings per condition (hard 70001+, large 71001+); the claim weights were tuned on 66001–66016 only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building. Every flight runs under the crash rule: a contact that starts faster than 0.5 m/s ends that drone's flight and the rest of the team carries on. It ended 3 of the 1500 drone flights in this bench.
 
 | Building | Team | Searched (95% CI) | vs 1 drone | Median time to 50% | Median time to 80% | Points per drone-minute | Overlap | Base knows at end | Packets through | Team battery, Wh | Points per Wh |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -733,20 +735,20 @@ Three drones on large buildings search +49.6 pts (95% CI +48.0 pts to +51.2 pts)
 
 Ablations, three drones:
 
-| Building | Three drones | Searched | vs 3 drones, full system | Median time to 80% | Base knows at end | Awareness gap, mean / worst | Collisions per episode |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Hard 20 m | 3 drones | 95.1% | — | 59 s | 94.8% | 0.1% / 0.5% | 0.00 |
-| Hard 20 m | 3 drones, no radio (each flies alone) | 65.0% | −30.1 pts (95% CI −34.0 pts to −26.0 pts) | not reached | 0.0% | 33.7% / 65.0% | 0.27 |
-| Hard 20 m | 3 drones, shared maps, no frontier split | 95.1% | +0.0 pts (95% CI −0.0 pts to +0.0 pts) | 61 s | 94.8% | 0.1% / 0.5% | 0.03 |
-| Hard 20 m | 3 drones, perfect radio | 95.1% | +0.0 pts (95% CI +0.0 pts to +0.0 pts) | 59 s | 94.8% | 0.1% / 0.4% | 0.00 |
-| Hard 20 m | 2 explorers + 1 relay | 95.0% | −0.1 pts (95% CI −0.2 pts to +0.0 pts) | 66 s | 94.8% | 0.1% / 0.4% | 0.00 |
-| Large 40 m | 3 drones | 79.1% | — | not reached | 79.0% | 0.1% / 1.0% | 0.00 |
-| Large 40 m | 3 drones, no radio (each flies alone) | 32.8% | −46.3 pts (95% CI −49.2 pts to −43.1 pts) | not reached | 0.0% | 16.6% / 32.8% | 0.20 |
-| Large 40 m | 3 drones, shared maps, no frontier split | 75.9% | −3.3 pts (95% CI −4.6 pts to −1.8 pts) | not reached | 75.7% | 0.1% / 1.1% | 0.00 |
-| Large 40 m | 3 drones, perfect radio | 79.1% | −0.0 pts (95% CI −0.0 pts to +0.0 pts) | not reached | 79.1% | 0.0% / 0.1% | 0.00 |
-| Large 40 m | 2 explorers + 1 relay | 58.4% | −20.7 pts (95% CI −21.9 pts to −19.2 pts) | not reached | 58.4% | 0.0% / 0.3% | 0.00 |
-| Large 40 m | 3 drones, weak radio (-10 dBm) | 79.1% | +0.0 pts (95% CI −0.3 pts to +0.4 pts) | not reached | 76.7% | 1.1% / 7.5% | 0.00 |
-| Large 40 m | 2 explorers + 1 relay, weak radio (-10 dBm) | 56.5% | −22.6 pts (95% CI −24.1 pts to −21.1 pts) | not reached | 55.9% | 0.2% / 2.1% | 0.00 |
+| Building | Three drones | Searched | vs 3 drones, full system | Median time to 80% | Base knows at end | Awareness gap, mean / worst | Collisions per episode | Drone flights ended by a crash |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hard 20 m | 3 drones | 95.1% | — | 59 s | 94.8% | 0.1% / 0.5% | 0.00 | 0 of 90 |
+| Hard 20 m | 3 drones, no radio (each flies alone) | 65.0% | −30.1 pts (95% CI −34.0 pts to −26.0 pts) | not reached | 0.0% | 33.7% / 65.0% | 0.27 | 0 of 90 |
+| Hard 20 m | 3 drones, shared maps, no frontier split | 95.1% | +0.0 pts (95% CI −0.0 pts to +0.0 pts) | 61 s | 94.8% | 0.1% / 0.5% | 0.03 | 0 of 90 |
+| Hard 20 m | 3 drones, perfect radio | 95.1% | +0.0 pts (95% CI +0.0 pts to +0.0 pts) | 59 s | 94.8% | 0.1% / 0.4% | 0.00 | 0 of 90 |
+| Hard 20 m | 2 explorers + 1 relay | 95.0% | −0.1 pts (95% CI −0.2 pts to +0.0 pts) | 66 s | 94.8% | 0.1% / 0.4% | 0.00 | 0 of 90 |
+| Large 40 m | 3 drones | 79.1% | — | not reached | 79.0% | 0.1% / 1.0% | 0.00 | 0 of 90 |
+| Large 40 m | 3 drones, no radio (each flies alone) | 32.8% | −46.3 pts (95% CI −49.2 pts to −43.1 pts) | not reached | 0.0% | 16.6% / 32.8% | 0.20 | 3 of 90 |
+| Large 40 m | 3 drones, shared maps, no frontier split | 75.9% | −3.3 pts (95% CI −4.6 pts to −1.8 pts) | not reached | 75.7% | 0.1% / 1.1% | 0.00 | 0 of 90 |
+| Large 40 m | 3 drones, perfect radio | 79.1% | −0.0 pts (95% CI −0.0 pts to +0.0 pts) | not reached | 79.1% | 0.0% / 0.1% | 0.00 | 0 of 90 |
+| Large 40 m | 2 explorers + 1 relay | 58.4% | −20.7 pts (95% CI −21.9 pts to −19.2 pts) | not reached | 58.4% | 0.0% / 0.3% | 0.00 | 0 of 90 |
+| Large 40 m | 3 drones, weak radio (-10 dBm) | 79.1% | +0.0 pts (95% CI −0.3 pts to +0.4 pts) | not reached | 76.7% | 1.1% / 7.5% | 0.00 | 0 of 90 |
+| Large 40 m | 2 explorers + 1 relay, weak radio (-10 dBm) | 56.5% | −22.6 pts (95% CI −24.1 pts to −21.1 pts) | not reached | 55.9% | 0.2% / 2.1% | 0.00 | 0 of 90 |
 
 - **Sharing maps is most of the gain.** Without the radio each drone explores alone and covers what the others already did: −46.3 pts (95% CI −49.2 pts to −43.1 pts) against the full team on large buildings, and overlap near 2.7.
 - **Splitting frontiers adds a few points and keeps drones apart.** Without claims the drones share maps but chase the same frontiers: −3.3 pts (95% CI −4.6 pts to −1.8 pts), and they spend many more steps within 0.35 m of each other.

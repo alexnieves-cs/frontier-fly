@@ -98,11 +98,11 @@ function readRows(files: string[]): Result[] {
   );
 }
 
-/** The flights of an arm already flown into RUNS (by a runner), or null when there are none. */
-function flown(arm: Arm): Result[] | null {
-  const files = readdirSync(RUNS)
+/** The flights of an arm already flown into a run folder (by a runner), or null when there are none. */
+function flown(arm: Arm, dir: string): Result[] | null {
+  const files = readdirSync(dir)
     .filter((f) => f.startsWith(`${arm.id}.eval.`) && f.endsWith('.jsonl'))
-    .map((f) => `${RUNS}/${f}`);
+    .map((f) => `${dir}/${f}`);
   return files.length ? readRows(files) : null;
 }
 
@@ -148,42 +148,53 @@ async function evaluate(arm: Arm): Promise<Result[]> {
 }
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+
+function cellOf(flights: Result[], pilot: string, lighting: string) {
+  const rs = flights.filter((r) => r.pilot === pilot && r.lighting === lighting);
+  const cov = rs.map((r) => r.coverage);
+  return {
+    episodes: rs.length,
+    coverage: mean(cov),
+    coverageCi: bootstrapCi(cov),
+    collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
+    // Flights the crash rule ended.
+    crashes: rs.filter((r) => r.crashed).length,
+  };
+}
+
+// --merge takes one folder per training run (`--runs runs/s11,runs/s23,runs/s47`): an arm's cells pool
+// the flights of every run, and `runs` keeps each run's own numbers, since one DAgger run's validation
+// swings by tens of points.
+const DIRS = MERGE ? RUNS.split(',').filter(Boolean) : [RUNS];
 const arms = [];
 for (const arm of ARMS) {
-  let rows: Result[] | null;
-  if (MERGE) {
-    rows = flown(arm);
-    if (!rows) {
-      console.log(`skip ${arm.id}: no ${RUNS}/${arm.id}.eval.*.jsonl`);
-      continue;
+  const perRun: { run: string; rows: Result[]; log: ReturnType<typeof parseLog> }[] = [];
+  for (const dir of DIRS) {
+    let rows: Result[] | null;
+    if (MERGE) {
+      rows = flown(arm, dir);
+    } else if (existsSync(`${dir}/${arm.checkpoint}`)) {
+      rows = await evaluate(arm);
+    } else {
+      rows = null;
     }
-  } else {
-    if (!existsSync(`${RUNS}/${arm.checkpoint}`)) {
-      console.log(`skip ${arm.id}: no ${RUNS}/${arm.checkpoint}`);
-      continue;
-    }
-    rows = await evaluate(arm);
+    if (rows) perRun.push({ run: dir.split('/').filter(Boolean).at(-1)!, rows, log: parseLog(`${dir}/${arm.log}`) });
   }
-  const flights = rows;
-  const cell = (pilot: string, lighting: string) => {
-    const rs = flights.filter((r) => r.pilot === pilot && r.lighting === lighting);
-    const cov = rs.map((r) => r.coverage);
-    return {
-      episodes: rs.length,
-      coverage: mean(cov),
-      coverageCi: bootstrapCi(cov),
-      collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
-      // Flights the crash rule ended.
-      crashes: rs.filter((r) => r.crashed).length,
-    };
-  };
-  const log = parseLog(`${RUNS}/${arm.log}`);
+  if (!perRun.length) {
+    console.log(`skip ${arm.id}: nothing for it in ${RUNS}`);
+    continue;
+  }
+  const flights = perRun.flatMap((r) => r.rows);
+  const cell = (pilot: string, lighting: string) => cellOf(flights, pilot, lighting);
+  const own = arm.id === 'dagger' || arm.ablation !== null;
+  const log = perRun[0]!.log;
   arms.push({
     id: arm.id,
     label: arm.label,
     ablation: arm.ablation,
-    curve: arm.id === 'dagger' || arm.ablation ? log.rounds : [],
-    best: arm.id === 'dagger' || arm.ablation ? log.best : null,
+    // The learning curve, best round and anchored-PPO validation of the first run; every run's are in `runs`.
+    curve: own ? log.rounds : [],
+    best: own ? log.best : null,
     ppo: arm.id === 'ppo' ? log.ppo : null,
     hard: {
       policyDay: cell('policy', 'day'),
@@ -191,13 +202,21 @@ for (const arm of ARMS) {
       guardedDay: cell('guarded', 'day'),
       guardedNight: cell('guarded', 'night-dark'),
     },
+    runs: perRun.map((r) => ({
+      run: r.run,
+      best: own ? r.log.best : null,
+      bestVal: own && r.log.rounds.length ? Math.max(...r.log.rounds.map((x) => x.valScore)) : null,
+      ppo: arm.id === 'ppo' ? r.log.ppo : null,
+      policyDay: cellOf(r.rows, 'policy', 'day'),
+      guardedDay: cellOf(r.rows, 'guarded', 'day'),
+    })),
   });
   console.log(
-    `${arm.id}: policy ${(cell('policy', 'day').coverage * 100).toFixed(1)}% guarded ${(cell('guarded', 'day').coverage * 100).toFixed(1)}%`,
+    `${arm.id}: policy ${(cell('policy', 'day').coverage * 100).toFixed(1)}% guarded ${(cell('guarded', 'day').coverage * 100).toFixed(1)}% (${perRun.length} run${perRun.length > 1 ? 's' : ''})`,
   );
 }
 writeFileSync(
   OUT,
-  `${JSON.stringify({ schema: 2, commit: arg('commit', execSync('git rev-parse --short HEAD').toString().trim()), crashSpeed: CRASH_SPEED, recipe: 'BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint', arms }, null, 2)}\n`,
+  `${JSON.stringify({ schema: 2, commit: arg('commit', execSync('git rev-parse --short HEAD').toString().trim()), crashSpeed: CRASH_SPEED, trainingRuns: DIRS.length, recipe: 'BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint', arms }, null, 2)}\n`,
 );
 console.log(`wrote ${OUT}`);

@@ -70,7 +70,7 @@ A technical report on frontier-fly's indoor autonomy: how much of it works from 
 
 Until this rule, contacts cost the drone a small reward penalty and nothing else: the env stopped the motion into the wall and let the drone slide along it. The policy learned to use that, touching walls 3.4 times per flight on fresh hard buildings. Now every contact is measured by the airframe's speed into the surface at the moment it starts, the velocity the surface takes away. Faster than {{R_CRASH_SPEED}} m/s is a crash: the flight ends where it hit, and coverage counts what was flown until then. Slower touches are contacts, which a prop-guarded airframe survives; they are still counted and penalized. The limit is deliberately strict, a quarter of the env's 2 m/s cruise. The same rule ends missions (outcome `crashed`), and the fault bench counts a crash as unsafe. Training adds a crash penalty, and the shipped checkpoint has been retrained under the rule ([Retraining under the crash rule](#retraining-under-the-crash-rule)); FrontierBench v2 keeps contacts free so its submitted scores stay comparable.
 
-On the 30 fresh hard buildings, the bare policy's contacts start at a median {{R_POLICY_CONTACT_SPEED}} m/s, so the rule ends {{R_POLICY_CRASHES}} of its flights; under its lidar guard the median is {{R_GUARD_CONTACT_SPEED}} m/s and {{R_GUARD_CRASHES}} flights crash. The ablations and the drone teams below were measured before the rule and still treat contacts as free; the speed study and the real floor plans were re-run under it.
+On the 30 fresh hard buildings, the bare policy's contacts start at a median {{R_POLICY_CONTACT_SPEED}} m/s, so the rule ends {{R_POLICY_CRASHES}} of its flights; under its lidar guard the median is {{R_GUARD_CONTACT_SPEED}} m/s and {{R_GUARD_CRASHES}} flights crash. Every study below runs under the rule. The ablation arms were trained and flown again under it, the fine-tuning table flies each earlier checkpoint under it, and the drone teams, the speed study and the real floor plans fly under it as well.
 
 ### One airframe
 
@@ -275,7 +275,9 @@ The DAgger policy only ever learned to copy its teacher. Here it learns from its
 
 {{RL_TABLE}}
 
-The fine-tuned policy covers {{R_RL_HARD}} of the hard buildings against {{R_RL_BASE_HARD}} for the DAgger checkpoint it started from, a paired change of {{R_RL_DELTA}} points (95% interval {{R_RL_CI}}) over {{R_RL_N}} flights, and collides {{R_RL_COLL}} times per episode instead of {{R_RL_BASE_COLL}}. On the coverage study's hard buildings it covers {{R_RL_STUDY_DAY}} by day and {{R_RL_STUDY_NIGHT}} at night, more than the oracle teacher it imitated. The teacher is a greedy nearest-frontier rule and PPO optimizes coverage over the whole episode; this report does not measure where the extra coverage comes from.
+Every flight in this table runs under the crash rule, whichever rule its checkpoint was trained under. On the {{R_RL_N}} held-out hard flights the DAgger checkpoint covers {{R_RL_BASE_HARD}}, and {{R_RL_BASE_CRASHES}} of its flights end in a crash. The first PPO fine-tune, trained while contacts were free, covers {{R_RL_FIRST_HARD}}, a paired change of {{R_RL_FIRST_DELTA}} points (95% interval {{R_RL_FIRST_CI}}), with {{R_RL_FIRST_CRASHES}} crashes. The shipped checkpoint, fine-tuned again under the rule ([next section](#retraining-under-the-crash-rule)), covers {{R_RL_HARD}} ({{R_RL_DELTA}} points against DAgger, {{R_RL_CI}}) with {{R_RL_CRASHES}} crashes, and touches walls {{R_RL_COLL}} times per flight below the crash speed. On the coverage study's hard buildings it covers {{R_RL_STUDY_DAY}} for DAgger by day, and {{R_RL_STUDY_NIGHT}} at night.
+
+When contacts were free, as this section first reported, the first fine-tune covered 80.8% of the same {{R_RL_N}} flights against 61.0% for DAgger (a paired +19.7 points), more than the oracle teacher it imitated. The teacher is a greedy nearest-frontier rule and PPO optimizes coverage over the whole episode. Under the rule both checkpoints lose: the fine-tune falls from 80.8% to {{R_RL_FIRST_HARD}} and DAgger from 61.0% to {{R_RL_BASE_HARD}}. PPO's gain over DAgger holds, but both had leaned on contacts being free, flying into walls and sliding along them.
 
 ### Retraining under the crash rule
 
@@ -297,7 +299,7 @@ The runs behind it, with hard coverage on the tuning block (66001–66299, the o
 
 **Memory did not help.** The same recipe with a small recurrent memory (a 64-unit GRU feeding the second layer, starting from zero so it changes nothing at first) reaches 72.2% on the held-out hard flights after 260 updates, against 72.4% for the feed-forward run at the same point, with fewer collisions (2.0 against 2.9 per flight). It trains about three times slower, so the shipped policy has no memory. Both runs are in the table above.
 
-Every bench in this report that flies the policy was re-run once with the new weights: the coverage study, the speed study, the mission bench, the real-floor-plan bench and the camera bench. The ablation runs above and the FrontierBench baseline in [BENCHMARKS.md](BENCHMARKS.md) keep the DAgger policy they were measured with.
+Every bench in this report that flies the policy was re-run once with the new weights: the coverage study, the speed study, the mission bench, the real-floor-plan bench and the camera bench. The ablation arms above were trained again under the rule afterwards, and the fine-tuning table flies the two earlier checkpoints under it (`results/archive/checkpoints/`).
 
 ## Outdoor search for a lost person
 

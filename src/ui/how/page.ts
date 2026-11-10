@@ -185,7 +185,7 @@ function markup(): string {
           ${bars([
             { label: 'Behavior cloning', value: bc.coverage, note: `${bc.episodes} fresh hard buildings, ablation run` },
             { label: '+ DAgger', value: dagger.coverage, note: `same buildings, best of 6 rounds on validation seeds` },
-            { label: '+ PPO (shipped)', value: hardPooled.ppo800.coverage, note: `${hardPooled.episodes} held-out hard flights`, tone: 'accent' },
+            { label: '+ PPO (shipped)', value: hardPooled.retrained.coverage, note: `${hardPooled.episodes} held-out hard flights`, tone: 'accent' },
             { label: 'Teacher (sees the map)', value: teacher.coverage, note: `${teacher.episodes} fresh hard buildings`, tone: 'muted' },
             { label: 'Sensor-only planner', value: planner.coverage, note: `same buildings, no collisions`, tone: 'muted' },
           ])}

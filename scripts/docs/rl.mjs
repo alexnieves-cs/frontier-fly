@@ -49,7 +49,7 @@ function curves(runs) {
 }
 
 export function rlSection(doc) {
-  const keys = ['RL_NOTE', 'RL_TABLE', 'RL_RUNS_TABLE', 'RL_CURVES_FIGURE', 'R_RL_BASE_HARD', 'R_RL_HARD', 'R_RL_DELTA', 'R_RL_CI', 'R_RL_N', 'R_RL_BASE_COLL', 'R_RL_COLL', 'R_RL_STUDY_DAY', 'R_RL_STUDY_NIGHT', 'R_RL_PROTO_DAY', 'R_RL_PROTO_NIGHT', 'R_RL_SHIPPED'];
+  const keys = ['RL_NOTE', 'RL_TABLE', 'RL_RUNS_TABLE', 'RL_CURVES_FIGURE', 'R_RL_BASE_HARD', 'R_RL_HARD', 'R_RL_DELTA', 'R_RL_CI', 'R_RL_N', 'R_RL_BASE_COLL', 'R_RL_COLL', 'R_RL_STUDY_DAY', 'R_RL_STUDY_NIGHT', 'R_RL_PROTO_DAY', 'R_RL_PROTO_NIGHT', 'R_RL_SHIPPED', 'R_RL_CRASHES', 'R_RL_BASE_CRASHES', 'R_RL_FIRST_HARD', 'R_RL_FIRST_DELTA', 'R_RL_FIRST_CI', 'R_RL_FIRST_CRASHES', 'R_RL_FIRST_COLL'];
   if (!doc) {
     const none = '_Not measured yet. Run scripts/study/rl-finetune.ts._';
     return { values: Object.fromEntries(keys.map((k) => [k, none])), files: {} };
@@ -58,16 +58,18 @@ export function rlSection(doc) {
   const shipped = doc.shipped;
   const arms = doc.arms.map((a) => a.label);
   const cell = (set, stage, lighting) => doc.cells.find((c) => c.set === set && c.stage === stage && c.lighting === lighting);
+  // Under the crash rule each cell also counts the flights a crash ended.
+  const crashed = (e) => (e.crashes === undefined ? '' : ` · ${e.crashes} crashed`);
   const rows = doc.cells.map((c) => [
     `${SET_LABEL[c.set] ?? c.set}, ${c.stage === 0 ? 'easy' : 'hard'}, ${c.lighting === 'day' ? 'day' : 'night'} (${c.episodes})`,
     ...arms.map((a) => {
       const e = c[a];
       const d = e.deltaVsBase != null && c.stage === 3 ? ` (${pts(e.deltaVsBase)})` : '';
-      return `${pct(e.coverage)}${d} · ${e.collisionsPerEpisode.toFixed(1)}`;
+      return `${pct(e.coverage)}${d} · ${e.collisionsPerEpisode.toFixed(1)}${crashed(e)}`;
     }),
   ]);
   const p = doc.hardPooled;
-  rows.push([`**All hard flights (${p.episodes})**`, ...arms.map((a) => `**${pct(p[a].coverage)}**${p[a].deltaCi ? ` (${ci(p[a].deltaCi)})` : ''} · ${p[a].collisionsPerEpisode.toFixed(1)}`)]);
+  rows.push([`**All hard flights (${p.episodes})**`, ...arms.map((a) => `**${pct(p[a].coverage)}**${p[a].deltaCi ? ` (${ci(p[a].deltaCi)})` : ''} · ${p[a].collisionsPerEpisode.toFixed(1)}${crashed(p[a])}`)]);
   const runs = doc.runs ?? [];
   const runRows = runs.map((r) => {
     const last = r.curve.at(-1);
@@ -76,9 +78,12 @@ export function rlSection(doc) {
   });
   const svg = curves(runs);
   const s = p[shipped];
+  // The first PPO fine-tune, the checkpoint that shipped before the crash-rule retrain (when it is an arm).
+  const first = p.ppo800 ?? s;
+  const crashes = (e) => (e.crashes === undefined ? 'not counted' : `${e.crashes}`);
   return {
     values: {
-      RL_NOTE: `Every number below is on buildings that played no part in training or in picking the checkpoint (picked on the tuning block 66001–66299). Each cell is coverage, the paired change against the DAgger checkpoint in points, and collisions per episode. The last row pools every hard flight with a bootstrap 95% interval on the paired change. From \`scripts/study/rl-finetune.ts\` at \`${doc.commit}\`.`,
+      RL_NOTE: `Every number below is on buildings that played no part in training or in picking the checkpoint (picked on the tuning block 66001–66299). Each cell is coverage, the paired change against the DAgger checkpoint in points, ${doc.crashSpeed == null ? 'and collisions per episode' : `collisions per episode, and the flights ended by a crash. Every flight runs under the crash rule (a contact faster than ${doc.crashSpeed} m/s ends it), whichever rule the checkpoint was trained under`}. The last row pools every hard flight with a bootstrap 95% interval on the paired change. From \`scripts/study/rl-finetune.ts\` at \`${doc.commit}\`.`,
       RL_TABLE: table(['Set, buildings, light (flights)', ...arms], rows),
       RL_RUNS_TABLE: table(['Run', 'Recipe (on top of the defaults)', 'Hard coverage at the end', 'Best checkpoint (tuning block)'], runRows),
       RL_CURVES_FIGURE: svg ? '![Hard coverage on the tuning block per PPO update, for each run](report/rl-curves.svg)' : '',
@@ -94,6 +99,13 @@ export function rlSection(doc) {
       R_RL_PROTO_DAY: pct(cell('protocol', 3, 'day')[shipped].coverage),
       R_RL_PROTO_NIGHT: pct(cell('protocol', 3, 'night-dark')[shipped].coverage),
       R_RL_SHIPPED: shipped,
+      R_RL_CRASHES: crashes(s),
+      R_RL_BASE_CRASHES: crashes(p[base]),
+      R_RL_FIRST_HARD: pct(first.coverage),
+      R_RL_FIRST_DELTA: pts(first.deltaVsBase),
+      R_RL_FIRST_CI: ci(first.deltaCi),
+      R_RL_FIRST_CRASHES: crashes(first),
+      R_RL_FIRST_COLL: first.collisionsPerEpisode.toFixed(1),
     },
     files: svg ? { 'docs/report/rl-curves.svg': svg } : {},
   };
