@@ -24,7 +24,7 @@ export function drawCoverage(
   for (let z = 0; z < grid.d; z++) {
     for (let x = 0; x < grid.w; x++) {
       const cell = grid.cells[z * grid.w + x]!;
-      let fill = '#121a24';
+      let fill: string;
       if (cell === CELL.WALL) fill = '#243140';
       else if (cell === CELL.DOOR) fill = '#3d4e63';
       else if (cell === CELL.SHAFT) fill = '#c47b3a';

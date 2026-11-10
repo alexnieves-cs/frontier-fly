@@ -67,6 +67,8 @@ export function results() {
     /** The policy alone crashes more than under its guard. */
     guardSaves: policy.crashes !== null && guarded.crashes !== null && policy.crashes > guarded.crashes,
     easy: cell('easy', 'day', 'guarded').coverage,
+    /** The guarded policy on the same hard buildings with every light off. */
+    night: cell('hard', 'night-dark', 'guarded').coverage,
     nightOverDay: cell('hard', 'night-dark', 'guarded').coverage / guarded.value,
     commit: commit.slice(0, 7),
     /** The crash speed the study ran under, m/s; null before the crash rule. */

@@ -72,7 +72,7 @@ async function checkPage(browser, url) {
   const t0 = Date.now();
   const response = await page.goto(url, { waitUntil: 'load' });
   const status = response?.status() ?? 0;
-  let ready = false;
+  let ready;
   try {
     // The service worker reloads the page once on the first visit, so wait on the DOM, not navigation.
     await page.waitForSelector('#app[data-ready="1"]', { timeout: READY_TIMEOUT });

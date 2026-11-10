@@ -109,9 +109,9 @@ export function runTrace(env: ExplorerEnv, c: TraceCase, opts: TraceOptions = {}
     const cfg = traceConfig(c, spec, episode);
     return physics ? env.reset(spec, c.seed + episode, cfg, physics) : env.reset(spec, c.seed + episode, cfg);
   };
-  let obs = reset();
-  fnv.f32(obs);
-  if (keep) record.obs.push(obs);
+  const first = reset();
+  fnv.f32(first);
+  if (keep) record.obs.push(first);
   const action = new Float32Array(4);
   for (let t = 0; t < c.steps; t++) {
     // Biased forward so episodes cover ground, hit walls and terminate.
@@ -129,13 +129,12 @@ export function runTrace(env: ExplorerEnv, c: TraceCase, opts: TraceOptions = {}
       record.rewards.push(step.reward);
       record.dones.push(step.done);
     }
-    obs = step.obs;
     if (step.done) {
       episode += 1;
       spec = specFor(episode);
-      obs = reset();
-      fnv.f32(obs);
-      if (keep) record.obs.push(obs);
+      const next = reset();
+      fnv.f32(next);
+      if (keep) record.obs.push(next);
     }
   }
   record.hash = fnv.hex();

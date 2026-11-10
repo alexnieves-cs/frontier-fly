@@ -199,7 +199,7 @@ class Tour {
   private async point(step: TourStep): Promise<void> {
     if (!step.anchor) return;
     const deadline = performance.now() + 10_000;
-    let el: HTMLElement | null = null;
+    let el: HTMLElement | null;
     while (!(el = document.querySelector<HTMLElement>(`[data-tour="${step.anchor}"]`)) && performance.now() < deadline) {
       await new Promise((r) => setTimeout(r, 100));
     }

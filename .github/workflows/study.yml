@@ -69,8 +69,8 @@ jobs:
       SHARD: ${{ matrix.shard }}
       STUDY_ARGS: ${{ inputs.args }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -90,7 +90,7 @@ jobs:
             pids+=($!)
           done
           for p in "${pids[@]}"; do wait "$p"; done
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: shard-${{ matrix.shard }}
           path: shards/
@@ -109,14 +109,14 @@ jobs:
       STUDY_ARGS: ${{ inputs.args }}
       RUN_ID: ${{ github.run_id }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm install --no-save @tensorflow/tfjs-node@4.22.0
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: shard-*
           path: shards
@@ -133,7 +133,7 @@ jobs:
           git add -f -- "$OUT"
           git commit -m "$STUDY result from study run $RUN_ID"
           git push origin "$b"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ inputs.study }}
           path: ${{ inputs.out }}
