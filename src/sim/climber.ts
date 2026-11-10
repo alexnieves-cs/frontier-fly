@@ -88,7 +88,10 @@ export class Climber {
   private columnStuck = 0;
   private up = new Uint8Array(0);
   private down = new Uint8Array(0);
+  /** Floors the planner has used up. */
   private done = new Set<number>();
+  /** Floors swept at least once; one that is entered but not done was left early and is worth a second visit. */
+  private entered = new Set<number>();
   private phase: 'sweep' | 'route' | 'column' | 'done' = 'sweep';
   private route: [number, number][] = [];
   private target: { x: number; y: number; to: number } | null = null;
@@ -109,6 +112,7 @@ export class Climber {
     this.up = new Uint8Array(0);
     this.down = new Uint8Array(0);
     this.done.clear();
+    this.entered.clear();
     this.phase = 'sweep';
     this.route = [];
     this.target = null;
@@ -159,12 +163,15 @@ export class Climber {
     if (this.phase === 'column') return this.column(f);
     if (this.phase === 'route') return this.follow(f, floor);
     if (this.phase === 'sweep') {
+      this.entered.add(floor);
       const cmd = this.planner.act(f);
       this.onFloor += 1;
-      const stalled = (this.sinceNew > this.stallSteps || this.onFloor > this.floorSteps) && this.next(floor, f) !== null;
-      if (cmd.exploring && !stalled) return cmd;
-      this.done.add(floor);
-      if (this.leave(f, floor)) {
+      if (!cmd.exploring) this.done.add(floor);
+      // Leaving early (a stall, or the floor's time share is spent) is only worth it for a floor never
+      // swept: a floor left early keeps its frontiers and is picked up again once the fresh ones are gone.
+      const early = cmd.exploring && (this.sinceNew > this.stallSteps || this.onFloor > this.floorSteps) && this.goals(floor, f, true).length > 0;
+      if (cmd.exploring && !early) return cmd;
+      if (this.leave(f, floor, cmd.exploring)) {
         this.columnStuck = 0;
         return this.follow(f, floor);
       }
@@ -175,21 +182,38 @@ export class Climber {
     return { vx: 0, vy: 0, vz: 0, yawRate: 0.6, exploring: false };
   }
 
-  /** Adjacent floor not yet explored, preferring up. */
-  private next(floor: number, f: SensorFrame): number | null {
-    for (const g of [floor + 1, floor - 1]) if (g >= 0 && g < f.floors && !this.done.has(g)) return g;
-    return null;
+  /**
+   * Floors still worth a visit from `floor`, best first: floors never swept (nearest first, up before
+   * down), then, unless `freshOnly`, floors left early with frontiers remaining. Any floor counts, not
+   * only the one above or below: the way to a far floor is one shaft at a time through the floors between.
+   */
+  private goals(floor: number, f: SensorFrame, freshOnly: boolean): number[] {
+    const out: number[] = [];
+    for (const fresh of freshOnly ? [true] : [true, false]) {
+      for (let d = 1; d < f.floors; d++) {
+        for (const g of [floor + d, floor - d]) {
+          if (g < 0 || g >= f.floors || this.done.has(g) || this.entered.has(g) === fresh) continue;
+          out.push(g);
+        }
+      }
+    }
+    return out;
   }
 
-  private leave(f: SensorFrame, floor: number): boolean {
-    for (const g of [floor + 1, floor - 1]) {
-      if (g < 0 || g >= f.floors || this.done.has(g)) continue;
-      const at = shaftCentre(g > floor ? this.up : this.down, floor * f.vw * f.vd, f.vw, f.vd, [f.pos[0], f.pos[1]]);
+  /** Routes to the shaft that starts the way to the best floor still worth a visit; false when none is known. */
+  private leave(f: SensorFrame, floor: number, freshOnly: boolean): boolean {
+    const tried = new Set<number>();
+    for (const g of this.goals(floor, f, freshOnly)) {
+      // The next floor on the way. A floor passed through on the way is swept only if it has work left.
+      const hop = floor + Math.sign(g - floor);
+      if (tried.has(hop)) continue;
+      tried.add(hop);
+      const at = shaftCentre(hop > floor ? this.up : this.down, floor * f.vw * f.vd, f.vw, f.vd, [f.pos[0], f.pos[1]]);
       if (!at) continue;
       const path = sensorPath(f, floor, [f.pos[0], f.pos[1]], at);
       if (!path) continue;
       this.route = path;
-      this.target = { x: at[0], y: at[1], to: g };
+      this.target = { x: at[0], y: at[1], to: hop };
       this.phase = 'route';
       return true;
     }

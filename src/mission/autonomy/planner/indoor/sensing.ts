@@ -2,7 +2,7 @@
  * The drone's own view of a building it is inside (IndoorSensing): lidar cast against the real collision
  * world, the seen-free and flown maps, the look estimate, and the lidar shield.
  */
-import { FLOOR_HEIGHT, LIDAR_H, LIDAR_MAX, OBS, OBS_DIM, VOXEL } from '../../../../shared/constants';
+import { LIDAR_H, LIDAR_MAX, OBS, OBS_DIM, VOXEL } from '../../../../shared/constants';
 import { RNG } from '../../../../shared/rng';
 import { type LightingState } from '../../../../shared/types';
 import { makeDroneState } from '../../../../sim/drone';
@@ -421,7 +421,7 @@ export class IndoorSensing implements SensorGrid {
    * the current floor, saw well past the ceiling (floor): open air to the next storey.
    */
   seesThrough(dir: 'up' | 'down', zf: number): boolean {
-    return dir === 'up' ? this.obs[OBS.ceil]! * FLOOR_HEIGHT > this.grid.H - zf + 0.8 : this.obs[OBS.alt]! * FLOOR_HEIGHT > zf + 0.8;
+    return dir === 'up' ? this.obs[OBS.ceil]! * this.grid.H > this.grid.H - zf + 0.8 : this.obs[OBS.alt]! * this.grid.H > zf + 0.8;
   }
 
   /**
@@ -562,7 +562,7 @@ export class IndoorSensing implements SensorGrid {
       pos: [local[0], local[1], local[2]],
       yaw,
       lidar: this.lidar,
-      alt: this.obs[OBS.alt]! * FLOOR_HEIGHT,
+      alt: this.obs[OBS.alt]! * this.grid.H,
       vel: this.velWorld,
     };
   }
