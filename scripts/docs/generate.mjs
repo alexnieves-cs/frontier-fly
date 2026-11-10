@@ -17,7 +17,7 @@ import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
-import { hazardsSection } from './hazards.mjs';
+import { floorsBudgetNote, hazardsSection } from './hazards.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -1276,7 +1276,8 @@ const values = {
   ...confirmClearSection(readJson('docs/mission-bench.json'), readJson('docs/mission-bench-control.json')),
   GALLERY: galleryBlock(readJson('docs/report/gallery.json')),
   ...atlasValues(readJson('docs/atlas.json')),
-  ...hazardsSection(readJson('docs/hazard-coverage.json'), readJson('docs/hazard-missions.json')).values,
+  ...hazardsSection(readJson('docs/hazard-coverage.json'), readJson('docs/hazard-missions.json'), readJson('docs/hazard-thermal.json')).values,
+  FLOORS_BUDGET_NOTE: floorsBudgetNote(readJson('docs/floors-study.json')),
   ...trackingValues(readJson('docs/atlas/mc-tracking.json'), readJson('docs/atlas/mc-tracking-control.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('results/archive/fault-bench/fault-bench-run1.json'), readJson('results/archive/fault-bench/fault-bench-run2.json'), readJson('results/archive/fault-bench/fault-bench-run3.json'), readJson('results/archive/fault-bench/fault-bench-run4.json'), readJson('results/archive/fault-bench/fault-bench-run5.json'), readJson('results/archive/fault-bench/fault-bench-run6.json'), readJson('results/archive/fault-bench/fault-bench-run7.json')]),
 };
