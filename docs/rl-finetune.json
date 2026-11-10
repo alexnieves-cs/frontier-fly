@@ -1,84 +1,49 @@
 {
- "schema": 1,
- "commit": "820e541",
+ "schema": 2,
+ "commit": "9b3cb49",
+ "crashSpeed": 0.5,
  "baseline": "dagger",
- "shipped": "ppo800",
+ "shipped": "retrained",
  "arms": [
   {
    "label": "dagger",
-   "checkpoint": "public/checkpoints/pretrained.bin"
-  },
-  {
-   "label": "ppo",
-   "checkpoint": "/tmp/claude-0/runs/f.bin"
-  },
-  {
-   "label": "ppoSeed2",
-   "checkpoint": "/tmp/claude-0/runs/h.bin"
-  },
-  {
-   "label": "ppo260",
-   "checkpoint": "/tmp/claude-0/runs/f.u260.bin"
-  },
-  {
-   "label": "gru260",
-   "checkpoint": "/tmp/claude-0/runs/g.u260.bin"
+   "checkpoint": "results/archive/checkpoints/dagger.bin"
   },
   {
    "label": "ppo800",
-   "checkpoint": "/tmp/claude-0/runs/k.bin"
+   "checkpoint": "results/archive/checkpoints/ppo800.bin"
+  },
+  {
+   "label": "retrained",
+   "checkpoint": "public/checkpoints/pretrained.bin"
   }
  ],
  "selection": "checkpoints picked on the tuning block 66001-66299 only",
  "hardPooled": {
   "episodes": 106,
   "dagger": {
-   "coverage": 0.6102374507869197,
-   "collisionsPerEpisode": 5.566037735849057
-  },
-  "ppo": {
-   "coverage": 0.7518937778100426,
-   "collisionsPerEpisode": 2.339622641509434,
-   "deltaVsBase": 0.14165632702312247,
-   "deltaCi": [
-    0.12081637113668232,
-    0.16451341067181463
-   ]
-  },
-  "ppoSeed2": {
-   "coverage": 0.7510824856499423,
-   "collisionsPerEpisode": 2.7547169811320753,
-   "deltaVsBase": 0.14084503486302274,
-   "deltaCi": [
-    0.11968883305476818,
-    0.16362355164924997
-   ]
-  },
-  "ppo260": {
-   "coverage": 0.7239102559244099,
-   "collisionsPerEpisode": 2.858490566037736,
-   "deltaVsBase": 0.11367280513749,
-   "deltaCi": [
-    0.09203113040206684,
-    0.13868240074998037
-   ]
-  },
-  "gru260": {
-   "coverage": 0.7215102832818401,
-   "collisionsPerEpisode": 2.018867924528302,
-   "deltaVsBase": 0.11127283249492029,
-   "deltaCi": [
-    0.09034750185985709,
-    0.1329891251212931
-   ]
+   "coverage": 0.36525079826151174,
+   "collisionsPerEpisode": 0.9716981132075472,
+   "crashes": 84
   },
   "ppo800": {
-   "coverage": 0.8075106743792105,
-   "collisionsPerEpisode": 3.330188679245283,
-   "deltaVsBase": 0.1972732235922905,
+   "coverage": 0.6189390265261094,
+   "collisionsPerEpisode": 0.9622641509433962,
+   "crashes": 71,
+   "deltaVsBase": 0.2536882282645977,
    "deltaCi": [
-    0.1771310657283807,
-    0.21913471482807045
+    0.2067092559637386,
+    0.30043003861928963
+   ]
+  },
+  "retrained": {
+   "coverage": 0.7528576195152745,
+   "collisionsPerEpisode": 3.839622641509434,
+   "crashes": 21,
+   "deltaVsBase": 0.3876068212537628,
+   "deltaCi": [
+    0.345941902908595,
+    0.4294914595983076
    ]
   }
  },
@@ -90,47 +55,23 @@
    "episodes": 4,
    "dagger": {
     "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0
-   },
-   "ppo": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 4,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.9513888888888888,
     "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 1.25,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "gru260": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
+    "crashes": 0
    },
    "ppo800": {
     "coverage": 0.9513888888888888,
     "collisionsPerEpisode": 0,
+    "crashes": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "retrained": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "crashes": 0,
     "deltaVsBase": 0,
     "deltaCi": [
      0,
@@ -144,52 +85,28 @@
    "lighting": "day",
    "episodes": 3,
    "dagger": {
-    "coverage": 0.67267225651372,
-    "collisionsPerEpisode": 8.666666666666666
-   },
-   "ppo": {
-    "coverage": 0.7861742008083472,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0.11350194429462723,
-    "deltaCi": [
-     0.0692567567567568,
-     0.14015151515151514
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.8184722971308336,
-    "collisionsPerEpisode": 0.3333333333333333,
-    "deltaVsBase": 0.14580004061711374,
-    "deltaCi": [
-     0.13344594594594594,
-     0.15243902439024382
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.7147638214711386,
-    "collisionsPerEpisode": 1.6666666666666667,
-    "deltaVsBase": 0.042091564957418615,
-    "deltaCi": [
-     -0.010135135135135087,
-     0.13262195121951215
-    ]
-   },
-   "gru260": {
-    "coverage": 0.8029637175978639,
+    "coverage": 0.4929789823082506,
     "collisionsPerEpisode": 1.3333333333333333,
-    "deltaVsBase": 0.13029146108414402,
-    "deltaCi": [
-     0.09121621621621623,
-     0.16856060606060608
-    ]
+    "crashes": 2
    },
    "ppo800": {
-    "coverage": 0.8610715760106005,
-    "collisionsPerEpisode": 0.6666666666666666,
-    "deltaVsBase": 0.1883993194968805,
+    "coverage": 0.8478601938967792,
+    "collisionsPerEpisode": 0.3333333333333333,
+    "crashes": 1,
+    "deltaVsBase": 0.3548812115885287,
     "deltaCi": [
-     0.14786585365853655,
-     0.21969696969696972
+     0.1976351351351352,
+     0.4981060606060607
+    ]
+   },
+   "retrained": {
+    "coverage": 0.9013848937629425,
+    "collisionsPerEpisode": 6.666666666666667,
+    "crashes": 1,
+    "deltaVsBase": 0.408405911454692,
+    "deltaCi": [
+     0.27533783783783783,
+     0.48018292682926833
     ]
    }
   },
@@ -199,52 +116,28 @@
    "lighting": "day",
    "episodes": 30,
    "dagger": {
-    "coverage": 0.6073523123768687,
-    "collisionsPerEpisode": 6.366666666666666
-   },
-   "ppo": {
-    "coverage": 0.7523210737874673,
-    "collisionsPerEpisode": 2.066666666666667,
-    "deltaVsBase": 0.14496876141059822,
-    "deltaCi": [
-     0.10959368525019787,
-     0.19284847953167814
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.7506105241035603,
-    "collisionsPerEpisode": 2.6333333333333333,
-    "deltaVsBase": 0.14325821172669148,
-    "deltaCi": [
-     0.11070977088992313,
-     0.18704150746038667
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.725003646762639,
-    "collisionsPerEpisode": 2.533333333333333,
-    "deltaVsBase": 0.11765133438577001,
-    "deltaCi": [
-     0.08310746736764951,
-     0.1597814502074096
-    ]
-   },
-   "gru260": {
-    "coverage": 0.7145966492300798,
-    "collisionsPerEpisode": 2.9,
-    "deltaVsBase": 0.10724433685321107,
-    "deltaCi": [
-     0.07935960497313574,
-     0.139799048702348
-    ]
+    "coverage": 0.2997540540304888,
+    "collisionsPerEpisode": 1.0666666666666667,
+    "crashes": 28
    },
    "ppo800": {
-    "coverage": 0.7995653074318988,
-    "collisionsPerEpisode": 3.433333333333333,
-    "deltaVsBase": 0.1922129950550299,
+    "coverage": 0.6297288519818937,
+    "collisionsPerEpisode": 1.0666666666666667,
+    "crashes": 19,
+    "deltaVsBase": 0.3299747979514048,
     "deltaCi": [
-     0.15530955881556882,
-     0.2369374252711151
+     0.24220392990527537,
+     0.41042577273759384
+    ]
+   },
+   "retrained": {
+    "coverage": 0.6745856610408926,
+    "collisionsPerEpisode": 4.9,
+    "crashes": 7,
+    "deltaVsBase": 0.3748316070104038,
+    "deltaCi": [
+     0.295797273188597,
+     0.4596163573471934
     ]
    }
   },
@@ -254,52 +147,28 @@
    "lighting": "night-dark",
    "episodes": 4,
    "dagger": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 1.75
-   },
-   "ppo": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 2.5,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "gru260": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
+    "coverage": 0.9479166666666667,
+    "collisionsPerEpisode": 0.5,
+    "crashes": 2
    },
    "ppo800": {
     "coverage": 0.9513888888888888,
     "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
+    "crashes": 0,
+    "deltaVsBase": 0.00347222222222221,
     "deltaCi": [
      0,
-     0
+     0.00694444444444442
+    ]
+   },
+   "retrained": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "crashes": 0,
+    "deltaVsBase": 0.00347222222222221,
+    "deltaCi": [
+     0,
+     0.00694444444444442
     ]
    }
   },
@@ -309,52 +178,28 @@
    "lighting": "night-dark",
    "episodes": 3,
    "dagger": {
-    "coverage": 0.6735878062097574,
-    "collisionsPerEpisode": 0.3333333333333333
-   },
-   "ppo": {
-    "coverage": 0.8121579173408442,
+    "coverage": 0.6662679863899377,
     "collisionsPerEpisode": 0.3333333333333333,
-    "deltaVsBase": 0.13857011113108672,
-    "deltaCi": [
-     0.05335365853658536,
-     0.24242424242424232
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.8006827503778723,
-    "collisionsPerEpisode": 1.6666666666666667,
-    "deltaVsBase": 0.12709494416811487,
-    "deltaCi": [
-     0.038851351351351315,
-     0.21590909090909083
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.8115578161309868,
-    "collisionsPerEpisode": 6.333333333333333,
-    "deltaVsBase": 0.1379700099212294,
-    "deltaCi": [
-     0.08231707317073167,
-     0.2234848484848484
-    ]
-   },
-   "gru260": {
-    "coverage": 0.791171437512901,
-    "collisionsPerEpisode": 0.3333333333333333,
-    "deltaVsBase": 0.11758363130314349,
-    "deltaCi": [
-     0.06707317073170738,
-     0.18939393939393934
-    ]
+    "crashes": 1
    },
    "ppo800": {
-    "coverage": 0.8772768056304642,
-    "collisionsPerEpisode": 1,
-    "deltaVsBase": 0.20368899942070673,
+    "coverage": 0.8415383232456404,
+    "collisionsPerEpisode": 0.6666666666666666,
+    "crashes": 2,
+    "deltaVsBase": 0.17527033685570267,
     "deltaCi": [
-     0.1402439024390244,
-     0.26136363636363635
+     0.13719512195121952,
+     0.23141891891891886
+    ]
+   },
+   "retrained": {
+    "coverage": 0.770059277681229,
+    "collisionsPerEpisode": 7,
+    "crashes": 0,
+    "deltaVsBase": 0.10379129129129123,
+    "deltaCi": [
+     -0.10416666666666674,
+     0.29054054054054046
     ]
    }
   },
@@ -364,52 +209,28 @@
    "lighting": "night-dark",
    "episodes": 30,
    "dagger": {
-    "coverage": 0.5964887424760449,
-    "collisionsPerEpisode": 5.566666666666666
-   },
-   "ppo": {
-    "coverage": 0.7413233796619412,
-    "collisionsPerEpisode": 2.7666666666666666,
-    "deltaVsBase": 0.14483463718589637,
-    "deltaCi": [
-     0.09847308333806597,
-     0.1963722254477878
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.7413211168539278,
-    "collisionsPerEpisode": 2.6,
-    "deltaVsBase": 0.1448323743778829,
-    "deltaCi": [
-     0.09901480074675882,
-     0.19743568140671705
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.712465980693714,
-    "collisionsPerEpisode": 2.7666666666666666,
-    "deltaVsBase": 0.11597723821766914,
-    "deltaCi": [
-     0.07216244442073248,
-     0.17015525385957905
-    ]
-   },
-   "gru260": {
-    "coverage": 0.7125334753930825,
-    "collisionsPerEpisode": 1.4666666666666666,
-    "deltaVsBase": 0.11604473291703771,
-    "deltaCi": [
-     0.07601631073033739,
-     0.1676037294098321
-    ]
+    "coverage": 0.30005532939900587,
+    "collisionsPerEpisode": 1.1333333333333333,
+    "crashes": 25
    },
    "ppo800": {
-    "coverage": 0.7998060531796906,
-    "collisionsPerEpisode": 2.9,
-    "deltaVsBase": 0.20331731070364575,
+    "coverage": 0.6065436162062359,
+    "collisionsPerEpisode": 0.9666666666666667,
+    "crashes": 21,
+    "deltaVsBase": 0.30648828680723,
     "deltaCi": [
-     0.159614697614025,
-     0.260319871174563
+     0.23082486567287047,
+     0.3857492407583953
+    ]
+   },
+   "retrained": {
+    "coverage": 0.7628551862667687,
+    "collisionsPerEpisode": 3.6666666666666665,
+    "crashes": 6,
+    "deltaVsBase": 0.4627998568677628,
+    "deltaCi": [
+     0.384670161770336,
+     0.5374699053579589
     ]
    }
   },
@@ -419,52 +240,28 @@
    "lighting": "day",
    "episodes": 30,
    "dagger": {
-    "coverage": 0.9402777777777781,
-    "collisionsPerEpisode": 0.1
-   },
-   "ppo": {
-    "coverage": 0.9430555555555559,
-    "collisionsPerEpisode": 2.9,
-    "deltaVsBase": 0.0027777777777777753,
-    "deltaCi": [
-     -0.025,
-     0.033333333333333326
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.9513888888888892,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0.011111111111111108,
-    "deltaCi": [
-     0,
-     0.033333333333333326
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.9465277777777781,
-    "collisionsPerEpisode": 0.7666666666666667,
-    "deltaVsBase": 0.00625,
-    "deltaCi": [
-     -0.014583333333333327,
-     0.033333333333333326
-    ]
-   },
-   "gru260": {
-    "coverage": 0.9513888888888892,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0.011111111111111108,
-    "deltaCi": [
-     0,
-     0.033333333333333326
-    ]
+    "coverage": 0.9326388888888891,
+    "collisionsPerEpisode": 0.06666666666666667,
+    "crashes": 2
    },
    "ppo800": {
     "coverage": 0.9513888888888892,
     "collisionsPerEpisode": 0,
-    "deltaVsBase": 0.011111111111111108,
+    "crashes": 0,
+    "deltaVsBase": 0.018749999999999996,
     "deltaCi": [
      0,
-     0.033333333333333326
+     0.04837962962962963
+    ]
+   },
+   "retrained": {
+    "coverage": 0.9513888888888892,
+    "collisionsPerEpisode": 0,
+    "crashes": 0,
+    "deltaVsBase": 0.018749999999999996,
+    "deltaCi": [
+     0,
+     0.044907407407407396
     ]
    }
   },
@@ -474,52 +271,28 @@
    "lighting": "day",
    "episodes": 32,
    "dagger": {
-    "coverage": 0.6274310603414701,
-    "collisionsPerEpisode": 4.25
-   },
-   "ppo": {
-    "coverage": 0.7499139610071641,
-    "collisionsPerEpisode": 2.21875,
-    "deltaVsBase": 0.1224829006656939,
-    "deltaCi": [
-     0.09848994630749952,
-     0.15036771438954222
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.7510862716992756,
-    "collisionsPerEpisode": 2.8125,
-    "deltaVsBase": 0.12365521135780522,
-    "deltaCi": [
-     0.09638393997627806,
-     0.1588923034341394
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.7250245012746573,
-    "collisionsPerEpisode": 2.90625,
-    "deltaVsBase": 0.09759344093318716,
-    "deltaCi": [
-     0.07041326811181768,
-     0.12820224056677135
-    ]
-   },
-   "gru260": {
-    "coverage": 0.7180475099571574,
-    "collisionsPerEpisode": 1.6875,
-    "deltaVsBase": 0.090616449615687,
-    "deltaCi": [
-     0.04624683813091858,
-     0.13217458834364615
-    ]
+    "coverage": 0.46363980411641464,
+    "collisionsPerEpisode": 0.71875,
+    "crashes": 20
    },
    "ppo800": {
-    "coverage": 0.8075097325550026,
-    "collisionsPerEpisode": 3.46875,
-    "deltaVsBase": 0.1800786722135322,
+    "coverage": 0.6152541306997056,
+    "collisionsPerEpisode": 0.875,
+    "crashes": 20,
+    "deltaVsBase": 0.15161432658329094,
     "deltaCi": [
-     0.15490287363793437,
-     0.20979357653991465
+     0.0571356194577716,
+     0.2472546581451148
+    ]
+   },
+   "retrained": {
+    "coverage": 0.7859372001679532,
+    "collisionsPerEpisode": 3.21875,
+    "crashes": 4,
+    "deltaVsBase": 0.32229739605153845,
+    "deltaCi": [
+     0.26017026438223484,
+     0.39040421700172984
     ]
    }
   },
@@ -529,52 +302,28 @@
    "lighting": "night-dark",
    "episodes": 8,
    "dagger": {
-    "coverage": 0.5566705023410753,
-    "collisionsPerEpisode": 8.625
-   },
-   "ppo": {
-    "coverage": 0.7623954672131756,
-    "collisionsPerEpisode": 3.875,
-    "deltaVsBase": 0.2057249648721003,
-    "deltaCi": [
-     0.12396829486673235,
-     0.3124111327236327
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.7455710516582912,
-    "collisionsPerEpisode": 4.875,
-    "deltaVsBase": 0.188900549317216,
-    "deltaCi": [
-     0.10255462442962443,
-     0.3055515086765087
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.7288311688376792,
-    "collisionsPerEpisode": 3.375,
-    "deltaVsBase": 0.17216066649660394,
-    "deltaCi": [
-     0.06402682867526618,
-     0.300208580482018
-    ]
-   },
-   "gru260": {
-    "coverage": 0.7382825631523549,
-    "collisionsPerEpisode": 3,
-    "deltaVsBase": 0.18161206081127956,
-    "deltaCi": [
-     0.0836512217371592,
-     0.2904085497835497
-    ]
+    "coverage": 0.3010110593769448,
+    "collisionsPerEpisode": 1.125,
+    "crashes": 8
    },
    "ppo800": {
-    "coverage": 0.8199542598956662,
-    "collisionsPerEpisode": 5.875,
-    "deltaVsBase": 0.2632837575545909,
+    "coverage": 0.4703793790382331,
+    "collisionsPerEpisode": 1.25,
+    "crashes": 8,
+    "deltaVsBase": 0.1693683196612884,
     "deltaCi": [
-     0.19524814993564993,
-     0.3567891349141349
+     0.02389272262319136,
+     0.30397981364778237
+    ]
+   },
+   "retrained": {
+    "coverage": 0.8144199162102808,
+    "collisionsPerEpisode": 0.75,
+    "crashes": 3,
+    "deltaVsBase": 0.513408856833336,
+    "deltaCi": [
+     0.37976545203107703,
+     0.6472231159731159
     ]
    }
   },
@@ -585,47 +334,23 @@
    "episodes": 6,
    "dagger": {
     "coverage": 0.951388888888889,
-    "collisionsPerEpisode": 0
-   },
-   "ppo": {
-    "coverage": 0.951388888888889,
-    "collisionsPerEpisode": 2.8333333333333335,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.951388888888889,
     "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.951388888888889,
-    "collisionsPerEpisode": 0.5,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "gru260": {
-    "coverage": 0.951388888888889,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
+    "crashes": 0
    },
    "ppo800": {
     "coverage": 0.951388888888889,
     "collisionsPerEpisode": 0,
+    "crashes": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "retrained": {
+    "coverage": 0.951388888888889,
+    "collisionsPerEpisode": 0,
+    "crashes": 0,
     "deltaVsBase": 0,
     "deltaCi": [
      0,
@@ -640,47 +365,23 @@
    "episodes": 2,
    "dagger": {
     "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0
-   },
-   "ppo": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 3,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppoSeed2": {
-    "coverage": 0.9513888888888888,
     "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "ppo260": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
-   },
-   "gru260": {
-    "coverage": 0.9513888888888888,
-    "collisionsPerEpisode": 0,
-    "deltaVsBase": 0,
-    "deltaCi": [
-     0,
-     0
-    ]
+    "crashes": 0
    },
    "ppo800": {
     "coverage": 0.9513888888888888,
     "collisionsPerEpisode": 0,
+    "crashes": 0,
+    "deltaVsBase": 0,
+    "deltaCi": [
+     0,
+     0
+    ]
+   },
+   "retrained": {
+    "coverage": 0.9513888888888888,
+    "collisionsPerEpisode": 0,
+    "crashes": 0,
     "deltaVsBase": 0,
     "deltaCi": [
      0,

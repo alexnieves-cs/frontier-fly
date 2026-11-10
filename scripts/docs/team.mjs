@@ -157,17 +157,25 @@ export function teamSection(bench) {
         pct(x.baseKnown),
         `${pct(x.awarenessGap)} / ${pct(x.awarenessGapMax)}`,
         x.collisionsPerEpisode.toFixed(2),
+        x.crashes === undefined ? '—' : `${x.crashes} of ${x.droneFlights}`,
       ]);
     }
   }
   const L = (arm) => cell('large', arm);
   const H = (arm) => cell('hard', arm);
+  // Under the crash rule a drone that hits a surface faster than the limit is out of the search.
+  const crashed = bench.cells.reduce((s, c) => s + (c.crashes ?? 0), 0);
+  const flights = bench.cells.reduce((s, c) => s + (c.droneFlights ?? 0), 0);
+  const crashNote =
+    bench.crashSpeed == null
+      ? ''
+      : ` Every flight runs under the crash rule: a contact that starts faster than ${bench.crashSpeed} m/s ends that drone's flight and the rest of the team carries on. It ended ${crashed} of the ${flights} drone flights in this bench.`;
   const contacts = bench.cells.reduce((s, c) => s + c.droneContactsPerEpisode * c.episodes, 0);
   return {
     values: {
-      TEAM_NOTE: `Commit \`${bench.commit}\`. ${bench.seedsPerCondition} fresh buildings per condition (hard ${bench.evalSeedBase.hard}+, large ${bench.evalSeedBase.large}+); the claim weights were tuned on ${bench.tuneSeeds[0]}–${bench.tuneSeeds[1]} only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.`,
+      TEAM_NOTE: `Commit \`${bench.commit}\`. ${bench.seedsPerCondition} fresh buildings per condition (hard ${bench.evalSeedBase.hard}+, large ${bench.evalSeedBase.large}+); the claim weights were tuned on ${bench.tuneSeeds[0]}–${bench.tuneSeeds[1]} only. Day light, kinematic airframe, every drone runs the sensor-only planner. Differences are paired by building.${crashNote}`,
       TEAM_TABLE: table(['Building', 'Team', 'Searched (95% CI)', 'vs 1 drone', 'Median time to 50%', 'Median time to 80%', 'Points per drone-minute', 'Overlap', 'Base knows at end', 'Packets through', 'Team battery, Wh', 'Points per Wh'], rows),
-      TEAM_ABLATION_TABLE: table(['Building', 'Three drones', 'Searched', 'vs 3 drones, full system', 'Median time to 80%', 'Base knows at end', 'Awareness gap, mean / worst', 'Collisions per episode'], ab),
+      TEAM_ABLATION_TABLE: table(['Building', 'Three drones', 'Searched', 'vs 3 drones, full system', 'Median time to 80%', 'Base knows at end', 'Awareness gap, mean / worst', 'Collisions per episode', 'Drone flights ended by a crash'], ab),
       TEAM_FIGURE: '![Mean searched floor over time for one to four drones](report/team-curves.svg)',
       R_TEAM_SEEDS: String(bench.seedsPerCondition),
       R_TEAM_SOLO_LARGE: pct(L('solo').coverage),

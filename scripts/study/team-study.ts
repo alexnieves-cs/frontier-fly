@@ -9,6 +9,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { bootstrapCi } from './common';
+import { CRASH_SPEED } from '../../src/shared/constants';
 import { DEFAULT_CLAIMS, type ClaimOptions } from '../../src/team/allocate';
 import { TEAM_CONDITIONS, teamEpisodeSetup } from '../../src/team/conditions';
 import { runTeam, TIME_KEYS, type Comms, type Role, type TeamResult } from '../../src/team/run';
@@ -122,6 +123,9 @@ export function summarize(rows: Row[]) {
         maxPackUsed: mean(rs.map((r) => Math.max(...r.energyWh) / (DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction))),
         coveragePerWh: mean(rs.map((r) => (r.coverage * 100) / Math.max(1e-9, sum(r.energyWh)))),
         collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
+        // Drone flights the crash rule ended, over all drone flights of the cell.
+        crashes: sum(rs.map((r) => r.crashes)),
+        droneFlights: sum(rs.map((r) => r.drones)),
         droneContactsPerEpisode: mean(rs.map((r) => r.droneContacts)),
         delivery: mean(rs.map((r) => r.packets.delivered / Math.max(1, r.packets.sent))),
         kilobytesPerDroneMinute: mean(rs.map((r) => r.packets.bytes / 1000 / (a.drones * (r.steps / 20 / 60)))),
@@ -172,8 +176,9 @@ if (process.argv.includes('--tune')) {
   );
   rows.sort((a, b) => a.condition.localeCompare(b.condition) || a.arm.localeCompare(b.arm) || a.seed - b.seed);
   const report = {
-    schema: 1,
+    schema: 2,
     commit: execSync('git rev-parse --short HEAD').toString().trim(),
+    crashSpeed: CRASH_SPEED,
     seedsPerCondition: SEEDS_PER_CONDITION,
     evalSeedBase: EVAL_SEED_BASE,
     tuneSeeds: [TUNE_SEEDS[0], TUNE_SEEDS[TUNE_SEEDS.length - 1]],

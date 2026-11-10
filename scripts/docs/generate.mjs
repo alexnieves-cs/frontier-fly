@@ -246,6 +246,44 @@ function studyTables(study) {
   };
 }
 
+/**
+ * The numbers the ablation prose in REPORT.template.md quotes, so the sentences follow the JSON:
+ * R_AB_<ARM> coverage alone by day, _CRASHES the flights a crash ended, _G under the lidar guard,
+ * _G_D the guarded change against the full-observation DAgger arm in points, _G_RANGE over training runs.
+ */
+function ablationNumbers(ab) {
+  const out = {};
+  const full = ab.arms.find((a) => a.id === 'dagger');
+  const name = { dagger: 'FULL', bc: 'BC', ppo: 'PPO', 'no-nav': 'NONAV', 'no-local': 'NOLOCAL', 'no-coarse': 'NOCOARSE' };
+  const signed = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}`;
+  for (const a of ab.arms) {
+    const k = `R_AB_${name[a.id] ?? a.id.toUpperCase()}`;
+    const p = a.hard.policyDay;
+    const g = a.hard.guardedDay;
+    out[k] = pct(p.coverage);
+    out[`${k}_CRASHES`] = p.crashes === undefined ? 'not counted' : `${p.crashes} of ${p.episodes}`;
+    out[`${k}_COLL`] = p.collisionsPerEpisode.toFixed(1);
+    out[`${k}_G`] = pct(g.coverage);
+    out[`${k}_G_CRASHES`] = g.crashes === undefined ? 'not counted' : `${g.crashes} of ${g.episodes}`;
+    out[`${k}_G_NIGHT`] = pct(a.hard.guardedNight.coverage);
+    if (full) out[`${k}_G_D`] = signed(g.coverage - full.hard.guardedDay.coverage);
+    if (full) out[`${k}_D`] = signed(p.coverage - full.hard.policyDay.coverage);
+    const runs = a.runs ?? [];
+    out[`${k}_G_RANGE`] = runs.length > 1 ? `${(Math.min(...runs.map((r) => r.guardedDay.coverage)) * 100).toFixed(1)}–${(Math.max(...runs.map((r) => r.guardedDay.coverage)) * 100).toFixed(1)}%` : pct(g.coverage);
+    out[`${k}_RANGE`] = runs.length > 1 ? `${(Math.min(...runs.map((r) => r.policyDay.coverage)) * 100).toFixed(1)}–${(Math.max(...runs.map((r) => r.policyDay.coverage)) * 100).toFixed(1)}%` : pct(p.coverage);
+  }
+  out.R_AB_RUNS = String(ab.trainingRuns ?? 1);
+  const guarded = ab.arms.map((a) => a.hard.guardedDay.coverage);
+  out.R_AB_G_MIN = pct(Math.min(...guarded));
+  out.R_AB_G_MAX = pct(Math.max(...guarded));
+  // The widest gap between two training runs of one arm, alone or guarded: the noise floor for comparing arms.
+  const spread = (xs) => (xs.length > 1 ? Math.max(...xs) - Math.min(...xs) : 0);
+  out.R_AB_MAX_SPREAD = (Math.max(0, ...ab.arms.flatMap((a) => [spread((a.runs ?? []).map((r) => r.policyDay.coverage)), spread((a.runs ?? []).map((r) => r.guardedDay.coverage))])) * 100).toFixed(1);
+  const ppoRuns = (ab.arms.find((a) => a.id === 'ppo')?.runs ?? []).filter((r) => r.ppo);
+  out.R_AB_PPO_WINS = `${ppoRuns.filter((r) => r.ppo.val > r.ppo.dagger).length} of ${ppoRuns.length}`;
+  return out;
+}
+
 /** Ablations (scripts/study/ablations.ts) and the learning-curve figure drawn from their logs. */
 function ablationTables(ab) {
   if (!ab) {
@@ -254,13 +292,30 @@ function ablationTables(ab) {
   }
   const ci = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}`;
   const c = (x) => `${pct(x.coverage)} (${ci(x.coverageCi)})`;
+  // Runs made under the crash rule record its speed and count the flights it ended.
+  const crashRule = ab.crashSpeed != null;
+  // With several training runs per arm the cells pool their flights, and the spread over runs is shown beside them.
+  const multi = (ab.trainingRuns ?? 1) > 1;
+  const range = (xs) => (xs.length ? `${(Math.min(...xs) * 100).toFixed(1)}–${(Math.max(...xs) * 100).toFixed(1)}%` : '—');
+  const bestVal = (a) => {
+    if (a.ppo) return `${pct(a.ppo.val)} (DAgger ${pct(a.ppo.dagger)})`;
+    if (multi) {
+      const vals = a.runs.map((r) => r.bestVal).filter((v) => v != null);
+      return vals.length ? range(vals) : '—';
+    }
+    return a.curve.length ? pct(Math.max(...a.curve.map((r) => r.valScore))) : '—';
+  };
   const rows = ab.arms.map((a) => [
     a.label,
     c(a.hard.policyDay),
+    ...(multi ? [range(a.runs.map((r) => r.policyDay.coverage))] : []),
     c(a.hard.policyNight),
     a.hard.policyDay.collisionsPerEpisode.toFixed(2),
+    ...(crashRule ? [`${a.hard.policyDay.crashes} of ${a.hard.policyDay.episodes}`] : []),
     c(a.hard.guardedDay),
-    a.curve.length ? pct(Math.max(...a.curve.map((r) => r.valScore))) : a.ppo ? `${pct(a.ppo.val)} (DAgger ${pct(a.ppo.dagger)})` : '—',
+    ...(multi ? [range(a.runs.map((r) => r.guardedDay.coverage))] : []),
+    ...(crashRule ? [`${a.hard.guardedDay.crashes} of ${a.hard.guardedDay.episodes}`] : []),
+    bestVal(a),
   ]);
   // Learning curves: validation score per round for every arm that has a curve.
   const curved = ab.arms.filter((a) => a.curve.length);
@@ -290,9 +345,10 @@ function ablationTables(ab) {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${parts.join('')}</svg>\n`;
   return {
     values: {
-      ABLATION_NOTE: `Each arm is one \`npm run train:indoor\` run with the default recipe (${ab.recipe}), the checkpoint kept by held-out validation, then flown on the coverage study's 30 hard buildings, from \`scripts/study/ablations.ts\` at \`${ab.commit}\`. Observation ablations zero the block in training and evaluation alike. Brackets are bootstrap 95% intervals.`,
-      ABLATION_TABLE: table(['Arm', 'Hard, day', 'Hard, night', 'Collisions per episode', 'Under the lidar guard, day', 'Best validation'], rows),
+      ABLATION_NOTE: `Each arm is ${multi ? `${ab.trainingRuns} \`npm run train:indoor\` runs from different seeds` : 'one `npm run train:indoor` run'} with the default recipe (${ab.recipe}), the checkpoint kept by held-out validation, then flown on the coverage study's 30 hard buildings${multi ? `; cells pool the runs' flights and the range column gives each run's own mean` : ''}, from \`scripts/study/ablations.ts\` at \`${ab.commit}\`. Observation ablations zero the block in training and evaluation alike. Brackets are bootstrap 95% intervals.${crashRule ? ` Training, validation and these flights all run under the crash rule (a contact faster than ${ab.crashSpeed} m/s ends the flight).` : ''}`,
+      ABLATION_TABLE: table(['Arm', 'Hard, day', ...(multi ? ['Day, range over runs'] : []), 'Hard, night', 'Collisions per episode', ...(crashRule ? ['Crashed, day'] : []), 'Under the lidar guard, day', ...(multi ? ['Guard, range over runs'] : []), ...(crashRule ? ['Crashed under the guard'] : []), 'Best validation'], rows),
       CURVES_FIGURE: '![Validation score per DAgger round for each arm](report/learning-curves.svg)',
+      ...ablationNumbers(ab),
     },
     files: { 'docs/report/learning-curves.svg': svg },
   };
