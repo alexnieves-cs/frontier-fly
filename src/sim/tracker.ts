@@ -193,5 +193,6 @@ export class CommandShaper {
   hold(vx: number, vy: number): void {
     this.vx = vx;
     this.vy = vy;
+    this.primed = true;
   }
 }
