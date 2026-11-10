@@ -1,0 +1,2936 @@
+{
+ "note": "Quad policy sweep, 2026-11-10. Validation on the tuning block only (hard buildings 66001+, quad episodes 66301-66332, 32 flights, quadrotor dynamics with full domain randomization, crash rule 0.5 m/s). No checkpoint was shipped, so no report-only seeds were flown. last5 = mean of the last five validation points of a run.",
+ "trainRun": 42768952749,
+ "commit": "d7f1356",
+ "commonArgs": "--eval-every 50 --quad-guard --quad-eval 32 --quad-weight 0.6 --crash-penalty -60 --impact-penalty 20 --log-std -2.0",
+ "reference": {
+  "planner, braking filter + tracker (classicalBrakeTrack)": {
+   "quad": 47.8,
+   "crashes": "0/32"
+  },
+  "planner, braking filter only (classicalBrake)": {
+   "quad": 34.2,
+   "crashes": "14/32"
+  },
+  "shipped policy behind the braking guard (guardedBrake)": {
+   "quad": 32.1,
+   "crashes": "14/32"
+  },
+  "shipped policy alone": {
+   "quad": 9.2,
+   "crashes": "32/32"
+  }
+ },
+ "runs": [
+  {
+   "k": 0,
+   "args": "--quad 1 --labels planner --bc 0.3 --lr 3e-5",
+   "updates": 2200,
+   "last5": {
+    "large": 28.7,
+    "quad": 22.3,
+    "quadCrash": 83.8,
+    "quadGuarded": 41.3,
+    "quadGuardedCrash": 10.0
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 34.1,
+     "quad": 10.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.9,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 100,
+     "large": 42.9,
+     "quad": 12.8,
+     "quadCrash": 93.8,
+     "quadGuarded": 35.1,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 150,
+     "large": 45.7,
+     "quad": 13.2,
+     "quadCrash": 90.6,
+     "quadGuarded": 36.1,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 200,
+     "large": 35.8,
+     "quad": 14.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.2,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 250,
+     "large": 30.9,
+     "quad": 16.6,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.4,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 300,
+     "large": 34.0,
+     "quad": 18.3,
+     "quadCrash": 90.6,
+     "quadGuarded": 38.4,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 350,
+     "large": 23.0,
+     "quad": 15.7,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.4,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 400,
+     "large": 28.7,
+     "quad": 15.7,
+     "quadCrash": 90.6,
+     "quadGuarded": 36.7,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 450,
+     "large": 32.2,
+     "quad": 20.1,
+     "quadCrash": 87.5,
+     "quadGuarded": 37.6,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 500,
+     "large": 28.8,
+     "quad": 23.4,
+     "quadCrash": 84.4,
+     "quadGuarded": 36.5,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 550,
+     "large": 19.5,
+     "quad": 18.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 600,
+     "large": 25.8,
+     "quad": 20.5,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 650,
+     "large": 21.0,
+     "quad": 19.1,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 700,
+     "large": 19.9,
+     "quad": 21.7,
+     "quadCrash": 90.6,
+     "quadGuarded": 33.2,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 750,
+     "large": 19.8,
+     "quad": 19.1,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.5,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 800,
+     "large": 20.2,
+     "quad": 19.1,
+     "quadCrash": 84.4,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 850,
+     "large": 18.6,
+     "quad": 19.4,
+     "quadCrash": 93.8,
+     "quadGuarded": 35.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 900,
+     "large": 19.4,
+     "quad": 24.1,
+     "quadCrash": 81.3,
+     "quadGuarded": 39.4,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 950,
+     "large": 21.4,
+     "quad": 20.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 40.9,
+     "quadGuardedCrash": 0.0
+    },
+    {
+     "update": 1000,
+     "large": 19.3,
+     "quad": 23.4,
+     "quadCrash": 84.4,
+     "quadGuarded": 38.9,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1050,
+     "large": 19.8,
+     "quad": 21.3,
+     "quadCrash": 84.4,
+     "quadGuarded": 37.9,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1100,
+     "large": 19.1,
+     "quad": 18.9,
+     "quadCrash": 90.6,
+     "quadGuarded": 38.3,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1150,
+     "large": 25.9,
+     "quad": 18.4,
+     "quadCrash": 90.6,
+     "quadGuarded": 39.6,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1200,
+     "large": 26.1,
+     "quad": 17.9,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.1,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1250,
+     "large": 19.6,
+     "quad": 20.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 38.8,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1300,
+     "large": 22.2,
+     "quad": 19.9,
+     "quadCrash": 93.8,
+     "quadGuarded": 40.2,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1350,
+     "large": 23.3,
+     "quad": 18.4,
+     "quadCrash": 93.8,
+     "quadGuarded": 37.6,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1400,
+     "large": 19.3,
+     "quad": 20.6,
+     "quadCrash": 84.4,
+     "quadGuarded": 39.7,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1450,
+     "large": 18.5,
+     "quad": 22.4,
+     "quadCrash": 84.4,
+     "quadGuarded": 38.1,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1500,
+     "large": 22.4,
+     "quad": 18.3,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.4,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1550,
+     "large": 22.5,
+     "quad": 18.9,
+     "quadCrash": 90.6,
+     "quadGuarded": 39.1,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1600,
+     "large": 27.1,
+     "quad": 17.4,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.6,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1650,
+     "large": 21.5,
+     "quad": 20.5,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1700,
+     "large": 23.8,
+     "quad": 19.3,
+     "quadCrash": 93.8,
+     "quadGuarded": 40.6,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1750,
+     "large": 21.5,
+     "quad": 21.6,
+     "quadCrash": 93.8,
+     "quadGuarded": 39.5,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1800,
+     "large": 22.5,
+     "quad": 23.4,
+     "quadCrash": 87.5,
+     "quadGuarded": 39.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1850,
+     "large": 20.8,
+     "quad": 22.0,
+     "quadCrash": 96.9,
+     "quadGuarded": 40.8,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1900,
+     "large": 24.3,
+     "quad": 21.9,
+     "quadCrash": 93.8,
+     "quadGuarded": 41.0,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1950,
+     "large": 21.5,
+     "quad": 19.6,
+     "quadCrash": 81.3,
+     "quadGuarded": 40.9,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 2000,
+     "large": 20.7,
+     "quad": 21.4,
+     "quadCrash": 93.8,
+     "quadGuarded": 42.9,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 2050,
+     "large": 31.7,
+     "quad": 20.9,
+     "quadCrash": 81.3,
+     "quadGuarded": 40.1,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 2100,
+     "large": 35.0,
+     "quad": 20.7,
+     "quadCrash": 81.3,
+     "quadGuarded": 41.7,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 2150,
+     "large": 27.6,
+     "quad": 25.8,
+     "quadCrash": 81.3,
+     "quadGuarded": 41.6,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 2200,
+     "large": 28.5,
+     "quad": 22.8,
+     "quadCrash": 81.3,
+     "quadGuarded": 40.1,
+     "quadGuardedCrash": 12.5
+    }
+   ]
+  },
+  {
+   "k": 1,
+   "args": "--quad 1 --labels planner --bc 1:0.1 --lr 5e-5",
+   "updates": 2200,
+   "last5": {
+    "large": 15.0,
+    "quad": 12.2,
+    "quadCrash": 93.8,
+    "quadGuarded": 41.5,
+    "quadGuardedCrash": 11.3
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 40.7,
+     "quad": 19.7,
+     "quadCrash": 68.8,
+     "quadGuarded": 31.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 100,
+     "large": 25.5,
+     "quad": 12.8,
+     "quadCrash": 93.8,
+     "quadGuarded": 31.5,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 150,
+     "large": 16.1,
+     "quad": 12.4,
+     "quadCrash": 93.8,
+     "quadGuarded": 31.5,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 200,
+     "large": 19.7,
+     "quad": 21.6,
+     "quadCrash": 68.8,
+     "quadGuarded": 30.9,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 250,
+     "large": 24.1,
+     "quad": 19.2,
+     "quadCrash": 71.9,
+     "quadGuarded": 30.6,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 300,
+     "large": 24.4,
+     "quad": 15.8,
+     "quadCrash": 71.9,
+     "quadGuarded": 32.7,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 350,
+     "large": 25.2,
+     "quad": 26.5,
+     "quadCrash": 68.8,
+     "quadGuarded": 31.4,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 400,
+     "large": 19.2,
+     "quad": 24.0,
+     "quadCrash": 75.0,
+     "quadGuarded": 32.5,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 450,
+     "large": 27.4,
+     "quad": 25.4,
+     "quadCrash": 50.0,
+     "quadGuarded": 30.4,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 500,
+     "large": 22.4,
+     "quad": 25.3,
+     "quadCrash": 78.1,
+     "quadGuarded": 33.5,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 550,
+     "large": 29.3,
+     "quad": 24.6,
+     "quadCrash": 65.6,
+     "quadGuarded": 34.1,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 600,
+     "large": 21.7,
+     "quad": 24.1,
+     "quadCrash": 75.0,
+     "quadGuarded": 34.1,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 650,
+     "large": 22.7,
+     "quad": 26.6,
+     "quadCrash": 59.4,
+     "quadGuarded": 33.7,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 700,
+     "large": 21.7,
+     "quad": 25.4,
+     "quadCrash": 75.0,
+     "quadGuarded": 35.2,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 750,
+     "large": 16.1,
+     "quad": 20.5,
+     "quadCrash": 78.1,
+     "quadGuarded": 32.3,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 800,
+     "large": 15.0,
+     "quad": 12.0,
+     "quadCrash": 93.8,
+     "quadGuarded": 35.2,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 850,
+     "large": 27.2,
+     "quad": 19.1,
+     "quadCrash": 81.3,
+     "quadGuarded": 36.4,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 900,
+     "large": 21.2,
+     "quad": 20.9,
+     "quadCrash": 78.1,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 950,
+     "large": 24.1,
+     "quad": 23.5,
+     "quadCrash": 75.0,
+     "quadGuarded": 37.1,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1000,
+     "large": 31.9,
+     "quad": 23.5,
+     "quadCrash": 65.6,
+     "quadGuarded": 37.4,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1050,
+     "large": 28.1,
+     "quad": 20.0,
+     "quadCrash": 81.3,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1100,
+     "large": 20.4,
+     "quad": 23.3,
+     "quadCrash": 75.0,
+     "quadGuarded": 33.7,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1150,
+     "large": 20.8,
+     "quad": 23.9,
+     "quadCrash": 75.0,
+     "quadGuarded": 35.2,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1200,
+     "large": 19.7,
+     "quad": 23.8,
+     "quadCrash": 78.1,
+     "quadGuarded": 36.4,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 1250,
+     "large": 22.3,
+     "quad": 20.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 35.7,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1300,
+     "large": 19.2,
+     "quad": 22.8,
+     "quadCrash": 81.3,
+     "quadGuarded": 39.0,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1350,
+     "large": 18.7,
+     "quad": 20.8,
+     "quadCrash": 84.4,
+     "quadGuarded": 37.8,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1400,
+     "large": 21.8,
+     "quad": 23.7,
+     "quadCrash": 81.3,
+     "quadGuarded": 39.9,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1450,
+     "large": 19.8,
+     "quad": 23.6,
+     "quadCrash": 84.4,
+     "quadGuarded": 39.8,
+     "quadGuardedCrash": 0.0
+    },
+    {
+     "update": 1500,
+     "large": 22.3,
+     "quad": 22.6,
+     "quadCrash": 84.4,
+     "quadGuarded": 38.9,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 1550,
+     "large": 19.3,
+     "quad": 21.9,
+     "quadCrash": 90.6,
+     "quadGuarded": 41.6,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 1600,
+     "large": 22.1,
+     "quad": 13.3,
+     "quadCrash": 93.8,
+     "quadGuarded": 41.6,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1650,
+     "large": 25.2,
+     "quad": 18.2,
+     "quadCrash": 87.5,
+     "quadGuarded": 41.8,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1700,
+     "large": 20.2,
+     "quad": 20.3,
+     "quadCrash": 78.1,
+     "quadGuarded": 41.1,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1750,
+     "large": 17.5,
+     "quad": 14.4,
+     "quadCrash": 93.8,
+     "quadGuarded": 39.9,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1800,
+     "large": 19.7,
+     "quad": 16.6,
+     "quadCrash": 87.5,
+     "quadGuarded": 42.0,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1850,
+     "large": 21.3,
+     "quad": 15.9,
+     "quadCrash": 90.6,
+     "quadGuarded": 41.9,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1900,
+     "large": 28.9,
+     "quad": 19.2,
+     "quadCrash": 78.1,
+     "quadGuarded": 40.8,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1950,
+     "large": 26.5,
+     "quad": 19.9,
+     "quadCrash": 81.3,
+     "quadGuarded": 41.8,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 2000,
+     "large": 12.2,
+     "quad": 9.9,
+     "quadCrash": 93.8,
+     "quadGuarded": 41.5,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 2050,
+     "large": 16.0,
+     "quad": 11.2,
+     "quadCrash": 84.4,
+     "quadGuarded": 41.2,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 2100,
+     "large": 19.5,
+     "quad": 12.5,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.6,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 2150,
+     "large": 10.6,
+     "quad": 12.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 42.5,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 2200,
+     "large": 16.8,
+     "quad": 15.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 43.8,
+     "quadGuardedCrash": 9.4
+    }
+   ]
+  },
+  {
+   "k": 2,
+   "args": "--quad 0.7 --labels planner --bc 0.3 --lr 3e-5",
+   "updates": 2200,
+   "last5": {
+    "large": 46.9,
+    "quad": 18.2,
+    "quadCrash": 83.8,
+    "quadGuarded": 39.0,
+    "quadGuardedCrash": 21.3
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 69.7,
+     "quad": 9.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.4,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 100,
+     "large": 66.3,
+     "quad": 10.0,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.3,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 150,
+     "large": 69.1,
+     "quad": 10.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.0,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 200,
+     "large": 66.7,
+     "quad": 10.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.4,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 250,
+     "large": 62.9,
+     "quad": 12.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.8,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 300,
+     "large": 55.5,
+     "quad": 10.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 31.7,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 350,
+     "large": 59.2,
+     "quad": 14.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.3,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 400,
+     "large": 59.2,
+     "quad": 12.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.9,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 450,
+     "large": 56.9,
+     "quad": 15.0,
+     "quadCrash": 87.5,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 500,
+     "large": 64.6,
+     "quad": 15.9,
+     "quadCrash": 90.6,
+     "quadGuarded": 35.4,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 550,
+     "large": 55.4,
+     "quad": 18.1,
+     "quadCrash": 96.9,
+     "quadGuarded": 37.9,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 600,
+     "large": 63.6,
+     "quad": 20.5,
+     "quadCrash": 93.8,
+     "quadGuarded": 35.0,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 650,
+     "large": 57.5,
+     "quad": 16.6,
+     "quadCrash": 90.6,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 700,
+     "large": 56.6,
+     "quad": 17.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.6,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 750,
+     "large": 55.8,
+     "quad": 19.4,
+     "quadCrash": 87.5,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 800,
+     "large": 59.8,
+     "quad": 18.4,
+     "quadCrash": 87.5,
+     "quadGuarded": 34.6,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 850,
+     "large": 58.2,
+     "quad": 19.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 33.8,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 900,
+     "large": 50.4,
+     "quad": 15.8,
+     "quadCrash": 87.5,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 950,
+     "large": 61.9,
+     "quad": 18.9,
+     "quadCrash": 78.1,
+     "quadGuarded": 38.2,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1000,
+     "large": 58.7,
+     "quad": 16.3,
+     "quadCrash": 93.8,
+     "quadGuarded": 37.6,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1050,
+     "large": 47.9,
+     "quad": 16.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1100,
+     "large": 42.2,
+     "quad": 19.1,
+     "quadCrash": 90.6,
+     "quadGuarded": 37.6,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1150,
+     "large": 27.3,
+     "quad": 16.7,
+     "quadCrash": 87.5,
+     "quadGuarded": 37.7,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1200,
+     "large": 37.4,
+     "quad": 19.8,
+     "quadCrash": 90.6,
+     "quadGuarded": 35.3,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1250,
+     "large": 47.6,
+     "quad": 22.0,
+     "quadCrash": 81.3,
+     "quadGuarded": 35.2,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 1300,
+     "large": 50.7,
+     "quad": 17.3,
+     "quadCrash": 93.8,
+     "quadGuarded": 37.0,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1350,
+     "large": 47.2,
+     "quad": 22.5,
+     "quadCrash": 75.0,
+     "quadGuarded": 38.6,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1400,
+     "large": 42.9,
+     "quad": 21.0,
+     "quadCrash": 84.4,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1450,
+     "large": 51.2,
+     "quad": 20.2,
+     "quadCrash": 87.5,
+     "quadGuarded": 40.1,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1500,
+     "large": 39.5,
+     "quad": 18.5,
+     "quadCrash": 90.6,
+     "quadGuarded": 36.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1550,
+     "large": 36.4,
+     "quad": 17.7,
+     "quadCrash": 90.6,
+     "quadGuarded": 38.8,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1600,
+     "large": 34.2,
+     "quad": 17.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 37.0,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1650,
+     "large": 22.6,
+     "quad": 16.4,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.3,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1700,
+     "large": 34.5,
+     "quad": 17.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 37.1,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1750,
+     "large": 43.3,
+     "quad": 14.7,
+     "quadCrash": 87.5,
+     "quadGuarded": 35.8,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1800,
+     "large": 41.9,
+     "quad": 21.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 33.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1850,
+     "large": 45.3,
+     "quad": 21.9,
+     "quadCrash": 78.1,
+     "quadGuarded": 36.1,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1900,
+     "large": 47.3,
+     "quad": 18.8,
+     "quadCrash": 84.4,
+     "quadGuarded": 36.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1950,
+     "large": 48.1,
+     "quad": 17.4,
+     "quadCrash": 90.6,
+     "quadGuarded": 36.7,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 2000,
+     "large": 42.3,
+     "quad": 18.6,
+     "quadCrash": 84.4,
+     "quadGuarded": 37.9,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 2050,
+     "large": 44.7,
+     "quad": 18.8,
+     "quadCrash": 75.0,
+     "quadGuarded": 40.6,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 2100,
+     "large": 48.8,
+     "quad": 17.7,
+     "quadCrash": 81.3,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 2150,
+     "large": 51.5,
+     "quad": 21.1,
+     "quadCrash": 81.3,
+     "quadGuarded": 39.7,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 2200,
+     "large": 47.1,
+     "quad": 15.0,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.3,
+     "quadGuardedCrash": 18.8
+    }
+   ]
+  },
+  {
+   "k": 3,
+   "args": "--quad 1 --labels brake-self --bc 0.5 --lr 5e-5",
+   "updates": 2200,
+   "last5": {
+    "large": 25.6,
+    "quad": 19.2,
+    "quadCrash": 91.3,
+    "quadGuarded": 38.7,
+    "quadGuardedCrash": 25.0
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 64.1,
+     "quad": 9.9,
+     "quadCrash": 96.9,
+     "quadGuarded": 31.7,
+     "quadGuardedCrash": 46.9
+    },
+    {
+     "update": 100,
+     "large": 27.9,
+     "quad": 9.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.6,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 150,
+     "large": 32.8,
+     "quad": 10.4,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.4,
+     "quadGuardedCrash": 46.9
+    },
+    {
+     "update": 200,
+     "large": 37.4,
+     "quad": 12.7,
+     "quadCrash": 96.9,
+     "quadGuarded": 34.4,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 250,
+     "large": 41.1,
+     "quad": 15.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.4,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 300,
+     "large": 34.4,
+     "quad": 13.8,
+     "quadCrash": 90.6,
+     "quadGuarded": 36.9,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 350,
+     "large": 35.6,
+     "quad": 14.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.1,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 400,
+     "large": 36.2,
+     "quad": 17.6,
+     "quadCrash": 87.5,
+     "quadGuarded": 34.5,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 450,
+     "large": 34.7,
+     "quad": 17.7,
+     "quadCrash": 93.8,
+     "quadGuarded": 34.1,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 500,
+     "large": 22.8,
+     "quad": 17.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.7,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 550,
+     "large": 23.3,
+     "quad": 15.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.2,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 600,
+     "large": 30.5,
+     "quad": 19.8,
+     "quadCrash": 93.8,
+     "quadGuarded": 39.1,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 650,
+     "large": 38.6,
+     "quad": 16.2,
+     "quadCrash": 93.8,
+     "quadGuarded": 35.9,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 700,
+     "large": 36.9,
+     "quad": 17.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 37.1,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 750,
+     "large": 20.3,
+     "quad": 13.8,
+     "quadCrash": 93.8,
+     "quadGuarded": 36.7,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 800,
+     "large": 31.4,
+     "quad": 18.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 35.5,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 850,
+     "large": 29.8,
+     "quad": 19.8,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.4,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 900,
+     "large": 36.6,
+     "quad": 21.7,
+     "quadCrash": 90.6,
+     "quadGuarded": 39.2,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 950,
+     "large": 31.9,
+     "quad": 21.1,
+     "quadCrash": 90.6,
+     "quadGuarded": 37.8,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1000,
+     "large": 30.5,
+     "quad": 19.3,
+     "quadCrash": 90.6,
+     "quadGuarded": 36.5,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 1050,
+     "large": 28.4,
+     "quad": 19.3,
+     "quadCrash": 90.6,
+     "quadGuarded": 39.1,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1100,
+     "large": 30.8,
+     "quad": 20.0,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.8,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1150,
+     "large": 41.5,
+     "quad": 19.2,
+     "quadCrash": 87.5,
+     "quadGuarded": 42.8,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1200,
+     "large": 38.5,
+     "quad": 19.4,
+     "quadCrash": 87.5,
+     "quadGuarded": 39.6,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1250,
+     "large": 39.9,
+     "quad": 20.6,
+     "quadCrash": 81.3,
+     "quadGuarded": 37.1,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1300,
+     "large": 28.4,
+     "quad": 17.7,
+     "quadCrash": 93.8,
+     "quadGuarded": 42.1,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1350,
+     "large": 31.1,
+     "quad": 19.0,
+     "quadCrash": 93.8,
+     "quadGuarded": 40.6,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1400,
+     "large": 14.7,
+     "quad": 12.7,
+     "quadCrash": 93.8,
+     "quadGuarded": 36.4,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1450,
+     "large": 15.8,
+     "quad": 15.3,
+     "quadCrash": 90.6,
+     "quadGuarded": 37.8,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1500,
+     "large": 20.3,
+     "quad": 19.9,
+     "quadCrash": 87.5,
+     "quadGuarded": 40.5,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 1550,
+     "large": 26.3,
+     "quad": 19.5,
+     "quadCrash": 90.6,
+     "quadGuarded": 41.8,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1600,
+     "large": 34.5,
+     "quad": 25.0,
+     "quadCrash": 75.0,
+     "quadGuarded": 39.8,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1650,
+     "large": 35.4,
+     "quad": 21.8,
+     "quadCrash": 84.4,
+     "quadGuarded": 41.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1700,
+     "large": 36.8,
+     "quad": 22.2,
+     "quadCrash": 87.5,
+     "quadGuarded": 38.6,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1750,
+     "large": 13.0,
+     "quad": 13.3,
+     "quadCrash": 96.9,
+     "quadGuarded": 42.6,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1800,
+     "large": 11.2,
+     "quad": 13.4,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.0,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1850,
+     "large": 11.8,
+     "quad": 11.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.9,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 1900,
+     "large": 18.2,
+     "quad": 13.0,
+     "quadCrash": 93.8,
+     "quadGuarded": 39.2,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1950,
+     "large": 29.6,
+     "quad": 17.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.3,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 2000,
+     "large": 27.3,
+     "quad": 14.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.1,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 2050,
+     "large": 26.6,
+     "quad": 15.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.5,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 2100,
+     "large": 17.0,
+     "quad": 16.7,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.2,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 2150,
+     "large": 28.2,
+     "quad": 23.0,
+     "quadCrash": 81.3,
+     "quadGuarded": 37.7,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 2200,
+     "large": 28.8,
+     "quad": 26.0,
+     "quadCrash": 78.1,
+     "quadGuarded": 37.9,
+     "quadGuardedCrash": 18.8
+    }
+   ]
+  },
+  {
+   "k": 4,
+   "args": "--quad 0.7 --labels brake-self --bc 0.5 --lr 3e-5",
+   "updates": 2200,
+   "last5": {
+    "large": 64.2,
+    "quad": 12.8,
+    "quadCrash": 97.5,
+    "quadGuarded": 37.5,
+    "quadGuardedCrash": 26.9
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 59.2,
+     "quad": 10.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 31.9,
+     "quadGuardedCrash": 50.0
+    },
+    {
+     "update": 100,
+     "large": 61.4,
+     "quad": 7.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.9,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 150,
+     "large": 64.8,
+     "quad": 7.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.3,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 200,
+     "large": 49.1,
+     "quad": 8.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.9,
+     "quadGuardedCrash": 43.8
+    },
+    {
+     "update": 250,
+     "large": 60.1,
+     "quad": 10.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.1,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 300,
+     "large": 60.7,
+     "quad": 11.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.9,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 350,
+     "large": 57.0,
+     "quad": 10.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.1,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 400,
+     "large": 56.3,
+     "quad": 8.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.4,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 450,
+     "large": 61.4,
+     "quad": 8.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.7,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 500,
+     "large": 56.3,
+     "quad": 9.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 550,
+     "large": 53.9,
+     "quad": 7.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.8,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 600,
+     "large": 60.7,
+     "quad": 10.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 650,
+     "large": 59.0,
+     "quad": 10.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.0,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 700,
+     "large": 51.6,
+     "quad": 8.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.7,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 750,
+     "large": 60.5,
+     "quad": 9.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 800,
+     "large": 60.5,
+     "quad": 10.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.3,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 850,
+     "large": 54.5,
+     "quad": 9.0,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.2,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 900,
+     "large": 60.6,
+     "quad": 10.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.8,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 950,
+     "large": 61.8,
+     "quad": 9.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.8,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 1000,
+     "large": 56.7,
+     "quad": 10.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.2,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1050,
+     "large": 57.4,
+     "quad": 12.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.5,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1100,
+     "large": 57.9,
+     "quad": 11.7,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.1,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 1150,
+     "large": 60.4,
+     "quad": 10.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.1,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1200,
+     "large": 62.2,
+     "quad": 12.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.2,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1250,
+     "large": 59.1,
+     "quad": 12.6,
+     "quadCrash": 93.8,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1300,
+     "large": 45.7,
+     "quad": 12.0,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.2,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1350,
+     "large": 58.1,
+     "quad": 9.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1400,
+     "large": 64.2,
+     "quad": 10.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.2,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1450,
+     "large": 58.8,
+     "quad": 8.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.1,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 1500,
+     "large": 59.8,
+     "quad": 10.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.0,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1550,
+     "large": 61.4,
+     "quad": 10.3,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.1,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 1600,
+     "large": 64.1,
+     "quad": 14.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.8,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1650,
+     "large": 61.9,
+     "quad": 10.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.0,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1700,
+     "large": 58.5,
+     "quad": 11.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.3,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1750,
+     "large": 66.0,
+     "quad": 11.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.6,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1800,
+     "large": 59.4,
+     "quad": 12.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1850,
+     "large": 63.4,
+     "quad": 10.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.8,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1900,
+     "large": 61.0,
+     "quad": 12.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1950,
+     "large": 62.4,
+     "quad": 13.0,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.0,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 2000,
+     "large": 66.7,
+     "quad": 14.3,
+     "quadCrash": 93.8,
+     "quadGuarded": 37.4,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 2050,
+     "large": 61.1,
+     "quad": 14.8,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 2100,
+     "large": 63.8,
+     "quad": 13.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.8,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 2150,
+     "large": 62.7,
+     "quad": 10.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.3,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 2200,
+     "large": 66.6,
+     "quad": 11.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.8,
+     "quadGuardedCrash": 37.5
+    }
+   ]
+  },
+  {
+   "k": 5,
+   "args": "--quad 1 --labels planner --bc 0.3 --lr 3e-5 --mem 64",
+   "updates": 1000,
+   "last5": {
+    "large": 18.2,
+    "quad": 19.3,
+    "quadCrash": 90.6,
+    "quadGuarded": 37.4,
+    "quadGuardedCrash": 15.0
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 66.4,
+     "quad": 11.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.1,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 100,
+     "large": 40.8,
+     "quad": 11.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.9,
+     "quadGuardedCrash": 43.8
+    },
+    {
+     "update": 150,
+     "large": 30.1,
+     "quad": 12.1,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.7,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 200,
+     "large": 34.2,
+     "quad": 17.3,
+     "quadCrash": 81.3,
+     "quadGuarded": 34.3,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 250,
+     "large": 23.8,
+     "quad": 17.7,
+     "quadCrash": 90.6,
+     "quadGuarded": 35.8,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 300,
+     "large": 32.1,
+     "quad": 22.4,
+     "quadCrash": 87.5,
+     "quadGuarded": 36.6,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 350,
+     "large": 32.4,
+     "quad": 23.4,
+     "quadCrash": 81.3,
+     "quadGuarded": 36.0,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 400,
+     "large": 32.6,
+     "quad": 20.6,
+     "quadCrash": 78.1,
+     "quadGuarded": 35.9,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 450,
+     "large": 26.2,
+     "quad": 19.8,
+     "quadCrash": 81.3,
+     "quadGuarded": 33.7,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 500,
+     "large": 29.0,
+     "quad": 18.4,
+     "quadCrash": 87.5,
+     "quadGuarded": 37.8,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 550,
+     "large": 29.6,
+     "quad": 21.6,
+     "quadCrash": 75.0,
+     "quadGuarded": 35.9,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 600,
+     "large": 35.8,
+     "quad": 20.4,
+     "quadCrash": 84.4,
+     "quadGuarded": 35.2,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 650,
+     "large": 36.7,
+     "quad": 21.8,
+     "quadCrash": 84.4,
+     "quadGuarded": 35.0,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 700,
+     "large": 22.9,
+     "quad": 19.5,
+     "quadCrash": 87.5,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 750,
+     "large": 19.7,
+     "quad": 19.5,
+     "quadCrash": 90.6,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 800,
+     "large": 19.6,
+     "quad": 18.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.8,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 850,
+     "large": 17.9,
+     "quad": 18.1,
+     "quadCrash": 90.6,
+     "quadGuarded": 38.9,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 900,
+     "large": 17.4,
+     "quad": 21.3,
+     "quadCrash": 90.6,
+     "quadGuarded": 37.7,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 950,
+     "large": 17.4,
+     "quad": 19.7,
+     "quadCrash": 81.3,
+     "quadGuarded": 35.8,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1000,
+     "large": 18.7,
+     "quad": 19.0,
+     "quadCrash": 93.8,
+     "quadGuarded": 38.9,
+     "quadGuardedCrash": 15.6
+    }
+   ]
+  },
+  {
+   "k": 6,
+   "args": "--quad 1 --labels guard-self --bc 0 --lr 5e-5",
+   "updates": 2200,
+   "last5": {
+    "large": 11.2,
+    "quad": 9.9,
+    "quadCrash": 98.8,
+    "quadGuarded": 38.7,
+    "quadGuardedCrash": 61.9
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 55.2,
+     "quad": 8.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.2,
+     "quadGuardedCrash": 46.9
+    },
+    {
+     "update": 100,
+     "large": 34.6,
+     "quad": 9.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.0,
+     "quadGuardedCrash": 50.0
+    },
+    {
+     "update": 150,
+     "large": 8.0,
+     "quad": 7.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.0,
+     "quadGuardedCrash": 46.9
+    },
+    {
+     "update": 200,
+     "large": 9.1,
+     "quad": 5.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.0,
+     "quadGuardedCrash": 46.9
+    },
+    {
+     "update": 250,
+     "large": 8.2,
+     "quad": 6.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.1,
+     "quadGuardedCrash": 56.3
+    },
+    {
+     "update": 300,
+     "large": 7.4,
+     "quad": 5.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.2,
+     "quadGuardedCrash": 53.1
+    },
+    {
+     "update": 350,
+     "large": 7.3,
+     "quad": 6.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.2,
+     "quadGuardedCrash": 56.3
+    },
+    {
+     "update": 400,
+     "large": 8.2,
+     "quad": 7.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 30.9,
+     "quadGuardedCrash": 43.8
+    },
+    {
+     "update": 450,
+     "large": 9.0,
+     "quad": 9.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.5,
+     "quadGuardedCrash": 59.4
+    },
+    {
+     "update": 500,
+     "large": 8.6,
+     "quad": 8.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.9,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 550,
+     "large": 8.0,
+     "quad": 11.0,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.3,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 600,
+     "large": 9.3,
+     "quad": 10.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.7,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 650,
+     "large": 9.2,
+     "quad": 13.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.7,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 700,
+     "large": 10.2,
+     "quad": 13.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 750,
+     "large": 10.5,
+     "quad": 13.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.3,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 800,
+     "large": 10.2,
+     "quad": 13.0,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.1,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 850,
+     "large": 10.5,
+     "quad": 11.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.6,
+     "quadGuardedCrash": 43.8
+    },
+    {
+     "update": 900,
+     "large": 10.2,
+     "quad": 14.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 44.5,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 950,
+     "large": 9.5,
+     "quad": 12.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.8,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1000,
+     "large": 11.4,
+     "quad": 12.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.3,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 1050,
+     "large": 11.5,
+     "quad": 14.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 42.2,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1100,
+     "large": 12.0,
+     "quad": 13.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 43.9,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1150,
+     "large": 15.8,
+     "quad": 15.0,
+     "quadCrash": 96.9,
+     "quadGuarded": 42.2,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1200,
+     "large": 13.8,
+     "quad": 15.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.8,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1250,
+     "large": 16.6,
+     "quad": 13.9,
+     "quadCrash": 96.9,
+     "quadGuarded": 39.4,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1300,
+     "large": 17.8,
+     "quad": 13.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 41.6,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1350,
+     "large": 22.0,
+     "quad": 15.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.9,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1400,
+     "large": 19.3,
+     "quad": 15.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.4,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1450,
+     "large": 21.4,
+     "quad": 15.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1500,
+     "large": 14.2,
+     "quad": 15.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.4,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1550,
+     "large": 12.9,
+     "quad": 17.1,
+     "quadCrash": 87.5,
+     "quadGuarded": 39.5,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 1600,
+     "large": 12.2,
+     "quad": 20.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 41.2,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1650,
+     "large": 13.4,
+     "quad": 14.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 43.7,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 1700,
+     "large": 22.2,
+     "quad": 19.9,
+     "quadCrash": 93.8,
+     "quadGuarded": 36.2,
+     "quadGuardedCrash": 56.3
+    },
+    {
+     "update": 1750,
+     "large": 15.9,
+     "quad": 15.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.4,
+     "quadGuardedCrash": 65.6
+    },
+    {
+     "update": 1800,
+     "large": 12.6,
+     "quad": 11.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.5,
+     "quadGuardedCrash": 65.6
+    },
+    {
+     "update": 1850,
+     "large": 10.5,
+     "quad": 11.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.4,
+     "quadGuardedCrash": 78.1
+    },
+    {
+     "update": 1900,
+     "large": 12.0,
+     "quad": 10.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.8,
+     "quadGuardedCrash": 59.4
+    },
+    {
+     "update": 1950,
+     "large": 12.4,
+     "quad": 10.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.4,
+     "quadGuardedCrash": 71.9
+    },
+    {
+     "update": 2000,
+     "large": 11.7,
+     "quad": 11.1,
+     "quadCrash": 93.8,
+     "quadGuarded": 39.8,
+     "quadGuardedCrash": 56.3
+    },
+    {
+     "update": 2050,
+     "large": 11.5,
+     "quad": 10.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.6,
+     "quadGuardedCrash": 71.9
+    },
+    {
+     "update": 2100,
+     "large": 10.2,
+     "quad": 9.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.9,
+     "quadGuardedCrash": 65.6
+    },
+    {
+     "update": 2150,
+     "large": 10.0,
+     "quad": 9.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.6,
+     "quadGuardedCrash": 62.5
+    },
+    {
+     "update": 2200,
+     "large": 12.6,
+     "quad": 8.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 40.7,
+     "quadGuardedCrash": 53.1
+    }
+   ]
+  },
+  {
+   "k": 7,
+   "args": "--quad 1 --labels planner --bc 0.3 --lr 1e-4 --seed 47",
+   "updates": 2200,
+   "last5": {
+    "large": 15.2,
+    "quad": 9.3,
+    "quadCrash": 96.9,
+    "quadGuarded": 36.2,
+    "quadGuardedCrash": 22.5
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 24.1,
+     "quad": 10.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.1,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 100,
+     "large": 27.5,
+     "quad": 14.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.2,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 150,
+     "large": 18.2,
+     "quad": 14.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 33.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 200,
+     "large": 23.3,
+     "quad": 18.1,
+     "quadCrash": 84.4,
+     "quadGuarded": 33.9,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 250,
+     "large": 5.3,
+     "quad": 3.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.9,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 300,
+     "large": 6.1,
+     "quad": 5.9,
+     "quadCrash": 96.9,
+     "quadGuarded": 32.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 350,
+     "large": 10.6,
+     "quad": 9.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 33.7,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 400,
+     "large": 21.0,
+     "quad": 9.6,
+     "quadCrash": 96.9,
+     "quadGuarded": 31.4,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 450,
+     "large": 15.6,
+     "quad": 14.1,
+     "quadCrash": 90.6,
+     "quadGuarded": 31.9,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 500,
+     "large": 20.7,
+     "quad": 13.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 35.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 550,
+     "large": 17.3,
+     "quad": 16.9,
+     "quadCrash": 93.8,
+     "quadGuarded": 34.7,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 600,
+     "large": 17.1,
+     "quad": 19.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 32.9,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 650,
+     "large": 16.4,
+     "quad": 17.4,
+     "quadCrash": 90.6,
+     "quadGuarded": 35.0,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 700,
+     "large": 5.2,
+     "quad": 2.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 27.0,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 750,
+     "large": 5.9,
+     "quad": 5.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 19.8,
+     "quadGuardedCrash": 78.1
+    },
+    {
+     "update": 800,
+     "large": 6.9,
+     "quad": 8.2,
+     "quadCrash": 93.8,
+     "quadGuarded": 25.8,
+     "quadGuardedCrash": 53.1
+    },
+    {
+     "update": 850,
+     "large": 15.1,
+     "quad": 12.0,
+     "quadCrash": 90.6,
+     "quadGuarded": 33.9,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 900,
+     "large": 5.0,
+     "quad": 3.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 30.2,
+     "quadGuardedCrash": 53.1
+    },
+    {
+     "update": 950,
+     "large": 7.7,
+     "quad": 3.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.2,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1000,
+     "large": 7.6,
+     "quad": 3.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.5,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1050,
+     "large": 5.4,
+     "quad": 3.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.6,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 1100,
+     "large": 10.4,
+     "quad": 6.2,
+     "quadCrash": 93.8,
+     "quadGuarded": 36.3,
+     "quadGuardedCrash": 12.5
+    },
+    {
+     "update": 1150,
+     "large": 10.1,
+     "quad": 5.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.3,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1200,
+     "large": 15.5,
+     "quad": 16.1,
+     "quadCrash": 87.5,
+     "quadGuarded": 36.6,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1250,
+     "large": 17.3,
+     "quad": 13.0,
+     "quadCrash": 90.6,
+     "quadGuarded": 34.1,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1300,
+     "large": 20.5,
+     "quad": 10.3,
+     "quadCrash": 87.5,
+     "quadGuarded": 38.1,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 1350,
+     "large": 17.7,
+     "quad": 17.6,
+     "quadCrash": 75.0,
+     "quadGuarded": 40.5,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1400,
+     "large": 15.0,
+     "quad": 14.0,
+     "quadCrash": 93.8,
+     "quadGuarded": 43.6,
+     "quadGuardedCrash": 6.3
+    },
+    {
+     "update": 1450,
+     "large": 14.4,
+     "quad": 6.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 40.3,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1500,
+     "large": 19.5,
+     "quad": 14.8,
+     "quadCrash": 90.6,
+     "quadGuarded": 39.9,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1550,
+     "large": 17.8,
+     "quad": 17.9,
+     "quadCrash": 84.4,
+     "quadGuarded": 44.8,
+     "quadGuardedCrash": 3.1
+    },
+    {
+     "update": 1600,
+     "large": 13.6,
+     "quad": 13.7,
+     "quadCrash": 96.9,
+     "quadGuarded": 43.0,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 1650,
+     "large": 7.0,
+     "quad": 4.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.8,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 1700,
+     "large": 11.8,
+     "quad": 8.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 41.2,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 1750,
+     "large": 22.4,
+     "quad": 7.8,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.6,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 1800,
+     "large": 10.7,
+     "quad": 8.1,
+     "quadCrash": 96.9,
+     "quadGuarded": 42.0,
+     "quadGuardedCrash": 9.4
+    },
+    {
+     "update": 1850,
+     "large": 5.4,
+     "quad": 4.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 22.7,
+     "quadGuardedCrash": 78.1
+    },
+    {
+     "update": 1900,
+     "large": 17.1,
+     "quad": 10.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.3,
+     "quadGuardedCrash": 40.6
+    },
+    {
+     "update": 1950,
+     "large": 11.6,
+     "quad": 8.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.9,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 2000,
+     "large": 21.5,
+     "quad": 10.9,
+     "quadCrash": 96.9,
+     "quadGuarded": 37.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 2050,
+     "large": 21.0,
+     "quad": 12.1,
+     "quadCrash": 90.6,
+     "quadGuarded": 37.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 2100,
+     "large": 17.6,
+     "quad": 12.2,
+     "quadCrash": 96.9,
+     "quadGuarded": 40.3,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 2150,
+     "large": 3.6,
+     "quad": 2.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 30.7,
+     "quadGuardedCrash": 34.4
+    },
+    {
+     "update": 2200,
+     "large": 12.3,
+     "quad": 8.9,
+     "quadCrash": 100.0,
+     "quadGuarded": 35.4,
+     "quadGuardedCrash": 25.0
+    }
+   ]
+  },
+  {
+   "k": 8,
+   "args": "--quad 1 --labels brake-self --bc 0.5 --lr 3e-5 --mem 64",
+   "updates": 1000,
+   "last5": {
+    "large": 20.4,
+    "quad": 13.9,
+    "quadCrash": 99.4,
+    "quadGuarded": 38.0,
+    "quadGuardedCrash": 26.9
+   },
+   "validation": [
+    {
+     "update": 50,
+     "large": 26.7,
+     "quad": 8.4,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.8,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 100,
+     "large": 30.4,
+     "quad": 9.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.7,
+     "quadGuardedCrash": 37.5
+    },
+    {
+     "update": 150,
+     "large": 23.0,
+     "quad": 9.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.5,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 200,
+     "large": 22.3,
+     "quad": 9.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 32.0,
+     "quadGuardedCrash": 46.9
+    },
+    {
+     "update": 250,
+     "large": 23.9,
+     "quad": 9.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.6,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 300,
+     "large": 19.7,
+     "quad": 13.1,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 350,
+     "large": 20.2,
+     "quad": 10.9,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.9,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 400,
+     "large": 20.2,
+     "quad": 12.0,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.0,
+     "quadGuardedCrash": 31.3
+    },
+    {
+     "update": 450,
+     "large": 19.8,
+     "quad": 13.3,
+     "quadCrash": 100.0,
+     "quadGuarded": 34.6,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 500,
+     "large": 20.7,
+     "quad": 11.5,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.3,
+     "quadGuardedCrash": 18.8
+    },
+    {
+     "update": 550,
+     "large": 19.7,
+     "quad": 12.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.5,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 600,
+     "large": 18.8,
+     "quad": 11.8,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.3,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 650,
+     "large": 18.3,
+     "quad": 15.7,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.5,
+     "quadGuardedCrash": 15.6
+    },
+    {
+     "update": 700,
+     "large": 22.3,
+     "quad": 15.4,
+     "quadCrash": 96.9,
+     "quadGuarded": 38.8,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 750,
+     "large": 20.8,
+     "quad": 15.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 37.0,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 800,
+     "large": 20.7,
+     "quad": 14.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 38.6,
+     "quadGuardedCrash": 25.0
+    },
+    {
+     "update": 850,
+     "large": 21.0,
+     "quad": 14.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.5,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 900,
+     "large": 19.5,
+     "quad": 12.6,
+     "quadCrash": 100.0,
+     "quadGuarded": 39.4,
+     "quadGuardedCrash": 21.9
+    },
+    {
+     "update": 950,
+     "large": 20.6,
+     "quad": 14.5,
+     "quadCrash": 96.9,
+     "quadGuarded": 36.0,
+     "quadGuardedCrash": 28.1
+    },
+    {
+     "update": 1000,
+     "large": 20.4,
+     "quad": 13.2,
+     "quadCrash": 100.0,
+     "quadGuarded": 36.4,
+     "quadGuardedCrash": 31.3
+    }
+   ]
+  }
+ ]
+}
