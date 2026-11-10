@@ -38,9 +38,9 @@ export function buildClaims(r: Results = results(), a: AtlasRates = atlasRates()
       tone: 'result',
     },
     {
-      value: pct(Math.min(1, r.nightOverDay)),
-      label: 'as good at night, lights off',
-      condition: `Night coverage relative to day on the same ${r.seeds} hard buildings, lights off.`,
+      value: pct(r.night),
+      label: 'of the same buildings at night, lights off',
+      condition: `Night coverage on the same ${r.seeds} hard buildings with every light off; by day it is ${pct(r.pilots[0]!.value)}.`,
       tone: 'result',
     },
     {

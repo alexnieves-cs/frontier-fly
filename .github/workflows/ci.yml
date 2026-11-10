@@ -86,6 +86,8 @@ jobs:
       - run: npm run lint
       # Generated docs (README tables, BENCHMARKS.md, REPORT.md) must match the committed JSON.
       - run: npm run docs:check
+      # The failure atlas page and docs/ATLAS.md are rendered from docs/atlas/*.json by their own script.
+      - run: npx vite-node scripts/study/atlas-report.ts && git diff --exit-code docs/ATLAS.md docs/atlas.json
       # The PX4 results table in docs/PX4.md must match docs/px4-flight-check.json.
       - run: npx vite-node scripts/px4/report.ts -- --check
 

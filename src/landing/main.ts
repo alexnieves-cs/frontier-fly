@@ -60,7 +60,7 @@ function markup(): string {
         <ul class="proof" aria-label="Headline results">
           <li><strong>${pct(r.pilots[0]!.value)}</strong> of ${r.seeds} unseen hard buildings searched${r.pilots[0]!.crashes !== null ? `, ${r.pilots[0]!.crashes === 0 ? 'no' : r.pilots[0]!.crashes} crash${r.pilots[0]!.crashes === 1 ? '' : 'es'}` : ''}</li>
           <li><strong>${pct(r.easy)}</strong> of easy ones</li>
-          <li><strong>${pct(Math.min(1, r.nightOverDay))}</strong> as good at night, lights off</li>
+          <li><strong>${pct(r.night)}</strong> of the same buildings at night, lights off</li>
         </ul>
         <p class="method">
           The indoor pilot is a small network learned by imitation (behavior cloning + DAgger) from a privileged planner,
@@ -93,7 +93,7 @@ function markup(): string {
         </ul>
         <div class="tiles">
           <div class="tile"><span class="tile-value">${pct(r.easy)}</span><span class="tile-label">coverage on easy buildings (${r.seeds} fresh)</span></div>
-          <div class="tile"><span class="tile-value">${pct(Math.min(1, r.nightOverDay))}</span><span class="tile-label">night coverage relative to day, lights off</span></div>
+          <div class="tile"><span class="tile-value">${pct(r.night)}</span><span class="tile-label">coverage of the same hard buildings at night, lights off</span></div>
           <a class="tile tile-limit" href="./atlas.html"><span class="tile-value">${(falseClear.p * 100).toFixed(2)}%</span><span class="tile-label">of flights call a building clear with someone inside (failure atlas)</span></a>
         </div>
       </div>
