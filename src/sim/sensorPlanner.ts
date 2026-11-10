@@ -195,6 +195,15 @@ export class SensorPlanner {
     this.shaper.reset();
   }
 
+  /**
+   * Tell the tracker which horizontal command the airframe was last given (world frame, m/s), when
+   * it was not this planner's own: the acceleration limit then ramps from that command. Used when
+   * the planner labels another pilot's states (train/ppoJob.ts, labels 'planner').
+   */
+  holdCommand(vx: number, vy: number): void {
+    this.shaper.hold(vx, vy);
+  }
+
   /** Goals dropped for lack of progress (diagnostics). */
   get bannedCount(): number {
     let n = 0;
