@@ -1,6 +1,8 @@
 {
-  "schema": 1,
-  "commit": "4ef0a1c",
+  "schema": 2,
+  "commit": "9b3cb49",
+  "crashSpeed": 0.5,
+  "trainingRuns": 3,
   "recipe": "BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint",
   "arms": [
     {
@@ -11,107 +13,191 @@
         {
           "round": 0,
           "beta": 1,
-          "samples": 413443,
-          "loss": 0.0088,
-          "valSmall": 0.9440000000000001,
-          "valLarge": 0.522,
-          "valScore": 0.691
+          "samples": 395330,
+          "loss": 0.0086,
+          "valSmall": 0.627,
+          "valLarge": 0.294,
+          "valScore": 0.42700000000000005
         },
         {
           "round": 1,
           "beta": 0.6,
-          "samples": 137670,
-          "loss": 0.0107,
-          "valSmall": 0.948,
-          "valLarge": 0.45899999999999996,
-          "valScore": 0.655
+          "samples": 108206,
+          "loss": 0.0094,
+          "valSmall": 0.622,
+          "valLarge": 0.136,
+          "valScore": 0.331
         },
         {
           "round": 2,
           "beta": 0.42,
-          "samples": 142444,
-          "loss": 0.0126,
-          "valSmall": 0.951,
-          "valLarge": 0.335,
-          "valScore": 0.581
+          "samples": 85708,
+          "loss": 0.0094,
+          "valSmall": 0.7759999999999999,
+          "valLarge": 0.18600000000000003,
+          "valScore": 0.42200000000000004
         },
         {
           "round": 3,
           "beta": 0.29,
-          "samples": 142216,
-          "loss": 0.0131,
-          "valSmall": 0.951,
-          "valLarge": 0.625,
-          "valScore": 0.7559999999999999
+          "samples": 87917,
+          "loss": 0.0091,
+          "valSmall": 0.92,
+          "valLarge": 0.245,
+          "valScore": 0.515
         },
         {
           "round": 4,
           "beta": 0.21,
-          "samples": 140170,
-          "loss": 0.0156,
-          "valSmall": 0.951,
-          "valLarge": 0.515,
-          "valScore": 0.69
+          "samples": 92843,
+          "loss": 0.0097,
+          "valSmall": 0.9490000000000001,
+          "valLarge": 0.376,
+          "valScore": 0.605
         },
         {
           "round": 5,
           "beta": 0.14,
-          "samples": 138687,
-          "loss": 0.0163,
-          "valSmall": 0.748,
-          "valLarge": 0.23399999999999999,
-          "valScore": 0.44
+          "samples": 81258,
+          "loss": 0.0099,
+          "valSmall": 0.951,
+          "valLarge": 0.249,
+          "valScore": 0.53
         },
         {
           "round": 6,
           "beta": 0.1,
-          "samples": 132652,
-          "loss": 0.0203,
-          "valSmall": 0.951,
-          "valLarge": 0.5379999999999999,
-          "valScore": 0.703
+          "samples": 76334,
+          "loss": 0.01,
+          "valSmall": 0.748,
+          "valLarge": 0.174,
+          "valScore": 0.40299999999999997
         }
       ],
-      "best": "round 3",
+      "best": "round 4",
       "ppo": null,
       "hard": {
         "policyDay": {
-          "episodes": 30,
-          "coverage": 0.6150040144668664,
+          "episodes": 90,
+          "coverage": 0.3163155925000919,
           "coverageCi": [
-            0.5806361442543632,
-            0.6499631781155144
+            0.27465532559785183,
+            0.3576779563815241
           ],
-          "collisionsPerEpisode": 5.733333333333333
+          "collisionsPerEpisode": 1.1555555555555554,
+          "crashes": 77
         },
         "policyNight": {
-          "episodes": 30,
-          "coverage": 0.6151320194613551,
+          "episodes": 90,
+          "coverage": 0.31108821422250654,
           "coverageCi": [
-            0.5783950068522098,
-            0.6525017231480815
+            0.2730424910378128,
+            0.3523135236864355
           ],
-          "collisionsPerEpisode": 6.133333333333334
+          "collisionsPerEpisode": 1.288888888888889,
+          "crashes": 75
         },
         "guardedDay": {
-          "episodes": 30,
-          "coverage": 0.6218980869301439,
+          "episodes": 90,
+          "coverage": 0.545418855515916,
           "coverageCi": [
-            0.5864988025709112,
-            0.6569874309238805
+            0.5077752348638972,
+            0.5805966893544221
           ],
-          "collisionsPerEpisode": 0.03333333333333333
+          "collisionsPerEpisode": 0.13333333333333333,
+          "crashes": 1
         },
         "guardedNight": {
-          "episodes": 30,
-          "coverage": 0.6012906399535966,
+          "episodes": 90,
+          "coverage": 0.5444896240147287,
           "coverageCi": [
-            0.5533269882119088,
-            0.6458712565709516
+            0.5078428622106538,
+            0.5783548414182254
           ],
-          "collisionsPerEpisode": 0.16666666666666666
+          "collisionsPerEpisode": 0.14444444444444443,
+          "crashes": 3
         }
-      }
+      },
+      "runs": [
+        {
+          "run": "s11",
+          "best": "round 4",
+          "bestVal": 0.605,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.3339691800551755,
+            "coverageCi": [
+              0.25652499857699435,
+              0.41779466583241465
+            ],
+            "collisionsPerEpisode": 1.0666666666666667,
+            "crashes": 23
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5626738097753774,
+            "coverageCi": [
+              0.49780841493989963,
+              0.6218850805128304
+            ],
+            "collisionsPerEpisode": 0.13333333333333333,
+            "crashes": 1
+          }
+        },
+        {
+          "run": "s23",
+          "best": "round 6",
+          "bestVal": 0.639,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.340659531111438,
+            "coverageCi": [
+              0.26832424574592967,
+              0.416298313776366
+            ],
+            "collisionsPerEpisode": 1.2,
+            "crashes": 27
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5310219483952278,
+            "coverageCi": [
+              0.4629857230099127,
+              0.5953302761036757
+            ],
+            "collisionsPerEpisode": 0.16666666666666666,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s47",
+          "best": "round 5",
+          "bestVal": 0.528,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.2743180663336623,
+            "coverageCi": [
+              0.2238005577953057,
+              0.3248716591677107
+            ],
+            "collisionsPerEpisode": 1.2,
+            "crashes": 27
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5425608083771429,
+            "coverageCi": [
+              0.488352005514294,
+              0.59486574324401
+            ],
+            "collisionsPerEpisode": 0.1,
+            "crashes": 0
+          }
+        }
+      ]
     },
     {
       "id": "bc",
@@ -122,42 +208,126 @@
       "ppo": null,
       "hard": {
         "policyDay": {
-          "episodes": 30,
-          "coverage": 0.5050311121746358,
+          "episodes": 90,
+          "coverage": 0.24096821768757717,
           "coverageCi": [
-            0.4428277058730277,
-            0.5589253948546328
+            0.20902348791325018,
+            0.274214658741772
           ],
-          "collisionsPerEpisode": 8.7
+          "collisionsPerEpisode": 1.1444444444444444,
+          "crashes": 84
         },
         "policyNight": {
-          "episodes": 30,
-          "coverage": 0.532565851719553,
+          "episodes": 90,
+          "coverage": 0.2546990905649173,
           "coverageCi": [
-            0.47614656946093253,
-            0.5810283207173321
+            0.22361833599800512,
+            0.28532538018374204
           ],
-          "collisionsPerEpisode": 9.333333333333334
+          "collisionsPerEpisode": 1.2222222222222223,
+          "crashes": 86
         },
         "guardedDay": {
-          "episodes": 30,
-          "coverage": 0.5616315625428253,
+          "episodes": 90,
+          "coverage": 0.5477265701355915,
           "coverageCi": [
-            0.5247021921962985,
-            0.5976855026260371
+            0.5200099144597752,
+            0.5731169957785011
           ],
-          "collisionsPerEpisode": 0.16666666666666666
+          "collisionsPerEpisode": 0.2111111111111111,
+          "crashes": 3
         },
         "guardedNight": {
-          "episodes": 30,
-          "coverage": 0.5688838138852177,
+          "episodes": 90,
+          "coverage": 0.5673284564802116,
           "coverageCi": [
-            0.529484349815651,
-            0.6081151160157962
+            0.5400454647402195,
+            0.5914522455838759
           ],
-          "collisionsPerEpisode": 0.16666666666666666
+          "collisionsPerEpisode": 0.28888888888888886,
+          "crashes": 3
         }
-      }
+      },
+      "runs": [
+        {
+          "run": "s11",
+          "best": null,
+          "bestVal": null,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.2824291930242068,
+            "coverageCi": [
+              0.2340911495740602,
+              0.3354852319727638
+            ],
+            "collisionsPerEpisode": 1.1,
+            "crashes": 27
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5299911983578691,
+            "coverageCi": [
+              0.4817124228294863,
+              0.5757700716603896
+            ],
+            "collisionsPerEpisode": 0.2,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s23",
+          "best": null,
+          "bestVal": null,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.2322237083072067,
+            "coverageCi": [
+              0.18247056693067087,
+              0.2873978447337742
+            ],
+            "collisionsPerEpisode": 1.0666666666666667,
+            "crashes": 28
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5402109246295187,
+            "coverageCi": [
+              0.4903791617799555,
+              0.5880517331167197
+            ],
+            "collisionsPerEpisode": 0.23333333333333334,
+            "crashes": 1
+          }
+        },
+        {
+          "run": "s47",
+          "best": null,
+          "bestVal": null,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.20825175173131788,
+            "coverageCi": [
+              0.15165704076436531,
+              0.2749465398713879
+            ],
+            "collisionsPerEpisode": 1.2666666666666666,
+            "crashes": 29
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5729775874193863,
+            "coverageCi": [
+              0.5307405175148545,
+              0.6126813964267668
+            ],
+            "collisionsPerEpisode": 0.2,
+            "crashes": 2
+          }
+        }
+      ]
     },
     {
       "id": "ppo",
@@ -166,47 +336,140 @@
       "curve": [],
       "best": null,
       "ppo": {
-        "val": 0.7490000000000001,
-        "dagger": 0.7559999999999999
+        "val": 0.639,
+        "dagger": 0.605
       },
       "hard": {
         "policyDay": {
-          "episodes": 30,
-          "coverage": 0.5883253632912149,
+          "episodes": 90,
+          "coverage": 0.4062869789860023,
           "coverageCi": [
-            0.5550684429852307,
-            0.6228663809011377
+            0.3645182630558766,
+            0.444485938204834
           ],
-          "collisionsPerEpisode": 4.933333333333334
+          "collisionsPerEpisode": 4.2444444444444445,
+          "crashes": 63
         },
         "policyNight": {
-          "episodes": 30,
-          "coverage": 0.6068643272995311,
+          "episodes": 90,
+          "coverage": 0.38930565722661,
           "coverageCi": [
-            0.5647289665550222,
-            0.6474128982688081
+            0.347730344763392,
+            0.4288607586945629
           ],
-          "collisionsPerEpisode": 5.366666666666666
+          "collisionsPerEpisode": 4.055555555555555,
+          "crashes": 55
         },
         "guardedDay": {
-          "episodes": 30,
-          "coverage": 0.5917701544554779,
+          "episodes": 90,
+          "coverage": 0.5616037929685515,
           "coverageCi": [
-            0.5544332149381879,
-            0.6305633401744056
+            0.5269979933535152,
+            0.595749042926275
           ],
-          "collisionsPerEpisode": 0.43333333333333335
+          "collisionsPerEpisode": 0.12222222222222222,
+          "crashes": 2
         },
         "guardedNight": {
-          "episodes": 30,
-          "coverage": 0.5911342208604803,
+          "episodes": 90,
+          "coverage": 0.5491810730199502,
           "coverageCi": [
-            0.5600532426287669,
-            0.6267139398338638
+            0.514335292926736,
+            0.582719308656694
           ],
-          "collisionsPerEpisode": 0.4
+          "collisionsPerEpisode": 0.12222222222222222,
+          "crashes": 5
         }
-      }
+      },
+      "runs": [
+        {
+          "run": "s11",
+          "best": null,
+          "bestVal": null,
+          "ppo": {
+            "val": 0.639,
+            "dagger": 0.605
+          },
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.4283064235838573,
+            "coverageCi": [
+              0.3705227933557401,
+              0.483544680202238
+            ],
+            "collisionsPerEpisode": 10.066666666666666,
+            "crashes": 19
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5794236488645871,
+            "coverageCi": [
+              0.5249654954440156,
+              0.6283040038300926
+            ],
+            "collisionsPerEpisode": 0.13333333333333333,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s23",
+          "best": null,
+          "bestVal": null,
+          "ppo": {
+            "val": 0.647,
+            "dagger": 0.639
+          },
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.4188819993408351,
+            "coverageCi": [
+              0.34643058304479696,
+              0.4889226869212053
+            ],
+            "collisionsPerEpisode": 1.7,
+            "crashes": 22
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5891797807150437,
+            "coverageCi": [
+              0.5301868359094098,
+              0.6431535335978785
+            ],
+            "collisionsPerEpisode": 0.06666666666666667,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s47",
+          "best": null,
+          "bestVal": null,
+          "ppo": {
+            "val": 0.606,
+            "dagger": 0.528
+          },
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.3716725140333147,
+            "coverageCi": [
+              0.30034109444409385,
+              0.44440148318984984
+            ],
+            "collisionsPerEpisode": 0.9666666666666667,
+            "crashes": 22
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.516207949326024,
+            "coverageCi": [
+              0.4598355820251871,
+              0.5704235021258831
+            ],
+            "collisionsPerEpisode": 0.16666666666666666,
+            "crashes": 2
+          }
+        }
+      ]
     },
     {
       "id": "no-nav",
@@ -216,107 +479,191 @@
         {
           "round": 0,
           "beta": 1,
-          "samples": 413443,
-          "loss": 0.0119,
-          "valSmall": 0.737,
-          "valLarge": 0.272,
-          "valScore": 0.45799999999999996
+          "samples": 395330,
+          "loss": 0.0118,
+          "valSmall": 0.635,
+          "valLarge": 0.14800000000000002,
+          "valScore": 0.34299999999999997
         },
         {
           "round": 1,
           "beta": 0.6,
-          "samples": 137703,
-          "loss": 0.0158,
-          "valSmall": 0.932,
-          "valLarge": 0.43,
-          "valScore": 0.631
+          "samples": 103054,
+          "loss": 0.0134,
+          "valSmall": 0.48,
+          "valLarge": 0.20199999999999999,
+          "valScore": 0.313
         },
         {
           "round": 2,
           "beta": 0.42,
-          "samples": 139168,
-          "loss": 0.0196,
-          "valSmall": 0.903,
-          "valLarge": 0.33799999999999997,
-          "valScore": 0.564
+          "samples": 80990,
+          "loss": 0.0131,
+          "valSmall": 0.45299999999999996,
+          "valLarge": 0.11,
+          "valScore": 0.247
         },
         {
           "round": 3,
           "beta": 0.29,
-          "samples": 140194,
-          "loss": 0.0213,
-          "valSmall": 0.9390000000000001,
-          "valLarge": 0.544,
-          "valScore": 0.7020000000000001
+          "samples": 93962,
+          "loss": 0.0138,
+          "valSmall": 0.929,
+          "valLarge": 0.147,
+          "valScore": 0.46
         },
         {
           "round": 4,
           "beta": 0.21,
-          "samples": 138567,
-          "loss": 0.0235,
-          "valSmall": 0.879,
-          "valLarge": 0.353,
-          "valScore": 0.563
+          "samples": 72463,
+          "loss": 0.0135,
+          "valSmall": 0.951,
+          "valLarge": 0.18600000000000003,
+          "valScore": 0.49200000000000005
         },
         {
           "round": 5,
           "beta": 0.14,
-          "samples": 136668,
-          "loss": 0.0304,
-          "valSmall": 0.9309999999999999,
-          "valLarge": 0.414,
-          "valScore": 0.621
+          "samples": 66169,
+          "loss": 0.0157,
+          "valSmall": 0.747,
+          "valLarge": 0.14400000000000002,
+          "valScore": 0.385
         },
         {
           "round": 6,
           "beta": 0.1,
-          "samples": 139422,
-          "loss": 0.0346,
-          "valSmall": 0.951,
-          "valLarge": 0.384,
-          "valScore": 0.611
+          "samples": 64900,
+          "loss": 0.0171,
+          "valSmall": 0.872,
+          "valLarge": 0.14300000000000002,
+          "valScore": 0.435
         }
       ],
-      "best": "round 3",
+      "best": "round 4",
       "ppo": null,
       "hard": {
         "policyDay": {
-          "episodes": 30,
-          "coverage": 0.4718925868683017,
+          "episodes": 90,
+          "coverage": 0.2714214802626861,
           "coverageCi": [
-            0.4182998428209194,
-            0.5207043884323638
+            0.22940208135433693,
+            0.3148685289829646
           ],
-          "collisionsPerEpisode": 8.366666666666667
+          "collisionsPerEpisode": 1.1555555555555554,
+          "crashes": 76
         },
         "policyNight": {
-          "episodes": 30,
-          "coverage": 0.5038906486084962,
+          "episodes": 90,
+          "coverage": 0.2364330689397556,
           "coverageCi": [
-            0.46687907463969697,
-            0.5437361458968638
+            0.20300410566115445,
+            0.2711773888832329
           ],
-          "collisionsPerEpisode": 10.266666666666667
+          "collisionsPerEpisode": 1.3777777777777778,
+          "crashes": 83
         },
         "guardedDay": {
-          "episodes": 30,
-          "coverage": 0.5229696469607196,
+          "episodes": 90,
+          "coverage": 0.49682715795467436,
           "coverageCi": [
-            0.4805682707425153,
-            0.5630858733620279
+            0.46797349640379393,
+            0.5273086581845884
           ],
-          "collisionsPerEpisode": 0.13333333333333333
+          "collisionsPerEpisode": 0.2,
+          "crashes": 3
         },
         "guardedNight": {
-          "episodes": 30,
-          "coverage": 0.5617534795098705,
+          "episodes": 90,
+          "coverage": 0.5003912480801617,
           "coverageCi": [
-            0.5291922613413221,
-            0.595582985403446
+            0.4680393313117795,
+            0.5316940770292943
           ],
-          "collisionsPerEpisode": 0.23333333333333334
+          "collisionsPerEpisode": 0.23333333333333334,
+          "crashes": 2
         }
-      }
+      },
+      "runs": [
+        {
+          "run": "s11",
+          "best": "round 4",
+          "bestVal": 0.49200000000000005,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.18820343835313963,
+            "coverageCi": [
+              0.12872815601803,
+              0.25448659584303557
+            ],
+            "collisionsPerEpisode": 1.2,
+            "crashes": 28
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5018826703426346,
+            "coverageCi": [
+              0.45274247569880777,
+              0.5474724891168405
+            ],
+            "collisionsPerEpisode": 0.2,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s23",
+          "best": "round 6",
+          "bestVal": 0.5670000000000001,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.3214130171151852,
+            "coverageCi": [
+              0.2509880414434228,
+              0.39797802999689974
+            ],
+            "collisionsPerEpisode": 1,
+            "crashes": 22
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5173469430012189,
+            "coverageCi": [
+              0.45858131305911826,
+              0.5703391719179343
+            ],
+            "collisionsPerEpisode": 0.2,
+            "crashes": 1
+          }
+        },
+        {
+          "run": "s47",
+          "best": "round 6",
+          "bestVal": 0.514,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.30464798531973386,
+            "coverageCi": [
+              0.2370919697751709,
+              0.3812610753882878
+            ],
+            "collisionsPerEpisode": 1.2666666666666666,
+            "crashes": 26
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.47125186052016954,
+            "coverageCi": [
+              0.41878304229936714,
+              0.5246340264720717
+            ],
+            "collisionsPerEpisode": 0.2,
+            "crashes": 2
+          }
+        }
+      ]
     },
     {
       "id": "no-local",
@@ -326,107 +673,191 @@
         {
           "round": 0,
           "beta": 1,
-          "samples": 413443,
-          "loss": 0.0158,
-          "valSmall": 0.927,
-          "valLarge": 0.47,
-          "valScore": 0.653
+          "samples": 395330,
+          "loss": 0.016,
+          "valSmall": 0.598,
+          "valLarge": 0.166,
+          "valScore": 0.33899999999999997
         },
         {
           "round": 1,
           "beta": 0.6,
-          "samples": 137571,
-          "loss": 0.0198,
-          "valSmall": 0.9259999999999999,
-          "valLarge": 0.47100000000000003,
-          "valScore": 0.653
+          "samples": 101199,
+          "loss": 0.0166,
+          "valSmall": 0.519,
+          "valLarge": 0.223,
+          "valScore": 0.341
         },
         {
           "round": 2,
           "beta": 0.42,
-          "samples": 140930,
-          "loss": 0.0249,
-          "valSmall": 0.9470000000000001,
-          "valLarge": 0.431,
-          "valScore": 0.637
+          "samples": 91093,
+          "loss": 0.0181,
+          "valSmall": 0.585,
+          "valLarge": 0.134,
+          "valScore": 0.314
         },
         {
           "round": 3,
           "beta": 0.29,
-          "samples": 142702,
-          "loss": 0.0307,
-          "valSmall": 0.924,
-          "valLarge": 0.518,
-          "valScore": 0.68
+          "samples": 92228,
+          "loss": 0.02,
+          "valSmall": 0.753,
+          "valLarge": 0.113,
+          "valScore": 0.369
         },
         {
           "round": 4,
           "beta": 0.21,
-          "samples": 139945,
-          "loss": 0.0375,
-          "valSmall": 0.951,
-          "valLarge": 0.298,
-          "valScore": 0.5589999999999999
+          "samples": 75112,
+          "loss": 0.0231,
+          "valSmall": 0.637,
+          "valLarge": 0.17,
+          "valScore": 0.35700000000000004
         },
         {
           "round": 5,
           "beta": 0.14,
-          "samples": 136775,
-          "loss": 0.0488,
-          "valSmall": 0.951,
-          "valLarge": 0.457,
-          "valScore": 0.655
+          "samples": 61712,
+          "loss": 0.0265,
+          "valSmall": 0.6629999999999999,
+          "valLarge": 0.131,
+          "valScore": 0.344
         },
         {
           "round": 6,
           "beta": 0.1,
-          "samples": 139109,
-          "loss": 0.0616,
-          "valSmall": 0.9159999999999999,
-          "valLarge": 0.259,
-          "valScore": 0.522
+          "samples": 58089,
+          "loss": 0.0289,
+          "valSmall": 0.889,
+          "valLarge": 0.152,
+          "valScore": 0.447
         }
       ],
-      "best": "round 3",
+      "best": "round 6",
       "ppo": null,
       "hard": {
         "policyDay": {
-          "episodes": 30,
-          "coverage": 0.5436069721886297,
+          "episodes": 90,
+          "coverage": 0.17968948178160382,
           "coverageCi": [
-            0.5032236908531127,
-            0.5829724937241191
+            0.1559297297324363,
+            0.20488242519759448
           ],
-          "collisionsPerEpisode": 11.2
+          "collisionsPerEpisode": 1.3111111111111111,
+          "crashes": 88
         },
         "policyNight": {
-          "episodes": 30,
-          "coverage": 0.49140162968674955,
+          "episodes": 90,
+          "coverage": 0.1771924038118152,
           "coverageCi": [
-            0.4456869854639889,
-            0.5339567037254063
+            0.14923400942574935,
+            0.2062843944149838
           ],
-          "collisionsPerEpisode": 13.366666666666667
+          "collisionsPerEpisode": 1.4666666666666666,
+          "crashes": 87
         },
         "guardedDay": {
-          "episodes": 30,
-          "coverage": 0.5297597940537563,
+          "episodes": 90,
+          "coverage": 0.5374536577056184,
           "coverageCi": [
-            0.49608687012977093,
-            0.5612026842727167
+            0.5100301237553236,
+            0.5624687467024764
           ],
-          "collisionsPerEpisode": 0.3333333333333333
+          "collisionsPerEpisode": 0.37777777777777777,
+          "crashes": 2
         },
         "guardedNight": {
-          "episodes": 30,
-          "coverage": 0.5309599637406126,
+          "episodes": 90,
+          "coverage": 0.5036257978515172,
           "coverageCi": [
-            0.4914139071932606,
-            0.5681934737353368
+            0.4715726911259435,
+            0.53377425797116
           ],
-          "collisionsPerEpisode": 0.6333333333333333
+          "collisionsPerEpisode": 0.3333333333333333,
+          "crashes": 5
         }
-      }
+      },
+      "runs": [
+        {
+          "run": "s11",
+          "best": "round 6",
+          "bestVal": 0.447,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.150178205344815,
+            "coverageCi": [
+              0.1152313999607402,
+              0.18777256252396157
+            ],
+            "collisionsPerEpisode": 1.3666666666666667,
+            "crashes": 29
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.48986071781089396,
+            "coverageCi": [
+              0.44171606868423147,
+              0.5367693548239979
+            ],
+            "collisionsPerEpisode": 0.16666666666666666,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s23",
+          "best": "round 1",
+          "bestVal": 0.502,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.206227036149029,
+            "coverageCi": [
+              0.15580117062163848,
+              0.2615897481140943
+            ],
+            "collisionsPerEpisode": 1.3,
+            "crashes": 29
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5708626871218442,
+            "coverageCi": [
+              0.522616776738763,
+              0.6149102865368108
+            ],
+            "collisionsPerEpisode": 0.36666666666666664,
+            "crashes": 1
+          }
+        },
+        {
+          "run": "s47",
+          "best": "round 0",
+          "bestVal": 0.43700000000000006,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.18266320385096727,
+            "coverageCi": [
+              0.14932620781724956,
+              0.21786387228564588
+            ],
+            "collisionsPerEpisode": 1.2666666666666666,
+            "crashes": 30
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5516375681841168,
+            "coverageCi": [
+              0.5158995387589529,
+              0.5843544879182533
+            ],
+            "collisionsPerEpisode": 0.6,
+            "crashes": 1
+          }
+        }
+      ]
     },
     {
       "id": "no-coarse",
@@ -436,107 +867,191 @@
         {
           "round": 0,
           "beta": 1,
-          "samples": 413443,
-          "loss": 0.0099,
-          "valSmall": 0.951,
-          "valLarge": 0.5670000000000001,
-          "valScore": 0.72
+          "samples": 395330,
+          "loss": 0.0097,
+          "valSmall": 0.69,
+          "valLarge": 0.237,
+          "valScore": 0.418
         },
         {
           "round": 1,
           "beta": 0.6,
-          "samples": 134600,
-          "loss": 0.0123,
-          "valSmall": 0.951,
-          "valLarge": 0.535,
-          "valScore": 0.7020000000000001
+          "samples": 104168,
+          "loss": 0.0103,
+          "valSmall": 0.698,
+          "valLarge": 0.17300000000000001,
+          "valScore": 0.38299999999999995
         },
         {
           "round": 2,
           "beta": 0.42,
-          "samples": 139163,
-          "loss": 0.0147,
-          "valSmall": 0.951,
-          "valLarge": 0.457,
-          "valScore": 0.655
+          "samples": 94418,
+          "loss": 0.0113,
+          "valSmall": 0.74,
+          "valLarge": 0.155,
+          "valScore": 0.389
         },
         {
           "round": 3,
           "beta": 0.29,
-          "samples": 142315,
-          "loss": 0.0148,
+          "samples": 101962,
+          "loss": 0.0107,
           "valSmall": 0.951,
-          "valLarge": 0.614,
-          "valScore": 0.7490000000000001
+          "valLarge": 0.27399999999999997,
+          "valScore": 0.545
         },
         {
           "round": 4,
           "beta": 0.21,
-          "samples": 139537,
-          "loss": 0.0166,
-          "valSmall": 0.818,
-          "valLarge": 0.42,
-          "valScore": 0.579
+          "samples": 89562,
+          "loss": 0.01,
+          "valSmall": 0.748,
+          "valLarge": 0.157,
+          "valScore": 0.39399999999999996
         },
         {
           "round": 5,
           "beta": 0.14,
-          "samples": 137084,
-          "loss": 0.0186,
-          "valSmall": 0.713,
-          "valLarge": 0.46799999999999997,
-          "valScore": 0.5660000000000001
+          "samples": 76452,
+          "loss": 0.0096,
+          "valSmall": 0.948,
+          "valLarge": 0.364,
+          "valScore": 0.598
         },
         {
           "round": 6,
           "beta": 0.1,
-          "samples": 137146,
-          "loss": 0.0224,
-          "valSmall": 0.748,
-          "valLarge": 0.298,
-          "valScore": 0.478
+          "samples": 79654,
+          "loss": 0.0105,
+          "valSmall": 0.878,
+          "valLarge": 0.162,
+          "valScore": 0.449
         }
       ],
-      "best": "round 3",
+      "best": "round 5",
       "ppo": null,
       "hard": {
         "policyDay": {
-          "episodes": 30,
-          "coverage": 0.58512623488253,
+          "episodes": 90,
+          "coverage": 0.31470715641439057,
           "coverageCi": [
-            0.5366588499178309,
-            0.631605290972477
+            0.2729322746571171,
+            0.35672809374738385
           ],
-          "collisionsPerEpisode": 6.7
+          "collisionsPerEpisode": 1.288888888888889,
+          "crashes": 79
         },
         "policyNight": {
-          "episodes": 30,
-          "coverage": 0.607707872633332,
+          "episodes": 90,
+          "coverage": 0.3062259404057633,
           "coverageCi": [
-            0.5738581805812196,
-            0.6407302119422418
+            0.26367786541493343,
+            0.3483555303730644
           ],
-          "collisionsPerEpisode": 7.9
+          "collisionsPerEpisode": 1.1333333333333333,
+          "crashes": 81
         },
         "guardedDay": {
-          "episodes": 30,
-          "coverage": 0.6197820455553393,
+          "episodes": 90,
+          "coverage": 0.5811703162880876,
           "coverageCi": [
-            0.5882458846444039,
-            0.6510917074793791
+            0.5489464494207638,
+            0.6103264239676262
           ],
-          "collisionsPerEpisode": 0.06666666666666667
+          "collisionsPerEpisode": 0.1111111111111111,
+          "crashes": 2
         },
         "guardedNight": {
-          "episodes": 30,
-          "coverage": 0.5781047204075799,
+          "episodes": 90,
+          "coverage": 0.5884377020299906,
           "coverageCi": [
-            0.5329645708077702,
-            0.6206195691937562
+            0.5619254237623443,
+            0.6131812952808782
           ],
-          "collisionsPerEpisode": 0.23333333333333334
+          "collisionsPerEpisode": 0.07777777777777778,
+          "crashes": 0
         }
-      }
+      },
+      "runs": [
+        {
+          "run": "s11",
+          "best": "round 5",
+          "bestVal": 0.598,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.3143642180396166,
+            "coverageCi": [
+              0.24865781432748657,
+              0.38560881337675124
+            ],
+            "collisionsPerEpisode": 1.4,
+            "crashes": 26
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5941700050297342,
+            "coverageCi": [
+              0.5520079179674567,
+              0.6316215535474405
+            ],
+            "collisionsPerEpisode": 0.06666666666666667,
+            "crashes": 0
+          }
+        },
+        {
+          "run": "s23",
+          "best": "round 6",
+          "bestVal": 0.573,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.32121558179611825,
+            "coverageCi": [
+              0.258110995492187,
+              0.3863767005671768
+            ],
+            "collisionsPerEpisode": 1.2666666666666666,
+            "crashes": 28
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.5227763900963075,
+            "coverageCi": [
+              0.4554271068412035,
+              0.5834959328878858
+            ],
+            "collisionsPerEpisode": 0.13333333333333333,
+            "crashes": 1
+          }
+        },
+        {
+          "run": "s47",
+          "best": "round 4",
+          "bestVal": 0.547,
+          "ppo": null,
+          "policyDay": {
+            "episodes": 30,
+            "coverage": 0.30854166940743705,
+            "coverageCi": [
+              0.2325637475521801,
+              0.38940555552499967
+            ],
+            "collisionsPerEpisode": 1.2,
+            "crashes": 25
+          },
+          "guardedDay": {
+            "episodes": 30,
+            "coverage": 0.6265645537382211,
+            "coverageCi": [
+              0.5861325039345952,
+              0.6641226240452993
+            ],
+            "collisionsPerEpisode": 0.13333333333333333,
+            "crashes": 1
+          }
+        }
+      ]
     }
   ]
 }

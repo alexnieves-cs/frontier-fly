@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (312 files, 61,925 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (312 files, 61,932 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -235,7 +235,7 @@ flowchart LR
 | `src/shared` | 7 | 766 | `mission` | — | — |
 | `src/sim` | 32 | 6,696 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,321 | `gen`, `shared` | Three.js | — |
-| `src/team` | 6 | 1,116 | `eval`, `gen`, `mission`, `shared`, `sim` | — | — |
+| `src/team` | 6 | 1,123 | `eval`, `gen`, `mission`, `shared`, `sim` | — | — |
 | `src/train` | 5 | 1,443 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 44 | 6,855 | `app`, `eval`, `gen`, `landing`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 6 | 2,265 | `mission`, `rl`, `ui` | — | — |

@@ -67,6 +67,8 @@ export interface TeamResult {
   awarenessGap: number;
   awarenessGapMax: number;
   collisions: number;
+  /** Drones whose flight the crash rule ended (a contact that started faster than CRASH_SPEED). */
+  crashes: number;
   /** Each drone's battery energy used, Wh (DEFAULT_BATTERY power model, integrated by its env). */
   energyWh: number[];
   /** Steps on which two drones were closer than 0.35 m (centers): they would have touched. */
@@ -126,6 +128,8 @@ interface Drone {
   launched: boolean;
   done: boolean;
   collisions: number;
+  /** The crash rule ended this drone's flight (shared/constants.ts CRASH_SPEED). */
+  crashed: boolean;
   energyWh: number;
   /** Relay state: breadcrumbs with their mean base margin. */
   crumbs: { x: number; y: number; z: number; margin: number }[];
@@ -254,6 +258,7 @@ export class TeamSim {
         launched: false,
         done: false,
         collisions: 0,
+        crashed: false,
         energyWh: 0,
         crumbs: [],
         relay: 'explore',
@@ -334,6 +339,7 @@ export class TeamSim {
       const step = d.env.step(commandToAction(cmd, f.yaw, this.out));
       d.obs = step.obs;
       d.collisions = step.info.collisions;
+      d.crashed = step.info.crashed;
       d.energyWh = step.info.energyWh;
       if (step.done) d.done = true;
     }
@@ -420,6 +426,7 @@ export class TeamSim {
       awarenessGap: curve.length ? curve.reduce((acc, c, i) => acc + c - baseCurve[i]!, 0) / curve.length : 0,
       awarenessGapMax: curve.reduce((acc, c, i) => Math.max(acc, c - baseCurve[i]!), 0),
       collisions: drones.reduce((s, d) => s + d.collisions, 0),
+      crashes: drones.filter((d) => d.crashed).length,
       energyWh: drones.map((d) => d.energyWh),
       droneContacts: this.droneContacts,
       perDrone,
