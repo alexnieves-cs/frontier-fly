@@ -1,0 +1,122 @@
+{
+  "schema": 2,
+  "commit": "9b3cb49",
+  "crashSpeed": 0.5,
+  "recipe": "BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint",
+  "arms": [
+    {
+      "id": "no-nav",
+      "label": "No navigation block (obs 52–63)",
+      "ablation": "no-nav",
+      "curve": [
+        {
+          "round": 0,
+          "beta": 1,
+          "samples": 389261,
+          "loss": 0.0124,
+          "valSmall": 0.529,
+          "valLarge": 0.109,
+          "valScore": 0.27699999999999997
+        },
+        {
+          "round": 1,
+          "beta": 0.6,
+          "samples": 104341,
+          "loss": 0.013,
+          "valSmall": 0.41700000000000004,
+          "valLarge": 0.155,
+          "valScore": 0.259
+        },
+        {
+          "round": 2,
+          "beta": 0.42,
+          "samples": 84231,
+          "loss": 0.0134,
+          "valSmall": 0.795,
+          "valLarge": 0.203,
+          "valScore": 0.44
+        },
+        {
+          "round": 3,
+          "beta": 0.29,
+          "samples": 85021,
+          "loss": 0.0135,
+          "valSmall": 0.758,
+          "valLarge": 0.19,
+          "valScore": 0.41700000000000004
+        },
+        {
+          "round": 4,
+          "beta": 0.21,
+          "samples": 80907,
+          "loss": 0.0147,
+          "valSmall": 0.728,
+          "valLarge": 0.14800000000000002,
+          "valScore": 0.38
+        },
+        {
+          "round": 5,
+          "beta": 0.14,
+          "samples": 75048,
+          "loss": 0.0155,
+          "valSmall": 0.748,
+          "valLarge": 0.155,
+          "valScore": 0.392
+        },
+        {
+          "round": 6,
+          "beta": 0.1,
+          "samples": 74503,
+          "loss": 0.0166,
+          "valSmall": 0.951,
+          "valLarge": 0.31,
+          "valScore": 0.5670000000000001
+        }
+      ],
+      "best": "round 6",
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.3214130171151852,
+          "coverageCi": [
+            0.2509880414434228,
+            0.39797802999689974
+          ],
+          "collisionsPerEpisode": 1,
+          "crashes": 22
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.3114121685200154,
+          "coverageCi": [
+            0.2601098317882105,
+            0.3665195896378146
+          ],
+          "collisionsPerEpisode": 1.4666666666666666,
+          "crashes": 26
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5173469430012189,
+          "coverageCi": [
+            0.45858131305911826,
+            0.5703391719179343
+          ],
+          "collisionsPerEpisode": 0.2,
+          "crashes": 1
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.48569770887826724,
+          "coverageCi": [
+            0.4291470064063463,
+            0.5409279566210033
+          ],
+          "collisionsPerEpisode": 0.2,
+          "crashes": 0
+        }
+      }
+    }
+  ]
+}
