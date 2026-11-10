@@ -54,9 +54,9 @@ export class Curriculum {
   }
 
   genParams(stage: number, rng: RNG): GenParams {
-    let floors = 1;
-    let w = 8;
-    let d = 8;
+    let floors: number;
+    let w: number;
+    let d: number;
     if (stage <= 0) {
       floors = 1;
       w = 8;

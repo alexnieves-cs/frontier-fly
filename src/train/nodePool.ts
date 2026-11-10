@@ -72,7 +72,7 @@ function findRoot(start: string): string | null {
 
 function repoRoot(explicit?: string): string {
   if (explicit) return resolve(explicit);
-  let here: string | null = null;
+  let here: string | null;
   try {
     here = dirname(fileURLToPath(import.meta.url));
   } catch {

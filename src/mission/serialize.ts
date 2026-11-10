@@ -91,7 +91,7 @@ export function decodeMissionHash(hash: string): MissionValidation {
   if (payload.length > HASH_LIMIT) {
     return { ok: false, mission: null, issues: [{ path: 'url', message: 'The mission link is too long.', severity: 'error' }] };
   }
-  let json = '';
+  let json: string;
   try {
     json = fromBase64Url(payload);
   } catch {
