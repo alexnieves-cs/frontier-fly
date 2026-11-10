@@ -35,13 +35,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: px4
         with:
           path: px4-sitl.tar.gz
           key: px4-sitl-${{ env.PX4_VERSION }}-ubuntu-24.04-v1
       - if: steps.px4.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - name: Build PX4 SITL
@@ -59,7 +59,7 @@ jobs:
               | grep -v -e '^platforms/nuttx' -e '^Tools/simulation')
           make px4_sitl_default
           tar -C build/px4_sitl_default -czf "$GITHUB_WORKSPACE/px4-sitl.tar.gz" bin etc
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: px4-sitl
           path: px4-sitl.tar.gz
@@ -80,17 +80,17 @@ jobs:
           - sim: bridge
             speed: 2
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - run: npm ci
       - run: pip install -q pymavlink
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: px4-sitl
       - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
@@ -106,7 +106,7 @@ jobs:
       - if: always()
         run: npx vite-node scripts/px4/report.ts -- --${{ matrix.sim }} test-results/px4/${{ matrix.sim }} --summary "$GITHUB_STEP_SUMMARY"
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: px4-${{ matrix.sim }}
           path: test-results/px4
@@ -120,17 +120,17 @@ jobs:
       CI: '1'
       PX4_SIM_SPEED_FACTOR: 1
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - run: npm ci
       - run: pip install -q pymavlink
-      - uses: actions/cache@v6
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         id: playwright
         with:
           path: ~/.cache/ms-playwright
@@ -138,7 +138,7 @@ jobs:
       - run: npx playwright install-deps chromium
       - if: steps.playwright.outputs.cache-hit != 'true'
         run: npx playwright install chromium
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: px4-sitl
       - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
@@ -152,7 +152,7 @@ jobs:
       - if: always()
         run: npx vite-node scripts/px4/report.ts -- --browser test-results/px4/browser --summary "$GITHUB_STEP_SUMMARY"
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: px4-browser
           path: test-results/px4
@@ -166,17 +166,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - run: npm ci
       - run: pip install -q pymavlink
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: px4-sitl
       - run: mkdir -p "$PX4_BUILD" && tar -C "$PX4_BUILD" -xzf px4-sitl.tar.gz
@@ -188,7 +188,7 @@ jobs:
       - if: always()
         run: npx vite-node scripts/physics/report.ts -- --in test-results/physics --summary "$GITHUB_STEP_SUMMARY"
       - if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: px4-physics
           path: test-results/physics
