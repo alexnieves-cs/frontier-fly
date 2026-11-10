@@ -8,6 +8,14 @@ name: train
 #
 #   gh workflow run train -f runs='--updates 400 --seed 23
 #   --updates 400 --seed 47 --crash-penalty -20'
+#
+# With script=train:indoor each line is one DAgger run (scripts/train-indoor.ts) instead, for the
+# ablations in docs/REPORT.md. A line may start with ablation=<name> (src/sim/ablation.ts) to zero an
+# observation block in training and evaluation. The runner then flies the arm's checkpoints on the
+# coverage study's hard buildings (scripts/study/ablations.ts) and pushes the log and the flights;
+# the checkpoints themselves are packed to .bin.
+#
+#   gh workflow run train -f script=train:indoor -f runs='--ppo-updates 24|ablation=no-nav|ablation=no-local|ablation=no-coarse'
 on:
   workflow_dispatch:
     inputs:
@@ -15,6 +23,11 @@ on:
         description: One train:ppo argument line per run (newline or '|' separated); each gets its own runner
         required: true
         default: '--updates 400'
+      script:
+        description: Trainer each line runs
+        type: choice
+        options: ['train:ppo', 'train:indoor']
+        default: 'train:ppo'
       ref_note:
         description: Free text recorded in each result commit (what this sweep is testing)
         required: false
@@ -59,13 +72,35 @@ jobs:
         env:
           RUNS: ${{ inputs.runs }}
           K: ${{ matrix.k }}
+          SCRIPT: ${{ inputs.script }}
         run: |
+          set -o pipefail
           line=$(python3 -c 'import os,re; xs=[x.strip() for x in re.split(r"[\n|]", os.environ["RUNS"]) if x.strip()]; print(xs[int(os.environ["K"])])')
           echo "args: $line"
           mkdir -p train-out
-          echo "$line" > train-out/args.txt
-          # shellcheck disable=SC2086
-          npm run train:ppo -- --out train-out/ppo.bin $line 2>&1 | tee train-out/train.log
+          echo "$SCRIPT $line" > train-out/args.txt
+          if [ "$SCRIPT" = "train:indoor" ]; then
+            # An optional leading ablation=<name> picks the observation ablation and names the arm.
+            name=full
+            if [[ "$line" =~ ^ablation=([a-z-]+)(\ |$)(.*)$ ]]; then
+              name="${BASH_REMATCH[1]}"
+              line="${BASH_REMATCH[3]}"
+              export FRONTIER_OBS_ABLATION="$name"
+            fi
+            # shellcheck disable=SC2086
+            npm run train:indoor -- --out "train-out/$name.json" $line 2>&1 | tee "train-out/$name.log"
+            # Fly the arm's checkpoints on the coverage study's hard buildings (the script sets the ablation per arm).
+            unset FRONTIER_OBS_ABLATION
+            npx vite-node scripts/study/ablations.ts -- --runs train-out --out train-out/ablations.json
+            # Keep the checkpoints that were flown, packed; the per-round JSON files are tens of MB.
+            for f in "$name" "$name.r0" "$name.ppo"; do
+              if [ -f "train-out/$f.json" ]; then npm run pack:checkpoint -- "train-out/$f.json" "train-out/$f.bin"; fi
+            done
+            rm -f train-out/*.r[0-9]*.json train-out/*.swa*.json "train-out/$name.json" "train-out/$name.ppo.json"
+          else
+            # shellcheck disable=SC2086
+            npm run train:ppo -- --out train-out/ppo.bin $line 2>&1 | tee train-out/train.log
+          fi
       # Push even when the run hits the step timeout, so the checkpoints so far survive.
       - name: Push checkpoints to train/<run id>-<k>
         if: always()

@@ -9,9 +9,21 @@
 //
 // `runs` holds full.json/.log (with --ppo-updates, so full.ppo.json exists), no-nav, no-local and
 // no-coarse. BC alone is round 0 of the full run (full.r0.json).
+//
+// On GitHub's runners (.github/workflows/train.yml with script train:indoor) each arm trains on its own
+// runner, which then runs this script on the arms it holds and pushes the log and the flights
+// (<arm>.eval.<k>.jsonl) to train/<run id>-<k>. With those files gathered in one folder,
+//
+//   vite-node scripts/study/ablations.ts -- --runs runs --merge --out docs/ablations.json
+//
+// writes the report from the flights already flown, without flying anything.
+//
+// Training and evaluation both run under the crash rule (src/shared/constants.ts CRASH_SPEED): the
+// env ends an episode at a crash, in DAgger rollouts, in validation and in these flights.
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
+import { CRASH_SPEED } from '../../src/shared/constants';
 import { bootstrapCi, type Result } from './coverage-study';
 
 function arg(name: string, fallback: string): string {
@@ -21,6 +33,7 @@ function arg(name: string, fallback: string): string {
 
 const RUNS = arg('runs', 'runs');
 const OUT = arg('out', 'docs/ablations.json');
+const MERGE = process.argv.includes('--merge');
 
 interface Arm {
   id: string;
@@ -76,6 +89,34 @@ function run(args: string[], env: NodeJS.ProcessEnv): Promise<void> {
   });
 }
 
+function readRows(files: string[]): Result[] {
+  return files.flatMap((f) =>
+    readFileSync(f, 'utf8')
+      .split('\n')
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as Result),
+  );
+}
+
+/** The flights of an arm already flown into RUNS (by a runner), or null when there are none. */
+function flown(arm: Arm): Result[] | null {
+  const files = readdirSync(RUNS)
+    .filter((f) => f.startsWith(`${arm.id}.eval.`) && f.endsWith('.jsonl'))
+    .map((f) => `${RUNS}/${f}`);
+  return files.length ? readRows(files) : null;
+}
+
+/**
+ * The checkpoint an arm flies. train:indoor overwrites the run's main checkpoint with the PPO
+ * fine-tune when that validates better, so the DAgger arm then reads the best round's own file.
+ */
+function checkpointOf(arm: Arm): string {
+  if (arm.id !== 'dagger') return arm.checkpoint;
+  const text = existsSync(`${RUNS}/${arm.log}`) ? readFileSync(`${RUNS}/${arm.log}`, 'utf8') : '';
+  const round = /^best round (\d+) val/m.exec(text)?.[1];
+  return /^kept the PPO fine-tune/m.test(text) && round ? `full.r${round}.json` : arm.checkpoint;
+}
+
 async function evaluate(arm: Arm): Promise<Result[]> {
   const shards = availableParallelism();
   const env = { ...process.env };
@@ -95,7 +136,7 @@ async function evaluate(arm: Arm): Promise<Result[]> {
           '--pilots',
           'policy,guarded',
           '--checkpoint',
-          `${RUNS}/${arm.checkpoint}`,
+          `${RUNS}/${checkpointOf(arm)}`,
           '--out',
           out,
         ],
@@ -103,30 +144,37 @@ async function evaluate(arm: Arm): Promise<Result[]> {
       ),
     ),
   );
-  return files.flatMap((f) =>
-    readFileSync(f, 'utf8')
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => JSON.parse(l) as Result),
-  );
+  return readRows(files);
 }
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 const arms = [];
 for (const arm of ARMS) {
-  if (!existsSync(`${RUNS}/${arm.checkpoint}`)) {
-    console.log(`skip ${arm.id}: no ${RUNS}/${arm.checkpoint}`);
-    continue;
+  let rows: Result[] | null;
+  if (MERGE) {
+    rows = flown(arm);
+    if (!rows) {
+      console.log(`skip ${arm.id}: no ${RUNS}/${arm.id}.eval.*.jsonl`);
+      continue;
+    }
+  } else {
+    if (!existsSync(`${RUNS}/${arm.checkpoint}`)) {
+      console.log(`skip ${arm.id}: no ${RUNS}/${arm.checkpoint}`);
+      continue;
+    }
+    rows = await evaluate(arm);
   }
-  const rows = await evaluate(arm);
+  const flights = rows;
   const cell = (pilot: string, lighting: string) => {
-    const rs = rows.filter((r) => r.pilot === pilot && r.lighting === lighting);
+    const rs = flights.filter((r) => r.pilot === pilot && r.lighting === lighting);
     const cov = rs.map((r) => r.coverage);
     return {
       episodes: rs.length,
       coverage: mean(cov),
       coverageCi: bootstrapCi(cov),
       collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
+      // Flights the crash rule ended.
+      crashes: rs.filter((r) => r.crashed).length,
     };
   };
   const log = parseLog(`${RUNS}/${arm.log}`);
@@ -150,6 +198,6 @@ for (const arm of ARMS) {
 }
 writeFileSync(
   OUT,
-  `${JSON.stringify({ schema: 1, commit: execSync('git rev-parse --short HEAD').toString().trim(), recipe: 'BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint', arms }, null, 2)}\n`,
+  `${JSON.stringify({ schema: 2, commit: arg('commit', execSync('git rev-parse --short HEAD').toString().trim()), crashSpeed: CRASH_SPEED, recipe: 'BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint', arms }, null, 2)}\n`,
 );
 console.log(`wrote ${OUT}`);
