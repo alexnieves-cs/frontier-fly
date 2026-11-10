@@ -179,6 +179,12 @@ export interface PerceptionOptions {
   gimbal?: boolean;
   /** Pixel detector for contacts. Default: the analytic detector. */
   camera?: CameraContactSource;
+  /**
+   * The drone also carries a thermal camera (perception/model.ts THERMAL): people are detected
+   * through smoke and in the dark. Only detections use it; the seen-empty maps a clear rests on
+   * stay on the visible camera. Default off.
+   */
+  thermal?: boolean;
 }
 
 interface BuildingView {
@@ -551,6 +557,7 @@ function siteGeometry(world: MissionWorld, useGimbal: boolean) {
 export function createPerceptionSource(world: MissionWorld, opts: PerceptionOptions = {}): LiveDetectionSource {
   const rangeNoise = opts.rangeNoise ?? 0.05;
   const useGimbal = opts.gimbal ?? true;
+  const thermal = opts.thermal ?? false;
   const views = world.buildings.map((building, index) => buildingView(building, index));
   const tiles = outdoorTiles(world);
   const tileIndex = new Map<string, Tile>();
@@ -616,7 +623,7 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
       const seed = mixSeed(world.seed, frame, b.index + 1);
       if (resolved.length > 0 && !camera) {
         const targets = resolved.map((target) => ({ ...target, occluders: [...target.occluders, ...b.occluders] }));
-        const found = detect({ seed, camera: local, targets, spec: b.viewSpec, lighting, cameraSpeed, rangeScale });
+        const found = detect({ seed, camera: local, targets, spec: b.viewSpec, lighting, cameraSpeed, rangeScale, thermal });
         contacts.push(...toContacts(found, local, b.origin, b.building.id, seed, tSec));
       }
       if (passGate(b.gate, camPos, pose.yaw, gimbal, SEEN_REFRESH.indoorM)) {
@@ -640,7 +647,7 @@ export function createPerceptionSource(world: MissionWorld, opts: PerceptionOpti
     if (near.length > 0 && !camera) {
       const seed = mixSeed(world.seed, frame, 0);
       const targets = near.map((target) => ({ ...target, occluders: [...target.occluders, ...blockers] }));
-      const found = detect({ seed, camera: view, targets, spec: null, lighting, cameraSpeed, rangeScale });
+      const found = detect({ seed, camera: view, targets, spec: null, lighting, cameraSpeed, rangeScale, thermal });
       contacts.push(...toContacts(found, view, [0, 0, 0], null, seed, tSec));
     }
     if (!passGate(outdoorGate, camPos, pose.yaw, gimbal, SEEN_REFRESH.outdoorM)) {

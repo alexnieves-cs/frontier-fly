@@ -465,8 +465,12 @@ export class SearchPhase {
       // Bearings flown before that added no view (the target hidden or mislabeled there) are not retried.
       const tried = this.triedBearings.get(track.id) ?? [];
       const seenFrom = { ...track, views: [...track.views, ...tried.map((angle) => ({ angle, confidence: 1, tSec: 0, range: 0 }))] };
+      const smoky = this.inSmoke(track);
       search: for (const sep of [40, 27]) {
-        const radii = track.classId === 'person' ? [3.2, 2.6, 2.0] : v.sensing?.lookCone != null ? [1.8, 2.2, 2.6] : [2.4, 2.0, 2.8, 1.8];
+        // A contact in smoke is re-viewed from closer first: every meter of smoke on the line of sight
+        // costs contrast, whichever camera looks.
+        const person = smoky ? [2.0, 1.6, 2.6, 3.2] : [3.2, 2.6, 2.0];
+        const radii = track.classId === 'person' ? person : v.sensing?.lookCone != null ? [1.8, 2.2, 2.6] : [2.4, 2.0, 2.8, 1.8];
         for (const r of radii) {
           views = confirmViewpoints(seenFrom, est, cur, r, z, need + 1, accept, sep);
           if (views.length >= need) break search;

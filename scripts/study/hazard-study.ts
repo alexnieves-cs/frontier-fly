@@ -4,6 +4,9 @@
 //   vite-node scripts/study/hazard-study.ts -- --shard 0 --of 4 --out /tmp/h0.jsonl [--base 81901 --seeds 8 --modes sensor --scenarios smoke-cabin]
 //   vite-node scripts/study/hazard-study.ts -- --merge /tmp/h0.jsonl ... --out docs/hazard-missions.json
 //
+// The thermal follow-up (smoke scenarios with and without a thermal camera, fresh block 87001+):
+//   node scripts/study/parallel.mjs hazard-study docs/hazard-thermal.json --base 87001 --scenarios smoke-occupied,smoke-cabin --modes sensor,sensorThermal,policy,policyThermal
+//
 // The hazard coverage rows come from the coverage study's hazard conditions:
 //   node scripts/study/parallel.mjs coverage-study docs/hazard-coverage.json --conditions hazard-control,doors,glass,smoke
 import { execSync } from 'node:child_process';
@@ -12,6 +15,7 @@ import {
   flyHazard,
   HAZARD_MISSION_SEED_BASE,
   HAZARD_MISSION_SEEDS,
+  HAZARD_ALL_MODES,
   HAZARD_MODES,
   hazardBenchReport,
   hazardJobs,
@@ -29,8 +33,8 @@ const base = Number(arg('base', String(HAZARD_MISSION_SEED_BASE)));
 const modes = arg('modes', HAZARD_MODES.join(','))
   .split(',')
   .filter(Boolean) as HazardMode[];
-const bad = modes.filter((m) => !HAZARD_MODES.includes(m));
-if (bad.length) throw new Error(`Unknown hazard mode(s): ${bad.join(', ')}. Known: ${HAZARD_MODES.join(', ')}.`);
+const bad = modes.filter((m) => !HAZARD_ALL_MODES.includes(m));
+if (bad.length) throw new Error(`Unknown hazard mode(s): ${bad.join(', ')}. Known: ${HAZARD_ALL_MODES.join(', ')}.`);
 const scenarios = arg('scenarios', '').split(',').filter(Boolean);
 
 if (process.argv.includes('--merge')) {

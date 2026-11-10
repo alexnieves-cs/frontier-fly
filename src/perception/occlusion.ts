@@ -3,7 +3,10 @@ import type { BuildingSpec } from '../shared/types';
 import type { Aabb, Vec3 } from '../targets/types';
 import type { CameraView } from './camera';
 
-function solidAt(spec: BuildingSpec, x: number, y: number, z: number): number {
+/** How much of the view glass takes from the visible camera. Long-wave infrared does not pass glass at all. */
+export const GLASS_OCCLUSION = 0.45;
+
+function solidAt(spec: BuildingSpec, x: number, y: number, z: number, glass: number): number {
   if (z < -0.2) return 0;
   const f = Math.floor(z / spec.floorHeight);
   if (f < 0 || f >= spec.floors.length) return 0;
@@ -13,11 +16,11 @@ function solidAt(spec: BuildingSpec, x: number, y: number, z: number): number {
   if (ix < 0 || iy < 0 || ix >= floor.w || iy >= floor.d) return 0;
   const i = iy * floor.w + ix;
   if (floor.cells[i] !== 1) return 0;
-  return (floor.surfaces?.[i] ?? 0) === SURFACE.GLASS ? 0.45 : 1;
+  return (floor.surfaces?.[i] ?? 0) === SURFACE.GLASS ? glass : 1;
 }
 
 /** Worst occlusion along a segment. 1 is a solid wall, 0.45 is glass only. */
-export function segmentOcclusion(spec: BuildingSpec | null | undefined, origin: Vec3, dest: Vec3): number {
+export function segmentOcclusion(spec: BuildingSpec | null | undefined, origin: Vec3, dest: Vec3, glass = GLASS_OCCLUSION): number {
   if (!spec) return 0;
   const dx = dest[0] - origin[0];
   const dy = dest[1] - origin[1];
@@ -28,7 +31,7 @@ export function segmentOcclusion(spec: BuildingSpec | null | undefined, origin: 
   let worst = 0;
   for (let i = 1; i < steps; i++) {
     const t = i / steps;
-    const hit = solidAt(spec, origin[0] + dx * t, origin[1] + dy * t, origin[2] + dz * t);
+    const hit = solidAt(spec, origin[0] + dx * t, origin[1] + dy * t, origin[2] + dz * t, glass);
     if (hit > worst) worst = hit;
     if (worst >= 1) return 1;
   }
@@ -88,11 +91,13 @@ export function occlusionFraction(
   aabb: Aabb,
   spec: BuildingSpec | null | undefined,
   occluders: Aabb[],
+  /** Occlusion a glass wall counts as: 1 for a camera glass is opaque to (thermal). */
+  glass = GLASS_OCCLUSION,
 ): number {
   const points = samplePoints(aabb);
   let sum = 0;
   for (const point of points) {
-    let hit = segmentOcclusion(spec, cam.position, point);
+    let hit = segmentOcclusion(spec, cam.position, point, glass);
     if (hit < 1) {
       for (const box of occluders) {
         if (rayHitsAabb(cam.position, point, box)) {

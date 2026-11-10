@@ -4,7 +4,7 @@ import type { Aabb, ResolvedTarget, TargetClass, Vec3 } from '../targets/types';
 import { projectAabb, type CameraView } from './camera';
 import { occlusionFraction } from './occlusion';
 import { smokePath, smokeTransmittance } from '../gen/hazards';
-import { CLASS_PROFILE, CONFUSION, DECOY_FP_BASE, FLASH_HALF, illuminationOf, recallProbability } from './model';
+import { CLASS_PROFILE, CONFUSION, DECOY_FP_BASE, FLASH_HALF, illuminationOf, recallProbability, THERMAL } from './model';
 import { clamp, dist, dot, norm, sub } from './vec';
 
 export interface Detection {
@@ -37,6 +37,11 @@ export interface DetectRequest {
    * targets farther away. Default 1.
    */
   rangeScale?: number;
+  /**
+   * The drone also carries a thermal camera (model.ts THERMAL): a person is seen by whichever of
+   * the two cameras sees them better. Default off.
+   */
+  thermal?: boolean;
 }
 
 function angleTo(cam: CameraView, point: Vec3): number {
@@ -62,13 +67,16 @@ function jitter(bbox: Detection['bbox'], rng: RNG): Detection['bbox'] {
   return { x, y, w: Math.min(bbox.w, 1 - x), h: Math.min(bbox.h, 1 - y) };
 }
 
-/** Contrast the smoke along the camera-to-target line leaves, 1 without smoke. Building-local frame. */
-function smokeFactor(req: DetectRequest, center: readonly number[]): number {
+/**
+ * Contrast the smoke along the camera-to-target line leaves, 1 without smoke. Building-local frame.
+ * `gain` stretches the visibility for a band smoke scatters less (thermal).
+ */
+function smokeFactor(req: DetectRequest, center: readonly number[], gain = 1): number {
   const smoke = req.spec?.hazards?.smoke;
   if (!req.spec || !smoke) return 1;
   const cam = req.camera.position;
   const f = Math.max(0, Math.min(req.spec.floors.length - 1, Math.floor(cam[2] / req.spec.floorHeight)));
-  return smokeTransmittance(smokePath(req.spec, f, cam[0], cam[1], center[0]!, center[1]!), smoke.visibility);
+  return smokeTransmittance(smokePath(req.spec, f, cam[0], cam[1], center[0]!, center[1]!), smoke.visibility * gain);
 }
 
 /**
@@ -104,7 +112,7 @@ export function detect(req: DetectRequest): Detection[] {
     const area = projected?.area ?? 0;
     // Smoke (gen/hazards.ts) takes contrast off the line of sight: recall scales by what is left.
     const smoke = smokeFactor(req, target.center);
-    const recall = smoke * (projected
+    const visible = smoke * (projected
       ? recallProbability({
           classId: target.classId,
           distance: seenDistance,
@@ -115,6 +123,21 @@ export function detect(req: DetectRequest): Detection[] {
           area,
         })
       : 0);
+    // The thermal camera: its own range and smoke loss, no need for light, and glass is a wall to it.
+    const warm = req.thermal === true && projected !== null && THERMAL.classes.includes(target.classId);
+    const thermal = warm
+      ? smokeFactor(req, target.center, THERMAL.smokeGain) *
+        recallProbability({
+          classId: target.classId,
+          distance: seenDistance / THERMAL.rangeScale,
+          occlusion: occlusionFraction(req.camera, target.aabb, req.spec, blockers, 1),
+          illumination: 1,
+          speed: target.speed,
+          cameraSpeed,
+          area,
+        })
+      : 0;
+    const recall = Math.max(visible, thermal);
     const lookalike = target.looksLike;
     const lookRecall = smoke * (projected && lookalike
       ? recallProbability({

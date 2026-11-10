@@ -6,6 +6,7 @@ import type { HazardParams } from '../shared/types';
 import { generateOutdoor } from '../world/outdoor/generate';
 import type { Scenario } from '../mission/autonomy/scenarios';
 import { SCENARIOS } from '../mission/autonomy/scenarios';
+import { createPerceptionSource } from '../mission/autonomy/perception';
 import { flyMission, OCCUPIED_SWEEP, summarizeMissions, wilson, type MissionFlight } from './missions';
 
 /** Fresh block, never flown before this bench. Development flights used 81901-81999 only. */
@@ -60,7 +61,19 @@ export function hazardSeeds(scenario: HazardScenario, n: number, base: number): 
 
 /** `sensorNaive` is the sensor planner with hazard awareness off: the control. */
 export const HAZARD_MODES = ['sensor', 'policy', 'sensorNaive'] as const;
-export type HazardMode = (typeof HAZARD_MODES)[number];
+/**
+ * The hazard-aware explorers with a thermal camera beside the visible one (perception/model.ts
+ * THERMAL). Not part of the bench above or its pass conditions: the thermal follow-up flies these
+ * and their camera-only twins on the smoke scenarios, on its own fresh block.
+ */
+export const HAZARD_THERMAL_MODES = ['sensorThermal', 'policyThermal'] as const;
+export const HAZARD_ALL_MODES = [...HAZARD_MODES, ...HAZARD_THERMAL_MODES] as const;
+export type HazardMode = (typeof HAZARD_ALL_MODES)[number];
+
+/** The thermal follow-up: fresh block, never flown before it. Development flights used 81901-81999 only. */
+export const HAZARD_THERMAL_SEED_BASE = 87001;
+export const HAZARD_THERMAL_SCENARIOS = ['smoke-occupied', 'smoke-cabin'] as const;
+export const HAZARD_THERMAL_RUN_MODES: readonly HazardMode[] = ['sensor', 'sensorThermal', 'policy', 'policyThermal'];
 
 export interface HazardJob {
   scenario: string;
@@ -88,8 +101,9 @@ export function hazardJobs(seeds = HAZARD_MISSION_SEEDS, base = HAZARD_MISSION_S
 }
 
 export async function flyHazard(job: HazardJob): Promise<HazardFlight> {
-  const indoor = job.mode === 'policy' ? 'policy' : 'sensor';
-  const flight = await flyMission({ scenario: job.scenario, seed: job.seed, indoor }, undefined, undefined, {
+  const indoor = job.mode.startsWith('policy') ? 'policy' : 'sensor';
+  const thermal = job.mode.endsWith('Thermal');
+  const flight = await flyMission({ scenario: job.scenario, seed: job.seed, indoor }, (world) => createPerceptionSource(world, { thermal }), undefined, {
     scenarios: HAZARD_SCENARIOS,
     runner: { hazardAware: job.mode !== 'sensorNaive' },
   });
@@ -99,7 +113,7 @@ export async function flyHazard(job: HazardJob): Promise<HazardFlight> {
 export function hazardBenchReport(flights: HazardFlight[], commit: string, seeds: number, base: number) {
   const cells = [];
   for (const s of HAZARD_SCENARIOS) {
-    for (const mode of HAZARD_MODES) {
+    for (const mode of HAZARD_ALL_MODES) {
       const fs = flights.filter((f) => f.scenario === s.id && f.mode === mode);
       if (!fs.length) continue;
       const found = fs.filter((f) => f.outcome === 'found').length;

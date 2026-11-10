@@ -83,6 +83,18 @@ export interface RecallInput {
 }
 
 /** Analytic recall before the Bernoulli draw. Deterministic. */
+/**
+ * Thermal (long-wave infrared, 8 to 14 um) camera carried beside the visible one. It sees warm
+ * bodies by their own emission, so light does not matter, and smoke particles, far smaller than its
+ * wavelength, scatter little of it. Three assumptions, all stated in docs/HAZARDS.md:
+ * - only a person is warm enough to stand out (objects and decoys sit at room temperature);
+ * - smoke's optical depth in the long-wave band is a tenth of the visible one, so the same cloud
+ *   has ten times the visibility (firefighting imagers see across rooms the eye cannot);
+ * - a small uncooled core has far fewer pixels than the FPV camera: it resolves a person at half the range.
+ * Glass is opaque to it (perception/occlusion.ts).
+ */
+export const THERMAL = { classes: ['person'] as readonly TargetClass[], smokeGain: 10, rangeScale: 0.5 } as const;
+
 export function recallProbability(input: RecallInput): number {
   const profile = CLASS_PROFILE[input.classId];
   const dist = 1 / (1 + Math.exp((input.distance - profile.d50) / profile.dWidth));
