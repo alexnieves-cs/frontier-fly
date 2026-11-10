@@ -10,7 +10,8 @@
  *          [--bc 0.05] [--ppo 1] [--log-std -2.3] [--critic-warmup 8] [--imitate 0]
  *          [--eval-every 20] [--reward-scale 0.1] [--stage-mix 0.2,0.1,0.2,0.5] [--night 0.25] [--replay 300000]
  *          [--crash-penalty 0] [--impact-penalty 0] [--crash-weight 0.2] [--quad 0] [--eval-quad]
- *          [--labels teacher|guard-teacher|guard-self] [--guard-gain 1]
+ *          [--labels teacher|guard-teacher|guard-self|brake-self|planner] [--guard-gain 1] [--label-yaw 0.6]
+ *          [--quad-eval 16] [--quad-weight 0.333] [--quad-guard]
  *        npm run train:ppo -- --validate-only ckpt.bin [--set tune|tune-wide|report|fresh] [--eval-quad]
  *
  * Crash rule (shared/constants.ts CRASH_SPEED): a crash ends the episode with REWARD.crash in the
@@ -18,7 +19,11 @@
  * half the crash speed, --crash-weight takes crashes off the checkpoint score, and --quad flies that
  * share of rollouts on quadrotor dynamics (full domain randomization; validation then adds 16 quad
  * episodes). --labels picks the BC labels: the frontier teacher, the teacher through the lidar
- * guard, or the policy's own action through the guard (it learns to brake as the guard does).
+ * guard, or the policy's own action through the guard (it learns to brake as the guard does);
+ * brake-self does the last with the guard's quadrotor braking model and a yaw rate cap on quad episodes, and
+ * planner labels quad episodes with the sensor-only planner that flies the quad (braking filter + tracker).
+ * --quad-guard flies the quad episodes behind the braking guard (the study's guardedBrake pilot), in rollouts and,
+ * beside the unguarded ones, in validation. --quad-eval sets how many quad episodes validation flies and --quad-weight their share of the hard score.
  *
  * The defaults are the recipe of the shipped checkpoint's first 400 updates;
  * it then ran 400 more with --init on that run's best checkpoint and --seed 47
@@ -65,18 +70,23 @@ function schedule(name: string, fallback: string): (frac: number) => number {
  * (69001+, first used for the crash-rule retrain) are only ever reported. With `quad`, 16 more
  * stage-3 episodes fly quadrotor dynamics with full domain randomization (base + 301..316).
  */
-export function seedSet(name: 'tune' | 'tune-wide' | 'report' | 'fresh', quad = false): (EvalJob & { quad?: boolean })[] {
+export function seedSet(name: 'tune' | 'tune-wide' | 'report' | 'fresh', quad = false, nQuad = 16, guarded = false): QuadJob[] {
   const base = name === 'tune' || name === 'tune-wide' ? 66_000 : name === 'report' ? 68_000 : 69_000;
   // 'tune-wide' is the tuning block at 3x the hard episodes, to separate close checkpoints.
   const wide = name === 'tune-wide' ? 3 : 1;
-  const jobs: (EvalJob & { quad?: boolean })[] = [];
+  const jobs: QuadJob[] = [];
   for (let i = 1; i <= 32 * wide; i++) jobs.push({ stage: 3, seed: base + i, lighting: 'day' });
   for (let i = 1; i <= 8 * wide; i++) jobs.push({ stage: 3, seed: base + 100 + i, lighting: 'night-dark' });
   for (let i = 1; i <= 6; i++) jobs.push({ stage: 0, seed: base + 200 + i, lighting: 'day' });
   for (let i = 1; i <= 2; i++) jobs.push({ stage: 0, seed: base + 250 + i, lighting: 'night-dark' });
-  if (quad) for (let i = 1; i <= 16; i++) jobs.push({ stage: 3, seed: base + 300 + i, lighting: i > 12 ? 'night-dark' : 'day', quad: true });
+  // Past the first 16, every fourth is a night flight, as in the first 16 (13-16).
+  if (quad) for (let i = 1; i <= nQuad; i++) jobs.push({ stage: 3, seed: base + 300 + i, lighting: (i <= 16 ? i > 12 : i % 4 === 0) ? 'night-dark' : 'day', quad: true });
+  // The same quad episodes again behind the braking guard (--quad-guard).
+  if (quad && guarded) jobs.push(...jobs.filter((j) => j.quad).map((j) => ({ ...j, guard: true })));
   return jobs;
 }
+
+type QuadJob = EvalJob & { quad?: boolean; guard?: boolean };
 
 interface Score {
   small: number;
@@ -88,13 +98,16 @@ interface Score {
   /** Quadrotor episodes (NaN without them). */
   quad: number;
   quadCrashRate: number;
+  /** The quad episodes behind the braking guard (NaN without them). */
+  quadGuarded: number;
+  quadGuardedCrashRate: number;
   score: number;
 }
 
 /** Checkpoint score: coverage as before, minus --crash-weight per unit crash rate. */
 const crashWeight = () => num('crash-weight', 0.2);
 
-async function evaluate(pool: NodeRolloutPool, workers: number, policy: MemPolicy, jobs: (EvalJob & { quad?: boolean })[]): Promise<Score> {
+async function evaluate(pool: NodeRolloutPool, workers: number, policy: MemPolicy, jobs: QuadJob[]): Promise<Score> {
   const spec = { weights: policy.getWeights(), hidden: [...policy.hidden], memDim: policy.memDim };
   // Longest episodes first, round robin, so workers finish together.
   const order = jobs.map((job, i) => ({ job, i })).sort((a, b) => b.job.stage - a.job.stage);
@@ -103,24 +116,31 @@ async function evaluate(pool: NodeRolloutPool, workers: number, policy: MemPolic
   const parts = (await pool.runJobAll('seqEval', (w: number) => ({ policy: spec, jobs: per[w]!.map((x) => x.job) }))) as SeqEvalResult[][];
   const results = new Array<SeqEvalResult>(jobs.length);
   per.forEach((list, w) => list.forEach((x, k) => (results[x.i] = parts[w]![k]!)));
-  const pick = (f: (j: EvalJob & { quad?: boolean }) => boolean) => results.filter((_, i) => f(jobs[i]!));
+  const pick = (f: (j: QuadJob) => boolean) => results.filter((_, i) => f(jobs[i]!));
+  const guardedQuads = pick((j) => !!j.quad && !!j.guard);
+  const quadGuarded = guardedQuads.length ? mean(guardedQuads.map((r) => r.coverage)) : NaN;
+  const quadGuardedCrashRate = guardedQuads.length ? mean(guardedQuads.map((r) => (r.crashed ? 1 : 0))) : NaN;
   const small = mean(pick((j) => j.stage <= 1).map((r) => r.coverage));
   const large = mean(pick((j) => j.stage >= 2 && !j.quad).map((r) => r.coverage));
   const largeNight = mean(pick((j) => j.stage >= 2 && !j.quad && j.lighting !== 'day').map((r) => r.coverage));
   const collisions = mean(pick((j) => j.stage >= 2 && !j.quad).map((r) => r.collisions));
-  const crashRate = mean(results.map((r) => (r.crashed ? 1 : 0)));
-  const quads = pick((j) => !!j.quad);
+  const crashRate = mean(pick((j) => !j.guard).map((r) => (r.crashed ? 1 : 0)));
+  const quads = pick((j) => !!j.quad && !j.guard);
   const quad = quads.length ? mean(quads.map((r) => r.coverage)) : NaN;
   const quadCrashRate = quads.length ? mean(quads.map((r) => (r.crashed ? 1 : 0))) : NaN;
   // Same weighting as train-indoor's validation (the stage-3 bar is the hard one), with the quad
   // episodes, when there are any, taking a third of the hard share; crashes cost on top.
-  const hard = quads.length ? (2 * large + quad) / 3 : large;
-  return { small, large, largeNight, collisions, crashRate, quad, quadCrashRate, score: 0.4 * small + 0.6 * hard - crashWeight() * crashRate };
+  const qw = num('quad-weight', 1 / 3);
+  // With guarded quad episodes the quad share is scored on those, crashes included: it is the pilot being trained.
+  const quadScore = guardedQuads.length ? quadGuarded - crashWeight() * quadGuardedCrashRate : quad;
+  const hard = quads.length ? (1 - qw) * large + qw * quadScore : large;
+  return { small, large, largeNight, collisions, crashRate, quad, quadCrashRate, quadGuarded, quadGuardedCrashRate, score: 0.4 * small + 0.6 * hard - crashWeight() * crashRate };
 }
 
 const fmt = (s: Score) =>
   `small ${pct(s.small)} large ${pct(s.large)} (night ${pct(s.largeNight)}) coll ${s.collisions.toFixed(2)} crash ${pct(s.crashRate)}` +
   (Number.isNaN(s.quad) ? '' : ` quad ${pct(s.quad)} (crash ${pct(s.quadCrashRate)})`) +
+  (Number.isNaN(s.quadGuarded) ? '' : ` quad+guard ${pct(s.quadGuarded)} (crash ${pct(s.quadGuardedCrashRate)})`) +
   ` score ${pct(s.score)}`;
 
 function checkpointOf(policy: MemPolicy, base: Checkpoint): Checkpoint {
@@ -161,7 +181,7 @@ async function main() {
   if (validateOnly) {
     const c = parseCheckpoint(readFileSync(validateOnly));
     const set = (arg('set') ?? 'tune') as 'tune' | 'tune-wide' | 'report' | 'fresh';
-    const s = await evaluate(pool, workers, MemPolicy.fromCheckpoint(c), seedSet(set, args.includes('--eval-quad')));
+    const s = await evaluate(pool, workers, MemPolicy.fromCheckpoint(c), seedSet(set, args.includes('--eval-quad'), num('quad-eval', 16), args.includes('--quad-guard')));
     console.log(`${validateOnly} [${set}] ${fmt(s)}`);
     await pool.close();
     return;
@@ -180,7 +200,7 @@ async function main() {
   console.log(`backend ${backend}, ${workers} workers x ${envs} envs, mem ${memDim}, init ${arg('init') ?? 'shipped'}`);
 
   const quadFraction = num('quad', 0);
-  const tune = seedSet('tune', quadFraction > 0 || args.includes('--eval-quad'));
+  const tune = seedSet('tune', quadFraction > 0 || args.includes('--eval-quad'), num('quad-eval', 16), args.includes('--quad-guard'));
   let best = { label: 'init', score: await evaluate(pool, workers, policy, tune), weights: policy.getWeights() };
   console.log(`init ${fmt(best.score)}  (${((Date.now() - started) / 1000).toFixed(0)} s)`);
 
@@ -216,7 +236,9 @@ async function main() {
       impactSpeedPenalty: num('impact-penalty', 0),
       quadFraction: phase === 'imitate' ? 0 : quadFraction,
       guardGain: num('guard-gain', 1),
-      labels: (arg('labels') ?? 'teacher') as 'teacher' | 'guard-teacher' | 'guard-self',
+      labels: (arg('labels') ?? 'teacher') as 'teacher' | 'guard-teacher' | 'guard-self' | 'brake-self' | 'planner',
+      labelYawRate: num('label-yaw', 0.6),
+      quadGuard: args.includes('--quad-guard'),
     })) as SeqRolloutResult[];
     resetEnvs = false;
     const tCollect = (Date.now() - t0) / 1000;

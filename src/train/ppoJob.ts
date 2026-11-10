@@ -14,14 +14,15 @@
  * part of what the critic sees, so a time-out is a real end, not a truncation.
  */
 import { evalEpisodeSetup } from '../eval/coverage';
-import { guardedAction } from '../eval/pilots';
+import { classicalPilot, guardedAction } from '../eval/pilots';
 import { MemPolicy } from '../rl/memPolicy';
-import { ACT_DIM, CRASH_SPEED } from '../shared/constants';
+import { ACT_DIM, CRASH_SPEED, MAX_SPEED_H, MAX_YAW_RATE } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import type { BuildingSpec } from '../shared/types';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import { ExplorerEnv, policyEpisodeLimits } from '../sim/env';
 import { frontierAction, frontierDistance } from '../sim/frontier';
+import { QUAD_BRAKING } from '../sim/lidarSafety';
 import { lightingPreset } from '../sim/lighting';
 import type { PooledWorld } from '../sim/worldPool';
 import { makeConfig } from '../workers/rollout';
@@ -58,8 +59,22 @@ export interface SeqRolloutPayload {
    * What the BC labels (the `teacher` rows) are: the frontier teacher's action (default), the teacher's
    * action through the lidar guard (src/eval/pilots.ts guardedAction), or the policy's own action
    * through the guard, which teaches the actor to brake the way the guard does so it needs no guard.
+   * 'brake-self' is 'guard-self' with, on quadrotor episodes, the guard's braking model of the airframe
+   * (lidarSafety.ts QUAD_BRAKING: slow down while there is still room to stop) and the yaw rate capped
+   * at `labelYawRate`; the plain guard only cuts a contact 0.2 s ahead, too late for an airframe that
+   * has to tilt back to stop. 'planner' labels quadrotor episodes with the sensor-only planner that flies
+   * the quad without crashing (the study's classicalBrakeTrack pilot: braking filter and trajectory
+   * tracker), run beside the policy on the policy's own states; other episodes are labelled as 'guard-self'.
    */
-  labels?: 'teacher' | 'guard-teacher' | 'guard-self';
+  labels?: 'teacher' | 'guard-teacher' | 'guard-self' | 'brake-self' | 'planner';
+  /**
+   * Fly quadrotor episodes through the braking guard (the 'guardedBrake' pilot of the coverage study):
+   * the env executes guardedAction(action, QUAD_BRAKING), PPO still learns on the policy's own action.
+   * The guard is then part of what the policy flies, as it is when the guarded policy is deployed.
+   */
+  quadGuard?: boolean;
+  /** With labels 'brake-self': yaw rate cap of the quadrotor labels, rad/s (0 = none). */
+  labelYawRate?: number;
   /** With labels 'guard-self': the label moves this many times the guard's horizontal change (1 = the guard's action). */
   guardGain?: number;
   /** Penalty per contact, in reward per m/s of impact speed above half the crash speed (0 = off). */
@@ -114,6 +129,9 @@ interface EnvSlot {
   steps: number;
   reward: number;
   started: boolean;
+  /** Labels 'planner': the planner shadowing this env's quad episode, and the last command the env was given (world frame). */
+  shadow?: ReturnType<typeof classicalPilot>;
+  cmd: [number, number];
 }
 
 interface WorkerState {
@@ -198,6 +216,11 @@ function resetSlot(ctx: JobContext, env: ExplorerEnv, slot: EnvSlot, p: SeqRollo
   slot.steps = 0;
   slot.reward = 0;
   slot.started = true;
+  slot.cmd = [0, 0];
+  if (p.labels === 'planner' && quad) {
+    slot.shadow ??= classicalPilot({ tracker: {}, braking: QUAD_BRAKING });
+    slot.shadow.reset();
+  }
 }
 
 const seqRollout: JobFn = (ctx, raw) => {
@@ -209,7 +232,7 @@ const seqRollout: JobFn = (ctx, raw) => {
   if (T % L !== 0) throw new Error('seqRollout: stepsPerEnv must be a multiple of seqLen');
   worker ??= { slots: [], state: new Float32Array(0), policy: null, key: '' };
   if (worker.slots.length !== E) {
-    worker.slots = ctx.envs.map(() => ({ obs: null, world: null, spec: null, stage: 0, night: false, quad: false, maxSteps: 1, steps: 0, reward: 0, started: false }));
+    worker.slots = ctx.envs.map(() => ({ obs: null, world: null, spec: null, stage: 0, night: false, quad: false, maxSteps: 1, steps: 0, reward: 0, started: false, cmd: [0, 0] }));
   }
   const policy = policyFor(p.policy, D);
   const m = policy.memDim;
@@ -275,17 +298,34 @@ const seqRollout: JobFn = (ctx, raw) => {
       const row = i * T + t;
       const action = act.action.subarray(i * ACT_DIM, (i + 1) * ACT_DIM);
       out.actions.set(action, row * ACT_DIM);
-      if (p.labels === 'guard-self') {
+      if (p.labels === 'planner' && slot.quad) {
+        // The planner's command for this state, ramped from the command the airframe actually got last step.
+        const shadow = slot.shadow!;
+        if (slot.steps > 0) shadow.planner.holdCommand(slot.cmd[0], slot.cmd[1]);
+        out.teacher.set(shadow.act(slot.obs!, env), row * ACT_DIM);
+      } else if (p.labels === 'guard-self' || p.labels === 'brake-self' || p.labels === 'planner') {
         // Horizontal velocity only: the guard also holds a fixed height, which the policy should not copy.
-        const g = guardedAction(action, slot.obs!, env);
+        const braking = p.labels === 'brake-self' && slot.quad;
+        const g = guardedAction(action, slot.obs!, env, braking ? QUAD_BRAKING : undefined);
         // guardGain > 1 pulls harder where the guard brakes (the label moves k times the guard's change).
         const k = p.guardGain ?? 1;
         out.teacher.set(action, row * ACT_DIM);
         out.teacher[row * ACT_DIM] = clamp1(action[0]! + k * (g[0]! - action[0]!));
         out.teacher[row * ACT_DIM + 1] = clamp1(action[1]! + k * (g[1]! - action[1]!));
+        if (braking && p.labelYawRate) {
+          const lim = p.labelYawRate / MAX_YAW_RATE;
+          out.teacher[row * ACT_DIM + 3] = Math.max(-lim, Math.min(lim, action[3]!));
+        }
       }
       out.logp[row] = act.logp[i]!;
-      const step = env.step(action);
+      const exec = p.quadGuard && slot.quad ? guardedAction(action, slot.obs!, env, QUAD_BRAKING) : action;
+      if (slot.shadow && slot.quad) {
+        const yaw = env.snapshot().yaw;
+        const f = clamp1(exec[0]!) * MAX_SPEED_H;
+        const l = clamp1(exec[1]!) * MAX_SPEED_H;
+        slot.cmd = [Math.cos(yaw) * f - Math.sin(yaw) * l, Math.sin(yaw) * f + Math.cos(yaw) * l];
+      }
+      const step = env.step(exec);
       let reward = step.reward;
       if (step.info.crashed && step.done) reward += p.crashPenalty ?? 0;
       if (p.impactSpeedPenalty && step.info.impactSpeed > CONTACT_FREE_SPEED) {
@@ -326,7 +366,7 @@ const seqRollout: JobFn = (ctx, raw) => {
 
 export interface SeqEvalPayload {
   policy: PolicySpec;
-  jobs: (EvalJob & { quad?: boolean })[];
+  jobs: (EvalJob & { quad?: boolean; guard?: boolean })[];
 }
 
 export interface SeqEvalResult {
@@ -357,7 +397,7 @@ const seqEval: JobFn = (ctx, raw) => {
     }
     const env = evalEnvs[k]!;
     const obs = env.reset(setup.spec, setup.envSeed, setup.cfg);
-    return { env, obs, maxSteps: setup.cfg.maxSteps, steps: 0, coverage: 0, collisions: 0, crashed: false, done: false, state: new Float32Array(m) };
+    return { env, obs, guard: !!job.guard, maxSteps: setup.cfg.maxSteps, steps: 0, coverage: 0, collisions: 0, crashed: false, done: false, state: new Float32Array(m) };
   });
   const rng = new RNG(1);
   for (;;) {
@@ -372,7 +412,9 @@ const seqEval: JobFn = (ctx, raw) => {
     const act = policy.act(x, active.length, m > 0 ? state : null, rng, true).action;
     active.forEach((e, k) => {
       if (m > 0) e.state.set(state.subarray(k * m, (k + 1) * m));
-      const step = e.env.step(act.subarray(k * ACT_DIM, (k + 1) * ACT_DIM));
+      const a = act.subarray(k * ACT_DIM, (k + 1) * ACT_DIM);
+      // A guarded quad job flies the coverage study's 'guardedBrake' pilot.
+      const step = e.env.step(e.guard ? guardedAction(a, e.obs, e.env, QUAD_BRAKING) : a);
       e.obs = step.obs;
       e.coverage = step.info.coverage;
       e.collisions = step.info.collisions;
