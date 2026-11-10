@@ -123,7 +123,7 @@ More detail, including the generated module graph and the headless boundary betw
 
 | Layer | What | Why |
 | --- | --- | --- |
-| Language and build | TypeScript 6.0, Vite 6 | One codebase for the browser, workers, and Node |
+| Language and build | TypeScript 6.0, Vite 8 | One codebase for the browser, workers, and Node |
 | Physics | [Rapier](https://rapier.rs) 0.14 (WASM) | Deterministic colliders and fast ray casts for lidar |
 | Learning | [TensorFlow.js](https://www.tensorflow.org/js) 4.22, hand-written SIMD WASM gemm | PPO updates on WebGL or CPU, cheap batched inference in env workers |
 | Rendering | [Three.js](https://threejs.org) 0.170, WebGL2 (WebGPU opt-in) | PBR, HDRI, shadows, and post passes; `?renderer=webgpu` tries the lighter WebGPU path |
