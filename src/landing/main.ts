@@ -54,17 +54,19 @@ function markup(): string {
         <h1>frontier-fly</h1>
         <p class="pitch">
           A rescue drone that sweeps the woods, finds the building, flies in through an opening it fits, and searches
-          room by room, in buildings it has never seen. The physics, the sensors, the learned autopilot and the 3D replay
-          above all run in this tab. No server.
+          room by room, in buildings it has never seen, on its own sensors and without the floor plan. The physics,
+          the sensors, the autopilot and the 3D replay above all run in this tab. No server.
         </p>
         <ul class="proof" aria-label="Headline results">
-          <li><strong>${pct(r.pilots[0]!.value)}</strong> of ${r.seeds} unseen hard buildings searched${r.pilots[0]!.crashes !== null ? `, ${r.pilots[0]!.crashes === 0 ? 'no' : r.pilots[0]!.crashes} crash${r.pilots[0]!.crashes === 1 ? '' : 'es'}` : ''}</li>
-          <li><strong>${pct(r.easy)}</strong> of easy ones</li>
-          <li><strong>${pct(r.night)}</strong> of the same buildings at night, lights off</li>
+          ${r.missions ? `<li><strong>${pct(r.missions.expectedOutcome)}</strong> of ${r.missions.flights} quadrotor missions end the right way</li>` : ''}
+          <li><strong>${(falseClear.p * 100).toFixed(2)}%</strong> of flights call a building clear with someone inside</li>
+          <li><strong>${pct(r.pilots[0]!.value)}</strong> of ${r.seeds} unseen hard buildings searched by the learned policy</li>
         </ul>
         <p class="method">
-          The indoor pilot is a small network learned by imitation (behavior cloning + DAgger) from a privileged planner,
-          then fine-tuned with PPO on its own flights. <a href="#results-title">See the numbers</a>.
+          Indoors a planner maps from the drone's own lidar and takes over whenever the learned policy stalls, and a
+          failure atlas hunts for the flights where the mission is wrong. A small network, learned by imitation and fine-tuned with PPO, covers more than the planner on a
+          simple airframe behind a lidar guard${r.quad ? `, and loses to it on quadrotor dynamics (${pct(r.quad.policy.coverage)} against ${pct(r.quad.planner.coverage)})` : ''}.
+          <a href="#results-title">See the numbers</a>.
         </p>
       </div>
       <nav class="actions" aria-label="Start here">
@@ -102,6 +104,7 @@ function markup(): string {
         ${pct(r.pilots[0]!.ci[0])} to ${pct(r.pilots[0]!.ci[1])}.
         ${r.crashSpeed !== null ? `A contact faster than ${r.crashSpeed} m/s is a crash and ends the flight; coverage counts what was flown until then.` : ''}
         ${r.guardSaves ? 'Alone, the policy still crashes more often, even after retraining under the crash rule. The lidar guard is what makes it safe.' : ''}
+        ${r.quad ? `On quadrotor dynamics the order flips: the quad-aware planner covers ${pct(r.quad.planner.coverage)} with ${r.quad.planner.crashes ?? 0} crashes and the policy crashes in ${r.quad.policy.crashes ?? 'most'} of ${r.quad.policy.episodes} flights.` : ''}
         Night, multi-floor and quadrotor results are in
         <a href="${REPO}/blob/main/docs/REPORT.md" rel="noopener">REPORT.md</a>; method and every condition in
         <a href="${REPO}/blob/main/docs/BENCHMARKS.md" rel="noopener">BENCHMARKS.md</a>.
@@ -113,7 +116,7 @@ function markup(): string {
         <p class="kicker">ABOUT THE BUILDER</p>
         <h2 id="about-title">Built by ${AUTHOR.name}</h2>
         <p>
-          frontier-fly is ${AUTHOR.name}'s project: a browser simulator, a learned autopilot and a benchmark for
+          frontier-fly is ${AUTHOR.name}'s project: a browser simulator, an autopilot that flies on its own sensors, and a benchmark for
           drones that search buildings for people. It is built in the open, every number on this site regenerates
           from code in the repository, and the limits are written down next to the results.
         </p>

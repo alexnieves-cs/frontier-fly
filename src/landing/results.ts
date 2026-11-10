@@ -4,7 +4,7 @@
 // The small fixed protocol in docs/benchmarks.json is a smoke check and is not shown here.
 // docs/headline.json is the small extract of those cells that scripts/docs/generate.mjs writes, so the page
 // does not ship the study's per-episode rows.
-import { cells as studyCells, commit, conditions, crashSpeed, seedsPerCondition } from '../../docs/headline.json';
+import { cells as studyCells, commit, conditions, crashSpeed, missions, quad, seedsPerCondition } from '../../docs/headline.json';
 
 interface StudyCell {
   condition: string;
@@ -70,6 +70,10 @@ export function results() {
     /** The guarded policy on the same hard buildings with every light off. */
     night: cell('hard', 'night-dark', 'guarded').coverage,
     nightOverDay: cell('hard', 'night-dark', 'guarded').coverage / guarded.value,
+    /** Quadrotor dynamics: the quad-aware planner against the policy alone; null if the study has no quad cells. */
+    quad: quad.planner && quad.policy ? { planner: quad.planner, policy: quad.policy } : null,
+    /** Whole missions on the quadrotor (docs/mission-bench.json), the README's first row. */
+    missions,
     commit: commit.slice(0, 7),
     /** The crash speed the study ran under, m/s; null before the crash rule. */
     crashSpeed: crashSpeed as number | null,

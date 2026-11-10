@@ -759,8 +759,13 @@ function benchmarks() {
 
 
 /** The coverage-study cells the homepage shows (src/landing/results.ts reads docs/headline.json). */
-function studyHeadline(study) {
+function studyHeadline(study, mb) {
   if (!study) return null;
+  const quadCell = (pilot) => {
+    const c = study.cells.find((x) => x.condition === 'quad' && x.lighting === 'day' && x.pilot === pilot);
+    return c ? { coverage: c.coverage, crashes: c.crashes ?? null, episodes: c.episodes } : null;
+  };
+  const flown = mb?.modes?.policyQuad?.all;
   const keep = ['teacher', 'classical', 'policy', 'guarded', 'waypoint', 'heuristic'];
   return {
     source: 'docs/study.json (scripts/study/coverage-study.ts); regenerate with npm run docs',
@@ -768,6 +773,10 @@ function studyHeadline(study) {
     crashSpeed: study.crashSpeed ?? null,
     seedsPerCondition: study.seedsPerCondition,
     conditions: study.conditions.filter((c) => c.id === 'easy' || c.id === 'hard').map((c) => ({ id: c.id, stage: c.stage })),
+    // Quadrotor dynamics with sensor noise: the quad-aware planner against the learned policy.
+    quad: { planner: quadCell('classicalBrakeTrack'), policy: quadCell('policy') },
+    // Whole missions on the quadrotor, as the README's results table quotes them.
+    missions: flown ? { expectedOutcome: flown.expectedOutcome, ci: flown.expectedOutcomeCi, flights: flown.flights } : null,
     cells: study.cells
       .filter((c) => (c.condition === 'easy' || c.condition === 'hard') && keep.includes(c.pilot))
       .map((c) => ({
@@ -909,15 +918,12 @@ function readmeHeadline(study, mb, atlas, faults, tracking) {
   const col = atlas.rates.collision.importance;
   const occupied = atlas.conditional.falseClearSweepOccupied;
   const safe = faults.vehicles.quad.all;
+  const quadOf = (pilot) => study.cells.find((c) => c.condition === 'quad' && c.lighting === 'day' && c.pilot === pilot);
+  const quadPlanner = quadOf('classicalBrakeTrack');
+  const quadPolicy = quadOf('policy');
   return table(
     ['Question', 'Measured', 'On'],
     [
-      [
-        'How much of a new building does the trained policy search?',
-        `${pct(day.coverage)} (${ci1(day.coverageCi)}) behind its lidar guard${crashed(day)}. Alone ${pct(alone.coverage)}${crashed(alone)}. The sensor-only planner, no learning: ${pct(cell('day', 'classical').coverage)}`,
-        `${day.episodes} fresh hard buildings`,
-      ],
-      ['Does it work in the dark?', `${pct(night.coverage)} with every light off`, 'the same buildings'],
       [
         'Do whole missions end the right way?',
         `${pct(missions.expectedOutcome)} (${ci1(missions.expectedOutcomeCi)}) found the target or correctly cleared`,
@@ -936,6 +942,12 @@ function readmeHeadline(study, mb, atlas, faults, tracking) {
           ],
       ['How often does it hit something?', `${pct2(col.p)} per flight (${ci2(col.ci)})`, `${fmt(col.flights)} importance-sampled flights`],
       ['Does it get home when something breaks?', `${pct(safe.safeRate)} (${ci1(safe.safeRateCi)}) of faulted flights end safely`, `${fmt(safe.flights)} flights with sensor, motor, battery, link, GNSS or wind faults`],
+      [
+        'What does the learned policy add?',
+        `On the simple airframe, more coverage: ${pct(day.coverage)} (${ci1(day.coverageCi)}) behind its lidar guard${crashed(day)}, against ${pct(cell('day', 'classical').coverage)} for the sensor-only planner; alone it covers ${pct(alone.coverage)}${crashed(alone)}. On quadrotor dynamics it loses: the planner covers ${pct(quadPlanner.coverage)} with ${quadPlanner.crashes} crashes, the policy ${pct(quadPolicy.coverage)} and crashes in ${quadPolicy.crashes} of ${quadPolicy.episodes}`,
+        `${day.episodes} fresh hard buildings per airframe`,
+      ],
+      ['Does it work in the dark?', `${pct(night.coverage)} with every light off (guarded policy; the planner ${pct(cell('night-dark', 'classical').coverage)})`, 'the same buildings'],
     ],
   );
 }
@@ -1353,7 +1365,7 @@ const outputs = {
 };
 // The homepage and the tour quote the coverage study through this small extract, so the page does not ship
 // the study's per-episode rows (docs/study.json is ~700 KB).
-const headline = studyHeadline(readJson('docs/study.json'));
+const headline = studyHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'));
 if (headline) outputs['docs/headline.json'] = `${JSON.stringify(headline, null, 2)}\n`;
 let readme = read('README.md');
 readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json'), trackingRuns()));

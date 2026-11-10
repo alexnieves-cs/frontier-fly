@@ -1,6 +1,6 @@
 # frontier-fly
 
-**A search-and-rescue drone autopilot that searches buildings from the treeline to the last room, entirely in your browser. A small network, learned by imitation and fine-tuned with PPO, flies it on lidar alone, with a sensor-only planner as backup.**
+**A search-and-rescue drone autopilot that searches buildings from the treeline to the last room, entirely in your browser, and an honest measurement of how often it is wrong. A sensor-only planner maps and flies without ever reading the floor plan, a failure atlas hunts for its rare mistakes, and a learned policy is tested against the planner, where it wins on a simple airframe and loses on a quadrotor.**
 
 [![ci](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml)
 [![pages](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml)
@@ -22,15 +22,15 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 <!-- generated:headline:start -->
 | Question | Measured | On |
 | --- | --- | --- |
-| How much of a new building does the trained policy search? | 75.1% (70.5–79.4%) behind its lidar guard, 1 of 30 crashed. Alone 67.5%, 7 of 30 crashed. The sensor-only planner, no learning: 65.5% | 30 fresh hard buildings |
-| Does it work in the dark? | 77.0% with every light off | the same buildings |
 | Do whole missions end the right way? | 98.3% (94.1–99.5%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
 | **How often does it call a building clear with someone inside?** | **0.30% per flight** (0.14–0.65%); it was 4.05% before unconfirmed people blocked a clear | 2,000 fresh flights, both versions on the same seeds |
 | How often does it hit something? | 1.15% per flight (0.77–1.72%) | 2,000 importance-sampled flights |
 | Does it get home when something breaks? | 98.6% (97.7–99.2%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
+| What does the learned policy add? | On the simple airframe, more coverage: 75.1% (70.5–79.4%) behind its lidar guard, 1 of 30 crashed, against 65.5% for the sensor-only planner; alone it covers 67.5%, 7 of 30 crashed. On quadrotor dynamics it loses: the planner covers 46.9% with 0 crashes, the policy 11.9% and crashes in 30 of 30 | 30 fresh hard buildings per airframe |
+| Does it work in the dark? | 77.0% with every light off (guarded policy; the planner 65.8%) | the same buildings |
 <!-- generated:headline:end -->
 
-Every number comes from seeds no model or setting was tuned on, with 95% intervals, and is regenerated from the study's JSON by `npm run docs`. The false-clear rate is the one to read first: it is why this is a research simulator and not a product. The [project guide](docs/GUIDE.md#honest-limits) lists the other limits.
+Every number comes from seeds no model or setting was tuned on, with 95% intervals, and is regenerated from the study's JSON by `npm run docs`. The false-clear rate is the one to read first: it is why this is a research simulator and not a product. The learned policy is the one to read second: nine further training runs did not get it past the planner on the quadrotor ([QUAD_POLICY.md](docs/QUAD_POLICY.md)). The [project guide](docs/GUIDE.md#honest-limits) lists the other limits.
 
 ## Run it
 
@@ -53,13 +53,14 @@ The [project guide](docs/GUIDE.md) covers the pages, every benchmark table, the 
 
 ## About the project
 
-frontier-fly is built by [Alex Nieves](https://alexnieves.me) ([GitHub](https://github.com/alexnieves-cs)). It started as a browser drone demo and grew into a research-style simulator: a learned pilot, a sensor-only planner, PX4 in the loop, a Python package, and a benchmark anyone can enter.
+frontier-fly is built by [Alex Nieves](https://alexnieves.me) ([GitHub](https://github.com/alexnieves-cs)). It started as a browser drone demo and grew into a research-style simulator: a sensor-only planner, a failure atlas, a learned pilot measured against both, PX4 in the loop, a Python package, and a benchmark anyone can enter.
 
 What turned out to be hard, and what the repository does about it:
 
 - **A good average hides rare failures.** The mission bench looked fine, but the failure atlas found the drone calling a building clear with a walking person inside on 3.5% of flights. Tracking people across views took that to 0.3%.
 - **Free contacts teach bad habits.** The learned policy covered the most of any pilot, then a crash rule showed it was sliding along walls. Retraining under the rule cut the policy's own crashes from 19 of 30 flights to 7, and the lidar guard takes that to 1.
 - **Small fixed evaluations flatter.** The early 86% was partly seed luck. Every headline now comes from fresh seeds with 95% intervals, and the generated docs fail CI if a number drifts from its JSON.
+- **A learned pilot is not automatically the better pilot.** Behind a guard on a simple airframe the policy covers ten points more than the planner. On quadrotor dynamics it crashes in every flight, and nine training runs (planner imitation, braking labels, memory, quad-only training) closed only part of the gap. Missions keep the planner as the pilot of last resort; the write-up is in [QUAD_POLICY.md](docs/QUAD_POLICY.md).
 - **Simulators lie in specific ways.** Kinematic drones stop instantly and quadrotors don't. A braking filter, a quad-aware tracker and PX4 SITL in CI keep the gap visible.
 
 Skills it covers: reinforcement and imitation learning (behavior cloning, DAgger, PPO), quadrotor dynamics and control, lidar mapping and scan-matching localization, PX4 and MAVLink, benchmark design, TypeScript, three.js and WebGL, Python packaging, and CI on GitHub Actions. To cite it, see [CITATION.cff](CITATION.cff).
