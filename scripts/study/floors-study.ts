@@ -49,7 +49,7 @@ for (const budget of BUDGETS) {
     let obs = env.reset(spec, envSeed, cfg);
     const fp = new EpisodeFootprint();
     fp.start(env, spec, cfg.maxSteps);
-    let info = { coverage: 0, collisions: 0 };
+    let info: { coverage: number; collisions: number };
     let steps = 0;
     for (;;) {
       const s = env.step(pilot.act(obs, sensorFrame(env, obs)));
