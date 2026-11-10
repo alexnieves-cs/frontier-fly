@@ -49,7 +49,7 @@ function curves(runs) {
 }
 
 export function rlSection(doc) {
-  const keys = ['RL_NOTE', 'RL_TABLE', 'RL_RUNS_TABLE', 'RL_CURVES_FIGURE', 'R_RL_BASE_HARD', 'R_RL_HARD', 'R_RL_DELTA', 'R_RL_CI', 'R_RL_N', 'R_RL_BASE_COLL', 'R_RL_COLL', 'R_RL_STUDY_DAY', 'R_RL_STUDY_NIGHT', 'R_RL_PROTO_DAY', 'R_RL_PROTO_NIGHT', 'R_RL_SHIPPED', 'R_RL_CRASHES', 'R_RL_BASE_CRASHES', 'R_RL_FIRST_HARD', 'R_RL_FIRST_DELTA', 'R_RL_FIRST_CI', 'R_RL_FIRST_CRASHES', 'R_RL_FIRST_COLL'];
+  const keys = ['RL_NOTE', 'RL_TABLE', 'RL_RUNS_TABLE', 'RL_CURVES_FIGURE', 'R_RL_BASE_HARD', 'R_RL_HARD', 'R_RL_DELTA', 'R_RL_CI', 'R_RL_N', 'R_RL_BASE_COLL', 'R_RL_COLL', 'R_RL_STUDY_DAY', 'R_RL_STUDY_NIGHT', 'R_RL_PROTO_DAY', 'R_RL_PROTO_NIGHT', 'R_RL_SHIPPED', 'R_RL_BASE_STUDY_DAY', 'R_RL_CRASHES', 'R_RL_BASE_CRASHES', 'R_RL_FIRST_HARD', 'R_RL_FIRST_DELTA', 'R_RL_FIRST_CI', 'R_RL_FIRST_CRASHES', 'R_RL_FIRST_COLL'];
   if (!doc) {
     const none = '_Not measured yet. Run scripts/study/rl-finetune.ts._';
     return { values: Object.fromEntries(keys.map((k) => [k, none])), files: {} };
@@ -99,6 +99,7 @@ export function rlSection(doc) {
       R_RL_PROTO_DAY: pct(cell('protocol', 3, 'day')[shipped].coverage),
       R_RL_PROTO_NIGHT: pct(cell('protocol', 3, 'night-dark')[shipped].coverage),
       R_RL_SHIPPED: shipped,
+      R_RL_BASE_STUDY_DAY: pct(cell('study', 3, 'day')[base].coverage),
       R_RL_CRASHES: crashes(s),
       R_RL_BASE_CRASHES: crashes(p[base]),
       R_RL_FIRST_HARD: pct(first.coverage),
