@@ -1,5 +1,5 @@
 /** The pilots the leaderboard starts with, written against the bench pilot API only. */
-import { FLOOR_HEIGHT, OBS } from '../shared/constants';
+import { OBS } from '../shared/constants';
 import { Climber } from '../sim/climber';
 import { heuristicAction } from '../sim/heuristic';
 import { commandToAction, SensorPlanner, type SensorFrame, type SensorPlannerOptions } from '../sim/sensorPlanner';
@@ -38,7 +38,7 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
       const frame = { ...f, occupied: occ.occupied };
       if (f.floors > 1) {
         climber ??= new Climber(explorer, { floorSteps: (0.8 * ctx.maxSteps) / f.floors });
-        return commandToAction(climber.act(frame, obs[OBS.ceil]! * FLOOR_HEIGHT), f.yaw, out, ctx.speedH).slice();
+        return commandToAction(climber.act(frame, obs[OBS.ceil]! * f.floorHeight), f.yaw, out, ctx.speedH).slice();
       }
       return commandToAction(explorer.act(frame), f.yaw, out, ctx.speedH).slice();
     },

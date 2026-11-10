@@ -603,7 +603,7 @@ export function sensorFrame(env: ExplorerEnv, obs: Float32Array): SensorFrame {
     pos: s.pos,
     yaw: s.yaw,
     lidar: lidarScratch,
-    alt: obs[C.OBS.alt]! * C.FLOOR_HEIGHT,
+    alt: obs[C.OBS.alt]! * spec.floorHeight,
     vel: measuredVelocity(obs, s.yaw),
   };
 }

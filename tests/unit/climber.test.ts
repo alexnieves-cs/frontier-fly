@@ -75,4 +75,31 @@ describe('climbing pilot', () => {
     expect(pilot.climber.floorChanges).toBeGreaterThan(0);
     expect(collisions).toBe(0);
   }, 60_000);
+
+  it('started on the middle floor, goes up and then back down past it to the bottom floor', async () => {
+    const { spec, envSeed, cfg } = evalEpisodeSetup(4, 9103, 'day');
+    expect(spec.floors.length).toBe(3);
+    const room = spec.floors[1]!.rooms[0]!;
+    spec.spawn = [(room.x + room.w / 2) * spec.cellSize, (room.z + room.d / 2) * spec.cellSize, spec.floorHeight + 1.2];
+    cfg.maxSteps *= spec.floors.length;
+    const pilot = climbingPilot({}, { floorSteps: (0.8 * cfg.maxSteps) / spec.floors.length });
+    pilot.reset();
+    const env = await createEnv();
+    let obs = env.reset(spec, envSeed, cfg);
+    const order: number[] = [];
+    let info = { coverage: 0, collisions: 0 };
+    for (let t = 0; t < cfg.maxSteps; t++) {
+      const step = env.step(pilot.act(obs, env));
+      obs = step.obs;
+      info = step.info;
+      if (order[order.length - 1] !== step.info.floor) order.push(step.info.floor);
+      if (step.done) break;
+    }
+    env.dispose();
+    // The bottom floor is two floors from the top one: the climber used to look one floor up and down only.
+    expect(order.slice(0, 2)).toEqual([1, 2]);
+    expect(order).toContain(0);
+    expect(info.collisions).toBe(0);
+    expect(info.coverage).toBeGreaterThan(0.7);
+  }, 120_000);
 });

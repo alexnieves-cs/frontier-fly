@@ -1,4 +1,4 @@
-import { FLOOR_HEIGHT, LIDAR_H, LIDAR_MAX, OBS } from '../shared/constants';
+import { LIDAR_H, LIDAR_MAX, OBS } from '../shared/constants';
 import { Climber, type ClimberOptions } from '../sim/climber';
 import type { ExplorerEnv } from '../sim/env';
 import { commandToAction, measuredVelocity, sensorFrame, SensorPlanner, type SensorPlannerOptions } from '../sim/sensorPlanner';
@@ -49,7 +49,7 @@ export function climbingPilot(opts: SensorPlannerOptions = {}, climb: ClimberOpt
       const floor = Math.max(0, Math.min(f.floors - 1, Math.floor(f.pos[2] / f.floorHeight)));
       occ.mark(floor, f.pos[0], f.pos[1], f.yaw, f.lidar);
       f.occupied = occ.occupied;
-      return commandToAction(climber.act(f, obs[OBS.ceil]! * FLOOR_HEIGHT), f.yaw, out, env.speedLimit).slice();
+      return commandToAction(climber.act(f, obs[OBS.ceil]! * f.floorHeight), f.yaw, out, env.speedLimit).slice();
     },
   };
 }

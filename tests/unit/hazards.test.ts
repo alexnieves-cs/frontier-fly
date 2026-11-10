@@ -8,6 +8,9 @@ import { CELL, LIDAR_MAX, OBS, SURFACE } from '../../src/shared/constants';
 import { buildingFromJson, buildingToJson } from '../../src/shared/serialize';
 import type { BuildingSpec } from '../../src/shared/types';
 import { createEnv, defaultEpisodeConfig } from '../../src/sim/env';
+import { cameraLookingAt, detect } from '../../src/perception';
+import { bodyAabb, centerOf } from '../../src/targets/motion';
+import type { ResolvedTarget, TargetClass } from '../../src/targets/types';
 
 const ALL = { closedDoors: 0.35, ajarDoors: 0.6, glassRooms: 0.35, mirrors: 2, smokeRooms: 0.4 } as const;
 
@@ -129,5 +132,51 @@ describe('indoor hazards', () => {
     clear.dispose();
     expect(short / beams).toBeGreaterThan(0.2);
     expect(short / beams).toBeLessThan(0.95);
+  });
+
+  it('a thermal camera sees a person through smoke, not through glass, and adds nothing on decoys', () => {
+    const spec = corridor();
+    const floor = spec.floors[0]!;
+    const mask = new Uint8Array(floor.w * floor.d);
+    for (let z = 1; z < 9; z++) for (let x = 1; x < 5; x++) mask[z * floor.w + x] = 1;
+    spec.hazards!.smoke = { visibility: 1.5, cells: [mask] };
+    const body = (classId: TargetClass): ResolvedTarget => {
+      const aabb = bodyAabb([2.5, 5.5, 0], 0, 0.22, 0.16, 1.75);
+      const decoy = classId === 'mannequin';
+      return { id: `${classId}-0`, classId, category: decoy ? 'decoy' : 'person', state: decoy ? 'static' : 'standing', feet: [2.5, 5.5, 0], center: centerOf(aabb), yaw: 0, aabb, speed: 0, floor: 0, roomIndex: 0, occluders: [], ...(decoy ? { looksLike: 'person' as const } : {}) };
+    };
+    const camera = cameraLookingAt([2.5, 3, 1.2], [2.5, 5.5, 1.05], [0, 0, 1], (70 * Math.PI) / 180, 16 / 9);
+    const lighting = { timeOfDay: 12, interiorLightsOn: new Uint8Array([1]), flashlightOn: false, sensorMode: 'rgb' as const };
+    const seen = (target: ResolvedTarget, on: BuildingSpec, thermal: boolean) => {
+      let hits = 0;
+      let confidence = 0;
+      for (let i = 0; i < 300; i++) {
+        const d = detect({ seed: 4000 + i, camera, targets: [target], spec: on, lighting, thermal }).find((x) => x.classId === 'person');
+        if (d) {
+          hits += 1;
+          confidence += d.confidence;
+        }
+      }
+      return { rate: hits / 300, confidence: hits ? confidence / hits : 0 };
+    };
+    // 2.5 m of 1.5 m smoke leaves the visible camera a fraction of a percent of its contrast.
+    expect(seen(body('person'), spec, false).rate).toBeLessThan(0.02);
+    const warm = seen(body('person'), spec, true);
+    expect(warm.rate).toBeGreaterThan(0.4);
+    // Still weaker than a clear view: smoke costs the thermal camera contrast too.
+    expect(warm.rate).toBeLessThan(seen(body('person'), corridor(), true).rate);
+    // Without smoke the visible camera at this range already sees better: thermal changes nothing.
+    expect(seen(body('person'), corridor(), true)).toEqual(seen(body('person'), corridor(), false));
+    // A mannequin is at room temperature: thermal adds no detection of it, as a person or as itself.
+    expect(seen(body('mannequin'), spec, true)).toEqual(seen(body('mannequin'), spec, false));
+    // A glass wall between camera and person passes visible light and blocks long-wave infrared.
+    const glazed = corridor();
+    const g = glazed.floors[0]!;
+    for (let x = 1; x < 5; x++) {
+      g.cells[4 * g.w + x] = CELL.WALL;
+      g.surfaces![4 * g.w + x] = SURFACE.GLASS;
+    }
+    glazed.hazards!.smoke = { visibility: 1.5, cells: [mask] };
+    expect(seen(body('person'), glazed, true).rate).toBeLessThan(0.02);
   });
 });
