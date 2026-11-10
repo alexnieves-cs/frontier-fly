@@ -1,0 +1,225 @@
+{
+  "schema": 2,
+  "commit": "8372738",
+  "crashSpeed": 0.5,
+  "recipe": "BC, then 6 DAgger rounds, best round on validation seeds; no SWA, unlike the shipped checkpoint",
+  "arms": [
+    {
+      "id": "dagger",
+      "label": "BC + DAgger, full observation",
+      "ablation": null,
+      "curve": [
+        {
+          "round": 0,
+          "beta": 1,
+          "samples": 395330,
+          "loss": 0.0086,
+          "valSmall": 0.627,
+          "valLarge": 0.294,
+          "valScore": 0.42700000000000005
+        },
+        {
+          "round": 1,
+          "beta": 0.6,
+          "samples": 108206,
+          "loss": 0.0094,
+          "valSmall": 0.622,
+          "valLarge": 0.136,
+          "valScore": 0.331
+        },
+        {
+          "round": 2,
+          "beta": 0.42,
+          "samples": 85708,
+          "loss": 0.0094,
+          "valSmall": 0.7759999999999999,
+          "valLarge": 0.18600000000000003,
+          "valScore": 0.42200000000000004
+        },
+        {
+          "round": 3,
+          "beta": 0.29,
+          "samples": 87917,
+          "loss": 0.0091,
+          "valSmall": 0.92,
+          "valLarge": 0.245,
+          "valScore": 0.515
+        },
+        {
+          "round": 4,
+          "beta": 0.21,
+          "samples": 92843,
+          "loss": 0.0097,
+          "valSmall": 0.9490000000000001,
+          "valLarge": 0.376,
+          "valScore": 0.605
+        },
+        {
+          "round": 5,
+          "beta": 0.14,
+          "samples": 81258,
+          "loss": 0.0099,
+          "valSmall": 0.951,
+          "valLarge": 0.249,
+          "valScore": 0.53
+        },
+        {
+          "round": 6,
+          "beta": 0.1,
+          "samples": 76334,
+          "loss": 0.01,
+          "valSmall": 0.748,
+          "valLarge": 0.174,
+          "valScore": 0.40299999999999997
+        }
+      ],
+      "best": "round 4",
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.3339691800551755,
+          "coverageCi": [
+            0.25652499857699435,
+            0.41779466583241465
+          ],
+          "collisionsPerEpisode": 1.0666666666666667,
+          "crashes": 23
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.34033903929020415,
+          "coverageCi": [
+            0.2625417960063948,
+            0.42232070534686994
+          ],
+          "collisionsPerEpisode": 1.4,
+          "crashes": 23
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5626738097753774,
+          "coverageCi": [
+            0.49780841493989963,
+            0.6218850805128304
+          ],
+          "collisionsPerEpisode": 0.13333333333333333,
+          "crashes": 1
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5672707311261238,
+          "coverageCi": [
+            0.5053055318491574,
+            0.6172146886228866
+          ],
+          "collisionsPerEpisode": 0.23333333333333334,
+          "crashes": 2
+        }
+      }
+    },
+    {
+      "id": "bc",
+      "label": "BC only (DAgger round 0)",
+      "ablation": null,
+      "curve": [],
+      "best": null,
+      "ppo": null,
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.2824291930242068,
+          "coverageCi": [
+            0.2340911495740602,
+            0.3354852319727638
+          ],
+          "collisionsPerEpisode": 1.1,
+          "crashes": 27
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.3161972897816128,
+          "coverageCi": [
+            0.27147361664800823,
+            0.3666872734107055
+          ],
+          "collisionsPerEpisode": 1.1333333333333333,
+          "crashes": 29
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5299911983578691,
+          "coverageCi": [
+            0.4817124228294863,
+            0.5757700716603896
+          ],
+          "collisionsPerEpisode": 0.2,
+          "crashes": 0
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5820779478138018,
+          "coverageCi": [
+            0.5409459863388435,
+            0.62120629714208
+          ],
+          "collisionsPerEpisode": 0.16666666666666666,
+          "crashes": 1
+        }
+      }
+    },
+    {
+      "id": "ppo",
+      "label": "BC + DAgger + anchored PPO",
+      "ablation": null,
+      "curve": [],
+      "best": null,
+      "ppo": {
+        "val": 0.639,
+        "dagger": 0.605
+      },
+      "hard": {
+        "policyDay": {
+          "episodes": 30,
+          "coverage": 0.4283064235838573,
+          "coverageCi": [
+            0.3705227933557401,
+            0.483544680202238
+          ],
+          "collisionsPerEpisode": 10.066666666666666,
+          "crashes": 19
+        },
+        "policyNight": {
+          "episodes": 30,
+          "coverage": 0.39401015587912175,
+          "coverageCi": [
+            0.33833744739097044,
+            0.44983709226315743
+          ],
+          "collisionsPerEpisode": 8.333333333333334,
+          "crashes": 19
+        },
+        "guardedDay": {
+          "episodes": 30,
+          "coverage": 0.5794236488645871,
+          "coverageCi": [
+            0.5249654954440156,
+            0.6283040038300926
+          ],
+          "collisionsPerEpisode": 0.13333333333333333,
+          "crashes": 0
+        },
+        "guardedNight": {
+          "episodes": 30,
+          "coverage": 0.5825070273135802,
+          "coverageCi": [
+            0.5273901071728921,
+            0.6330659105268224
+          ],
+          "collisionsPerEpisode": 0.06666666666666667,
+          "crashes": 1
+        }
+      }
+    }
+  ]
+}
