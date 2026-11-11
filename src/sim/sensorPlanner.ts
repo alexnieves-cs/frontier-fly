@@ -1,7 +1,8 @@
 import * as C from '../shared/constants';
 import type { ExplorerEnv } from './env';
 import type { GainSource } from './mapPredict';
-import { approachSpeed, CommandShaper, profileSpeed, uTurnSpeed, resolveTracker, type ResolvedTracker, type TrackerOptions } from './tracker';
+import { approachSpeed, CommandShaper, cornerSpeed, profileSpeed, uTurnSpeed, resolveTracker, TRACKER_DEFAULTS, type ResolvedTracker, type TrackerOptions } from './tracker';
+import { MAX_CANDIDATES, PICK_DIM, type GoalPicker, type PickCandidates } from './picker';
 import { BRAKING_MARGIN, brakingFilter, descentClear, filterVelocity, SAFETY_HORIZON, SAFETY_MARGIN, type BrakingModel } from './lidarSafety';
 import { voxelLayout } from '../shared/voxels';
 
@@ -39,6 +40,8 @@ export interface SensorFrame {
   alt: number;
   /** Measured horizontal velocity in the world frame, m/s (the IMU's estimate). The braking filter needs it. */
   vel?: readonly [number, number];
+  /** Fraction of the step budget left, when the pilot knows it (a feature for SensorPlannerOptions.picker). */
+  timeLeft?: number;
 }
 
 /** World-frame command. */
@@ -97,6 +100,11 @@ export interface SensorPlannerOptions {
    * by default; pass {} for the tuned defaults.
    */
   tracker?: TrackerOptions;
+  /**
+   * Learned goal choice (sim/picker.ts): replaces the rule that picks the next frontier goal among
+   * one candidate per frontier cluster. Path search, filters and tracker are unchanged.
+   */
+  picker?: GoalPicker;
 }
 
 /** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
@@ -146,6 +154,16 @@ export class SensorPlanner {
   /** Swappable so a team can attach its claim map after construction. */
   penalty: CandidatePenalty | null;
   readonly tracker: ResolvedTracker | null;
+  readonly picker: GoalPicker | null;
+  /** Goal choices the picker made (diagnostics). */
+  picks = 0;
+  private candScore = new Float64Array(0);
+  private candOrder = new Int32Array(0);
+  private candLabel = new Int32Array(0);
+  private candQueue = new Int32Array(0);
+  private readonly cands: PickCandidates = { n: 0, feats: new Float32Array(MAX_CANDIDATES * PICK_DIM), ruleScore: new Float64Array(MAX_CANDIDATES), current: -1 };
+  private readonly candVox = new Int32Array(MAX_CANDIDATES);
+  private readonly candSize = new Int32Array(MAX_CANDIDATES);
   private readonly shaper = new CommandShaper();
   private readonly corners: [number, number][] = [];
   /** The last string-pulled point is the path's end (the goal), not a lookahead cut. */
@@ -180,6 +198,7 @@ export class SensorPlanner {
     this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
     this.penalty = opts.penalty ?? null;
     this.tracker = opts.tracker ? resolveTracker(opts.tracker) : null;
+    this.picker = opts.picker ?? null;
   }
 
   reset(): void {
@@ -192,7 +211,9 @@ export class SensorPlanner {
     this.noProgress = 0;
     this.lastFloor = -1;
     this.idle = 0;
+    this.picks = 0;
     this.shaper.reset();
+    this.picker?.reset?.();
   }
 
   /**
@@ -233,6 +254,10 @@ export class SensorPlanner {
     this.clear = new Uint8Array(this.plane);
     this.heap = new Int32Array(this.plane * 8 + 16);
     this.banned = new Uint8Array(n);
+    this.candScore = new Float64Array(this.plane);
+    this.candOrder = new Int32Array(this.plane);
+    this.candLabel = new Int32Array(this.plane);
+    this.candQueue = new Int32Array(this.plane);
   }
 
   private floorOf(f: SensorFrame): number {
@@ -327,6 +352,10 @@ export class SensorPlanner {
     if (gain) gain.prepare({ vw, vd, base, seen: f.seen, visited: f.visited, occupied: f.occupied });
     const claim = this.penalty;
     claim?.prepare(floor, vw);
+    const picker = this.picker;
+    const cs = this.candScore;
+    if (picker) cs.fill(NaN);
+    let popped = 0;
     while (size > 0) {
       const k = pop();
       if (done[k]! & 128) continue;
@@ -344,16 +373,20 @@ export class SensorPlanner {
           if (ol > 1e-6) score += mom * (1 - (ox * vel[0] + oy * vel[1]) / (ol * vmag + 1e-6)) * 0.5 * vmag;
         }
         // The gain is only worth computing where it could still change the choice.
-        if (gain && score - reach < bestCost) score -= gw * gain.gain(k);
+        if (gain && (picker || score - reach < bestCost)) score -= gw * gain.gain(k);
         // A penalty only raises the score, so the early-exit bound below still holds.
         if (claim) score += claim.cost(k);
         if (k === keep) keepCost = score;
+        if (picker) {
+          cs[k] = score;
+          this.candOrder[k] = popped++;
+        }
         if (score < bestCost) {
           bestCost = score;
           best = k;
         }
       }
-      if (d0 - 8 * this.edgeBonus - reach > bestCost + 1.5 && (keep < 0 || keepCost < Infinity)) break;
+      if (!picker && d0 - 8 * this.edgeBonus - reach > bestCost + 1.5 && (keep < 0 || keepCost < Infinity)) break;
       const x = k % vw;
       const y = (k - x) / vw;
       for (let d = 0; d < 8; d++) {
@@ -374,14 +407,189 @@ export class SensorPlanner {
       }
     }
     for (let k = 0; k < this.plane; k++) done[k] = done[k]! & 127;
+    if (picker) {
+      if (best < 0) return -1;
+      const chosen = this.pickGoal(f, base, start, keep);
+      return this.setPath(chosen, start);
+    }
     // Hysteresis: keep the current goal unless another is clearly cheaper.
     if (keep >= 0 && keepCost < Infinity && keepCost <= bestCost + 1.5) best = keep;
     if (best < 0) return -1;
-    const path: number[] = [];
-    for (let k = best; k >= 0 && k !== start; k = prev[k]!) path.push(k);
-    path.reverse();
-    this.path = path;
+    return this.setPath(best, start);
+  }
+
+  private setPath(best: number, start: number): number {
+    this.path = this.pathTo(best, start);
     return best;
+  }
+
+  private pathTo(k0: number, start: number): number[] {
+    const path: number[] = [];
+    for (let k = k0; k >= 0 && k !== start; k = this.prev[k]!) path.push(k);
+    path.reverse();
+    return path;
+  }
+
+  /**
+   * One candidate per 8-connected cluster of scored frontier voxels (its lowest-score voxel, ties to
+   * the earliest settled), the MAX_CANDIDATES − 1 best by score plus the current goal; features for
+   * each; then the picker's choice. Returns the chosen voxel on the floor plane.
+   */
+  private pickGoal(f: SensorFrame, base: number, start: number, keep: number): number {
+    const { vw, vd } = f;
+    const cs = this.candScore;
+    const ord = this.candOrder;
+    const lab = this.candLabel;
+    const q = this.candQueue;
+    lab.fill(-1);
+    // Cluster representatives, kept sorted by (score, order); at most MAX_CANDIDATES - 1.
+    const reps: { k: number; s: number; o: number; size: number }[] = [];
+    let nl = 0;
+    for (let k0 = 0; k0 < this.plane; k0++) {
+      if (!(cs[k0]! === cs[k0]!) || lab[k0]! >= 0) continue;
+      let head = 0;
+      let tail = 0;
+      q[tail++] = k0;
+      lab[k0] = nl;
+      let bk = k0;
+      let size = 0;
+      while (head < tail) {
+        const k = q[head++]!;
+        size++;
+        if (cs[k]! < cs[bk]! || (cs[k]! === cs[bk]! && ord[k]! < ord[bk]!)) bk = k;
+        const x = k % vw;
+        const y = (k - x) / vw;
+        for (let d = 0; d < 8; d++) {
+          const nx = x + DX[d]!;
+          const ny = y + DY[d]!;
+          if (nx < 0 || ny < 0 || nx >= vw || ny >= vd) continue;
+          const nk = ny * vw + nx;
+          if (lab[nk]! >= 0 || !(cs[nk]! === cs[nk]!)) continue;
+          lab[nk] = nl;
+          q[tail++] = nk;
+        }
+      }
+      nl++;
+      reps.push({ k: bk, s: cs[bk]!, o: ord[bk]!, size });
+    }
+    reps.sort((a, b) => a.s - b.s || a.o - b.o);
+    const c = this.cands;
+    c.n = 0;
+    c.current = -1;
+    const sizeOf = (k: number) => reps.find((r) => lab[r.k] === lab[k])?.size ?? 1;
+    for (let i = 0; i < reps.length && c.n < MAX_CANDIDATES - 1; i++) {
+      this.candVox[c.n] = reps[i]!.k;
+      this.candSize[c.n] = reps[i]!.size;
+      c.ruleScore[c.n] = reps[i]!.s;
+      if (reps[i]!.k === keep) c.current = c.n;
+      c.n++;
+    }
+    if (keep >= 0 && c.current < 0 && cs[keep]! === cs[keep]!) {
+      this.candVox[c.n] = keep;
+      this.candSize[c.n] = sizeOf(keep);
+      c.ruleScore[c.n] = cs[keep]!;
+      c.current = c.n++;
+    }
+    for (let i = 0; i < c.n; i++) this.candidateFeatures(f, base, start, i);
+    const pick = this.picker!.pick(c);
+    this.picks++;
+    return this.candVox[Math.max(0, Math.min(c.n - 1, pick))]!;
+  }
+
+  private candidateFeatures(f: SensorFrame, base: number, start: number, i: number): void {
+    const c = this.cands;
+    const k = this.candVox[i]!;
+    const vw = f.vw;
+    const o = i * PICK_DIM;
+    const out = c.feats;
+    const gx = ((k % vw) + 0.5) * VOXEL;
+    const gy = (Math.floor(k / vw) + 0.5) * VOXEL;
+    const vel = f.vel ?? [0, 0];
+    const vmag = Math.hypot(vel[0], vel[1]);
+    const tr = this.tracker ?? TRACKER_DEFAULTS;
+    const legs = this.stringPullPath(f, base, this.pathTo(k, start), 40, 16, []);
+    let meters = 0;
+    let turns = 0;
+    let time = 0;
+    let px = f.pos[0];
+    let py = f.pos[1];
+    let lx = 0;
+    let ly = 0;
+    for (let j = 0; j < legs.length; j++) {
+      const [qx, qy] = legs[j]!;
+      const ax = qx - px;
+      const ay = qy - py;
+      const l = Math.hypot(ax, ay);
+      meters += l;
+      time += l / this.speed;
+      if (j > 0 && l > 1e-6 && Math.hypot(lx, ly) > 1e-6) {
+        const th = Math.acos(clamp((ax * lx + ay * ly) / (l * Math.hypot(lx, ly)), -1, 1));
+        turns += th;
+        const vc = cornerSpeed(th, tr, this.speed);
+        time += ((this.speed - vc) * (this.speed - vc)) / (tr.accel * this.speed);
+      }
+      if (l > 1e-6) {
+        lx = ax;
+        ly = ay;
+      }
+      px = qx;
+      py = qy;
+    }
+    let cosH = 0;
+    if (legs.length) {
+      const [qx, qy] = legs[0]!;
+      const ax = qx - f.pos[0];
+      const ay = qy - f.pos[1];
+      const l = Math.hypot(ax, ay);
+      if (l > 1e-6) {
+        if (vmag > 1e-6) cosH = (ax * vel[0] + ay * vel[1]) / (l * vmag);
+        // Turning the current velocity onto the first leg at cruise.
+        time += Math.hypot((ax / l) * this.speed - vel[0], (ay / l) * this.speed - vel[1]) / (2 * tr.accel);
+      }
+    }
+    const ll = Math.hypot(lx, ly);
+    const lane = ll > 1e-6 ? this.laneFrom(f, base, gx, gy, lx / ll, ly / ll, 6) : 0;
+    // Unknown space and frontier around the candidate.
+    const cx = k % vw;
+    const cy = (k - cx) / vw;
+    let unk = 0;
+    let tot = 0;
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        if (dx * dx + dy * dy > 16) continue;
+        const x = cx + dx;
+        const y = cy + dy;
+        if (x < 0 || y < 0 || x >= vw || y >= f.vd) continue;
+        tot++;
+        const kk = base + y * vw + x;
+        if (f.seen[kk] !== 1 && f.visited[kk] !== 1) unk++;
+      }
+    }
+    let fn = 0;
+    for (let d = 0; d < 8; d++) {
+      const x = cx + DX[d]!;
+      const y = cy + DY[d]!;
+      if (x < 0 || y < 0 || x >= vw || y >= f.vd) continue;
+      if (this.candScore[y * vw + x]! === this.candScore[y * vw + x]!) fn++;
+    }
+    out[o + 0] = this.dist[k]! / 40;
+    out[o + 1] = Math.hypot(gx - f.pos[0], gy - f.pos[1]) / 10;
+    out[o + 2] = c.ruleScore[i]! / 40;
+    out[o + 3] = this.edgeCount(f, base, k) / 8;
+    out[o + 4] = Math.log1p(this.candSize[i]!) / 5;
+    out[o + 5] = tot ? unk / tot : 0;
+    out[o + 6] = (cosH * vmag) / 2;
+    out[o + 7] = ((1 - cosH) * vmag) / 2;
+    out[o + 8] = Math.min(4, turns / Math.PI);
+    out[o + 9] = time / 20;
+    out[o + 10] = lane / 6;
+    out[o + 11] = i === c.current ? 1 : 0;
+    out[o + 12] = meters / 10;
+    out[o + 13] = fn / 8;
+    out[o + 14] = f.timeLeft ?? 1;
+    out[o + 15] = vmag / 2;
+    out[o + 16] = c.n / MAX_CANDIDATES;
+    out[o + 17] = 1;
   }
 
   /** Neighbours of k (8-connected) that are flown or not traversable. */
@@ -530,11 +738,15 @@ export class SensorPlanner {
    * first flown or blocked voxel, up to `max`: where the current sweep lane ends.
    */
   private laneAhead(f: SensorFrame, base: number, ux: number, uy: number, max: number): number {
+    return this.laneFrom(f, base, f.pos[0], f.pos[1], ux, uy, max);
+  }
+
+  private laneFrom(f: SensorFrame, base: number, ox: number, oy: number, ux: number, uy: number, max: number): number {
     const stepM = VOXEL * 0.5;
     let lastK = -1;
     for (let d = stepM; d <= max; d += stepM) {
-      const x = Math.floor((f.pos[0] + ux * d) / VOXEL);
-      const y = Math.floor((f.pos[1] + uy * d) / VOXEL);
+      const x = Math.floor((ox + ux * d) / VOXEL);
+      const y = Math.floor((oy + uy * d) / VOXEL);
       if (x < 0 || y < 0 || x >= f.vw || y >= f.vd) return d - stepM;
       const k = y * f.vw + x;
       if (k === lastK) continue;
@@ -552,10 +764,16 @@ export class SensorPlanner {
    * lookahead cut).
    */
   private stringPull(f: SensorFrame, base: number, lookahead: number): [number, number][] {
-    const out = this.corners;
-    out.length = 0;
+    this.corners.length = 0;
     this.pulledToEnd = false;
-    const path = this.path;
+    if (!this.path.length) return this.corners;
+    this.stringPullPath(f, base, this.path, lookahead, 8, this.corners);
+    return this.corners;
+  }
+
+  /** String-pull `path` into at most `maxLegs` legs within `lookahead` meters; sets pulledToEnd. */
+  private stringPullPath(f: SensorFrame, base: number, path: readonly number[], lookahead: number, maxLegs: number, out: [number, number][]): [number, number][] {
+    out.length = 0;
     if (!path.length) return out;
     const vw = f.vw;
     const px = (k: number) => ((k % vw) + 0.5) * VOXEL;
@@ -570,7 +788,7 @@ export class SensorPlanner {
     let ax = f.pos[0];
     let ay = f.pos[1];
     let i = -1;
-    while (i < last && out.length < 8) {
+    while (i < last && out.length < maxLegs) {
       let j = i + 1;
       for (let c = last; c > i + 1; c--) {
         if (this.lineClear(f, base, ax, ay, px(path[c]!), py(path[c]!))) {
@@ -614,6 +832,7 @@ export function sensorFrame(env: ExplorerEnv, obs: Float32Array): SensorFrame {
     lidar: lidarScratch,
     alt: obs[C.OBS.alt]! * spec.floorHeight,
     vel: measuredVelocity(obs, s.yaw),
+    timeLeft: obs[C.OBS.time]!,
   };
 }
 
