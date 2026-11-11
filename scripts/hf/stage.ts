@@ -27,7 +27,12 @@ interface Cell {
   coverageCi: [number, number];
   crashes: number;
 }
-const headline = JSON.parse(readFileSync('docs/headline.json', 'utf8')) as { commit: string; crashSpeed: number; cells: Cell[] };
+const headline = JSON.parse(readFileSync('docs/headline.json', 'utf8')) as {
+  commit: string;
+  crashSpeed: number;
+  cells: Cell[];
+  quad: Record<'planner' | 'policy', { coverage: number; crashes: number; episodes: number }>;
+};
 const cell = (condition: string, lighting: string, pilot: string) => {
   const c = headline.cells.find((x) => x.condition === condition && x.lighting === lighting && x.pilot === pilot);
   if (!c) throw new Error(`docs/headline.json has no ${condition}/${lighting}/${pilot} cell`);
@@ -186,6 +191,7 @@ ablations, what failed, and the seed blocks used for tuning and for scoring.
 
 - Simulator only: generated and real (Swiss Dwellings, CC BY 4.0) floor plans, simulated lidar and physics.
 - Alone, the network crashes on ${p.crashes} of ${p.episodes} hard buildings; it is meant to fly under the guard.
+- On the quadrotor airframe the network loses to the planner: ${pct(headline.quad.policy.coverage)}% with ${headline.quad.policy.crashes} of ${headline.quad.policy.episodes} flights crashing, against ${pct(headline.quad.planner.coverage)}% and ${headline.quad.planner.crashes} crashes for the planner ([quad policy study](${GH}/blob/main/docs/QUAD_POLICY.md)).
 - The [project guide](${GH}/blob/main/docs/GUIDE.md#honest-limits) lists the rest.
 
 ## Citation
