@@ -47,7 +47,7 @@ function headline() {
     return row;
   };
   return {
-    coverage: find(/search/i),
+    coverage: find(/learned policy add|search/i),
     night: find(/dark/i),
     missions: find(/missions/i),
     falseClear: find(/clear with someone inside/i),
@@ -158,9 +158,9 @@ const cards = {
   problem: `<div class="card"><div class="kicker">The problem</div><h2>Someone is missing near a cabin in the woods.</h2>
     <p>With no pilot at the sticks, a drone has to sweep the area, find the building, get inside through whatever opening it fits, search every room, and come back with an answer: found, or clear.</p></div>`,
   fails: `<div class="card"><div class="kicker">Where it fails</div><h2>The numbers it is least proud of, measured on seeds it never trained on</h2><div class="grid">
-    <div class="stat warn"><div class="big">${esc(pct(h.falseClear.measured))}</div><div class="lbl">of flights call a building clear with someone still inside (it was ${esc(h.falseClear.measured.match(/from (\d+(?:\.\d+)?%)/)?.[1] ?? 'higher')} before unconfirmed people blocked a clear)</div></div>
+    <div class="stat warn"><div class="big">${esc(pct(h.falseClear.measured))}</div><div class="lbl">of flights call a building clear with someone still inside (it was ${esc(h.falseClear.measured.match(/(?:from|was) (\d+(?:\.\d+)?%)/)?.[1] ?? 'higher')} before unconfirmed people blocked a clear)</div></div>
     <div class="stat warn"><div class="big">${esc(pct(h.crash.measured))}</div><div class="lbl">of flights hit something hard enough to count as a crash</div></div>
-    <div class="stat warn"><div class="big">${esc(h.coverage.measured.match(/alone [\d.]+%, (\d+ of \d+) flights/)?.[1] ?? 'Most')}</div><div class="lbl">flights crash when the learned pilot flies alone, without its lidar guard</div></div>
+    <div class="stat warn"><div class="big">${esc(h.coverage.measured.match(/alone(?: it covers)? [\d.]+%, (\d+ of \d+)/)?.[1] ?? 'Most')}</div><div class="lbl">flights crash when the learned pilot flies alone, without its lidar guard</div></div>
     <div class="stat warn"><div class="big">Sim only</div><div class="lbl">It has not flown a real drone yet. The project guide lists every known limit.</div></div>
   </div></div>`,
   numbers: `<div class="card"><div class="kicker">What it does well</div><div class="grid">
