@@ -119,27 +119,34 @@ export function ruleWeights(): Float64Array {
   return w;
 }
 
-/** One hidden layer scorer: s_i = w2 · tanh(W1 x_i + b1). Row-major W1 (hidden × PICK_DIM). */
+/** One hidden layer scorer with a linear skip: s_i = lin · x_i + w2 · tanh(W1 x_i + b1). Row-major W1 (hidden × PICK_DIM). */
 export interface MlpWeights {
   hidden: number;
+  lin: number[];
   w1: number[];
   b1: number[];
   w2: number[];
 }
 
-export function initMlp(hidden: number, rand: () => number, scale = 0.3): MlpWeights {
+/**
+ * Random hidden layer; the output layer starts at zero, so the picker starts as the linear score
+ * `lin` (default: the planner rule, ruleWeights()).
+ */
+export function initMlp(hidden: number, rand: () => number, lin: ArrayLike<number> = ruleWeights(), scale = 0.3): MlpWeights {
   const g = () => (rand() * 2 - 1) * scale;
   return {
     hidden,
+    lin: Array.from(lin),
     w1: Array.from({ length: hidden * PICK_DIM }, g),
     b1: Array.from({ length: hidden }, g),
-    w2: Array.from({ length: hidden }, () => g() / Math.sqrt(hidden)),
+    w2: new Array(hidden).fill(0),
   };
 }
 
 /** Forward pass for one candidate; `h` receives the hidden activations. */
 export function mlpScore(m: MlpWeights, x: ArrayLike<number>, xo: number, h: Float64Array): number {
   let s = 0;
+  for (let d = 0; d < PICK_DIM; d++) s += m.lin[d]! * x[xo + d]!;
   for (let j = 0; j < m.hidden; j++) {
     let a = m.b1[j]!;
     const r = j * PICK_DIM;
@@ -166,7 +173,7 @@ export class MlpPicker implements GoalPicker {
   private s = new Float64Array(MAX_CANDIDATES);
   private rec: { step: number; cov: number; steps: number[]; coverage: number[]; n: number[]; feats: number[]; chosen: number[]; logp: number[] } | null = null;
   constructor(m: MlpWeights, temperature = 0, rand: () => number = Math.random) {
-    if (m.w1.length !== m.hidden * PICK_DIM) throw new Error('MlpPicker: w1 size does not match PICK_DIM');
+    if (m.w1.length !== m.hidden * PICK_DIM || m.lin.length !== PICK_DIM) throw new Error('MlpPicker: w1 size does not match PICK_DIM');
     this.m = m;
     this.temperature = temperature;
     this.rand = rand;

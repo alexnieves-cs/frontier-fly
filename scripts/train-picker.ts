@@ -16,7 +16,8 @@ import { RNG } from '../src/shared/rng';
 import { Cma } from '../src/train/cma';
 import { NodeRolloutPool } from '../src/train/nodePool';
 import type { PickerEpisode, PickerEpisodeResult, PickerSpec } from '../src/train/pickerJob';
-import { PICK_DIM, PICK_FEATURES, ruleWeights } from '../src/sim/picker';
+import { initMlp, PICK_DIM, PICK_FEATURES, ruleWeights, type MlpWeights } from '../src/sim/picker';
+import { buildDecisions, initCritic, PickerLearner, PPO_PICKER_DEFAULTS, type PpoPickerConfig } from '../src/train/pickerPpo';
 
 const args = process.argv.slice(2);
 export function arg(name: string): string | undefined {
@@ -109,6 +110,75 @@ const ARMS: Record<string, () => Arm> = {
   },
 };
 
+/**
+ * Decision-level PPO for the MLP picker. It starts as the planner rule (zero output layer over a
+ * linear skip set to the rule weights, or --init <best.json> of a linear CMA run), so iteration 0
+ * flies like the planner (or that linear picker) and learning only has to find improvements.
+ */
+async function ppo(pool: NodeRolloutPool, workers: number, outDir: string): Promise<void> {
+  const seed = num('seed', 1);
+  const rng = new RNG(seed, 'picker-ppo');
+  const rand = () => rng.next();
+  let lin: ArrayLike<number> = ruleWeights();
+  let replanEvery: number | undefined;
+  const init = arg('init');
+  if (init) {
+    const b = JSON.parse(readFileSync(init, 'utf8')) as { spec: PickerSpec };
+    if (b.spec.kind !== 'linear') throw new Error('--init wants a linear best.json');
+    lin = b.spec.w;
+    replanEvery = b.spec.planner?.replanEvery;
+  }
+  const scale = num('logit-scale', 1);
+  const actor: MlpWeights = initMlp(num('hidden', 32), rand, Array.from(lin, (v) => v * scale));
+  const critic = initCritic(num('critic-hidden', 32), rand);
+  const cfg: PpoPickerConfig = {
+    ...PPO_PICKER_DEFAULTS,
+    lr: num('lr', PPO_PICKER_DEFAULTS.lr),
+    entropy: num('entropy', PPO_PICKER_DEFAULTS.entropy),
+    crashCost: num('crash-cost', PPO_PICKER_DEFAULTS.crashCost),
+    epochs: num('epochs', PPO_PICKER_DEFAULTS.epochs),
+    gamma: num('gamma', PPO_PICKER_DEFAULTS.gamma),
+  };
+  const learner = new PickerLearner(actor, critic, cfg, rand);
+  const iters = num('iters', 200);
+  const batch = num('batch', 32);
+  const evalEvery = num('eval-every', 10);
+  const warm = num('critic-warmup', 3);
+  const tune = seedSet('tune');
+  const log = join(outDir, 'log.jsonl');
+  writeFileSync(log, '');
+  const planner = replanEvery ? { replanEvery } : undefined;
+  let best = -Infinity;
+  const evaluate = async (it: number) => {
+    const spec: PickerSpec = { kind: 'mlp', weights: actor, temperature: 0, planner };
+    const s = summarize(await fly(pool, workers, tune.map((episode) => ({ spec, episode }))));
+    appendFileSync(log, JSON.stringify({ iter: it, tune: s }) + '\n');
+    console.log(`iter ${it} tune ${pct(s)}`);
+    if (s.score > best) {
+      best = s.score;
+      writeFileSync(join(outDir, 'best.json'), JSON.stringify({ arm: 'mlp', iter: it, tune: s, spec: { ...spec, weights: actor } }, null, 1));
+    }
+    writeFileSync(join(outDir, `iter-${it}.json`), JSON.stringify({ arm: 'mlp', iter: it, tune: s, spec: { ...spec, weights: actor } }));
+  };
+  await evaluate(0);
+  for (let it = 1; it <= iters; it++) {
+    const t0 = Date.now();
+    const spec: PickerSpec = { kind: 'mlp', weights: actor, temperature: 1, record: true, planner };
+    const rs = await fly(pool, workers, trainBatch(rng, batch).map((episode) => ({ spec, episode })), it);
+    const d = buildDecisions(rs, critic, cfg);
+    const savedLr = cfg.lr;
+    // Critic warm-up: the first iterations fit the critic only (actor step size zero).
+    const st = it <= warm ? learner.updateCriticOnly(d) : learner.update(d);
+    cfg.lr = savedLr;
+    const s = summarize(rs);
+    console.log(
+      `iter ${it} train ${pct(s)} decisions ${d.m} kl ${st.kl.toFixed(4)} clip ${st.clipFrac.toFixed(3)} ent ${st.entropy.toFixed(3)} vloss ${st.vLoss.toFixed(2)} (${((Date.now() - t0) / 1000).toFixed(0)} s)`,
+    );
+    appendFileSync(log, JSON.stringify({ iter: it, train: s, decisions: d.m, ...st }) + '\n');
+    if (it % evalEvery === 0 || it === iters) await evaluate(it);
+  }
+}
+
 async function main(): Promise<void> {
   const mode = arg('mode') ?? 'eval';
   const workers = num('workers', Math.max(1, availableParallelism()));
@@ -167,7 +237,7 @@ async function main(): Promise<void> {
       }
       console.log(`best gen ${best.gen}: ${best.tune && pct(best.tune)}`);
     } else if (mode === 'ppo') {
-      throw new Error('ppo: not yet');
+      await ppo(pool, workers, outDir);
     } else throw new Error(`unknown mode ${mode}`);
   } finally {
     await pool.close();
