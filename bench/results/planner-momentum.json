@@ -1,0 +1,4143 @@
+{
+  "bench": 3,
+  "name": "Sensor-only planner + momentum",
+  "source": "baseline:planner-momentum",
+  "split": "test",
+  "commit": "160ae15",
+  "baseline": true,
+  "taskDefs": [
+    {
+      "id": "room",
+      "label": "One room",
+      "stage": 0,
+      "dynamics": "kinematic",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 0
+    },
+    {
+      "id": "hard",
+      "label": "Rooms, hallways, loops",
+      "stage": 3,
+      "dynamics": "kinematic",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 0
+    },
+    {
+      "id": "dark",
+      "label": "Rooms, hallways, loops, lights off",
+      "stage": 3,
+      "dynamics": "kinematic",
+      "lighting": "night-dark",
+      "speedH": 2,
+      "dr": 0
+    },
+    {
+      "id": "fast",
+      "label": "Rooms, hallways, loops at 4 m/s",
+      "stage": 3,
+      "dynamics": "kinematic",
+      "lighting": "day",
+      "speedH": 4,
+      "dr": 0
+    },
+    {
+      "id": "floors",
+      "label": "Several floors joined by shafts",
+      "stage": 4,
+      "dynamics": "kinematic",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 0
+    },
+    {
+      "id": "quad",
+      "label": "Quadrotor with randomized dynamics and noise",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 1
+    },
+    {
+      "id": "apartments",
+      "label": "Real apartment plans",
+      "stage": 3,
+      "dynamics": "kinematic",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 0,
+      "plans": true
+    }
+  ],
+  "score": 0.6603058072062844,
+  "footprintScore": 0.8625511904761904,
+  "safeShare": 0.9291666666666667,
+  "crashShare": 0.07083333333333333,
+  "tasks": {
+    "room": {
+      "episodes": 30,
+      "coverage": 0.9513888888888892,
+      "coverageCi": [
+        0.9513888888888892,
+        0.9513888888888892
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 30,
+      "crashedFlights": 0,
+      "energyWh": 1.4889708107013826,
+      "halfS": 19.34666666666666,
+      "footprint": 1,
+      "footprintCi": [
+        1,
+        1
+      ],
+      "area": {
+        "flown": 0.6051701666666667,
+        "footprint": 0.99184
+      },
+      "footprintHalfS": 1.350583319718242
+    },
+    "hard": {
+      "episodes": 30,
+      "coverage": 0.6304286876574738,
+      "coverageCi": [
+        0.5985561591141781,
+        0.661780860628681
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 30,
+      "crashedFlights": 0,
+      "energyWh": 3.851842966160163,
+      "halfS": 94.74166666666666,
+      "footprint": 0.88308,
+      "footprintCi": [
+        0.8445533333333333,
+        0.9200333333333331
+      ],
+      "area": {
+        "flown": 0.3450531666666667,
+        "footprint": 0.6289631666666666
+      },
+      "footprintHalfS": 40.32940090480459
+    },
+    "dark": {
+      "episodes": 30,
+      "coverage": 0.6279733255299018,
+      "coverageCi": [
+        0.6012498987418596,
+        0.6528131177263332
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 30,
+      "crashedFlights": 0,
+      "energyWh": 3.863947516393552,
+      "halfS": 94.69333333333333,
+      "footprint": 0.9037333333333333,
+      "footprintCi": [
+        0.8717999999999998,
+        0.9342766666666668
+      ],
+      "area": {
+        "flown": 0.34479716666666677,
+        "footprint": 0.6428916666666665
+      },
+      "footprintHalfS": 35.14574368030189
+    },
+    "fast": {
+      "episodes": 30,
+      "coverage": 0.81989529146915,
+      "coverageCi": [
+        0.7832546604495134,
+        0.8565430257920608
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 30,
+      "crashedFlights": 0,
+      "energyWh": 4.984681656181693,
+      "halfS": 65.565,
+      "footprint": 0.9678333333333334,
+      "footprintCi": [
+        0.9405433333333335,
+        0.9892733333333333
+      ],
+      "area": {
+        "flown": 0.47808383333333343,
+        "footprint": 0.7497283333333333
+      },
+      "footprintHalfS": 22.414328923129666
+    },
+    "floors": {
+      "episodes": 30,
+      "coverage": 0.426014384744369,
+      "coverageCi": [
+        0.39153702531515583,
+        0.46444374783534204
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 30,
+      "crashedFlights": 0,
+      "energyWh": 3.9247532973783117,
+      "halfS": 105.7642857142857,
+      "footprint": 0.77246,
+      "footprintCi": [
+        0.7164,
+        0.8277966666666667
+      ],
+      "area": {
+        "flown": 0.22894683333333338,
+        "footprint": 0.47213333333333335
+      },
+      "footprintHalfS": 69.68644343238927
+    },
+    "quad": {
+      "episodes": 30,
+      "coverage": 0.30534270828244814,
+      "coverageCi": [
+        0.2526862946193158,
+        0.3594771706357541
+      ],
+      "collisionsPerEpisode": 0.6333333333333333,
+      "safeFlights": 13,
+      "crashedFlights": 17,
+      "energyWh": 2.7689324253599463,
+      "halfS": 107.775,
+      "footprint": 0.56293,
+      "footprintCi": [
+        0.4929700000000001,
+        0.6383366666666668
+      ],
+      "area": {
+        "flown": 0.19466383333333334,
+        "footprint": 0.4562958333333334
+      },
+      "footprintHalfS": 46.404122403840056
+    },
+    "apartments": {
+      "episodes": 60,
+      "coverage": 0.8610973638717585,
+      "coverageCi": [
+        0.8317155358694689,
+        0.8889254145916791
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 60,
+      "crashedFlights": 0,
+      "energyWh": 3.3907082463346065,
+      "halfS": 57.196666666666665,
+      "footprint": 0.9478216666666668,
+      "footprintCi": [
+        0.9259033333333334,
+        0.9678549999999999
+      ],
+      "area": {
+        "flown": 0.5424860833333331,
+        "footprint": 0.7210894166666666
+      },
+      "footprintHalfS": 30.877365191493393
+    }
+  },
+  "episodes": [
+    {
+      "task": "room",
+      "seed": 82001,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5069958552968294,
+      "halfS": 18.8,
+      "steps": 941,
+      "footprint": 1,
+      "area": {
+        "flown": 0.605205,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82002,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5090619493649922,
+      "halfS": 18.8,
+      "steps": 942,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60417,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82003,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4767813015830962,
+      "halfS": 19.95,
+      "steps": 897,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6024299999999999,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82004,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5062463747143506,
+      "halfS": 18.8,
+      "steps": 940,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6055499999999999,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82005,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5056621934972005,
+      "halfS": 18.8,
+      "steps": 940,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6055499999999999,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82006,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4804014766987184,
+      "halfS": 19.95,
+      "steps": 899,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6024299999999999,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82007,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4335729068825525,
+      "halfS": 18.8,
+      "steps": 886,
+      "footprint": 1,
+      "area": {
+        "flown": 0.61597,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82008,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5360138857966101,
+      "halfS": 19.9,
+      "steps": 941,
+      "footprint": 1,
+      "area": {
+        "flown": 0.605205,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82009,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.510321928023142,
+      "halfS": 18.8,
+      "steps": 943,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6045149999999999,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82010,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5062386861514596,
+      "halfS": 18.8,
+      "steps": 940,
+      "footprint": 1,
+      "area": {
+        "flown": 0.605205,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82011,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.476213871780923,
+      "halfS": 19.95,
+      "steps": 897,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6024299999999999,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82012,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4871073872906049,
+      "halfS": 19.6,
+      "steps": 903,
+      "footprint": 1,
+      "area": {
+        "flown": 0.603115,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82013,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5075701961660786,
+      "halfS": 18.8,
+      "steps": 941,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6055499999999999,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82014,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4903806464878964,
+      "halfS": 19.85,
+      "steps": 901,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60312,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82015,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4931428604061898,
+      "halfS": 19.9,
+      "steps": 904,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60173,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82016,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4192817987407713,
+      "halfS": 18.8,
+      "steps": 879,
+      "footprint": 1,
+      "area": {
+        "flown": 0.617355,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82017,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.491659893461192,
+      "halfS": 19.95,
+      "steps": 903,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60173,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82018,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4222349812854393,
+      "halfS": 18.8,
+      "steps": 882,
+      "footprint": 1,
+      "area": {
+        "flown": 0.61666,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82019,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5088508459959245,
+      "halfS": 18.8,
+      "steps": 942,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60417,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82020,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4995966778661254,
+      "halfS": 18.8,
+      "steps": 936,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6069399999999999,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82021,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.517122693274268,
+      "halfS": 19.9,
+      "steps": 932,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6066,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82022,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4905905339336503,
+      "halfS": 19.95,
+      "steps": 903,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60173,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82023,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.513936580181485,
+      "halfS": 19.85,
+      "steps": 930,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6076399999999998,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82024,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4178382714095126,
+      "halfS": 19.9,
+      "steps": 860,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6048549999999999,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82025,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4928224919018027,
+      "halfS": 19.95,
+      "steps": 904,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60173,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82026,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4932196093524066,
+      "halfS": 19.9,
+      "steps": 904,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6020749999999999,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82027,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4942886852154544,
+      "halfS": 19.9,
+      "steps": 905,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60173,
+        "footprint": 0.9940950000000001
+      },
+      "footprintHalfS": 1.2949342173417588
+    },
+    {
+      "task": "room",
+      "seed": 82028,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.467926183533808,
+      "halfS": 18.8,
+      "steps": 905,
+      "footprint": 1,
+      "area": {
+        "flown": 0.599995,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82029,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5079931654635164,
+      "halfS": 18.8,
+      "steps": 941,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6055499999999999,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "room",
+      "seed": 82030,
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.5060503892854744,
+      "halfS": 18.8,
+      "steps": 940,
+      "footprint": 1,
+      "area": {
+        "flown": 0.60417,
+        "footprint": 0.9895849999999999
+      },
+      "footprintHalfS": 1.4062324220947238
+    },
+    {
+      "task": "hard",
+      "seed": 82101,
+      "coverage": 0.7424242424242424,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9019806994818067,
+      "halfS": 72.05,
+      "steps": 2400,
+      "footprint": 0.9924,
+      "area": {
+        "flown": 0.4163849999999999,
+        "footprint": 0.701415
+      },
+      "footprintHalfS": 22.114673708034704
+    },
+    {
+      "task": "hard",
+      "seed": 82102,
+      "coverage": 0.6875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7306039759696845,
+      "halfS": 78.05,
+      "steps": 2400,
+      "footprint": 0.8868,
+      "area": {
+        "flown": 0.39408999999999994,
+        "footprint": 0.7202549999999999
+      },
+      "footprintHalfS": 9.50949720670391
+    },
+    {
+      "task": "hard",
+      "seed": 82103,
+      "coverage": 0.52875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8290435464878043,
+      "halfS": 110.4,
+      "steps": 2400,
+      "footprint": 0.89,
+      "area": {
+        "flown": 0.291215,
+        "footprint": 0.628695
+      },
+      "footprintHalfS": 33.17425431711146
+    },
+    {
+      "task": "hard",
+      "seed": 82104,
+      "coverage": 0.5837912087912088,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8634782538115204,
+      "halfS": 104.55,
+      "steps": 2400,
+      "footprint": 0.9135,
+      "area": {
+        "flown": 0.30130999999999997,
+        "footprint": 0.523485
+      },
+      "footprintHalfS": 53.037194473963865
+    },
+    {
+      "task": "hard",
+      "seed": 82105,
+      "coverage": 0.5,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.0115816357043546,
+      "halfS": 119.8,
+      "steps": 2400,
+      "footprint": 0.7188,
+      "area": {
+        "flown": 0.27826500000000004,
+        "footprint": 0.5155050000000001
+      },
+      "footprintHalfS": 60.65822784810127
+    },
+    {
+      "task": "hard",
+      "seed": 82106,
+      "coverage": 0.7179054054054054,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8618115920548233,
+      "halfS": 82.05,
+      "steps": 2400,
+      "footprint": 0.9054,
+      "area": {
+        "flown": 0.38783500000000004,
+        "footprint": 0.6162150000000001
+      },
+      "footprintHalfS": 42.46363636363636
+    },
+    {
+      "task": "hard",
+      "seed": 82107,
+      "coverage": 0.7094594594594594,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9308155946976626,
+      "halfS": 80.7,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.38597500000000007,
+        "footprint": 0.6856499999999999
+      },
+      "footprintHalfS": 39.51734693877551
+    },
+    {
+      "task": "hard",
+      "seed": 82108,
+      "coverage": 0.5833333333333334,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.845319946379559,
+      "halfS": 101.25,
+      "steps": 2400,
+      "footprint": 0.75,
+      "area": {
+        "flown": 0.31645499999999993,
+        "footprint": 0.49159499999999995
+      },
+      "footprintHalfS": 70.39203084832906
+    },
+    {
+      "task": "hard",
+      "seed": 82109,
+      "coverage": 0.7628676470588235,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8804289479496,
+      "halfS": 78.45,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.410665,
+        "footprint": 0.72674
+      },
+      "footprintHalfS": 27.5451174289246
+    },
+    {
+      "task": "hard",
+      "seed": 82110,
+      "coverage": 0.7204861111111112,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9550861910601554,
+      "halfS": 83.9,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.3862,
+        "footprint": 0.7079000000000001
+      },
+      "footprintHalfS": 26.567901234567902
+    },
+    {
+      "task": "hard",
+      "seed": 82111,
+      "coverage": 0.5367647058823529,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7532001373194928,
+      "halfS": 109.45,
+      "steps": 2400,
+      "footprint": 0.6961,
+      "area": {
+        "flown": 0.29264000000000007,
+        "footprint": 0.5857349999999999
+      },
+      "footprintHalfS": 36.47296058661778
+    },
+    {
+      "task": "hard",
+      "seed": 82112,
+      "coverage": 0.7077702702702703,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.713636285000348,
+      "halfS": 78.3,
+      "steps": 2400,
+      "footprint": 0.8784,
+      "area": {
+        "flown": 0.400765,
+        "footprint": 0.7783899999999997
+      },
+      "footprintHalfS": 7.590288315629742
+    },
+    {
+      "task": "hard",
+      "seed": 82113,
+      "coverage": 0.5461309523809523,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.892937912958102,
+      "halfS": 109.75,
+      "steps": 2400,
+      "footprint": 0.6726,
+      "area": {
+        "flown": 0.305945,
+        "footprint": 0.51458
+      },
+      "footprintHalfS": 74.1106719367589
+    },
+    {
+      "task": "hard",
+      "seed": 82114,
+      "coverage": 0.6570945945945946,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9055234313582723,
+      "halfS": 94.9,
+      "steps": 2400,
+      "footprint": 0.8699,
+      "area": {
+        "flown": 0.360135,
+        "footprint": 0.7174099999999999
+      },
+      "footprintHalfS": 15.512758786711604
+    },
+    {
+      "task": "hard",
+      "seed": 82115,
+      "coverage": 0.5366847826086957,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7775097157412403,
+      "halfS": 113.4,
+      "steps": 2400,
+      "footprint": 0.9063,
+      "area": {
+        "flown": 0.30326499999999995,
+        "footprint": 0.54688
+      },
+      "footprintHalfS": 72.76541095890411
+    },
+    {
+      "task": "hard",
+      "seed": 82116,
+      "coverage": 0.52734375,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.886380973946405,
+      "halfS": 113.65,
+      "steps": 2400,
+      "footprint": 0.8281,
+      "area": {
+        "flown": 0.283,
+        "footprint": 0.5103549999999999
+      },
+      "footprintHalfS": 70.99999999999999
+    },
+    {
+      "task": "hard",
+      "seed": 82117,
+      "coverage": 0.5325520833333334,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9166863995382846,
+      "halfS": 113.1,
+      "steps": 2400,
+      "footprint": 0.9167,
+      "area": {
+        "flown": 0.27715500000000004,
+        "footprint": 0.538155
+      },
+      "footprintHalfS": 58.1232
+    },
+    {
+      "task": "hard",
+      "seed": 82118,
+      "coverage": 0.6857142857142857,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7688289160981294,
+      "halfS": 76.45,
+      "steps": 2400,
+      "footprint": 0.9214,
+      "area": {
+        "flown": 0.40276000000000006,
+        "footprint": 0.7623200000000001
+      },
+      "footprintHalfS": 24.960806270996642
+    },
+    {
+      "task": "hard",
+      "seed": 82119,
+      "coverage": 0.6153846153846154,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.697617718763257,
+      "halfS": 96.3,
+      "steps": 2400,
+      "footprint": 0.8242,
+      "area": {
+        "flown": 0.32995,
+        "footprint": 0.6303049999999997
+      },
+      "footprintHalfS": 10.641638225255974
+    },
+    {
+      "task": "hard",
+      "seed": 82120,
+      "coverage": 0.5625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9307997984376835,
+      "halfS": 107.65,
+      "steps": 2400,
+      "footprint": 0.8199,
+      "area": {
+        "flown": 0.29279,
+        "footprint": 0.49346000000000007
+      },
+      "footprintHalfS": 70.50084033613446
+    },
+    {
+      "task": "hard",
+      "seed": 82121,
+      "coverage": 0.5367647058823529,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7530721230830073,
+      "halfS": 109.45,
+      "steps": 2400,
+      "footprint": 0.6961,
+      "area": {
+        "flown": 0.29264000000000007,
+        "footprint": 0.5857349999999999
+      },
+      "footprintHalfS": 36.47296058661778
+    },
+    {
+      "task": "hard",
+      "seed": 82122,
+      "coverage": 0.7077702702702703,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.845960790953646,
+      "halfS": 79.6,
+      "steps": 2400,
+      "footprint": 0.8784,
+      "area": {
+        "flown": 0.389785,
+        "footprint": 0.6347049999999999
+      },
+      "footprintHalfS": 22.894736842105267
+    },
+    {
+      "task": "hard",
+      "seed": 82123,
+      "coverage": 0.7253787878787878,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.884406576862895,
+      "halfS": 81.1,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.39621499999999993,
+        "footprint": 0.7119350000000001
+      },
+      "footprintHalfS": 18
+    },
+    {
+      "task": "hard",
+      "seed": 82124,
+      "coverage": 0.7272727272727273,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.890814070913634,
+      "halfS": 76.3,
+      "steps": 2400,
+      "footprint": 0.964,
+      "area": {
+        "flown": 0.41430500000000003,
+        "footprint": 0.7139150000000001
+      },
+      "footprintHalfS": 32.793809740555304
+    },
+    {
+      "task": "hard",
+      "seed": 82125,
+      "coverage": 0.5216836734693877,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.948219621436768,
+      "halfS": 113.95,
+      "steps": 2400,
+      "footprint": 0.9592,
+      "area": {
+        "flown": 0.27774,
+        "footprint": 0.5723299999999998
+      },
+      "footprintHalfS": 62.07027027027027
+    },
+    {
+      "task": "hard",
+      "seed": 82126,
+      "coverage": 0.5367647058823529,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7532455084594547,
+      "halfS": 109.45,
+      "steps": 2400,
+      "footprint": 0.6961,
+      "area": {
+        "flown": 0.29264000000000007,
+        "footprint": 0.5857349999999999
+      },
+      "footprintHalfS": 36.47296058661778
+    },
+    {
+      "task": "hard",
+      "seed": 82127,
+      "coverage": 0.7205882352941176,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9268411114829114,
+      "halfS": 77.85,
+      "steps": 2400,
+      "footprint": 0.954,
+      "area": {
+        "flown": 0.40451,
+        "footprint": 0.7138650000000001
+      },
+      "footprintHalfS": 31.850694444444443
+    },
+    {
+      "task": "hard",
+      "seed": 82128,
+      "coverage": 0.7556818181818182,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8321621390622997,
+      "halfS": 74.3,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.4130750000000001,
+        "footprint": 0.718175
+      },
+      "footprintHalfS": 36.25054945054945
+    },
+    {
+      "task": "hard",
+      "seed": 82129,
+      "coverage": 0.5535714285714286,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8818550467834783,
+      "halfS": 107.45,
+      "steps": 2400,
+      "footprint": 0.9541,
+      "area": {
+        "flown": 0.29413500000000004,
+        "footprint": 0.58579
+      },
+      "footprintHalfS": 55.04258943781942
+    },
+    {
+      "task": "hard",
+      "seed": 82130,
+      "coverage": 0.6829268292682927,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7854403230086002,
+      "halfS": 88.65,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.35975,
+        "footprint": 0.651665
+      },
+      "footprintHalfS": 51.375
+    },
+    {
+      "task": "dark",
+      "seed": 82201,
+      "coverage": 0.5279411764705882,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9122020640709683,
+      "halfS": 114.45,
+      "steps": 2400,
+      "footprint": 0.8662,
+      "area": {
+        "flown": 0.28844499999999995,
+        "footprint": 0.5598449999999999
+      },
+      "footprintHalfS": 57.723653395784545
+    },
+    {
+      "task": "dark",
+      "seed": 82202,
+      "coverage": 0.6098901098901099,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7652291281275083,
+      "halfS": 96.85,
+      "steps": 2400,
+      "footprint": 0.8132,
+      "area": {
+        "flown": 0.32787999999999995,
+        "footprint": 0.5668350000000002
+      },
+      "footprintHalfS": 31.310126582278482
+    },
+    {
+      "task": "dark",
+      "seed": 82203,
+      "coverage": 0.588855421686747,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9112790786952543,
+      "halfS": 99.85,
+      "steps": 2400,
+      "footprint": 0.8223,
+      "area": {
+        "flown": 0.31732,
+        "footprint": 0.538775
+      },
+      "footprintHalfS": 50.603631809643076
+    },
+    {
+      "task": "dark",
+      "seed": 82204,
+      "coverage": 0.7083333333333334,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8971860374235168,
+      "halfS": 86.35,
+      "steps": 2400,
+      "footprint": 0.8636,
+      "area": {
+        "flown": 0.38542,
+        "footprint": 0.6464749999999999
+      },
+      "footprintHalfS": 16.410649819494587
+    },
+    {
+      "task": "dark",
+      "seed": 82205,
+      "coverage": 0.7010135135135135,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8632703169167133,
+      "halfS": 77.25,
+      "steps": 2400,
+      "footprint": 0.9899,
+      "area": {
+        "flown": 0.39636999999999994,
+        "footprint": 0.7344649999999999
+      },
+      "footprintHalfS": 20.32442748091603
+    },
+    {
+      "task": "dark",
+      "seed": 82206,
+      "coverage": 0.659375,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.918106320241626,
+      "halfS": 90.65,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.35392499999999993,
+        "footprint": 0.6566449999999999
+      },
+      "footprintHalfS": 37.128
+    },
+    {
+      "task": "dark",
+      "seed": 82207,
+      "coverage": 0.625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9404967647406717,
+      "halfS": 95.7,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.33239,
+        "footprint": 0.69246
+      },
+      "footprintHalfS": 33.0922131147541
+    },
+    {
+      "task": "dark",
+      "seed": 82208,
+      "coverage": 0.5175,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9027057154419302,
+      "halfS": 112.1,
+      "steps": 2400,
+      "footprint": 0.83,
+      "area": {
+        "flown": 0.29220000000000007,
+        "footprint": 0.6342650000000001
+      },
+      "footprintHalfS": 41.47826086956522
+    },
+    {
+      "task": "dark",
+      "seed": 82209,
+      "coverage": 0.6976351351351351,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.831982701380823,
+      "halfS": 80,
+      "steps": 2400,
+      "footprint": 0.9054,
+      "area": {
+        "flown": 0.38919500000000007,
+        "footprint": 0.7576599999999999
+      },
+      "footprintHalfS": 18.196342637151105
+    },
+    {
+      "task": "dark",
+      "seed": 82210,
+      "coverage": 0.5934065934065934,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8829419566287573,
+      "halfS": 101.15,
+      "steps": 2400,
+      "footprint": 0.9423,
+      "area": {
+        "flown": 0.32231,
+        "footprint": 0.753225
+      },
+      "footprintHalfS": 20.351776354106
+    },
+    {
+      "task": "dark",
+      "seed": 82211,
+      "coverage": 0.5461309523809523,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8977365192696163,
+      "halfS": 109.85,
+      "steps": 2400,
+      "footprint": 0.6726,
+      "area": {
+        "flown": 0.30632000000000004,
+        "footprint": 0.51458
+      },
+      "footprintHalfS": 74.1106719367589
+    },
+    {
+      "task": "dark",
+      "seed": 82212,
+      "coverage": 0.706081081081081,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7939194802498633,
+      "halfS": 79.1,
+      "steps": 2400,
+      "footprint": 0.8784,
+      "area": {
+        "flown": 0.39729500000000006,
+        "footprint": 0.6925799999999998
+      },
+      "footprintHalfS": 17.45161290322581
+    },
+    {
+      "task": "dark",
+      "seed": 82213,
+      "coverage": 0.5736111111111111,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.820409679331879,
+      "halfS": 105.65,
+      "steps": 2400,
+      "footprint": 0.8972,
+      "area": {
+        "flown": 0.31054499999999996,
+        "footprint": 0.514515
+      },
+      "footprintHalfS": 58.23943661971831
+    },
+    {
+      "task": "dark",
+      "seed": 82214,
+      "coverage": 0.7234848484848485,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.884536920748686,
+      "halfS": 80.5,
+      "steps": 2400,
+      "footprint": 0.9394,
+      "area": {
+        "flown": 0.40606,
+        "footprint": 0.665065
+      },
+      "footprintHalfS": 36
+    },
+    {
+      "task": "dark",
+      "seed": 82215,
+      "coverage": 0.5477941176470589,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.792813664720523,
+      "halfS": 110,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.292585,
+        "footprint": 0.650555
+      },
+      "footprintHalfS": 36.47296058661778
+    },
+    {
+      "task": "dark",
+      "seed": 82216,
+      "coverage": 0.5753012048192772,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.929139444880633,
+      "halfS": 106.35,
+      "steps": 2400,
+      "footprint": 0.9398,
+      "area": {
+        "flown": 0.31769000000000003,
+        "footprint": 0.6304200000000001
+      },
+      "footprintHalfS": 34.00884955752213
+    },
+    {
+      "task": "dark",
+      "seed": 82217,
+      "coverage": 0.6265243902439024,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9447666516203097,
+      "halfS": 98.25,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.33109500000000003,
+        "footprint": 0.6462749999999999
+      },
+      "footprintHalfS": 33.11461794019934
+    },
+    {
+      "task": "dark",
+      "seed": 82218,
+      "coverage": 0.7035714285714286,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.855130549524598,
+      "halfS": 77.2,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.395895,
+        "footprint": 0.74901
+      },
+      "footprintHalfS": 21.6864
+    },
+    {
+      "task": "dark",
+      "seed": 82219,
+      "coverage": 0.5477941176470589,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7926618191849477,
+      "halfS": 110.05,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.292585,
+        "footprint": 0.650375
+      },
+      "footprintHalfS": 36.47296058661778
+    },
+    {
+      "task": "dark",
+      "seed": 82220,
+      "coverage": 0.6875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7298412256146354,
+      "halfS": 78.1,
+      "steps": 2400,
+      "footprint": 0.8885,
+      "area": {
+        "flown": 0.394005,
+        "footprint": 0.7199149999999999
+      },
+      "footprintHalfS": 9.50949720670391
+    },
+    {
+      "task": "dark",
+      "seed": 82221,
+      "coverage": 0.52875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.827106205303552,
+      "halfS": 110.5,
+      "steps": 2400,
+      "footprint": 0.8888,
+      "area": {
+        "flown": 0.29083000000000003,
+        "footprint": 0.6284449999999999
+      },
+      "footprintHalfS": 33.17425431711146
+    },
+    {
+      "task": "dark",
+      "seed": 82222,
+      "coverage": 0.6153846153846154,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6872708571577077,
+      "halfS": 95.95,
+      "steps": 2400,
+      "footprint": 0.8242,
+      "area": {
+        "flown": 0.33242000000000005,
+        "footprint": 0.6927999999999997
+      },
+      "footprintHalfS": 10.641638225255974
+    },
+    {
+      "task": "dark",
+      "seed": 82223,
+      "coverage": 0.6917808219178082,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8621627598786743,
+      "halfS": 85.05,
+      "steps": 2400,
+      "footprint": 0.9829,
+      "area": {
+        "flown": 0.378855,
+        "footprint": 0.6087250000000001
+      },
+      "footprintHalfS": 29.64625071551231
+    },
+    {
+      "task": "dark",
+      "seed": 82224,
+      "coverage": 0.5746951219512195,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9669980553304134,
+      "halfS": 100.1,
+      "steps": 2400,
+      "footprint": 0.7698,
+      "area": {
+        "flown": 0.325625,
+        "footprint": 0.59724
+      },
+      "footprintHalfS": 38.59574468085106
+    },
+    {
+      "task": "dark",
+      "seed": 82225,
+      "coverage": 0.671875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9285243268250065,
+      "halfS": 88.95,
+      "steps": 2400,
+      "footprint": 0.9149,
+      "area": {
+        "flown": 0.371795,
+        "footprint": 0.6346199999999999
+      },
+      "footprintHalfS": 37.56076759061834
+    },
+    {
+      "task": "dark",
+      "seed": 82226,
+      "coverage": 0.7246621621621622,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8468146232436484,
+      "halfS": 82.8,
+      "steps": 2400,
+      "footprint": 0.9764,
+      "area": {
+        "flown": 0.3864000000000001,
+        "footprint": 0.63235
+      },
+      "footprintHalfS": 53.375510204081635
+    },
+    {
+      "task": "dark",
+      "seed": 82227,
+      "coverage": 0.6002747252747253,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8102986665850915,
+      "halfS": 96.95,
+      "steps": 2400,
+      "footprint": 0.8022,
+      "area": {
+        "flown": 0.325765,
+        "footprint": 0.5696600000000002
+      },
+      "footprintHalfS": 32.57439446366783
+    },
+    {
+      "task": "dark",
+      "seed": 82228,
+      "coverage": 0.7212837837837838,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8294294378636713,
+      "halfS": 76.9,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.400505,
+        "footprint": 0.7684900000000001
+      },
+      "footprintHalfS": 31.499999999999986
+    },
+    {
+      "task": "dark",
+      "seed": 82229,
+      "coverage": 0.71875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9502309298887943,
+      "halfS": 79.75,
+      "steps": 2400,
+      "footprint": 0.989,
+      "area": {
+        "flown": 0.4001799999999999,
+        "footprint": 0.6699600000000002
+      },
+      "footprintHalfS": 48.16311535635562
+    },
+    {
+      "task": "dark",
+      "seed": 82230,
+      "coverage": 0.525,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.943233590916544,
+      "halfS": 114.45,
+      "steps": 2400,
+      "footprint": 0.715,
+      "area": {
+        "flown": 0.28201,
+        "footprint": 0.5105199999999999
+      },
+      "footprintHalfS": 55.45454545454545
+    },
+    {
+      "task": "fast",
+      "seed": 82301,
+      "coverage": 0.8461538461538461,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.886850425162387,
+      "halfS": 67.7,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.47924500000000003,
+        "footprint": 0.7541749999999999
+      },
+      "footprintHalfS": 37.95283018867924
+    },
+    {
+      "task": "fast",
+      "seed": 82302,
+      "coverage": 0.8255494505494505,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.100523369266121,
+      "halfS": 59.55,
+      "steps": 2400,
+      "footprint": 0.9231,
+      "area": {
+        "flown": 0.485635,
+        "footprint": 0.701665
+      },
+      "footprintHalfS": 10.0852052672347
+    },
+    {
+      "task": "fast",
+      "seed": 82303,
+      "coverage": 0.9147727272727273,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.161338908799128,
+      "halfS": 54.7,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5400599999999999,
+        "footprint": 0.798665
+      },
+      "footprintHalfS": 21.714644877435575
+    },
+    {
+      "task": "fast",
+      "seed": 82304,
+      "coverage": 0.8920454545454546,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.013091077514985,
+      "halfS": 49.85,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.53636,
+        "footprint": 0.8289750000000001
+      },
+      "footprintHalfS": 14.55505617977528
+    },
+    {
+      "task": "fast",
+      "seed": 82305,
+      "coverage": 0.9003378378378378,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.92897133050461,
+      "halfS": 49.8,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.53648,
+        "footprint": 0.756325
+      },
+      "footprintHalfS": 5.301289980561937
+    },
+    {
+      "task": "fast",
+      "seed": 82306,
+      "coverage": 0.8155487804878049,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.552516438328012,
+      "halfS": 59.65,
+      "steps": 2400,
+      "footprint": 0.9939,
+      "area": {
+        "flown": 0.47424,
+        "footprint": 0.8331649999999999
+      },
+      "footprintHalfS": 25.08569545154911
+    },
+    {
+      "task": "fast",
+      "seed": 82307,
+      "coverage": 0.875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.104069075485347,
+      "halfS": 70.95,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.482475,
+        "footprint": 0.765405
+      },
+      "footprintHalfS": 5.642279480910288
+    },
+    {
+      "task": "fast",
+      "seed": 82308,
+      "coverage": 0.6425,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.9063596060973,
+      "halfS": 90.45,
+      "steps": 2400,
+      "footprint": 0.84,
+      "area": {
+        "flown": 0.36914499999999995,
+        "footprint": 0.63569
+      },
+      "footprintHalfS": 41.094339622641506
+    },
+    {
+      "task": "fast",
+      "seed": 82309,
+      "coverage": 0.6556122448979592,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.117932360651664,
+      "halfS": 91.05,
+      "steps": 2400,
+      "footprint": 0.9898,
+      "area": {
+        "flown": 0.36485500000000004,
+        "footprint": 0.7192800000000001
+      },
+      "footprintHalfS": 39.562499999999986
+    },
+    {
+      "task": "fast",
+      "seed": 82310,
+      "coverage": 0.8175675675675675,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.1626848088280575,
+      "halfS": 59.65,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.489435,
+        "footprint": 0.7975449999999997
+      },
+      "footprintHalfS": 21.482029598308667
+    },
+    {
+      "task": "fast",
+      "seed": 82311,
+      "coverage": 0.9232142857142858,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.795314322148737,
+      "halfS": 57.9,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.52938,
+        "footprint": 0.792685
+      },
+      "footprintHalfS": 20.668740279937794
+    },
+    {
+      "task": "fast",
+      "seed": 82312,
+      "coverage": 0.7002551020408163,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.226316012957705,
+      "halfS": 81.1,
+      "steps": 2400,
+      "footprint": 0.9209,
+      "area": {
+        "flown": 0.40088999999999997,
+        "footprint": 0.64681
+      },
+      "footprintHalfS": 29.790666062528317
+    },
+    {
+      "task": "fast",
+      "seed": 82313,
+      "coverage": 0.6802325581395349,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.983776533867798,
+      "halfS": 84.55,
+      "steps": 2400,
+      "footprint": 0.9709,
+      "area": {
+        "flown": 0.39723499999999995,
+        "footprint": 0.7085750000000001
+      },
+      "footprintHalfS": 32.64261897544711
+    },
+    {
+      "task": "fast",
+      "seed": 82314,
+      "coverage": 0.7376373626373627,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.929293830759722,
+      "halfS": 68.95,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.42067000000000004,
+        "footprint": 0.77012
+      },
+      "footprintHalfS": 29.87451587916344
+    },
+    {
+      "task": "fast",
+      "seed": 82315,
+      "coverage": 0.9136029411764706,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.7039846694159335,
+      "halfS": 54.9,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.52694,
+        "footprint": 0.8143249999999999
+      },
+      "footprintHalfS": 26.217622708456535
+    },
+    {
+      "task": "fast",
+      "seed": 82316,
+      "coverage": 0.8802083333333334,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.946499664115639,
+      "halfS": 61.6,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.506435,
+        "footprint": 0.76615
+      },
+      "footprintHalfS": 23.47777082028804
+    },
+    {
+      "task": "fast",
+      "seed": 82317,
+      "coverage": 0.6364795918367347,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.1146011511254015,
+      "halfS": 87.65,
+      "steps": 2400,
+      "footprint": 0.852,
+      "area": {
+        "flown": 0.36677499999999996,
+        "footprint": 0.6290600000000001
+      },
+      "footprintHalfS": 44.84221381918185
+    },
+    {
+      "task": "fast",
+      "seed": 82318,
+      "coverage": 0.9307432432432432,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.730100234747321,
+      "halfS": 51.65,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.548895,
+        "footprint": 0.8222799999999999
+      },
+      "footprintHalfS": 5.208333333333334
+    },
+    {
+      "task": "fast",
+      "seed": 82319,
+      "coverage": 0.8712121212121212,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.048139379058178,
+      "halfS": 56.6,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5161,
+        "footprint": 0.8232849999999999
+      },
+      "footprintHalfS": 5.143151037202125
+    },
+    {
+      "task": "fast",
+      "seed": 82320,
+      "coverage": 0.9087837837837838,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.997717120724358,
+      "halfS": 57.1,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5284599999999999,
+        "footprint": 0.7913699999999999
+      },
+      "footprintHalfS": 5.208333333333334
+    },
+    {
+      "task": "fast",
+      "seed": 82321,
+      "coverage": 0.8964285714285715,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.827101567074345,
+      "halfS": 54.75,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.55019,
+        "footprint": 0.815895
+      },
+      "footprintHalfS": 30.572
+    },
+    {
+      "task": "fast",
+      "seed": 82322,
+      "coverage": 0.8072916666666666,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.102496930494132,
+      "halfS": 69.75,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.4763,
+        "footprint": 0.77917
+      },
+      "footprintHalfS": 30.4992
+    },
+    {
+      "task": "fast",
+      "seed": 82323,
+      "coverage": 0.8255494505494505,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.100406303427527,
+      "halfS": 59.55,
+      "steps": 2400,
+      "footprint": 0.9231,
+      "area": {
+        "flown": 0.485635,
+        "footprint": 0.701665
+      },
+      "footprintHalfS": 10.0852052672347
+    },
+    {
+      "task": "fast",
+      "seed": 82324,
+      "coverage": 0.7916666666666666,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.388405639934829,
+      "halfS": 74.9,
+      "steps": 2400,
+      "footprint": 0.9938,
+      "area": {
+        "flown": 0.44299,
+        "footprint": 0.69506
+      },
+      "footprintHalfS": 15.29153605015674
+    },
+    {
+      "task": "fast",
+      "seed": 82325,
+      "coverage": 0.875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.161181536258079,
+      "halfS": 65.4,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.485175,
+        "footprint": 0.72123
+      },
+      "footprintHalfS": 29.334775554353705
+    },
+    {
+      "task": "fast",
+      "seed": 82326,
+      "coverage": 0.62625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 5.020653916195587,
+      "halfS": 80.85,
+      "steps": 2400,
+      "footprint": 0.6875,
+      "area": {
+        "flown": 0.383955,
+        "footprint": 0.5707600000000002
+      },
+      "footprintHalfS": 40.41509433962264
+    },
+    {
+      "task": "fast",
+      "seed": 82327,
+      "coverage": 0.67,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.892244759865175,
+      "halfS": 81.35,
+      "steps": 2400,
+      "footprint": 0.94,
+      "area": {
+        "flown": 0.38358000000000003,
+        "footprint": 0.65744
+      },
+      "footprintHalfS": 45
+    },
+    {
+      "task": "fast",
+      "seed": 82328,
+      "coverage": 0.9087837837837838,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.99785903095661,
+      "halfS": 57.1,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5284599999999999,
+        "footprint": 0.7913699999999999
+      },
+      "footprintHalfS": 5.208333333333334
+    },
+    {
+      "task": "fast",
+      "seed": 82329,
+      "coverage": 0.9117647058823529,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.7611535044825475,
+      "halfS": 59.05,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5391549999999999,
+        "footprint": 0.7934699999999999
+      },
+      "footprintHalfS": 14.636174636174637
+    },
+    {
+      "task": "fast",
+      "seed": 82330,
+      "coverage": 0.9166666666666666,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.878866177203537,
+      "halfS": 48.9,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5673650000000001,
+        "footprint": 0.81024
+      },
+      "footprintHalfS": 5.837711617046118
+    },
+    {
+      "task": "floors",
+      "seed": 82401,
+      "coverage": 0.34962406015037595,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9810459977634065,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8496,
+      "area": {
+        "flown": 0.188625,
+        "footprint": 0.44087499999999996
+      },
+      "footprintHalfS": 71.82159624413146
+    },
+    {
+      "task": "floors",
+      "seed": 82402,
+      "coverage": 0.48625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.970361555084105,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9,
+      "area": {
+        "flown": 0.26102499999999995,
+        "footprint": 0.5643800000000001
+      },
+      "footprintHalfS": 58.36363636363636
+    },
+    {
+      "task": "floors",
+      "seed": 82403,
+      "coverage": 0.3333333333333333,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.904574371399155,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7161,
+      "area": {
+        "flown": 0.177915,
+        "footprint": 0.39775499999999997
+      },
+      "footprintHalfS": 81.80246913580247
+    },
+    {
+      "task": "floors",
+      "seed": 82404,
+      "coverage": 0.6404109589041096,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9751126144278595,
+      "halfS": 89.1,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.348375,
+        "footprint": 0.6636200000000001
+      },
+      "footprintHalfS": 45.8580375782881
+    },
+    {
+      "task": "floors",
+      "seed": 82405,
+      "coverage": 0.6157407407407407,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9166664458039957,
+      "halfS": 98.15,
+      "steps": 2400,
+      "footprint": 0.9321,
+      "area": {
+        "flown": 0.3253100000000001,
+        "footprint": 0.55123
+      },
+      "footprintHalfS": 64.58722592945662
+    },
+    {
+      "task": "floors",
+      "seed": 82406,
+      "coverage": 0.3413793103448276,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9095479905699864,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7164,
+      "area": {
+        "flown": 0.17826999999999998,
+        "footprint": 0.39720999999999995
+      },
+      "footprintHalfS": 87.0580204778157
+    },
+    {
+      "task": "floors",
+      "seed": 82407,
+      "coverage": 0.47125,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.923189750085933,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7713,
+      "area": {
+        "flown": 0.24890500000000002,
+        "footprint": 0.49064499999999994
+      },
+      "footprintHalfS": 61.14068441064639
+    },
+    {
+      "task": "floors",
+      "seed": 82408,
+      "coverage": 0.4975,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.980893416046388,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.98,
+      "area": {
+        "flown": 0.26952,
+        "footprint": 0.5953849999999999
+      },
+      "footprintHalfS": 48
+    },
+    {
+      "task": "floors",
+      "seed": 82409,
+      "coverage": 0.3356164383561644,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8805222959389085,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.595,
+      "area": {
+        "flown": 0.17928,
+        "footprint": 0.41219
+      },
+      "footprintHalfS": 80.78720445062586
+    },
+    {
+      "task": "floors",
+      "seed": 82410,
+      "coverage": 0.49355670103092786,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9843354312542045,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9175,
+      "area": {
+        "flown": 0.2686799999999999,
+        "footprint": 0.5740350000000001
+      },
+      "footprintHalfS": 45.327586206896555
+    },
+    {
+      "task": "floors",
+      "seed": 82411,
+      "coverage": 0.3887795275590551,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9432171718277873,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8553,
+      "area": {
+        "flown": 0.20822500000000002,
+        "footprint": 0.48161
+      },
+      "footprintHalfS": 72.50643776824035
+    },
+    {
+      "task": "floors",
+      "seed": 82412,
+      "coverage": 0.36466165413533835,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8903332753358,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8318,
+      "area": {
+        "flown": 0.19427500000000003,
+        "footprint": 0.4871849999999999
+      },
+      "footprintHalfS": 68.5828402366864
+    },
+    {
+      "task": "floors",
+      "seed": 82413,
+      "coverage": 0.5817901234567902,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.984114946556134,
+      "halfS": 96.15,
+      "steps": 2400,
+      "footprint": 0.9074,
+      "area": {
+        "flown": 0.32925,
+        "footprint": 0.6735299999999997
+      },
+      "footprintHalfS": 36
+    },
+    {
+      "task": "floors",
+      "seed": 82414,
+      "coverage": 0.35688405797101447,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8602094939261797,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6947,
+      "area": {
+        "flown": 0.19013,
+        "footprint": 0.38382499999999997
+      },
+      "footprintHalfS": 86.81379310344828
+    },
+    {
+      "task": "floors",
+      "seed": 82415,
+      "coverage": 0.3550347222222222,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8544438354009123,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5903,
+      "area": {
+        "flown": 0.19105500000000003,
+        "footprint": 0.34414500000000003
+      },
+      "footprintHalfS": 99.8776758409786
+    },
+    {
+      "task": "floors",
+      "seed": 82416,
+      "coverage": 0.49867021276595747,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.889817655667212,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9016,
+      "area": {
+        "flown": 0.266825,
+        "footprint": 0.524395
+      },
+      "footprintHalfS": 57.75
+    },
+    {
+      "task": "floors",
+      "seed": 82417,
+      "coverage": 0.32954545454545453,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.873664336694273,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5166,
+      "area": {
+        "flown": 0.173465,
+        "footprint": 0.3594450000000001
+      },
+      "footprintHalfS": 82.9042904290429
+    },
+    {
+      "task": "floors",
+      "seed": 82418,
+      "coverage": 0.526595744680851,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9558984540327096,
+      "halfS": 114.55,
+      "steps": 2400,
+      "footprint": 0.8936,
+      "area": {
+        "flown": 0.284785,
+        "footprint": 0.49002999999999997
+      },
+      "footprintHalfS": 85.7336956521739
+    },
+    {
+      "task": "floors",
+      "seed": 82419,
+      "coverage": 0.34183673469387754,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8470983675590635,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7253,
+      "area": {
+        "flown": 0.18036000000000002,
+        "footprint": 0.4213
+      },
+      "footprintHalfS": 75.81947743467934
+    },
+    {
+      "task": "floors",
+      "seed": 82420,
+      "coverage": 0.4693627450980392,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.862447228620718,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7941,
+      "area": {
+        "flown": 0.25668,
+        "footprint": 0.49049
+      },
+      "footprintHalfS": 58.66180758017493
+    },
+    {
+      "task": "floors",
+      "seed": 82421,
+      "coverage": 0.31833333333333336,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9739977530898623,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6767,
+      "area": {
+        "flown": 0.168295,
+        "footprint": 0.391475
+      },
+      "footprintHalfS": 96.32715376226827
+    },
+    {
+      "task": "floors",
+      "seed": 82422,
+      "coverage": 0.31583333333333335,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.929152224872324,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.675,
+      "area": {
+        "flown": 0.16541499999999998,
+        "footprint": 0.380545
+      },
+      "footprintHalfS": 78.93071354705275
+    },
+    {
+      "task": "floors",
+      "seed": 82423,
+      "coverage": 0.394,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8742182613239624,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.604,
+      "area": {
+        "flown": 0.21445000000000003,
+        "footprint": 0.3678
+      },
+      "footprintHalfS": 87.87878787878788
+    },
+    {
+      "task": "floors",
+      "seed": 82424,
+      "coverage": 0.2784090909090909,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.914085344038543,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3247,
+      "area": {
+        "flown": 0.158075,
+        "footprint": 0.24603999999999998
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "floors",
+      "seed": 82425,
+      "coverage": 0.4950980392156863,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.95332705786062,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9988,
+      "area": {
+        "flown": 0.264635,
+        "footprint": 0.6343099999999999
+      },
+      "footprintHalfS": 48.46153846153846
+    },
+    {
+      "task": "floors",
+      "seed": 82426,
+      "coverage": 0.5077319587628866,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.921976752943344,
+      "halfS": 118.35,
+      "steps": 2400,
+      "footprint": 0.8286,
+      "area": {
+        "flown": 0.276355,
+        "footprint": 0.5616099999999998
+      },
+      "footprintHalfS": 53.21709786276715
+    },
+    {
+      "task": "floors",
+      "seed": 82427,
+      "coverage": 0.3215460526315789,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9261063310319066,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5321,
+      "area": {
+        "flown": 0.17413499999999998,
+        "footprint": 0.326185
+      },
+      "footprintHalfS": 107.34992679355784
+    },
+    {
+      "task": "floors",
+      "seed": 82428,
+      "coverage": 0.5175,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.964659031252285,
+      "halfS": 116.4,
+      "steps": 2400,
+      "footprint": 0.8888,
+      "area": {
+        "flown": 0.27219499999999996,
+        "footprint": 0.519315
+      },
+      "footprintHalfS": 55.58371040723982
+    },
+    {
+      "task": "floors",
+      "seed": 82429,
+      "coverage": 0.5474137931034483,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.941523869014369,
+      "halfS": 107.65,
+      "steps": 2400,
+      "footprint": 0.8549,
+      "area": {
+        "flown": 0.28778500000000007,
+        "footprint": 0.541015
+      },
+      "footprintHalfS": 58.76398362892224
+    },
+    {
+      "task": "floors",
+      "seed": 82430,
+      "coverage": 0.3067434210526316,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9560576619274026,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7015,
+      "area": {
+        "flown": 0.16610999999999998,
+        "footprint": 0.452425
+      },
+      "footprintHalfS": 64.99746835443038
+    },
+    {
+      "task": "quad",
+      "seed": 82501,
+      "coverage": 0.08734939759036145,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.8332858724120361,
+      "halfS": null,
+      "steps": 489,
+      "footprint": 0.256,
+      "area": {
+        "flown": 0.08090999999999998,
+        "footprint": 0.25088500000000014
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82502,
+      "coverage": 0.3585164835164835,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.038637565978496,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5755,
+      "area": {
+        "flown": 0.20528000000000005,
+        "footprint": 0.47390499999999997
+      },
+      "footprintHalfS": 84
+    },
+    {
+      "task": "quad",
+      "seed": 82503,
+      "coverage": 0.2533783783783784,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.01409681618777,
+      "halfS": null,
+      "steps": 1127,
+      "footprint": 0.6875,
+      "area": {
+        "flown": 0.19924500000000003,
+        "footprint": 0.600515
+      },
+      "footprintHalfS": 28.354838709677423
+    },
+    {
+      "task": "quad",
+      "seed": 82504,
+      "coverage": 0.5101351351351351,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.841742977173988,
+      "halfS": 112.6,
+      "steps": 2400,
+      "footprint": 0.7027,
+      "area": {
+        "flown": 0.3124199999999999,
+        "footprint": 0.65919
+      },
+      "footprintHalfS": 8.547700170357752
+    },
+    {
+      "task": "quad",
+      "seed": 82505,
+      "coverage": 0.33984375,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9743128631335294,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5352,
+      "area": {
+        "flown": 0.20566000000000004,
+        "footprint": 0.45893499999999987
+      },
+      "footprintHalfS": 42
+    },
+    {
+      "task": "quad",
+      "seed": 82506,
+      "coverage": 0.413265306122449,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 3.9377872629164816,
+      "halfS": null,
+      "steps": 2367,
+      "footprint": 0.7742,
+      "area": {
+        "flown": 0.22201000000000004,
+        "footprint": 0.471675
+      },
+      "footprintHalfS": 58.628571428571426
+    },
+    {
+      "task": "quad",
+      "seed": 82507,
+      "coverage": 0.12244897959183673,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.346570192087711,
+      "halfS": null,
+      "steps": 797,
+      "footprint": 0.2704,
+      "area": {
+        "flown": 0.10557500000000002,
+        "footprint": 0.25516000000000005
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82508,
+      "coverage": 0.018229166666666668,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.13453422877222895,
+      "halfS": null,
+      "steps": 80,
+      "footprint": 0.2135,
+      "area": {
+        "flown": 0.018199999999999997,
+        "footprint": 0.21349999999999988
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82509,
+      "coverage": 0.49464285714285716,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.990765645004943,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7929,
+      "area": {
+        "flown": 0.25964,
+        "footprint": 0.53062
+      },
+      "footprintHalfS": 72.96564195298373
+    },
+    {
+      "task": "quad",
+      "seed": 82510,
+      "coverage": 0.4358108108108108,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.027870607604354,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6081,
+      "area": {
+        "flown": 0.24467500000000003,
+        "footprint": 0.5489850000000002
+      },
+      "footprintHalfS": 37.5
+    },
+    {
+      "task": "quad",
+      "seed": 82511,
+      "coverage": 0.21691176470588236,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.9096154526523355,
+      "halfS": null,
+      "steps": 1123,
+      "footprint": 0.5202,
+      "area": {
+        "flown": 0.18032999999999996,
+        "footprint": 0.4681849999999999
+      },
+      "footprintHalfS": 29.436541143654114
+    },
+    {
+      "task": "quad",
+      "seed": 82512,
+      "coverage": 0.24375,
+      "collisions": 2,
+      "crashed": true,
+      "energyWh": 2.4209944064222078,
+      "halfS": null,
+      "steps": 1425,
+      "footprint": 0.3875,
+      "area": {
+        "flown": 0.18236499999999994,
+        "footprint": 0.36274000000000006
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82513,
+      "coverage": 0.11363636363636363,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.7421656842531507,
+      "halfS": null,
+      "steps": 442,
+      "footprint": 0.4015,
+      "area": {
+        "flown": 0.10707499999999996,
+        "footprint": 0.3957250000000002
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82514,
+      "coverage": 0.1661392405063291,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.2707166711398938,
+      "halfS": null,
+      "steps": 761,
+      "footprint": 0.3434,
+      "area": {
+        "flown": 0.146175,
+        "footprint": 0.33302499999999996
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82515,
+      "coverage": 0.40813253012048195,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.940431355437112,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.619,
+      "area": {
+        "flown": 0.23501500000000003,
+        "footprint": 0.45219999999999994
+      },
+      "footprintHalfS": 80.59372197309418
+    },
+    {
+      "task": "quad",
+      "seed": 82516,
+      "coverage": 0.46565934065934067,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.929044079938283,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6484,
+      "area": {
+        "flown": 0.25447000000000003,
+        "footprint": 0.516005
+      },
+      "footprintHalfS": 46.13819095477387
+    },
+    {
+      "task": "quad",
+      "seed": 82517,
+      "coverage": 0.2193627450980392,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.372800200285139,
+      "halfS": null,
+      "steps": 1425,
+      "footprint": 0.5907,
+      "area": {
+        "flown": 0.17274999999999993,
+        "footprint": 0.5649
+      },
+      "footprintHalfS": 17.67811158798284
+    },
+    {
+      "task": "quad",
+      "seed": 82518,
+      "coverage": 0.12683823529411764,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.9745840904746417,
+      "halfS": null,
+      "steps": 573,
+      "footprint": 0.4504,
+      "area": {
+        "flown": 0.11614499999999998,
+        "footprint": 0.4332950000000001
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82519,
+      "coverage": 0.16722972972972974,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.3203277885647127,
+      "halfS": null,
+      "steps": 778,
+      "footprint": 0.4105,
+      "area": {
+        "flown": 0.14524999999999993,
+        "footprint": 0.3973199999999999
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82520,
+      "coverage": 0.3704268292682927,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 3.598827032792587,
+      "halfS": null,
+      "steps": 2171,
+      "footprint": 0.4863,
+      "area": {
+        "flown": 0.23460999999999999,
+        "footprint": 0.40518
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82521,
+      "coverage": 0.4391891891891892,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.023297367350872,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8699,
+      "area": {
+        "flown": 0.23250500000000002,
+        "footprint": 0.527185
+      },
+      "footprintHalfS": 78.60355029585799
+    },
+    {
+      "task": "quad",
+      "seed": 82522,
+      "coverage": 0.4375,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.005150695989654,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6014,
+      "area": {
+        "flown": 0.25617500000000004,
+        "footprint": 0.537025
+      },
+      "footprintHalfS": 38.7074569789675
+    },
+    {
+      "task": "quad",
+      "seed": 82523,
+      "coverage": 0.6047297297297297,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.90392895215557,
+      "halfS": 102.95,
+      "steps": 2400,
+      "footprint": 0.9223,
+      "area": {
+        "flown": 0.322205,
+        "footprint": 0.589615
+      },
+      "footprintHalfS": 43.49554896142433
+    },
+    {
+      "task": "quad",
+      "seed": 82524,
+      "coverage": 0.364010989010989,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.029614378705792,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.636,
+      "area": {
+        "flown": 0.20425500000000002,
+        "footprint": 0.5346799999999999
+      },
+      "footprintHalfS": 48.666666666666664
+    },
+    {
+      "task": "quad",
+      "seed": 82525,
+      "coverage": 0.10807291666666667,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.9499271875567282,
+      "halfS": null,
+      "steps": 568,
+      "footprint": 0.3047,
+      "area": {
+        "flown": 0.09826000000000003,
+        "footprint": 0.28992000000000007
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82526,
+      "coverage": 0.375,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.003403011776189,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6044,
+      "area": {
+        "flown": 0.22823000000000002,
+        "footprint": 0.45535500000000007
+      },
+      "footprintHalfS": 63.000000000000014
+    },
+    {
+      "task": "quad",
+      "seed": 82527,
+      "coverage": 0.2193877551020408,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.686715524990352,
+      "halfS": null,
+      "steps": 1601,
+      "footprint": 0.3814,
+      "area": {
+        "flown": 0.16013499999999997,
+        "footprint": 0.31218500000000005
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "quad",
+      "seed": 82528,
+      "coverage": 0.4814189189189189,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.020356635195563,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8733,
+      "area": {
+        "flown": 0.271115,
+        "footprint": 0.5609050000000001
+      },
+      "footprintHalfS": 34.223684210526315
+    },
+    {
+      "task": "quad",
+      "seed": 82529,
+      "coverage": 0.3713235294117647,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.383979771209682,
+      "halfS": null,
+      "steps": 1436,
+      "footprint": 0.9632,
+      "area": {
+        "flown": 0.26983999999999997,
+        "footprint": 0.7388650000000002
+      },
+      "footprintHalfS": 22.73397823458283
+    },
+    {
+      "task": "quad",
+      "seed": 82530,
+      "coverage": 0.22794117647058823,
+      "collisions": 2,
+      "crashed": true,
+      "energyWh": 2.442488442636401,
+      "halfS": null,
+      "steps": 1455,
+      "footprint": 0.4574,
+      "area": {
+        "flown": 0.16939500000000002,
+        "footprint": 0.3511949999999999
+      },
+      "footprintHalfS": null
+    },
+    {
+      "task": "apartments",
+      "seed": 84101,
+      "plan": "sd-0d6c5dfb8d",
+      "coverage": 0.9512987012987013,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.4481639382137392,
+      "halfS": 51.95,
+      "steps": 2118,
+      "footprint": 1,
+      "area": {
+        "flown": 0.562345,
+        "footprint": 0.7081250000000001
+      },
+      "footprintHalfS": 31.81902985074627
+    },
+    {
+      "task": "apartments",
+      "seed": 84102,
+      "plan": "sd-a07a08b7ba",
+      "coverage": 0.9368131868131868,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9644872260076798,
+      "halfS": 54.55,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5138800000000001,
+        "footprint": 0.7479299999999999
+      },
+      "footprintHalfS": 21.120174799708668
+    },
+    {
+      "task": "apartments",
+      "seed": 84103,
+      "plan": "sd-634f65634b",
+      "coverage": 0.9506578947368421,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.4444706359012196,
+      "halfS": 52,
+      "steps": 2104,
+      "footprint": 1,
+      "area": {
+        "flown": 0.559385,
+        "footprint": 0.7468649999999999
+      },
+      "footprintHalfS": 28.242554498004296
+    },
+    {
+      "task": "apartments",
+      "seed": 84104,
+      "plan": "sd-650e73457c",
+      "coverage": 0.8075221238938053,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.85586867711988,
+      "halfS": 72.5,
+      "steps": 2400,
+      "footprint": 0.9978,
+      "area": {
+        "flown": 0.43319,
+        "footprint": 0.63961
+      },
+      "footprintHalfS": 36
+    },
+    {
+      "task": "apartments",
+      "seed": 84105,
+      "plan": "sd-143b7bc071",
+      "coverage": 0.9339080459770115,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9229975325772206,
+      "halfS": 55.4,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.535775,
+        "footprint": 0.733615
+      },
+      "footprintHalfS": 34.22775800711744
+    },
+    {
+      "task": "apartments",
+      "seed": 84106,
+      "plan": "sd-57e44f30dc",
+      "coverage": 0.573943661971831,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8917272408558343,
+      "halfS": 107.6,
+      "steps": 2400,
+      "footprint": 0.8011,
+      "area": {
+        "flown": 0.32685000000000003,
+        "footprint": 0.471225
+      },
+      "footprintHalfS": 78
+    },
+    {
+      "task": "apartments",
+      "seed": 84107,
+      "plan": "sd-c261db8931",
+      "coverage": 0.6330645161290323,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.908576670887492,
+      "halfS": 84.7,
+      "steps": 2400,
+      "footprint": 0.6875,
+      "area": {
+        "flown": 0.353425,
+        "footprint": 0.5318550000000001
+      },
+      "footprintHalfS": 50.313209802749554
+    },
+    {
+      "task": "apartments",
+      "seed": 84108,
+      "plan": "sd-2e34d617d3",
+      "coverage": 0.7097457627118644,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.928440374496008,
+      "halfS": 75.05,
+      "steps": 2400,
+      "footprint": 0.7818,
+      "area": {
+        "flown": 0.408675,
+        "footprint": 0.5395200000000001
+      },
+      "footprintHalfS": 40.043076923076924
+    },
+    {
+      "task": "apartments",
+      "seed": 84109,
+      "plan": "sd-1669411c56",
+      "coverage": 0.9417808219178082,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.893758446909019,
+      "halfS": 52.4,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5619850000000002,
+        "footprint": 0.730135
+      },
+      "footprintHalfS": 17.300822228522826
+    },
+    {
+      "task": "apartments",
+      "seed": 84110,
+      "plan": "sd-4316fe5e12",
+      "coverage": 0.9537037037037037,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.4415130940678544,
+      "halfS": 34.85,
+      "steps": 1523,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6886549999999999,
+        "footprint": 0.8655100000000001
+      },
+      "footprintHalfS": 5.2255704581083435
+    },
+    {
+      "task": "apartments",
+      "seed": 84111,
+      "plan": "sd-2925fe2f7a",
+      "coverage": 0.9517045454545454,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.806655970003211,
+      "halfS": 53.75,
+      "steps": 2355,
+      "footprint": 1,
+      "area": {
+        "flown": 0.542755,
+        "footprint": 0.7847999999999999
+      },
+      "footprintHalfS": 30.04731061672768
+    },
+    {
+      "task": "apartments",
+      "seed": 84112,
+      "plan": "sd-bc82e22360",
+      "coverage": 0.9512195121951219,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.5056535812796445,
+      "halfS": 50.75,
+      "steps": 2197,
+      "footprint": 1,
+      "area": {
+        "flown": 0.58888,
+        "footprint": 0.7814
+      },
+      "footprintHalfS": 5.590756615728663
+    },
+    {
+      "task": "apartments",
+      "seed": 84113,
+      "plan": "sd-808af159b0",
+      "coverage": 0.8695652173913043,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.915925464351283,
+      "halfS": 62.8,
+      "steps": 2400,
+      "footprint": 0.9293,
+      "area": {
+        "flown": 0.48953500000000005,
+        "footprint": 0.6915699999999998
+      },
+      "footprintHalfS": 17.300613496932513
+    },
+    {
+      "task": "apartments",
+      "seed": 84114,
+      "plan": "sd-7b65aaf690",
+      "coverage": 0.8909574468085106,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9046469916696926,
+      "halfS": 63.2,
+      "steps": 2400,
+      "footprint": 0.9362,
+      "area": {
+        "flown": 0.5115700000000001,
+        "footprint": 0.7527849999999998
+      },
+      "footprintHalfS": 21.16614420062696
+    },
+    {
+      "task": "apartments",
+      "seed": 84115,
+      "plan": "sd-ce68f8b9ef",
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.7240050361449226,
+      "halfS": 27.15,
+      "steps": 1050,
+      "footprint": 1,
+      "area": {
+        "flown": 0.7805599999999997,
+        "footprint": 0.9260400000000001
+      },
+      "footprintHalfS": 4.800000000000001
+    },
+    {
+      "task": "apartments",
+      "seed": 84116,
+      "plan": "sd-3e80de2400",
+      "coverage": 0.9512195121951219,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6442853960997663,
+      "halfS": 54.3,
+      "steps": 2209,
+      "footprint": 1,
+      "area": {
+        "flown": 0.56753,
+        "footprint": 0.73674
+      },
+      "footprintHalfS": 42.849927431059506
+    },
+    {
+      "task": "apartments",
+      "seed": 84117,
+      "plan": "sd-3b0486aae9",
+      "coverage": 0.95,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.1259299543613888,
+      "halfS": 47.65,
+      "steps": 1911,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6024899999999999,
+        "footprint": 0.746355
+      },
+      "footprintHalfS": 37.20124804992199
+    },
+    {
+      "task": "apartments",
+      "seed": 84118,
+      "plan": "sd-e6d2b05e77",
+      "coverage": 0.9507575757575758,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.7879536077014273,
+      "halfS": 45.95,
+      "steps": 1741,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6333499999999999,
+        "footprint": 0.750765
+      },
+      "footprintHalfS": 33.49963316214233
+    },
+    {
+      "task": "apartments",
+      "seed": 84119,
+      "plan": "sd-835bd52b98",
+      "coverage": 0.9565217391304348,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 0.8945812823132585,
+      "halfS": 12.2,
+      "steps": 553,
+      "footprint": 1,
+      "area": {
+        "flown": 0.87661,
+        "footprint": 0.9891400000000001
+      },
+      "footprintHalfS": 3.17225335730147
+    },
+    {
+      "task": "apartments",
+      "seed": 84120,
+      "plan": "sd-cbacc67599",
+      "coverage": 0.95,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.748024449579829,
+      "halfS": 48.4,
+      "steps": 1689,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6341699999999999,
+        "footprint": 0.7720899999999999
+      },
+      "footprintHalfS": 42.6310802274163
+    },
+    {
+      "task": "apartments",
+      "seed": 84121,
+      "plan": "sd-98da2fe398",
+      "coverage": 0.8174157303370787,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8519484267593977,
+      "halfS": 66.05,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.45716999999999997,
+        "footprint": 0.612935
+      },
+      "footprintHalfS": 43.23175182481752
+    },
+    {
+      "task": "apartments",
+      "seed": 84122,
+      "plan": "sd-54feea91e7",
+      "coverage": 0.95,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.2344454562024745,
+      "halfS": 44.45,
+      "steps": 2006,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6396199999999999,
+        "footprint": 0.8111599999999999
+      },
+      "footprintHalfS": 21.14108910891089
+    },
+    {
+      "task": "apartments",
+      "seed": 84123,
+      "plan": "sd-da95c1c2a5",
+      "coverage": 0.95,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.4938887139541297,
+      "halfS": 34.35,
+      "steps": 1509,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6970399999999998,
+        "footprint": 0.86159
+      },
+      "footprintHalfS": 13.035267349260524
+    },
+    {
+      "task": "apartments",
+      "seed": 84124,
+      "plan": "sd-765e2b043f",
+      "coverage": 0.9527027027027027,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.5088185223082498,
+      "halfS": 52.7,
+      "steps": 2151,
+      "footprint": 1,
+      "area": {
+        "flown": 0.55962,
+        "footprint": 0.7743249999999999
+      },
+      "footprintHalfS": 21.29977794226499
+    },
+    {
+      "task": "apartments",
+      "seed": 84125,
+      "plan": "sd-a24bd35424",
+      "coverage": 0.7145833333333333,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.911285888816673,
+      "halfS": 76.2,
+      "steps": 2400,
+      "footprint": 0.8354,
+      "area": {
+        "flown": 0.41655999999999993,
+        "footprint": 0.6281399999999999
+      },
+      "footprintHalfS": 48.302158273381295
+    },
+    {
+      "task": "apartments",
+      "seed": 84126,
+      "plan": "sd-3be4f3b945",
+      "coverage": 0.95,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.1446172035327304,
+      "halfS": 41.75,
+      "steps": 1940,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6371399999999999,
+        "footprint": 0.7794800000000001
+      },
+      "footprintHalfS": 19.703999999999997
+    },
+    {
+      "task": "apartments",
+      "seed": 84127,
+      "plan": "sd-ded503d0dd",
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.0745728396366085,
+      "halfS": 42.2,
+      "steps": 1907,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6288249999999999,
+        "footprint": 0.776915
+      },
+      "footprintHalfS": 27.581049698095683
+    },
+    {
+      "task": "apartments",
+      "seed": 84128,
+      "plan": "sd-c58c9479ec",
+      "coverage": 0.6735537190082644,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.887811502987493,
+      "halfS": 85.8,
+      "steps": 2400,
+      "footprint": 0.7293,
+      "area": {
+        "flown": 0.38895,
+        "footprint": 0.5190049999999999
+      },
+      "footprintHalfS": 78.31337579617835
+    },
+    {
+      "task": "apartments",
+      "seed": 84129,
+      "plan": "sd-9171dd82b2",
+      "coverage": 0.9537037037037037,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.5020791682472345,
+      "halfS": 31.85,
+      "steps": 1522,
+      "footprint": 1,
+      "area": {
+        "flown": 0.7226999999999999,
+        "footprint": 0.879865
+      },
+      "footprintHalfS": 6.458471760797342
+    },
+    {
+      "task": "apartments",
+      "seed": 84130,
+      "plan": "sd-590a00463e",
+      "coverage": 0.7109375,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.89813131253138,
+      "halfS": 84.1,
+      "steps": 2400,
+      "footprint": 0.8809,
+      "area": {
+        "flown": 0.39551499999999995,
+        "footprint": 0.5523450000000001
+      },
+      "footprintHalfS": 39.94436310395315
+    },
+    {
+      "task": "apartments",
+      "seed": 84131,
+      "plan": "sd-db18ef2d36",
+      "coverage": 0.7137681159420289,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.888693624406842,
+      "halfS": 82.15,
+      "steps": 2400,
+      "footprint": 0.8786,
+      "area": {
+        "flown": 0.3789,
+        "footprint": 0.6252550000000002
+      },
+      "footprintHalfS": 46.57848837209303
+    },
+    {
+      "task": "apartments",
+      "seed": 84132,
+      "plan": "sd-20d1eb948a",
+      "coverage": 0.8443396226415094,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9488805678465204,
+      "halfS": 61.95,
+      "steps": 2400,
+      "footprint": 0.9693,
+      "area": {
+        "flown": 0.4809,
+        "footprint": 0.6926750000000002
+      },
+      "footprintHalfS": 27.405963302752294
+    },
+    {
+      "task": "apartments",
+      "seed": 84133,
+      "plan": "sd-41d386839e",
+      "coverage": 0.9447674418604651,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9254272173375018,
+      "halfS": 53.75,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.542295,
+        "footprint": 0.7034849999999999
+      },
+      "footprintHalfS": 25.69633507853403
+    },
+    {
+      "task": "apartments",
+      "seed": 84134,
+      "plan": "sd-4821a46f1e",
+      "coverage": 0.9518072289156626,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6965094814730457,
+      "halfS": 62.3,
+      "steps": 2257,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5191300000000001,
+        "footprint": 0.7076749999999999
+      },
+      "footprintHalfS": 37.6673839532739
+    },
+    {
+      "task": "apartments",
+      "seed": 84135,
+      "plan": "sd-e4908778d8",
+      "coverage": 0.953125,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.860827796411871,
+      "halfS": 42.45,
+      "steps": 1792,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6429649999999999,
+        "footprint": 0.787885
+      },
+      "footprintHalfS": 25.93053016453382
+    },
+    {
+      "task": "apartments",
+      "seed": 84136,
+      "plan": "sd-af4d523904",
+      "coverage": 0.9540816326530612,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.191567720245151,
+      "halfS": 27.9,
+      "steps": 1352,
+      "footprint": 1,
+      "area": {
+        "flown": 0.7474550000000002,
+        "footprint": 0.924495
+      },
+      "footprintHalfS": 13.459072847682119
+    },
+    {
+      "task": "apartments",
+      "seed": 84137,
+      "plan": "sd-38d616ce0d",
+      "coverage": 0.9410112359550562,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.819738189015752,
+      "halfS": 56.6,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.5542050000000002,
+        "footprint": 0.725985
+      },
+      "footprintHalfS": 42.31490159325211
+    },
+    {
+      "task": "apartments",
+      "seed": 84138,
+      "plan": "sd-ba39a81a6e",
+      "coverage": 0.9518072289156626,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6178306918138854,
+      "halfS": 52.7,
+      "steps": 2243,
+      "footprint": 1,
+      "area": {
+        "flown": 0.567175,
+        "footprint": 0.80603
+      },
+      "footprintHalfS": 8.307692307692308
+    },
+    {
+      "task": "apartments",
+      "seed": 84139,
+      "plan": "sd-b386282e82",
+      "coverage": 0.9537037037037037,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.451736546342185,
+      "halfS": 35.15,
+      "steps": 1490,
+      "footprint": 1,
+      "area": {
+        "flown": 0.7060249999999999,
+        "footprint": 0.8706149999999999
+      },
+      "footprintHalfS": 19.74977497749775
+    },
+    {
+      "task": "apartments",
+      "seed": 84140,
+      "plan": "sd-4556eba074",
+      "coverage": 0.7165178571428571,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.856433756100294,
+      "halfS": 73.3,
+      "steps": 2400,
+      "footprint": 0.8036,
+      "area": {
+        "flown": 0.39831000000000005,
+        "footprint": 0.5250999999999999
+      },
+      "footprintHalfS": 45
+    },
+    {
+      "task": "apartments",
+      "seed": 84141,
+      "plan": "sd-8f2403d284",
+      "coverage": 0.9534883720930233,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8930387008255383,
+      "halfS": 25,
+      "steps": 1178,
+      "footprint": 1,
+      "area": {
+        "flown": 0.767445,
+        "footprint": 0.92646
+      },
+      "footprintHalfS": 3.8221429481462605
+    },
+    {
+      "task": "apartments",
+      "seed": 84142,
+      "plan": "sd-3a11248005",
+      "coverage": 0.9410112359550562,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8536251722408976,
+      "halfS": 53.95,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.54044,
+        "footprint": 0.7349600000000001
+      },
+      "footprintHalfS": 38.49026192075218
+    },
+    {
+      "task": "apartments",
+      "seed": 84143,
+      "plan": "sd-2f82136de3",
+      "coverage": 0.7582644628099173,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.893052802282969,
+      "halfS": 78.55,
+      "steps": 2400,
+      "footprint": 0.9256,
+      "area": {
+        "flown": 0.4160149999999999,
+        "footprint": 0.6092850000000001
+      },
+      "footprintHalfS": 62.48414023372287
+    },
+    {
+      "task": "apartments",
+      "seed": 84144,
+      "plan": "sd-a09a24df61",
+      "coverage": 0.9513888888888888,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.2687044777127676,
+      "halfS": 49.1,
+      "steps": 1981,
+      "footprint": 1,
+      "area": {
+        "flown": 0.615445,
+        "footprint": 0.78976
+      },
+      "footprintHalfS": 12
+    },
+    {
+      "task": "apartments",
+      "seed": 84145,
+      "plan": "sd-e582ebaa65",
+      "coverage": 0.7975,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.898536765033988,
+      "halfS": 63.2,
+      "steps": 2400,
+      "footprint": 0.99,
+      "area": {
+        "flown": 0.46324999999999994,
+        "footprint": 0.676625
+      },
+      "footprintHalfS": 26.052631578947366
+    },
+    {
+      "task": "apartments",
+      "seed": 84146,
+      "plan": "sd-0db6c0db3b",
+      "coverage": 0.95,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.0469899688062543,
+      "halfS": 14.35,
+      "steps": 625,
+      "footprint": 1,
+      "area": {
+        "flown": 0.8599999999999998,
+        "footprint": 0.97
+      },
+      "footprintHalfS": 4.166666666666666
+    },
+    {
+      "task": "apartments",
+      "seed": 84147,
+      "plan": "sd-908fab15bd",
+      "coverage": 0.8318181818181818,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8543983838455347,
+      "halfS": 69.95,
+      "steps": 2400,
+      "footprint": 0.9159,
+      "area": {
+        "flown": 0.45431999999999995,
+        "footprint": 0.7112500000000002
+      },
+      "footprintHalfS": 32.59905882352941
+    },
+    {
+      "task": "apartments",
+      "seed": 84148,
+      "plan": "sd-a2feb62718",
+      "coverage": 0.7333333333333333,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.940698397959112,
+      "halfS": 74.55,
+      "steps": 2400,
+      "footprint": 0.9375,
+      "area": {
+        "flown": 0.41678,
+        "footprint": 0.5900000000000001
+      },
+      "footprintHalfS": 41.64353612167301
+    },
+    {
+      "task": "apartments",
+      "seed": 84149,
+      "plan": "sd-b44eb985d7",
+      "coverage": 0.9514925373134329,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.937941897939058,
+      "halfS": 41.7,
+      "steps": 1823,
+      "footprint": 1,
+      "area": {
+        "flown": 0.6417949999999999,
+        "footprint": 0.78451
+      },
+      "footprintHalfS": 24.185929648241206
+    },
+    {
+      "task": "apartments",
+      "seed": 84150,
+      "plan": "sd-791eac6a93",
+      "coverage": 0.6804511278195489,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 4.023995552432735,
+      "halfS": 88.3,
+      "steps": 2400,
+      "footprint": 0.8947,
+      "area": {
+        "flown": 0.36588000000000004,
+        "footprint": 0.55094
+      },
+      "footprintHalfS": 65.58241758241758
+    },
+    {
+      "task": "apartments",
+      "seed": 84151,
+      "plan": "sd-6901e5daa0",
+      "coverage": 0.8582474226804123,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.983661711232359,
+      "halfS": 70.95,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.44934499999999994,
+        "footprint": 0.6344100000000001
+      },
+      "footprintHalfS": 23.388560157790927
+    },
+    {
+      "task": "apartments",
+      "seed": 84152,
+      "plan": "sd-b433fe99c8",
+      "coverage": 0.6324503311258278,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9115091751946323,
+      "halfS": 83.25,
+      "steps": 2400,
+      "footprint": 0.7219,
+      "area": {
+        "flown": 0.364905,
+        "footprint": 0.5666549999999999
+      },
+      "footprintHalfS": 53.079069767441865
+    },
+    {
+      "task": "apartments",
+      "seed": 84153,
+      "plan": "sd-27032e1642",
+      "coverage": 0.7871287128712872,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8538870241098953,
+      "halfS": 67,
+      "steps": 2400,
+      "footprint": 0.896,
+      "area": {
+        "flown": 0.457925,
+        "footprint": 0.62659
+      },
+      "footprintHalfS": 54.25252525252525
+    },
+    {
+      "task": "apartments",
+      "seed": 84154,
+      "plan": "sd-1fdf85705b",
+      "coverage": 0.7379032258064516,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.920696679015066,
+      "halfS": 75.5,
+      "steps": 2400,
+      "footprint": 0.8952,
+      "area": {
+        "flown": 0.4157250000000001,
+        "footprint": 0.6311500000000001
+      },
+      "footprintHalfS": 30.205128205128204
+    },
+    {
+      "task": "apartments",
+      "seed": 84155,
+      "plan": "sd-a5ed01c45d",
+      "coverage": 0.6464285714285715,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8737929118928727,
+      "halfS": 84.95,
+      "steps": 2400,
+      "footprint": 0.8089,
+      "area": {
+        "flown": 0.364925,
+        "footprint": 0.5785599999999997
+      },
+      "footprintHalfS": 46.05042016806723
+    },
+    {
+      "task": "apartments",
+      "seed": 84156,
+      "plan": "sd-f6bcc84116",
+      "coverage": 0.7912844036697247,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.987352060097968,
+      "halfS": 67.6,
+      "steps": 2400,
+      "footprint": 0.922,
+      "area": {
+        "flown": 0.44609499999999996,
+        "footprint": 0.6591600000000001
+      },
+      "footprintHalfS": 30
+    },
+    {
+      "task": "apartments",
+      "seed": 84157,
+      "plan": "sd-8d63ab5e38",
+      "coverage": 0.7564102564102564,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9814004213381184,
+      "halfS": 74.25,
+      "steps": 2400,
+      "footprint": 0.8739,
+      "area": {
+        "flown": 0.418915,
+        "footprint": 0.6259600000000002
+      },
+      "footprintHalfS": 42.98815165876777
+    },
+    {
+      "task": "apartments",
+      "seed": 84158,
+      "plan": "sd-04dac73947",
+      "coverage": 0.9519230769230769,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.5670956246866345,
+      "halfS": 32.8,
+      "steps": 1563,
+      "footprint": 1,
+      "area": {
+        "flown": 0.689655,
+        "footprint": 0.85842
+      },
+      "footprintHalfS": 13.523275008253549
+    },
+    {
+      "task": "apartments",
+      "seed": 84159,
+      "plan": "sd-6a1eb1b3d1",
+      "coverage": 0.9528301886792453,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.3593006031366826,
+      "halfS": 28,
+      "steps": 1478,
+      "footprint": 1,
+      "area": {
+        "flown": 0.7466849999999999,
+        "footprint": 0.9660299999999999
+      },
+      "footprintHalfS": 3.831417624521073
+    },
+    {
+      "task": "apartments",
+      "seed": 84160,
+      "plan": "sd-e598ed3a55",
+      "coverage": 0.6875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8699062537835323,
+      "halfS": 74,
+      "steps": 2400,
+      "footprint": 0.8569,
+      "area": {
+        "flown": 0.40150500000000006,
+        "footprint": 0.5636049999999999
+      },
+      "footprintHalfS": 52.62396694214876
+    }
+  ]
+}
