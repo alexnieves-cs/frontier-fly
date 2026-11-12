@@ -13,8 +13,12 @@
 import type { PlanRecord, PlanSet } from '../plans';
 import type { LightingPreset } from '../sim/lighting';
 
-/** v2 adds the real-apartments task, so v1 and v2 scores are not comparable. */
-export const BENCH_VERSION = 2;
+/**
+ * v2 added the real-apartments task. v3 flies under the crash rule (a contact faster than
+ * CRASH_SPEED ends the flight) and prices energy on the current airframe; v2 counted contacts
+ * without ending the flight. Scores from different versions are not comparable.
+ */
+export const BENCH_VERSION = 3;
 
 export interface BenchTask {
   id: string;

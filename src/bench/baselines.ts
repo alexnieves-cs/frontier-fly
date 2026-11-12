@@ -85,6 +85,9 @@ export function policyPilot(name: string, policy: (obs: Float32Array) => Float32
 export const BASELINES: Record<string, () => BenchPilot> = {
   planner: () => plannerPilot('Sensor-only planner'),
   'planner-momentum': () => plannerPilot('Sensor-only planner + momentum', { momentum: 1 }),
+  // The quad-aware planner the report flies on the quadrotor: the trajectory tracker (sim/tracker.ts)
+  // shapes its command there; on the kinematic airframe it is the plain planner.
+  'planner-tracker': () => explorerPilot('Sensor-only planner + quad tracker', (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {} } : {}) })),
   waypoint: () => statelessPilot('Frontier waypoint follower', waypointAction),
   heuristic: () => statelessPilot('Lidar wall-follower', heuristicAction),
   // Published exploration methods (src/sim/explorers), on the same maps, flight layer and safety filter.

@@ -15,7 +15,7 @@ import { sarSection } from './sar.mjs';
 import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
-import { benchSection } from './bench.mjs';
+import { benchPair, benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
 import { floorsBudgetNote, hazardsSection } from './hazards.mjs';
 
@@ -805,7 +805,17 @@ function studyTargetRows(study) {
     c.coverageCi[0] >= target ? '✅ meets' : c.coverage >= target ? '⚠️ meets on the mean; interval spans the target' : '❌ misses';
   const rows = [];
   const easy = cell('easy', 'day', 'policy');
-  if (easy) rows.push(['Coverage, easy buildings (policy)', `≥ ${pct(TARGETS.easy)}`, `${pct(easy.coverage)} (${ci(easy.coverageCi)}), ${n} fresh`, status(easy, TARGETS.easy)]);
+  // Stage 0 is one empty 8 x 8 m room (rl/curriculum.ts) whatever the seed, so every pilot that sweeps
+  // it reaches the same ceiling: a sanity check, not a measurement.
+  const easyPlanner = cell('easy', 'day', 'classical');
+  const saturated = easy && easyPlanner && Math.abs(easy.coverage - easyPlanner.coverage) < 1e-4 && easy.coverageCi[1] - easy.coverageCi[0] < 1e-4;
+  if (easy)
+    rows.push([
+      'Coverage, easy buildings (policy)',
+      `≥ ${pct(TARGETS.easy)}`,
+      `${pct(easy.coverage)} (${ci(easy.coverageCi)}), ${n} fresh${saturated ? '; a sanity check: the easy stage is one empty 8 × 8 m room whatever the seed, and the planner and the teacher reach the same ceiling' : ''}`,
+      status(easy, TARGETS.easy),
+    ]);
   for (const [pilot, label] of [
     ['policy', 'Coverage, new hard buildings (policy)'],
     ['guarded', 'Coverage, new hard buildings (policy + lidar guard)'],
@@ -819,7 +829,16 @@ function studyTargetRows(study) {
   const night = cell('hard', 'night-dark', 'policy');
   if (day && night) {
     const ratio = night.coverage / day.coverage;
-    rows.push(['Night coverage vs day, hard buildings (policy)', `≥ ${pct(TARGETS.nightRatio)}`, `${pct(ratio)}, ${n} fresh`, mark(ratio >= TARGETS.nightRatio)]);
+    // Lidar and the maps ignore light; the dark only adds optical-flow and IMU noise (sim/env.ts, lowLightImu).
+    // A ratio above 100% is the policy's flights taking different paths around its crashes, not the dark helping.
+    const ratioOf = (pilot) => {
+      const a = cell('hard', 'day', pilot);
+      const b = cell('hard', 'night-dark', pilot);
+      return a && b ? pct(b.coverage / a.coverage) : null;
+    };
+    const others = [['guarded', 'guarded policy'], ['classical', 'planner']].map(([p, l]) => (ratioOf(p) ? `${l} ${ratioOf(p)}` : null)).filter(Boolean);
+    const note = ratio > 1.02 ? `; above 100% because the dark changes the noise, so the policy's crash-prone flights take other paths, not because darkness helps (${others.join(', ')})` : '';
+    rows.push(['Night coverage vs day, hard buildings (policy)', `≥ ${pct(TARGETS.nightRatio)}`, `${pct(ratio)}, ${n} fresh${note}`, mark(ratio >= TARGETS.nightRatio)]);
   }
   return rows;
 }
@@ -956,6 +975,17 @@ function readmeHeadline(study, mb, atlas, faults, tracking) {
  * The guide's "Honest limits" list. Every number is read from the same JSON as the tables, so the prose
  * cannot drift from them (it did once: the list quoted a 3.5% false-clear rate for weeks after it fell to 0.3%).
  */
+/** One sentence on FrontierBench's guarded policy against the planner, from bench/results (current version). */
+function benchLimit() {
+  const p = benchPair(ROOT, 'guarded', 'planner');
+  if (!p) return '';
+  const pc = (x) => `${(x * 100).toFixed(1)}%`;
+  const crashed = (r) => `${Math.round(r.crashShare * 100)}%`;
+  const quad = (r) => (r.tasks.quad ? pc(r.tasks.quad.coverage) : '—');
+  const lead = p.a.score > p.b.score + 0.005 ? 'the guarded policy scores higher than the planner' : p.b.score > p.a.score + 0.005 ? 'the planner scores higher than the guarded policy' : 'the guarded policy and the planner score about the same';
+  return `Across all of FrontierBench v${p.version}, under the same crash rule, ${lead}: ${pc(p.a.score)} against ${pc(p.b.score)}, with ${crashed(p.a)} and ${crashed(p.b)} of flights ended by a crash, and ${quad(p.a)} against ${quad(p.b)} on its quadrotor task ([LEADERBOARD.md](LEADERBOARD.md)).`;
+}
+
 function guideLimits(v, study, mb, plans) {
   if (!study || !mb) return '_Not measured yet._';
   const quad = (pilot) => study.cells.find((c) => c.condition === 'quad' && c.lighting === 'day' && c.pilot === pilot);
@@ -964,7 +994,7 @@ function guideLimits(v, study, mb, plans) {
   const truth = mb.modes.sensorQuad?.all;
   const lines = [
     `- The drone sometimes declares a building clear while a person is inside. Over a declared mix of missions, sites, light, wind and faults, the [failure atlas](ATLAS.md) measures this at ${v.R_ATLAS_FC} of flights (95% interval ${v.R_ATLAS_FC_CI}), all of them on sweeps of an occupied site, where the rate is ${v.R_ATLAS_FC_OCC}. A walking or hiding person is the usual case. At v1.0.0 the rate was 3.55%: a person the detector saw but could not confirm was dropped, and the mission bench never caught it because its occupied scenario only used a person lying still. Unconfirmed people now block a clear, which took a fresh ${v.R_TRK_N}-flight check from ${v.R_TRK_FC_CTRL} to ${v.R_TRK_FC}. The [atlas page](https://alexnieves-cs.github.io/frontier-fly/atlas.html) replays every failing flight.`,
-    `- The learned policy needs its guard. On 30 fresh hard buildings under the crash rule (a contact faster than 0.5 m/s ends the flight) the policy alone covers ${v.R_POLICY_HARD} and crashes in ${v.R_POLICY_CRASHES} flights; behind the hand-written lidar guard it covers ${v.R_GUARD_HARD} and crashes in ${v.R_GUARD_CRASHES}; the sensor-only planner, with no learning, covers ${v.R_PLANNER_HARD} and never crashes. Across all of FrontierBench the guarded policy and the planner score about the same ([LEADERBOARD.md](LEADERBOARD.md)). The small fixed eval (4 easy and 3 hard seeds) is a smoke check, not a headline. [BENCHMARKS.md](BENCHMARKS.md) has the per-seed numbers.`,
+    `- The learned policy needs its guard. On 30 fresh hard buildings under the crash rule (a contact faster than 0.5 m/s ends the flight) the policy alone covers ${v.R_POLICY_HARD} and crashes in ${v.R_POLICY_CRASHES} flights; behind the hand-written lidar guard it covers ${v.R_GUARD_HARD} and crashes in ${v.R_GUARD_CRASHES}; the sensor-only planner, with no learning, covers ${v.R_PLANNER_HARD} and never crashes. ${benchLimit()} The small fixed eval (4 easy and 3 hard seeds) is a smoke check, not a headline. [BENCHMARKS.md](BENCHMARKS.md) has the per-seed numbers.`,
     `- Indoors, missions do not read the floor plan: a sensor-only planner maps from the drone's own lidar and range finders, and the policy flies under a lidar guard with that planner as its fallback. On ${v.R_M_FLIGHTS} fresh mission worlds per explorer the sensor-only explorer reaches the expected outcome in ${v.R_M_SENSOR} of flights, the policy-first explorer in ${v.R_M_POLICY}, and the old floor-plan planner (kept as a reference) in ${v.R_M_ORACLE}; ${v.R_M_COLL} of the ${v.R_M_ALL} flights touched anything. The policy hands ${v.R_M_HANDOFF} of the buildings it enters to the planner after a stall, so much of each mission is flown by the planner. [REPORT.md](REPORT.md) has the study, the ablations and the failure cases.`,
     `- On quadrotor dynamics with sensor noise every pilot covers less than on the kinematic airframe, because the quad cannot change speed instantly. Under the crash rule only the quad-aware planner (braking safety filter plus command tracker) survives: ${v.R_Q_BRAKE_TRACK} with ${v.R_Q_BRAKE_TRACK_CRASHES} crashes in 30 flights. The plain planner crashes in ${crashes(quad('classical'))} and covers ${v.R_PLANNER_QUAD}; the policy crashes in ${crashes(quad('policy'))} and covers ${v.R_POLICY_QUAD}, and the guard does not save it (${crashes(quad('guarded'))}). Whole missions on the quad, which slow to 1 m/s indoors behind the braking filter, reach the expected outcome ${v.R_MQ_SENSOR} of the time with the planner and ${v.R_MQ_POLICY} with the policy.${loc && truth ? ` Flown on the pose estimate instead of the true pose they reach it ${pct(loc.expectedOutcome)} of the time, and ${loc.flightsWithCollision} of ${loc.flights} flights touch something against ${truth.flightsWithCollision} on the true pose; the cause is not traced.` : ''}`,
     '- FrontierBench freezes seven exploration tasks (the last on real apartment plans) and a drone-team track, with public dev and test seeds so other pilots can be scored the same way; CI re-scores every submitted entry from its code. The seeds are public, so the board relies on entrants not tuning on the test split. [LEADERBOARD.md](LEADERBOARD.md) has the board and how to enter.',

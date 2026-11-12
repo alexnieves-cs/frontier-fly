@@ -24,6 +24,10 @@ updates:
         update-types: [version-update:semver-minor, version-update:semver-major]
       - dependency-name: '@tensorflow/tfjs'
         update-types: [version-update:semver-minor, version-update:semver-major]
+      # TypeScript 7 (the native compiler) type-checks this repo cleanly, but typescript-eslint
+      # (8.72, peer typescript <6.1) refuses to run on it. Lift this once typescript-eslint supports 7.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
   - package-ecosystem: github-actions
     directory: /
     schedule:

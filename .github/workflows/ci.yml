@@ -5,8 +5,12 @@ name: ci
 # Runs on every pull request, including ones whose branch a workflow pushed (media/*, study/*,
 # train/*): a push made with GITHUB_TOKEN starts no push run, so a push trigger would leave those
 # pull requests with no checks at all. A branch with no pull request can be run from Run workflow.
+# It also runs on every push to main, so the README's ci badge shows main's status (a badge reads
+# the default branch's runs, and pull request runs are not on it).
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
