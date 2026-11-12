@@ -30,10 +30,12 @@ export const has = (name: string) => args.includes(`--${name}`);
 export const TRAIN_SEEDS = [66001, 66299] as const;
 export const TUNE_SEEDS = [66301, 66332] as const;
 export const REPORT_SEEDS = [89001, 89332] as const;
+/** A second selection block, for choosing among finished runs without reusing the tuning block they were picked on. */
+export const VAL2_SEEDS = [66401, 66464] as const;
 const LIGHTS = ['day', 'night-dark'] as const;
 
 export function seedSet(set: string): PickerEpisode[] {
-  const block = set === 'tune' ? TUNE_SEEDS : set === 'report' ? REPORT_SEEDS : set === 'published' ? ([50001, 50030] as const) : null;
+  const block = set === 'tune' ? TUNE_SEEDS : set === 'val2' ? VAL2_SEEDS : set === 'report' ? REPORT_SEEDS : set === 'published' ? ([50001, 50030] as const) : null;
   if (!block) throw new Error(`unknown set ${set}`);
   if (set === 'report' && !has('final')) throw new Error('the report block is flown once, after everything is frozen: pass --final');
   const out: PickerEpisode[] = [];
