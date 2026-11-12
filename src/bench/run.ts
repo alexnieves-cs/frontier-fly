@@ -9,10 +9,6 @@ import type { BuildingSpec, EpisodeConfig, StepResult } from '../shared/types';
 import type { BenchContext, BenchPilot } from './pilot';
 import { planEpisodeSetup } from '../plans';
 import type { BenchRun, BenchTask } from './tasks';
-import { DEFAULT_BATTERY, type BatteryConfig } from '../mission/autonomy/battery';
-
-/** FrontierBench v2's power model: the mission quad before the one-airframe change (shared/airframe.ts). */
-export const FRONTIERBENCH_V2_ENERGY: BatteryConfig = { ...DEFAULT_BATTERY, massKg: 1.2, rotors: 4, rotorDiameterM: 0.254, cdaM2: 0.03, capacityWh: 74 };
 
 export interface BenchEpisode {
   task: string;
@@ -21,6 +17,8 @@ export interface BenchEpisode {
   plan?: string;
   coverage: number;
   collisions: number;
+  /** The crash rule ended the flight (a contact faster than CRASH_SPEED). */
+  crashed: boolean;
   energyWh: number;
   /** Seconds until half the building was flown, or null. */
   halfS: number | null;
@@ -42,11 +40,9 @@ export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: Build
   const envSeed = run.plan ? seed : setup.envSeed;
   cfg.dynamics = task.dynamics;
   cfg.speedH = task.speedH;
-  // FrontierBench v2 predates the crash rule (shared/constants.ts CRASH_SPEED): its scores count
-  // contacts instead of ending the flight, so submitted results stay comparable.
-  cfg.crashSpeed = Infinity;
-  // Its energy column prices the 1.2 kg, 10 inch, 74 Wh quad the mission model described when v2 was frozen.
-  cfg.energyModel = FRONTIERBENCH_V2_ENERGY;
+  // v3 flies under the crash rule (shared/constants.ts CRASH_SPEED: a contact faster than 0.5 m/s ends
+  // the flight, coverage counts what was flown until then) and prices energy on the current airframe
+  // (shared/airframe.ts), the same as every study in the report. v2 did neither (bench/results/v2/).
   if (task.dynamics === 'quad' && task.dr > 0) {
     const rng = new RNG(seed, 'bench-dr');
     cfg.dyn = sampleDynParams(rng, defaultDynParams(), task.dr);
@@ -66,7 +62,7 @@ export class BenchEpisodeRecorder {
   readonly ctx: BenchContext;
   readonly obs: Float32Array;
   private readonly fp = new EpisodeFootprint();
-  private info = { coverage: 0, collisions: 0, energyWh: 0 };
+  private info = { coverage: 0, collisions: 0, energyWh: 0, crashed: false };
   private halfS: number | null = null;
   private steps = 0;
   private over = false;
@@ -85,7 +81,7 @@ export class BenchEpisodeRecorder {
   /** Record one env step; true when the episode is over. */
   record(s: StepResult): boolean {
     if (this.over) throw new Error('bench episode already over');
-    this.info = s.info;
+    this.info = { coverage: s.info.coverage, collisions: s.info.collisions, energyWh: s.info.energyWh, crashed: this.info.crashed || s.info.crashed };
     this.steps += 1;
     if (this.halfS === null && this.info.coverage >= 0.5) this.halfS = this.steps / 20;
     this.fp.step(this.env, this.steps, this.info.coverage);
@@ -101,6 +97,7 @@ export class BenchEpisodeRecorder {
       ...(this.run.plan ? { plan: this.run.plan.record.id } : {}),
       coverage: this.info.coverage,
       collisions: this.info.collisions,
+      crashed: this.info.crashed,
       energyWh: this.info.energyWh,
       halfS: this.halfS,
       steps: this.steps,

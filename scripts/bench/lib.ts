@@ -38,13 +38,14 @@ export function summarize(episodes: BenchEpisode[]) {
       coverageCi: bootstrapCi(cov),
       collisionsPerEpisode: mean(rs.map((r) => r.collisions)),
       safeFlights: rs.filter((r) => r.collisions <= SAFE_COLLISIONS).length,
+      crashedFlights: rs.filter((r) => r.crashed).length,
       energyWh: mean(rs.map((r) => r.energyWh)),
       halfS: half.length ? mean(half) : null,
       ...footprintStats(rs, mean),
     };
     if (rs.every((r) => r.footprint !== undefined)) fps.push(mean(rs.map((r) => r.footprint)));
   }
-  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), tasks };
+  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), crashShare: episodes.filter((e) => e.crashed).length / Math.max(1, episodes.length), tasks };
 }
 
 /** Footprint columns of a task (absent on results written before the footprint metric existed). */

@@ -1,12 +1,12 @@
 # FrontierBench leaderboard
 
-FrontierBench is this repository's indoor exploration benchmark, frozen so that anyone can score a pilot the same way [REPORT.md](REPORT.md) scores ours. A pilot flies seven tasks: six on 30 generated test buildings each, and one on 60 real apartment plans, and its **score** is the mean fraction of the reachable building it flew through, averaged over tasks. Each building gets a fixed flight time: 1,000 policy steps (50 s) for one room, 2,400 (120 s) for the rest.
+FrontierBench is this repository's indoor exploration benchmark, frozen so that anyone can score a pilot the same way [REPORT.md](REPORT.md) scores ours. A pilot flies seven tasks: six on 30 generated test buildings each, and one on 60 real apartment plans, and its **score** is the mean fraction of the reachable building it flew through, averaged over tasks. Each building gets a fixed flight time: 1,000 policy steps (50 s) for one room, 2,400 (120 s) for the rest. Version 3 flies under the same crash rule as every study in the report: a contact faster than 0.5 m/s ends the flight, and coverage counts what was flown until then.
 
 ## Leaderboard
 
 {{BENCH_BOARD}}
 
-The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. The last-but-one column is the share of all 240 test flights that ended without touching anything. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
+The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. *Flights ended by a crash* is the share of all 240 test flights the crash rule ended, and *flights that touched nothing* the share with no contact at all, slow ones included. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
 
 ### Published methods
 
@@ -22,7 +22,13 @@ Three baselines reimplement published exploration methods on the same sensor map
 
 Task definitions and seeds are in [`src/bench/tasks.ts`](../src/bench/tasks.ts): a **dev** split (seeds 81001+, 20 buildings per task) to tune on, and a **test** split (82001+, 30 per task) to score once. The `apartments` task flies the 20 dev and 60 eval plans of the real-plan set ([REAL_PLANS.md](REAL_PLANS.md)), converted from Swiss Dwellings 3.0.0 (CC BY 4.0), with env seeds 84001+ (dev) and 84101+ (test).
 
-Version 2 added the `apartments` task, so scores from version 1 (six tasks) are not comparable and were re-run. Both are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
+Version 2 added the `apartments` task, so scores from version 1 (six tasks) are not comparable and were re-run. Version 3 (November 2026) keeps the tasks and seeds and changes two rules: crashes end the flight, and the energy column prices the current 0.45 kg airframe (`src/shared/airframe.ts`) instead of the 1.2 kg quad of v2. Under v2 a contact cost nothing, so a pilot that slid along walls lost no coverage for it; the learned policy ranked first there and beat the planner on the quadrotor task while crashing in every quadrotor flight of the report's coverage study. Seeds are public, as everything in a static repository is. The leaderboard relies on entrants not tuning on test seeds, and on CI re-scoring each entry from its code.
+
+### Version 2, for reference
+
+Scored without the crash rule and with the old airframe's power model, so these numbers are not comparable with the board above. The result files are in [`bench/results/v2/`](../bench/results/v2).
+
+{{BENCH_V2}}
 
 ## Team track
 

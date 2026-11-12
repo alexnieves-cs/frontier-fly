@@ -44,6 +44,8 @@ interface BenchResult {
   commit: string;
   score: number;
   safeShare: number;
+  crashShare?: number;
+  bench: number;
   tasks: Record<string, { coverage: number }>;
 }
 const benchFiles = ['guarded', 'policy', 'planner', 'waypoint'];
@@ -63,7 +65,7 @@ const rows = (['guarded', 'policy', 'teacher', 'classical'] as const).map((pilot
 const benchTasks = Object.keys(bench.guarded!.tasks);
 const benchRows = benchFiles.map((f) => {
   const r = bench[f]!;
-  return `| ${r.name} | **${pct(r.score)}%** | ${benchTasks.map((t) => (r.tasks[t] ? `${pct(r.tasks[t].coverage)}%` : '–')).join(' | ')} | ${pct(r.safeShare)}% |`;
+  return `| ${r.name} | **${pct(r.score)}%** | ${benchTasks.map((t) => (r.tasks[t] ? `${pct(r.tasks[t].coverage)}%` : '–')).join(' | ')} | ${r.crashShare === undefined ? '–' : `${pct(r.crashShare)}%`} | ${pct(r.safeShare)}% |`;
 });
 const g = cell('hard', 'day', 'guarded');
 const gn = cell('hard', 'night-dark', 'guarded');
@@ -104,10 +106,10 @@ model-index:
             value: ${pct(p.coverage)}
       - task:
           type: reinforcement-learning
-          name: FrontierBench v2
+          name: FrontierBench v${bench.guarded!.bench}
         dataset:
           type: frontierbench
-          name: FrontierBench v2, test split
+          name: FrontierBench v${bench.guarded!.bench}, test split
         metrics:
           - type: coverage
             name: FrontierBench score, guarded (%)
@@ -140,12 +142,12 @@ Read the crash column. Alone, the network ends most hard flights by hitting some
 always flies it under a lidar guard that brakes before contact, with the planner taking over on a stall,
 and that pair covers ${pct(g.coverage)}% with ${g.crashes} crash${g.crashes === 1 ? '' : 'es'} in ${g.episodes} flights.
 
-**FrontierBench v2** (test split; [leaderboard](${GH}/blob/main/docs/LEADERBOARD.md)), mean coverage over
-seven tasks and the share of flights that touched nothing. Scored at ${bench.guarded!.commit}; the scorer
+**FrontierBench v${bench.guarded!.bench}** (test split; [leaderboard](${GH}/blob/main/docs/LEADERBOARD.md)), mean coverage over
+seven tasks under the same crash rule, the share of flights a crash ended, and the share that touched nothing. Scored at ${bench.guarded!.commit}; the scorer
 is deterministic, and CI re-scores every entry from its code.
 
-| Pilot | Score | ${benchTasks.join(' | ')} | Touched nothing |
-| --- | --- | ${benchTasks.map(() => '---').join(' | ')} | --- |
+| Pilot | Score | ${benchTasks.join(' | ')} | Ended by a crash | Touched nothing |
+| --- | --- | ${benchTasks.map(() => '---').join(' | ')} | --- | --- |
 ${benchRows.join('\n')}
 
 ## Files

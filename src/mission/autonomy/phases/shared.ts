@@ -79,6 +79,8 @@ export interface Visit {
   opening: MeasuredOpening | null;
   axis: PassageAxis | null;
   aborts: number;
+  /** Times the way out ended short of the opening and was routed again (IndoorPhase.reachedExit). */
+  exitTries: number;
   /** Oracle mode only: camera-visibility estimate and planner on the true floor plan. */
   vis: IndoorVisibility | null;
   explorer: FrontierExplorer | null;

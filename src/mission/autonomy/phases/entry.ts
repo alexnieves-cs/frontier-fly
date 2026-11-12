@@ -60,6 +60,7 @@ export class EntryPhase {
       opening: null,
       axis: null,
       aborts: 0,
+      exitTries: 0,
       vis: null,
       explorer: null,
       sensing: null,

@@ -305,7 +305,7 @@ export class IndoorPhase {
 
   // ----------------------------------------------------------- exit and home
 
-  startExit(after: 'continue' | 'rth'): void {
+  startExit(after: 'continue' | 'rth', preferTrail = false): void {
     this.policyRun?.release();
     const v = this.c.visit;
     // Only a building the drone got into counts as searched in the probability map.
@@ -324,7 +324,7 @@ export class IndoorPhase {
     // check will not let the drone fly; the trail it climbed by is known flyable. On the level, the map's route is shorter.
     const offLevel = Math.abs(this.c.navPos[2] - ft.start[2]) > 1;
     const trail = () => trailOut(this.c.crumbs, this.c.navPos, ft.start);
-    let wps = (offLevel ? trail() : null) ?? route(local) ?? (offLevel ? null : trail());
+    let wps = (offLevel || preferTrail ? trail() : null) ?? route(local) ?? (offLevel ? null : trail());
     if (!wps) {
       // No route from here on the map (the drone can be somewhere the map calls blocked): retrace the
       // breadcrumbs, which the drone has already flown, until a route opens up. Never fly straight at the opening.
@@ -342,7 +342,35 @@ export class IndoorPhase {
       }
     }
     this.c.log('action', `Leaving ${v.b.label} through opening ${v.opening?.id ?? -1}.`);
-    this.c.setJob(this.pilot.followJob('exit', wps, () => this.crossOut(after), 0.2));
+    this.c.setJob(this.pilot.followJob('exit', wps, () => this.reachedExit(after), 0.2));
+  }
+
+  /**
+   * The way out is done: start the fly-through if the drone is where it begins. The route's progress
+   * watch skips waypoints the lidar shield will not let the drone reach, so a blocked way out can end
+   * metres short of the opening, and the fly-through's alignment, which is not shielded, would then fly
+   * straight at the opening through whatever is in between. Route again instead (alternating the trail
+   * flown in and the map), and land in place if the opening stays out of reach.
+   */
+  reachedExit(after: 'continue' | 'rth'): void {
+    const v = this.c.visit!;
+    const start = new FlyThrough(v.axis!, 'out').start;
+    const p = this.c.navPos;
+    const gap = Math.hypot(p[0] - start[0], p[1] - start[1], p[2] - start[2]);
+    if (gap <= EXIT_START_TOL_M) {
+      v.exitTries = 0;
+      this.crossOut(after);
+      return;
+    }
+    v.exitTries += 1;
+    if (v.exitTries > EXIT_REROUTES) {
+      this.c.log('warn', `The way out of ${v.b.label} stays blocked ${fmt(gap, 1)} m short of the opening.`);
+      this.go.startLand('cannot reach the way out');
+      return;
+    }
+    const trail = v.exitTries % 2 === 1;
+    this.c.log('warn', `Way out blocked ${fmt(gap, 1)} m short of the opening; routing again ${trail ? 'along the trail flown in' : 'on the map'}.`);
+    this.startExit(after, trail);
   }
 
   crossOut(after: 'continue' | 'rth'): void {
@@ -387,6 +415,11 @@ export class IndoorPhase {
     );
   }
 }
+
+/** The fly-through starts only this close to its start point (FlyThrough.start), m. */
+const EXIT_START_TOL_M = 0.5;
+/** Routes out tried after the first ends short of the opening, before the drone lands in place. */
+const EXIT_REROUTES = 4;
 
 /** Crumbs this close (and on the same level) are joined: the drone flew through both. */
 const TRAIL_JOIN_M = 0.6;
