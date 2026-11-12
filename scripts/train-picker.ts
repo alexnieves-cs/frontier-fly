@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { RNG } from '../src/shared/rng';
 import { Cma } from '../src/train/cma';
 import { NodeRolloutPool } from '../src/train/nodePool';
-import type { PickerEpisode, PickerEpisodeResult, PickerSpec } from '../src/train/pickerJob';
+import type { PickerEpisode, PickerEpisodeResult, PickerSpec, PlannerKnobs } from '../src/train/pickerJob';
 import { initMlp, PICK_DIM, PICK_FEATURES, ruleWeights, type MlpWeights } from '../src/sim/picker';
 import { buildDecisions, initCritic, PickerLearner, PPO_PICKER_DEFAULTS, type PpoPickerConfig } from '../src/train/pickerPpo';
 
@@ -85,6 +85,13 @@ interface Arm {
   names: string[];
   spec(x: number[]): PickerSpec;
 }
+/** --init-planner <best.json of the planner arm>: the linear arm searches around that tuned planner. */
+const basePlanner = (): PlannerKnobs => {
+  const p = arg('init-planner');
+  if (!p) return {};
+  const b = JSON.parse(readFileSync(p, 'utf8')) as { spec: PickerSpec };
+  return b.spec.planner ?? {};
+};
 const replanOf = (x: number) => Math.max(1, Math.min(40, Math.round(5 * 2 ** x)));
 const ARMS: Record<string, () => Arm> = {
   // The planner's own rule with its three selection knobs tuned on the quad.
@@ -104,7 +111,7 @@ const ARMS: Record<string, () => Arm> = {
       spec: (x) => {
         const w = Array.from(base);
         perCand.forEach(({ f, i }, k) => (w[i] = base[i]! + (f === 'ruleScore' ? 10 : 3) * x[k]!));
-        return { kind: 'linear', w, planner: { replanEvery: replanOf(x[perCand.length]!) } };
+        return { kind: 'linear', w, planner: { ...basePlanner(), replanEvery: replanOf(x[perCand.length]! + Math.log2((basePlanner().replanEvery ?? 5) / 5)) } };
       },
     };
   },
@@ -120,13 +127,15 @@ async function ppo(pool: NodeRolloutPool, workers: number, outDir: string): Prom
   const rng = new RNG(seed, 'picker-ppo');
   const rand = () => rng.next();
   let lin: ArrayLike<number> = ruleWeights();
-  let replanEvery: number | undefined;
+  // --init: a linear best.json (its weights and planner settings) or a rule best.json of the
+  // tuned-planner arm (the rule weights over that planner's settings).
+  let planner: PlannerKnobs | undefined;
   const init = arg('init');
   if (init) {
     const b = JSON.parse(readFileSync(init, 'utf8')) as { spec: PickerSpec };
-    if (b.spec.kind !== 'linear') throw new Error('--init wants a linear best.json');
-    lin = b.spec.w;
-    replanEvery = b.spec.planner?.replanEvery;
+    if (b.spec.kind === 'linear') lin = b.spec.w;
+    else if (b.spec.kind !== 'rule') throw new Error('--init wants a linear or rule best.json');
+    planner = b.spec.planner;
   }
   const scale = num('logit-scale', 1);
   const actor: MlpWeights = initMlp(num('hidden', 32), rand, Array.from(lin, (v) => v * scale));
@@ -147,7 +156,6 @@ async function ppo(pool: NodeRolloutPool, workers: number, outDir: string): Prom
   const tune = seedSet('tune');
   const log = join(outDir, 'log.jsonl');
   writeFileSync(log, '');
-  const planner = replanEvery ? { replanEvery } : undefined;
   let best = -Infinity;
   const evaluate = async (it: number) => {
     const spec: PickerSpec = { kind: 'mlp', weights: actor, temperature: 0, planner };

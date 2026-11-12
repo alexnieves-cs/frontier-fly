@@ -24,9 +24,12 @@ export interface PickerEpisode {
 }
 
 export type PickerSpec =
-  | { kind: 'rule'; planner?: Pick<SensorPlannerOptions, 'edgeBonus' | 'momentum' | 'replanEvery' | 'speed'> }
-  | { kind: 'linear'; w: number[]; temperature?: number; planner?: Pick<SensorPlannerOptions, 'replanEvery' | 'speed'> }
-  | { kind: 'mlp'; weights: MlpWeights; temperature?: number; record?: boolean; planner?: Pick<SensorPlannerOptions, 'replanEvery' | 'speed'> };
+  | { kind: 'rule'; planner?: PlannerKnobs }
+  | { kind: 'linear'; w: number[]; temperature?: number; planner?: PlannerKnobs }
+  | { kind: 'mlp'; weights: MlpWeights; temperature?: number; record?: boolean; planner?: PlannerKnobs };
+
+/** Planner settings a picker spec may carry (edgeBonus and momentum shape the rule score feature). */
+export type PlannerKnobs = Pick<SensorPlannerOptions, 'edgeBonus' | 'momentum' | 'replanEvery' | 'speed'>;
 
 export interface PickerEpisodesPayload {
   /** Episodes to fly, each with its own picker. */
