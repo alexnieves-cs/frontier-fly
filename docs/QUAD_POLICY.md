@@ -2,6 +2,8 @@
 
 Short answer: not as well as the classical planner. Nine training runs (about 45 runner-hours, 2026-11-10) tried to make the learned policy fly the quadrotor airframe. The best of them, flown behind the same lidar braking filter the planner uses, cover about 41% of a hard building and crash in about one flight in ten. The sensor-only planner with its trajectory tracker covers 47.8% of the same buildings and never crashes. Flown alone, without the braking filter, every trained policy still crashes in more than 80% of flights. No checkpoint from this work is shipped.
 
+Follow-up: learning only the goal choice, and leaving the flying to the planner and tracker, does work. See [QUAD_PICKER.md](QUAD_PICKER.md): 54.8% against 46.2% on report-only seeds.
+
 Numbers here are from the tuning block only (quad episodes 66301-66332, 32 flights, randomized quadrotor dynamics and sensor noise, the 0.5 m/s crash rule). Because nothing was selected to ship, no report-only seeds were flown. The published quadrotor comparison is still the coverage study's `quad` condition in [REPORT.md](REPORT.md). The raw validation curves are in [`quad-policy.json`](quad-policy.json).
 
 ## Where it started

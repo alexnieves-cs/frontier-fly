@@ -15,6 +15,10 @@ name: train
 # coverage study's hard buildings (scripts/study/ablations.ts) and pushes the log and the flights;
 # the checkpoints themselves are packed to .bin.
 #
+# With script=train:picker each line is one goal-picker search (scripts/train-picker.ts).
+#
+#   gh workflow run train -f script=train:picker -f runs='--mode cma --arm planner --seed 1|--mode cma --arm linear --seed 1'
+#
 #   gh workflow run train -f script=train:indoor -f runs='--ppo-updates 24|ablation=no-nav|ablation=no-local|ablation=no-coarse'
 on:
   workflow_dispatch:
@@ -26,7 +30,7 @@ on:
       script:
         description: Trainer each line runs
         type: choice
-        options: ['train:ppo', 'train:indoor']
+        options: ['train:ppo', 'train:indoor', 'train:picker']
         default: 'train:ppo'
       ref_note:
         description: Free text recorded in each result commit (what this sweep is testing)
@@ -97,6 +101,10 @@ jobs:
               if [ -f "train-out/$f.json" ]; then npm run pack:checkpoint -- "train-out/$f.json" "train-out/$f.bin"; fi
             done
             rm -f train-out/*.r[0-9]*.json train-out/*.swa*.json "train-out/$name.json" "train-out/$name.ppo.json"
+          elif [ "$SCRIPT" = "train:picker" ]; then
+            # Goal-picker search on the quad (docs/QUAD_PICKER.md): log.jsonl and best.json per run.
+            # shellcheck disable=SC2086
+            npm run train:picker -- --out-dir train-out $line 2>&1 | tee train-out/train.log
           else
             # shellcheck disable=SC2086
             npm run train:ppo -- --out train-out/ppo.bin $line 2>&1 | tee train-out/train.log
