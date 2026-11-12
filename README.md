@@ -41,7 +41,7 @@ Everything runs in a browser tab, on desktop or phone. Pick the way that suits y
 | [Live site](https://alexnieves-cs.github.io/frontier-fly/) | Every page: the film, missions, race, drone team, safety numbers, indoor and outdoor flying, the mission planner and PX4 | Nothing, just a browser |
 | Your computer | The site, training and benchmarks (`npm run train:ppo`, `npm run study:missions`, ...) | Node 22 |
 | Terminal or Docker | The whole mission, FrontierBench and QGroundControl plan export with no browser: `docker run --rm ghcr.io/alexnieves-cs/frontier-fly mission`, see [CLI.md](docs/CLI.md) | Docker, or Node 22 |
-| Python | A Gymnasium env (`gym.make("FrontierFly-hard-v0")`) and the FrontierBench scorer, on the same simulator, see [python/](python/README.md) | Python 3.10+ and Node 22 |
+| Python | A Gymnasium env (`gym.make("FrontierFly-hard-v0")`) and the FrontierBench scorer, on the same simulator, install from a checkout (not on PyPI yet), see [python/](python/README.md#install) | Python 3.10+ and Node 22 |
 
 Also: [GitHub Codespaces](https://codespaces.new/alexnieves-cs/frontier-fly?quickstart=1), a real autopilot in the loop ([PX4.md](docs/PX4.md)), and a simulated Crazyflie that has not flown for real yet ([CRAZYFLIE.md](docs/CRAZYFLIE.md)).
 
@@ -50,6 +50,10 @@ npm ci && npm run dev   # Node 22, then open http://127.0.0.1:3000
 ```
 
 The [project guide](docs/GUIDE.md) covers the pages, every benchmark table, the studies, and how to train the policy. [ARCHITECTURE.md](docs/ARCHITECTURE.md) maps the code, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send changes. Code is [MIT](LICENSE). Every asset is CC0, MIT, Apache-2.0 or CC BY 4.0 and listed in [CREDITS.md](CREDITS.md).
+
+## Project status
+
+frontier-fly is at a stable stopping point as of [v1.2.0](CHANGELOG.md): the site, the CLI and Docker image, the Python package and FrontierBench are complete and tested in CI, and no new features or studies are planned. The limits above stay as measured: the false-clear rate is not zero, the learned policy loses to the planner on the quadrotor, and nothing has flown on real hardware. Bug fixes and dependency updates still land, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send changes or a benchmark entry.
 
 ## About the project
 

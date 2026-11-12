@@ -16,7 +16,7 @@ from ._bridge import BridgeError
 from .env import FrontierFlyEnv
 
 __all__ = ["FrontierFlyEnv", "BridgeError", "TASKS", "make"]
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 #: FrontierBench tasks that work as training envs (``apartments`` flies fixed real plans: score it with ``bench``).
 TASKS = ("room", "hard", "dark", "fast", "floors", "quad")
