@@ -12,18 +12,17 @@ are bit-identical to the committed leaderboard.
 
 You need Python 3.10+ and Node.js 22+ on `PATH`. Nothing from npm is needed at run time.
 
-From PyPI, once the first release is up (the wheel carries the bundled simulator):
+`frontierfly` is not on PyPI yet, so install it from a checkout of the repository:
 
 ```bash
-pip install frontierfly
-```
-
-From a checkout of the repository:
-
-```bash
+git clone https://github.com/alexnieves-cs/frontier-fly && cd frontier-fly
 npm ci && npm run build:py      # bundles the simulator into python/frontierfly/_server/
 pip install -e python           # or: pip install ./python
 ```
+
+Each CI run also builds the wheel (the `python-dist` artifact of the
+[pypi workflow](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pypi.yml)), which installs
+with `pip install frontierfly-*.whl`. Once the package is published, `pip install frontierfly` will work too.
 
 ## Train
 

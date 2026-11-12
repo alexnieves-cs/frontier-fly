@@ -1,22 +1,26 @@
 name: pypi
 
-# Builds the frontierfly Python package (python/) with its bundled simulator, tests the wheel as a
-# user would install it, and, only when run by hand with `publish` set, uploads it to TestPyPI or
-# PyPI through trusted publishing (no API token in the repository).
+# Builds the frontierfly Python package (python/) with its bundled simulator and tests the wheel as a
+# user would install it. Publishing (trusted publishing, no API token in the repository) runs on a
+# published GitHub release, or by hand with `publish` set, and only once the repository variable
+# PYPI_PUBLISHING is "true". Until then the publish step is skipped and the run stays green.
 #
-# One-time setup on the index, by the account owner: add a trusted publisher for project
-# "frontierfly", owner alexnieves-cs, repository frontier-fly, workflow pypi.yml, and environment
-# "pypi" (or "testpypi" on test.pypi.org). See docs/RELEASING.md.
+# One-time setup by the account owner, then set PYPI_PUBLISHING=true (Settings, Secrets and
+# variables, Actions, Variables): add a trusted publisher on pypi.org for project "frontierfly",
+# owner alexnieves-cs, repository frontier-fly, workflow pypi.yml, environment "pypi" (and on
+# test.pypi.org with environment "testpypi" to rehearse). See docs/RELEASING.md.
 on:
   pull_request:
     paths:
       - python/**
       - scripts/py/**
       - .github/workflows/pypi.yml
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       publish:
-        description: Upload after the build and tests pass
+        description: Upload after the build and tests pass (needs the PYPI_PUBLISHING variable)
         type: choice
         options: [none, testpypi, pypi]
         default: none
@@ -62,15 +66,32 @@ jobs:
           name: python-dist
           path: dist-py/
 
+  # Explains, on the run page, why nothing was uploaded when a publish was asked for before the
+  # trusted publisher is set up. Succeeds, so the run is not red.
+  publish-not-configured:
+    needs: build
+    if: vars.PYPI_PUBLISHING != 'true' && (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.publish != 'none'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: |
+          msg="PyPI publishing is not configured yet: add the trusted publisher (docs/RELEASING.md), then set the repository variable PYPI_PUBLISHING=true. The wheel was built and tested; nothing was uploaded."
+          echo "::notice title=PyPI publish skipped::$msg"
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+
   publish:
     needs: build
-    # Only main can publish: a dispatch from another branch builds and tests but uploads nothing.
-    if: github.event_name == 'workflow_dispatch' && inputs.publish != 'none' && github.ref == 'refs/heads/main'
+    # A published, non-prerelease GitHub release uploads to PyPI; a dispatch from main uploads to the
+    # index picked. A dispatch from another branch builds and tests but uploads nothing.
+    if: >-
+      vars.PYPI_PUBLISHING == 'true' && (
+        (github.event_name == 'release' && !github.event.release.prerelease) ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish != 'none' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
-      name: ${{ inputs.publish }}
-      url: ${{ inputs.publish == 'pypi' && 'https://pypi.org/p/frontierfly' || 'https://test.pypi.org/p/frontierfly' }}
+      name: ${{ github.event_name == 'release' && 'pypi' || inputs.publish }}
+      url: ${{ (github.event_name == 'release' || inputs.publish == 'pypi') && 'https://pypi.org/p/frontierfly' || 'https://test.pypi.org/p/frontierfly' }}
     permissions:
       id-token: write
     steps:
@@ -81,4 +102,4 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           packages-dir: dist-py/
-          repository-url: ${{ inputs.publish == 'pypi' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
+          repository-url: ${{ (github.event_name == 'release' || inputs.publish == 'pypi') && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
