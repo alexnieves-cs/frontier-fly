@@ -23,15 +23,16 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 <!-- generated:headline:start -->
 | Question | Measured | On |
 | --- | --- | --- |
-| Do whole missions end the right way? | 98.3% (94.1–99.5%) found the target or correctly cleared | 120 fixed-scenario missions on the quadrotor |
-| **How often does it call a building clear with someone inside?** | **0.30% per flight** (0.14–0.65%); it was 4.05% before unconfirmed people blocked a clear | 2,000 fresh flights, both versions on the same seeds |
-| How often does it hit something? | 1.15% per flight (0.77–1.72%) | 2,000 importance-sampled flights |
-| Does it get home when something breaks? | 98.6% (97.7–99.2%) of faulted flights end safely | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
-| What does the learned policy add? | On the simple airframe, more coverage: 75.1% (70.5–79.4%) behind its lidar guard, 1 of 30 crashed, against 65.5% for the sensor-only planner; alone it covers 67.5%, 7 of 30 crashed. On quadrotor dynamics it loses: the planner covers 46.9% with 0 crashes, the policy 11.9% and crashes in 30 of 30 | 30 fresh hard buildings per airframe |
-| Does it work in the dark? | 77.0% with every light off (guarded policy; the planner 65.8%) | the same buildings |
+| Do staged missions end the right way? | 98.3% (94.1–99.5%) found the target or correctly cleared | 120 missions on the quadrotor: four fixed scenarios, calm air, no faults, any person lying still |
+| **And over a realistic mix of conditions?** | **41.2%** (40.0–42.5%) end as expected, 53.4% with no fault injected. Most of the rest end *incomplete* and hand back to a person; an empty site is correctly cleared in 37.7% of sweeps | 6,000 flights drawn from the failure atlas's declared mix of missions, people who walk or hide, wind, and a fault on 40% of flights |
+| **How often does it call a building clear with someone inside?** | **0.25% per flight** (0.16–0.35%); a plain draw gives 0.20% (12 of 6,000). It was 4.05% before unconfirmed people blocked a clear (0.30% after, both versions on the same 2,000 seeds) | 2,000 importance-sampled flights over the same mix |
+| How often does it hit something? | 1.22% per flight (0.97–1.53%) | 6,000 flights drawn from the same mix |
+| Does it end safely when something breaks? | 98.6% (97.7–99.2%) of faulted flights end safely: 395 finished the mission, 495 flew home, 64 landed where they were, 6 crashed | 960 flights with sensor, motor, battery, link, GNSS or wind faults |
+| What does the learned policy add? | On the simple airframe, more coverage: 75.1% (70.5–79.4%) behind its lidar guard, 1 of 30 crashed, against 65.5% for the sensor-only planner, which touched nothing; alone it covers 67.5%, 7 of 30 crashed and 16 of 30 touched a wall (contacts slower than 0.5 m/s do not end a flight). On quadrotor dynamics it loses: the planner covers 46.9% with 0 crashes, the policy 11.9% and crashes in 30 of 30 | 30 hard buildings per airframe |
+| Does it need light? | No: it flies on lidar. With every room light off and its flashlight on it covers 77.0% (guarded policy; the planner 65.8%). In this simulator darkness only adds 5% lidar dropout, so this checks the design, not a harder condition | the same buildings |
 <!-- generated:headline:end -->
 
-Every number comes from seeds no model or setting was tuned on, with 95% intervals, and is regenerated from the study's JSON by `npm run docs`. The false-clear rate is the one to read first: it is why this is a research simulator and not a product. The learned policy is the one to read second: nine further training runs did not get it past the planner on the quadrotor ([QUAD_POLICY.md](docs/QUAD_POLICY.md)). The [project guide](docs/GUIDE.md#honest-limits) lists the other limits.
+Every number comes from report-only seed blocks that no model or setting was tuned on, with 95% intervals, and is regenerated from the study's JSON by `npm run docs`. The blocks are re-flown when the code changes, so they are held out, not unseen. Read the first two rows together: staged scenarios go well, and a realistic mix of conditions does not. The false-clear rate is the next one to read: it is why this is a research simulator and not a product. The learned policy is the one to read second: nine further training runs did not get it past the planner on the quadrotor ([QUAD_POLICY.md](docs/QUAD_POLICY.md)). The [project guide](docs/GUIDE.md#honest-limits) lists the other limits.
 
 ## Run it
 
@@ -54,7 +55,7 @@ The [project guide](docs/GUIDE.md) covers the pages, every benchmark table, the 
 
 ## Project status
 
-frontier-fly is at a stable stopping point as of [v1.2.0](CHANGELOG.md): the site, the CLI and Docker image, the Python package and FrontierBench are complete and tested in CI, and no new features or studies are planned. The limits above stay as measured: the false-clear rate is not zero, the learned policy loses to the planner on the quadrotor, and nothing has flown on real hardware. Bug fixes and dependency updates still land, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send changes or a benchmark entry.
+frontier-fly is at a stable stopping point as of [v1.2.0](CHANGELOG.md): the site, the CLI and Docker image, the Python package and FrontierBench are complete and tested in CI, and no new features or studies are planned. The limits above stay as measured: fewer than half of missions end as expected over a realistic mix of conditions, the false-clear rate is not zero, the learned policy loses to the planner on the quadrotor, and nothing has flown on real hardware. The built-in flight controller also stops the quadrotor in about a quarter of the distance PX4's default gains need on the same physics ([PHYSICS_VALIDATION.md](docs/PHYSICS_VALIDATION.md)), so crash and braking numbers are optimistic for a drone flown by PX4. Bug fixes and dependency updates still land, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send changes or a benchmark entry.
 
 ## About the project
 
@@ -62,9 +63,9 @@ frontier-fly is built by [Alex Nieves](https://alexnieves.me) ([GitHub](https://
 
 What turned out to be hard, and what the repository does about it:
 
-- **A good average hides rare failures.** The mission bench looked fine, but the failure atlas found the drone calling a building clear with a walking person inside on 3.5% of flights. Tracking people across views took that to 0.3%.
-- **Free contacts teach bad habits.** The learned policy covered the most of any pilot, then a crash rule showed it was sliding along walls. Retraining under the rule cut the policy's own crashes from 19 of 30 flights to 7, and the lidar guard takes that to 1.
-- **Small fixed evaluations flatter.** The early 86% was partly seed luck. Every headline now comes from fresh seeds with 95% intervals, and the generated docs fail CI if a number drifts from its JSON.
+- **A good average hides rare failures.** The mission bench looked fine, but the failure atlas found the drone calling a building clear with a walking or hiding person inside on about 4% of flights. Tracking people across views and letting an unconfirmed person block a clear took that to 0.3% on the same seeds. The price is that many sweeps now end incomplete instead of clear.
+- **Free contacts teach bad habits.** The learned policy covered the most of any pilot, then a crash rule showed it was sliding along walls. Retraining under the rule cut the policy's own crashes from 19 of 30 flights to 7, and the lidar guard takes that to 1. The habit moved below the threshold more than it went away: alone, the retrained policy still touches a wall slowly in 16 of 30 flights, and under the guard in 5.
+- **Small fixed evaluations flatter.** The early 86% was partly seed luck. Every headline now comes from held-out seed blocks with 95% intervals, and the generated docs fail CI if a number drifts from its JSON.
 - **A learned pilot is not automatically the better pilot.** Behind a guard on a simple airframe the policy covers ten points more than the planner. On quadrotor dynamics it crashes in every flight, and nine training runs (planner imitation, braking labels, memory, quad-only training) closed only part of the gap. Missions keep the planner as the pilot of last resort; the write-up is in [QUAD_POLICY.md](docs/QUAD_POLICY.md).
 - **Simulators lie in specific ways.** Kinematic drones stop instantly and quadrotors don't. A braking filter, a quad-aware tracker and PX4 SITL in CI keep the gap visible.
 

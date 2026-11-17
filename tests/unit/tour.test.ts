@@ -59,7 +59,7 @@ describe('closing card numbers', () => {
     const values = claims.map((c) => c.value);
     expect(values).toContain(`${(r.pilots[0]!.value * 100).toFixed(1)}%`);
     expect(values).toContain(`${(atlas.rates.falseClear.importance.p * 100).toFixed(2)}%`);
-    expect(values).toContain(`${(atlas.rates.collision.importance.p * 100).toFixed(2)}%`);
+    expect(values).toContain(`${(atlas.rates.collision.monteCarlo.p * 100).toFixed(2)}%`);
     expect(values).toContain(`${(atlas.conditional.falseClearSweepOccupied.p * 100).toFixed(1)}%`);
   });
 

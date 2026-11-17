@@ -24,7 +24,8 @@ const range = (ci: number[]): string => `${pct2(ci[0] ?? NaN)} to ${pct2(ci[1] ?
 export function atlasRates(): AtlasRates {
   return {
     falseClear: rates.falseClear.importance,
-    collision: rates.collision.importance,
+    // The collision search never left the nominal mix, so the larger plain Monte Carlo run is quoted.
+    collision: rates.collision.monteCarlo,
     occupiedSweep: conditional.falseClearSweepOccupied,
   };
 }
@@ -39,8 +40,8 @@ export function buildClaims(r: Results = results(), a: AtlasRates = atlasRates()
     },
     {
       value: pct(r.night),
-      label: 'of the same buildings at night, lights off',
-      condition: `Night coverage on the same ${r.seeds} hard buildings with every light off; by day it is ${pct(r.pilots[0]!.value)}.`,
+      label: 'of the same buildings with the room lights off',
+      condition: `Coverage on the same ${r.seeds} hard buildings with every room light off and the flashlight on; by day it is ${pct(r.pilots[0]!.value)}. The drone flies on lidar, and darkness only adds 5% lidar dropout here.`,
       tone: 'result',
     },
     {
@@ -58,7 +59,7 @@ export function buildClaims(r: Results = results(), a: AtlasRates = atlasRates()
     {
       value: pct2(a.collision.p),
       label: 'of flights hit something',
-      condition: `Collision per flight, ${a.collision.flights.toLocaleString('en-US')} importance-sampled flights, 95% interval ${range(a.collision.ci)}.`,
+      condition: `Collision per flight, ${a.collision.flights.toLocaleString('en-US')} flights drawn from the failure atlas mission mix, 95% interval ${range(a.collision.ci)}.`,
       tone: 'limit',
     },
   ];

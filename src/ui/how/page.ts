@@ -126,7 +126,7 @@ function markup(): string {
           <p>
             Exploring is going to frontiers until there are none left. The map above is a simplified version of that,
             written for this page: it ignores furniture, inertia and sensor noise. Because lidar doesn't care about light,
-            the trained pilot searches ${pct(night.coverage)} of hard buildings at night with the lights off, against
+            the trained pilot searches ${pct(night.coverage)} of hard buildings with the room lights off, against
             ${pct(policy.coverage)} by day.
           </p>
         </div>
