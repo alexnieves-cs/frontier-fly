@@ -33,7 +33,65 @@ function current(rows) {
 }
 
 /** Flights the crash rule ended, as a share (v3 results; v2 flew without the rule). */
-const crashes = (r) => (r.crashShare === undefined ? '—' : `${Math.round(r.crashShare * 100)}%`);
+const crashes = (r) => {
+  if (r.crashShare === undefined) return '—';
+  // Counts, not a rounded share: 1 crash in 240 flights is not "0%".
+  if (Array.isArray(r.episodes) && r.episodes.length) return `${r.episodes.filter((e) => e.crashed).length} of ${r.episodes.length}`;
+  return `${(r.crashShare * 100).toFixed(1)}%`;
+};
+
+/** Small deterministic generator, so the board's intervals do not change between runs of the docs. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Score of `a` minus score of `b` with a paired 95% bootstrap interval: both pilots flew the same
+ * buildings, so flights are resampled as pairs, within each task (the score is a mean over tasks).
+ * Null when the two results do not hold the same flights.
+ */
+export function pairedScoreGap(a, b, resamples = 4000) {
+  if (!Array.isArray(a?.episodes) || !Array.isArray(b?.episodes)) return null;
+  const key = (e) => `${e.task}:${e.seed}`;
+  const other = new Map(b.episodes.map((e) => [key(e), e.coverage]));
+  const byTask = new Map();
+  for (const e of a.episodes) {
+    if (!other.has(key(e))) return null;
+    if (!byTask.has(e.task)) byTask.set(e.task, []);
+    byTask.get(e.task).push(e.coverage - other.get(key(e)));
+  }
+  if (a.episodes.length !== b.episodes.length || !byTask.size) return null;
+  const tasks = [...byTask.values()];
+  const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
+  const gap = mean(tasks.map(mean));
+  const rand = mulberry32(7);
+  const draws = [];
+  for (let i = 0; i < resamples; i++) {
+    let sum = 0;
+    for (const d of tasks) {
+      let s = 0;
+      for (let j = 0; j < d.length; j++) s += d[Math.floor(rand() * d.length)];
+      sum += s / d.length;
+    }
+    draws.push(sum / tasks.length);
+  }
+  draws.sort((x, y) => x - y);
+  return { gap, ci: [draws[Math.floor(resamples * 0.025)], draws[Math.floor(resamples * 0.975)]] };
+}
+
+const gapCell = (g) => {
+  if (!g) return '—';
+  const pts = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}`;
+  const tied = g.ci[0] <= 0 && g.ci[1] >= 0;
+  return `${pts(g.gap)} (${pts(g.ci[0])} to ${pts(g.ci[1])})${tied ? ', tied' : ''}`;
+};
 
 function readTeam(root) {
   const out = [];
@@ -136,13 +194,14 @@ export function benchSection(root) {
     ...tasks.map((t) => (r.tasks[t.id] ? pct(r.tasks[t.id].coverage) : '—')),
     crashes(r),
     `${Math.round(r.safeShare * 100)}%`,
+    i === 0 ? '—' : gapCell(pairedScoreGap(r, rows[i - 1])),
     `\`${r.commit}\``,
   ]);
   return {
     BENCH_PUBLISHED: publishedTable(rows),
     BENCH_TEAM: teamBoard(root),
     BENCH_V2: v2Board(root),
-    BENCH_BOARD: table(['#', 'Pilot', 'Score', 'Footprint score', ...tasks.map((t) => t.id), 'Flights ended by a crash', 'Flights that touched nothing', 'Commit'], board),
+    BENCH_BOARD: table(['#', 'Pilot', 'Score', 'Footprint score', ...tasks.map((t) => t.id), 'Flights ended by a crash', 'Flights that touched nothing', 'Score vs the row above (95% CI)', 'Commit'], board),
     BENCH_TASKS: table(
       ['Task', 'Buildings', 'Airframe', 'Lighting', 'Speed cap'],
       tasks.map((t) => [`\`${t.id}\``, t.label, t.dynamics === 'quad' ? 'Quadrotor, randomized' : 'Kinematic', t.lighting === 'day' ? 'Day' : 'Lights off', `${t.speedH} m/s`]),

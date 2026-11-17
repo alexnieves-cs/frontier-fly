@@ -921,7 +921,7 @@ function readmeMissions(mb, control) {
  * The false-clear and collision rates come from the failure atlas, which samples a declared mix of
  * missions, light, wind and faults; the mission bench beside it uses fixed scenarios.
  */
-function readmeHeadline(study, mb, atlas, faults, tracking) {
+function readmeHeadline(study, mb, atlas, faults, tracking, mc) {
   if (!study || !mb || !atlas || !faults) return '_Not measured yet. Run the studies behind docs/REPORT.md._';
   const ci1 = ([lo, hi]) => `${(lo * 100).toFixed(1)}–${(hi * 100).toFixed(1)}%`;
   const ci2 = ([lo, hi]) => `${(lo * 100).toFixed(2)}–${(hi * 100).toFixed(2)}%`;
@@ -932,43 +932,92 @@ function readmeHeadline(study, mb, atlas, faults, tracking) {
   const night = cell('night-dark', 'guarded');
   const alone = cell('day', 'policy');
   const crashed = (c) => (c.crashes != null ? `, ${c.crashes} of ${c.episodes} crashed` : '');
+  const touched = (c) => `${c.episodesWithCollision} of ${c.episodes} touched a wall`;
   const missions = mb.modes.policyQuad.all;
   const fc = atlas.rates.falseClear.importance;
-  const col = atlas.rates.collision.importance;
-  const occupied = atlas.conditional.falseClearSweepOccupied;
+  const fcMc = atlas.rates.falseClear.monteCarlo;
+  // The collision search never moved its proposal off the nominal mix, so its "importance" run is a
+  // plain draw from the mix; the larger plain run is the one to quote.
+  const col = atlas.rates.collision.monteCarlo;
   const safe = faults.vehicles.quad.all;
+  const resp = safe.responses ?? {};
   const quadOf = (pilot) => study.cells.find((c) => c.condition === 'quad' && c.lighting === 'day' && c.pilot === pilot);
   const quadPlanner = quadOf('classicalBrakeTrack');
   const quadPolicy = quadOf('policy');
+  const mix = atlasMix(atlas, mc);
   return table(
     ['Question', 'Measured', 'On'],
     [
       [
-        'Do whole missions end the right way?',
+        'Do staged missions end the right way?',
         `${pct(missions.expectedOutcome)} (${ci1(missions.expectedOutcomeCi)}) found the target or correctly cleared`,
-        `${missions.flights} fixed-scenario missions on the quadrotor`,
+        `${missions.flights} missions on the quadrotor: four fixed scenarios, calm air, no faults, any person lying still`,
       ],
-      tracking
+      ...(mix
         ? [
-            '**How often does it call a building clear with someone inside?**',
-            `**${pct2(tracking.now.rates.falseClear.p)} per flight** (${ci2(tracking.now.rates.falseClear.ci)}); it was ${pct2(tracking.ctrl.rates.falseClear.p)} before unconfirmed people blocked a clear`,
-            `${fmt(tracking.now.flights)} fresh flights, both versions on the same seeds`,
+            [
+              '**And over a realistic mix of conditions?**',
+              `**${pct(mix.all.p)}** (${ci1(mix.all.ci)}) end as expected, ${pct(mix.noFault.p)} with no fault injected. Most of the rest end *incomplete* and hand back to a person; an empty site is correctly cleared in ${pct(mix.emptySweep.p)} of sweeps`,
+              `${fmt(mix.all.n)} flights drawn from the failure atlas's declared mix of missions, people who walk or hide, wind, and a fault on 40% of flights`,
+            ],
           ]
-        : [
-            '**How often does it call a building clear with someone inside?**',
-            `**${pct2(fc.p)} per flight** (${ci2(fc.ci)}); ${pct(occupied.p)} on sweeps of an occupied site`,
-            `${fmt(fc.flights)} importance-sampled flights, checked by ${fmt(atlas.rates.falseClear.monteCarlo.flights)} plain ones`,
-          ],
-      ['How often does it hit something?', `${pct2(col.p)} per flight (${ci2(col.ci)})`, `${fmt(col.flights)} importance-sampled flights`],
-      ['Does it get home when something breaks?', `${pct(safe.safeRate)} (${ci1(safe.safeRateCi)}) of faulted flights end safely`, `${fmt(safe.flights)} flights with sensor, motor, battery, link, GNSS or wind faults`],
+        : []),
+      [
+        '**How often does it call a building clear with someone inside?**',
+        `**${pct2(fc.p)} per flight** (${ci2(fc.ci)}); a plain draw gives ${pct2(fcMc.p)} (${fmt(fcMc.failures)} of ${fmt(fcMc.flights)})${tracking ? `. It was ${pct2(tracking.ctrl.rates.falseClear.p)} before unconfirmed people blocked a clear (${pct2(tracking.now.rates.falseClear.p)} after, both versions on the same ${fmt(tracking.now.flights)} seeds)` : ''}`,
+        `${fmt(fc.flights)} importance-sampled flights over the same mix`,
+      ],
+      ['How often does it hit something?', `${pct2(col.p)} per flight (${ci2(col.ci)})`, `${fmt(col.flights)} flights drawn from the same mix`],
+      [
+        'Does it end safely when something breaks?',
+        `${pct(safe.safeRate)} (${ci1(safe.safeRateCi)}) of faulted flights end safely: ${fmt(resp.completed ?? 0)} finished the mission, ${fmt(resp.returned_home ?? 0)} flew home, ${fmt(resp.landed ?? 0)} landed where they were, ${fmt(resp.crashed ?? 0)} crashed`,
+        `${fmt(safe.flights)} flights with sensor, motor, battery, link, GNSS or wind faults`,
+      ],
       [
         'What does the learned policy add?',
-        `On the simple airframe, more coverage: ${pct(day.coverage)} (${ci1(day.coverageCi)}) behind its lidar guard${crashed(day)}, against ${pct(cell('day', 'classical').coverage)} for the sensor-only planner; alone it covers ${pct(alone.coverage)}${crashed(alone)}. On quadrotor dynamics it loses: the planner covers ${pct(quadPlanner.coverage)} with ${quadPlanner.crashes} crashes, the policy ${pct(quadPolicy.coverage)} and crashes in ${quadPolicy.crashes} of ${quadPolicy.episodes}`,
-        `${day.episodes} fresh hard buildings per airframe`,
+        `On the simple airframe, more coverage: ${pct(day.coverage)} (${ci1(day.coverageCi)}) behind its lidar guard${crashed(day)}, against ${pct(cell('day', 'classical').coverage)} for the sensor-only planner, which touched nothing; alone it covers ${pct(alone.coverage)}${crashed(alone)} and ${touched(alone)} (contacts slower than ${study.crashSpeed ?? 0.5} m/s do not end a flight). On quadrotor dynamics it loses: the planner covers ${pct(quadPlanner.coverage)} with ${quadPlanner.crashes} crashes, the policy ${pct(quadPolicy.coverage)} and crashes in ${quadPolicy.crashes} of ${quadPolicy.episodes}`,
+        `${day.episodes} hard buildings per airframe`,
       ],
-      ['Does it work in the dark?', `${pct(night.coverage)} with every light off (guarded policy; the planner ${pct(cell('night-dark', 'classical').coverage)})`, 'the same buildings'],
+      [
+        'Does it need light?',
+        `No: it flies on lidar. With every room light off and its flashlight on it covers ${pct(night.coverage)} (guarded policy; the planner ${pct(cell('night-dark', 'classical').coverage)}). In this simulator darkness only adds 5% lidar dropout, so this checks the design, not a harder condition`,
+        'the same buildings',
+      ],
     ],
   );
+}
+
+/** Wilson 95% interval for k of n. */
+function wilsonCi(k, n) {
+  const z = 1.96;
+  const p = k / n;
+  const den = 1 + (z * z) / n;
+  const mid = (p + (z * z) / (2 * n)) / den;
+  const half = (z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n))) / den;
+  return [mid - half, mid + half];
+}
+
+/**
+ * How missions end over the failure atlas's declared mix (docs/atlas/mc.json, plain draws from the
+ * nominal distribution at the shipped code): all flights, flights with no fault, and empty sweeps.
+ */
+function atlasMix(atlas, mc) {
+  if (!atlas || !mc?.results?.length) return null;
+  const dim = (id) => atlas.dims.findIndex((d) => d.id === id);
+  const mi = dim('mission');
+  const fi = dim('fault');
+  if (mi < 0 || fi < 0) return null;
+  const none = atlas.dims[fi].values.indexOf('none');
+  const empty = atlas.dims[mi].values.indexOf('sweep-empty');
+  const rate = (rows) => {
+    const k = rows.filter((r) => r.expected).length;
+    return { k, n: rows.length, p: k / rows.length, ci: wilsonCi(k, rows.length) };
+  };
+  return {
+    all: rate(mc.results),
+    noFault: rate(mc.results.filter((r) => r.case.k[fi] === none)),
+    emptySweep: rate(mc.results.filter((r) => r.case.k[mi] === empty)),
+  };
 }
 
 /**
@@ -996,7 +1045,7 @@ function guideLimits(v, study, mb, plans) {
     `- The drone sometimes declares a building clear while a person is inside. Over a declared mix of missions, sites, light, wind and faults, the [failure atlas](ATLAS.md) measures this at ${v.R_ATLAS_FC} of flights (95% interval ${v.R_ATLAS_FC_CI}), all of them on sweeps of an occupied site, where the rate is ${v.R_ATLAS_FC_OCC}. A walking or hiding person is the usual case. At v1.0.0 the rate was 3.55%: a person the detector saw but could not confirm was dropped, and the mission bench never caught it because its occupied scenario only used a person lying still. Unconfirmed people now block a clear, which took a fresh ${v.R_TRK_N}-flight check from ${v.R_TRK_FC_CTRL} to ${v.R_TRK_FC}. The [atlas page](https://alexnieves-cs.github.io/frontier-fly/atlas.html) replays every failing flight.`,
     `- The learned policy needs its guard. On 30 fresh hard buildings under the crash rule (a contact faster than 0.5 m/s ends the flight) the policy alone covers ${v.R_POLICY_HARD} and crashes in ${v.R_POLICY_CRASHES} flights; behind the hand-written lidar guard it covers ${v.R_GUARD_HARD} and crashes in ${v.R_GUARD_CRASHES}; the sensor-only planner, with no learning, covers ${v.R_PLANNER_HARD} and never crashes. ${benchLimit()} The small fixed eval (4 easy and 3 hard seeds) is a smoke check, not a headline. [BENCHMARKS.md](BENCHMARKS.md) has the per-seed numbers.`,
     `- Indoors, missions do not read the floor plan: a sensor-only planner maps from the drone's own lidar and range finders, and the policy flies under a lidar guard with that planner as its fallback. On ${v.R_M_FLIGHTS} fresh mission worlds per explorer the sensor-only explorer reaches the expected outcome in ${v.R_M_SENSOR} of flights, the policy-first explorer in ${v.R_M_POLICY}, and the old floor-plan planner (kept as a reference) in ${v.R_M_ORACLE}; ${v.R_M_COLL} of the ${v.R_M_ALL} flights touched anything. The policy hands ${v.R_M_HANDOFF} of the buildings it enters to the planner after a stall, so much of each mission is flown by the planner. [REPORT.md](REPORT.md) has the study, the ablations and the failure cases.`,
-    `- On quadrotor dynamics with sensor noise every pilot covers less than on the kinematic airframe, because the quad cannot change speed instantly. Under the crash rule only the quad-aware planner (braking safety filter plus command tracker) survives: ${v.R_Q_BRAKE_TRACK} with ${v.R_Q_BRAKE_TRACK_CRASHES} crashes in 30 flights. The plain planner crashes in ${crashes(quad('classical'))} and covers ${v.R_PLANNER_QUAD}; the policy crashes in ${crashes(quad('policy'))} and covers ${v.R_POLICY_QUAD}, and the guard does not save it (${crashes(quad('guarded'))}). Whole missions on the quad, which slow to 1 m/s indoors behind the braking filter, reach the expected outcome ${v.R_MQ_SENSOR} of the time with the planner and ${v.R_MQ_POLICY} with the policy.${loc && truth ? ` Flown on the pose estimate instead of the true pose they reach it ${pct(loc.expectedOutcome)} of the time, and ${loc.flightsWithCollision} of ${loc.flights} flights touch something against ${truth.flightsWithCollision} on the true pose. The touches replayed so far (seeds 79206, 79221, 79303 and 79317) are slow, at most 0.35 m/s and below the crash limit, and all in the compound's larger second building, on its upper floor, while exploring or leaving. In two of them the estimate had drifted 0.7 to 1.2 m from the building by then; in the others it was within 15 cm, so drift is part of the cause but not all of it. One cause is fixed: a way out that ended short of the opening let the fly-through line up through a wall (src/mission/autonomy/phases/indoor.ts, reachedExit). On 120 fresh flights (seeds 79301+) that fix leaves the touch count unchanged, 3 against 3, so the rest is still open.` : ''}`,
+    `- On quadrotor dynamics with sensor noise every pilot covers less than on the kinematic airframe, because the quad cannot change speed instantly. Under the crash rule only the quad-aware planner (braking safety filter plus command tracker) survives: ${v.R_Q_BRAKE_TRACK} with ${v.R_Q_BRAKE_TRACK_CRASHES} crashes in 30 flights. The plain planner crashes in ${crashes(quad('classical'))} and covers ${v.R_PLANNER_QUAD}; the policy crashes in ${crashes(quad('policy'))} and covers ${v.R_POLICY_QUAD}, and the guard does not save it (${crashes(quad('guarded'))}). Whole missions on the quad, which slow to 1 m/s indoors behind the braking filter, reach the expected outcome ${v.R_MQ_SENSOR} of the time with the planner and ${v.R_MQ_POLICY} with the policy.${loc && truth ? ` Flown on the pose estimate instead of the true pose they reach it ${pct(loc.expectedOutcome)} of the time, and ${loc.flightsWithCollision} of ${loc.flights} flights touch something against ${truth.flightsWithCollision} on the true pose. The touches replayed so far (seeds 79206, 79221, 79303 and 79317) are slow, at most 0.35 m/s and below the crash limit, and all in the compound's larger second building, on its upper floor, while exploring or leaving. In two of them the estimate had drifted 0.7 to 1.2 m from the building by then; in the others it was within 15 cm, so drift is part of the cause but not all of it. One cause is fixed: a way out that ended short of the opening let the fly-through line up through a wall (src/mission/autonomy/phases/indoor.ts, reachedExit). On 120 fresh flights (seeds 79301+) that fix leaves the touch count unchanged, 3 against 3, so the rest is still open. Seed 79221 is in the published block, so that block's touch count for this arm is not held-out; the 79301+ flights are.` : ''}`,
     '- FrontierBench freezes seven exploration tasks (the last on real apartment plans) and a drone-team track, with public dev and test seeds so other pilots can be scored the same way; CI re-scores every submitted entry from its code. The seeds are public, so the board relies on entrants not tuning on the test split. [LEADERBOARD.md](LEADERBOARD.md) has the board and how to enter.',
     `- On multi-floor buildings only the sensor-only planner takes shafts; it reaches another floor in ${v.R_CLIMB_REACHED} fresh buildings and covers ${v.R_CLIMB_FLOORS} of them against ${v.R_PLANNER_FLOORS} without climbing. The policy and the teacher stay on the ground floor. A learned predictor of what lies behind each frontier is accurate but does not raise coverage, and neither does the true answer: coverage here is limited by flight time. [REPORT.md](REPORT.md) has both.`,
     '- Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.',
@@ -1398,7 +1447,7 @@ const outputs = {
 const headline = studyHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'));
 if (headline) outputs['docs/headline.json'] = `${JSON.stringify(headline, null, 2)}\n`;
 let readme = read('README.md');
-readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json'), trackingRuns()));
+readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json'), trackingRuns(), readJson('docs/atlas/mc.json')));
 outputs['README.md'] = readme;
 // The full tables live in the project guide, one directory down, so their links drop the docs/ prefix.
 const fromDocs = (text) => text.replaceAll('](docs/', '](');

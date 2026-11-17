@@ -3,6 +3,25 @@
 Notable changes to frontier-fly. Each release on GitHub carries the full notes and the tech report PDF, and
 Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.org/10.5281/zenodo.23717793).
 
+## Unreleased
+
+### Claims audit (2026-11-17)
+
+No study was rerun and no number changed; the wording around the numbers did.
+
+- README results: the mission row now says its four scenarios are staged, and a new row gives the rate over the
+  failure atlas's mix of conditions (41.2% of 6,000 flights end as expected). One false-clear number (the atlas's,
+  at the shipped code) replaces three. The collision rate is the 6,000-flight plain draw, since the collision search
+  never produced an importance-sampled estimate. The fault row breaks "ends safely" into finished, flew home,
+  landed in place and crashed. The policy row counts flights that touched a wall, and the dark row says the drone
+  flies on lidar.
+- Leaderboard: crash counts instead of rounded shares (the leader has 1 crash in 240 flights, not 0%), and a paired
+  95% interval between neighbouring ranks; ranks 2 to 4 are tied.
+- Model card: the policy alone crashes on 7 of 30 hard flights (it said "most"), and the guarded coverage number has
+  no planner fallback in it.
+- Report limits: staged missions, free slow contacts, the built-in controller braking harder than PX4, and the one
+  report block (79201+, quadrotor on its pose estimate) where a bug was traced on a published seed.
+
 ## 1.2.0 (2026-11-12)
 
 The wrap-up release. frontier-fly is at a stable stopping point: everything below was finished, measured and

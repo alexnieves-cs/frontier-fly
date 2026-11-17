@@ -95,7 +95,7 @@ function markup(): string {
         </ul>
         <div class="tiles">
           <div class="tile"><span class="tile-value">${pct(r.easy)}</span><span class="tile-label">coverage on easy buildings (${r.seeds} fresh)</span></div>
-          <div class="tile"><span class="tile-value">${pct(r.night)}</span><span class="tile-label">coverage of the same hard buildings at night, lights off</span></div>
+          <div class="tile"><span class="tile-value">${pct(r.night)}</span><span class="tile-label">coverage of the same hard buildings with the room lights off (it flies on lidar)</span></div>
           <a class="tile tile-limit" href="./atlas.html"><span class="tile-value">${(falseClear.p * 100).toFixed(2)}%</span><span class="tile-label">of flights call a building clear with someone inside (failure atlas)</span></a>
         </div>
       </div>

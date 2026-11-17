@@ -26,6 +26,7 @@ interface Cell {
   coverage: number;
   coverageCi: [number, number];
   crashes: number;
+  episodesWithCollision: number;
 }
 const headline = JSON.parse(readFileSync('docs/headline.json', 'utf8')) as {
   commit: string;
@@ -130,17 +131,19 @@ civilian and defensive use only.
 
 ## Results
 
-Coverage of 30 fresh hard buildings (rooms, hallways and loops) that no model or setting was tuned on, with
-95% bootstrap intervals. A flight ends in a crash when it hits a surface faster than ${headline.crashSpeed} m/s.
+Coverage of 30 held-out hard buildings (rooms, hallways and loops) that no model or setting was tuned on, with
+95% bootstrap intervals. "Lights off" keeps the drone's flashlight on; the network flies on lidar, and darkness
+only adds 5% lidar dropout in this simulator. A flight ends in a crash when it hits a surface faster than ${headline.crashSpeed} m/s.
 From [\`docs/headline.json\`](${GH}/blob/${headline.commit}/docs/headline.json) at ${headline.commit}.
 
 | Pilot | Day | Day crashes | Lights off | Lights-off crashes |
 | --- | --- | --- | --- | --- |
 ${rows.join('\n')}
 
-Read the crash column. Alone, the network ends most hard flights by hitting something. The simulator
-always flies it under a lidar guard that brakes before contact, with the planner taking over on a stall,
-and that pair covers ${pct(g.coverage)}% with ${g.crashes} crash${g.crashes === 1 ? '' : 'es'} in ${g.episodes} flights.
+Read the crash column. Alone, the network crashes on ${p.crashes} of ${p.episodes} hard flights and touches a wall in
+${p.episodesWithCollision} of them (contacts slower than ${headline.crashSpeed} m/s do not end a flight). Under a lidar guard that brakes
+before contact it covers ${pct(g.coverage)}% with ${g.crashes} crash${g.crashes === 1 ? '' : 'es'} in ${g.episodes} flights. Missions add the planner as a
+fallback when the policy stalls; these coverage numbers do not.
 
 **FrontierBench v${bench.guarded!.bench}** (test split; [leaderboard](${GH}/blob/main/docs/LEADERBOARD.md)), mean coverage over
 seven tasks under the same crash rule, the share of flights a crash ended, and the share that touched nothing. Scored at ${bench.guarded!.commit}; the scorer

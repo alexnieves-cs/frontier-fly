@@ -6,21 +6,21 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 
 ## Leaderboard
 
-| # | Pilot | Score | Footprint score | room | hard | dark | fast | floors | quad | apartments | Flights ended by a crash | Flights that touched nothing | Commit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Sensor-only planner + quad tracker (baseline) | **68.0%** | 87.7% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 44.6% | 85.5% | 0% | 99% | `160ae15` |
-| 2 | Sensor-only planner (baseline) | **66.2%** | 85.2% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 31.7% | 85.5% | 5% | 94% | `160ae15` |
-| 3 | Sensor-only planner + momentum (baseline) | **66.0%** | 86.3% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 30.5% | 86.1% | 7% | 93% | `160ae15` |
-| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **65.4%** | 87.4% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 35.1% | 85.6% | 4% | 95% | `160ae15` |
-| 5 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **62.7%** | 80.0% | 95.1% | 73.1% | 74.1% | 66.4% | 38.7% | 25.8% | 65.5% | 21% | 67% | `160ae15` |
-| 6 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.5%** | 83.1% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 39.7% | 80.6% | 2% | 96% | `160ae15` |
-| 7 | Shipped policy (DAgger + PPO) (baseline) | **46.4%** | 65.3% | 95.1% | 69.8% | 73.9% | 6.0% | 35.9% | 9.2% | 35.0% | 63% | 28% | `160ae15` |
-| 8 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **27.1%** | 89.7% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 22.8% | 31.1% | 2% | 98% | `160ae15` |
-| 9 | Frontier waypoint follower (baseline) | **19.1%** | 49.9% | 52.8% | 20.4% | 15.7% | 6.6% | 12.0% | 3.6% | 22.5% | 100% | 0% | `160ae15` |
-| 10 | Lidar wall-follower (baseline) | **16.8%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 17.5% | 10.1% | 0% | 97% | `160ae15` |
-| 11 | Nearest frontier (Yamauchi 1997) (baseline) | **8.8%** | 73.5% | 3.3% | 10.0% | 11.6% | 10.3% | 4.6% | 9.7% | 11.9% | 1% | 99% | `160ae15` |
+| # | Pilot | Score | Footprint score | room | hard | dark | fast | floors | quad | apartments | Flights ended by a crash | Flights that touched nothing | Score vs the row above (95% CI) | Commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sensor-only planner + quad tracker (baseline) | **68.0%** | 87.7% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 44.6% | 85.5% | 1 of 240 | 99% | — | `160ae15` |
+| 2 | Sensor-only planner (baseline) | **66.2%** | 85.2% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 31.7% | 85.5% | 12 of 240 | 94% | −1.8 (−2.4 to −1.3) | `160ae15` |
+| 3 | Sensor-only planner + momentum (baseline) | **66.0%** | 86.3% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 30.5% | 86.1% | 17 of 240 | 93% | −0.1 (−1.1 to +0.8), tied | `160ae15` |
+| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **65.4%** | 87.4% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 35.1% | 85.6% | 9 of 240 | 95% | −0.6 (−1.8 to +0.5), tied | `160ae15` |
+| 5 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **62.7%** | 80.0% | 95.1% | 73.1% | 74.1% | 66.4% | 38.7% | 25.8% | 65.5% | 51 of 240 | 67% | −2.7 (−4.8 to −0.8) | `160ae15` |
+| 6 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.5%** | 83.1% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 39.7% | 80.6% | 5 of 240 | 96% | −3.2 (−5.0 to −1.2) | `160ae15` |
+| 7 | Shipped policy (DAgger + PPO) (baseline) | **46.4%** | 65.3% | 95.1% | 69.8% | 73.9% | 6.0% | 35.9% | 9.2% | 35.0% | 152 of 240 | 28% | −13.0 (−14.8 to −11.3) | `160ae15` |
+| 8 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **27.1%** | 89.7% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 22.8% | 31.1% | 5 of 240 | 98% | −19.4 (−21.4 to −17.3) | `160ae15` |
+| 9 | Frontier waypoint follower (baseline) | **19.1%** | 49.9% | 52.8% | 20.4% | 15.7% | 6.6% | 12.0% | 3.6% | 22.5% | 239 of 240 | 0% | −8.0 (−9.3 to −6.6) | `160ae15` |
+| 10 | Lidar wall-follower (baseline) | **16.8%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 17.5% | 10.1% | 1 of 240 | 97% | −2.2 (−3.4 to −1.1) | `160ae15` |
+| 11 | Nearest frontier (Yamauchi 1997) (baseline) | **8.8%** | 73.5% | 3.3% | 10.0% | 11.6% | 10.3% | 4.6% | 9.7% | 11.9% | 2 of 240 | 99% | −8.1 (−8.9 to −7.3) | `160ae15` |
 
-The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. *Flights ended by a crash* is the share of all 240 test flights the crash rule ended, and *flights that touched nothing* the share with no contact at all, slow ones included. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
+The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. *Flights ended by a crash* counts the test flights the crash rule ended, and *flights that touched nothing* the share with no contact at all, slow ones included. *Score vs the row above* is the score gap in points with a paired 95% bootstrap interval (both pilots fly the same buildings; flights are resampled within each task): where it says *tied* the interval includes zero and the two ranks should be read as one. The quad-aware planner leads the plain planner only through the `quad` task, the one task where they fly differently. The `room` task is one empty room that almost every pilot covers equally, so it is a sanity check and does not separate pilots. The planner and its variants were tuned on the dev split; the three published methods use their papers' parameters and were not tuned, which favors the planner. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
 
 ### Published methods
 
@@ -28,10 +28,10 @@ Three baselines reimplement published exploration methods on the same sensor map
 
 | Pilot | Score (flown) | Footprint score | Footprint curve area | Half seen, s | Flights ended by a crash | Flights that touched nothing |
 | --- | --- | --- | --- | --- | --- | --- |
-| Sensor-only planner (this repository) | 66.2% | 85.2% | 0.65 | 39.0 | 5% | 94% |
-| Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 1% | 99% |
-| Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.1% | 89.7% | 0.84 | 10.5 | 2% | 98% |
-| Boustrophedon coverage (BA*, Viet et al. 2013) | 65.4% | 87.4% | 0.67 | 35.0 | 4% | 95% |
+| Sensor-only planner (this repository) | 66.2% | 85.2% | 0.65 | 39.0 | 12 of 240 | 94% |
+| Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 2 of 240 | 99% |
+| Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.1% | 89.7% | 0.84 | 10.5 | 5 of 240 | 98% |
+| Boustrophedon coverage (BA*, Viet et al. 2013) | 65.4% | 87.4% | 0.67 | 35.0 | 9 of 240 | 95% |
 
 [REPORT.md](REPORT.md#against-published-exploration-methods) describes each method and its adaptations.
 
