@@ -105,6 +105,23 @@ export interface SensorPlannerOptions {
    * one candidate per frontier cluster. Path search, filters and tracker are unchanged.
    */
   picker?: GoalPicker;
+  /**
+   * View-first exploration: a voxel stops being a goal once the
+   * drone's own lidar ring has had it in line of sight within `radius` meters, not only once the
+   * drone has flown through it. The drone then visits rooms to look into them instead of sweeping
+   * lanes, which is what sensor-footprint coverage scores. With `sweep`, once nothing on the floor is
+   * left unviewed the planner falls back to the flown-voxel goals and sweeps the rest of the budget.
+   */
+  view?: ViewOptions;
+}
+
+export interface ViewOptions {
+  /** Line-of-sight radius that counts a voxel as viewed, meters (default 3, the footprint metric's headline). */
+  radius?: number;
+  /** Rays cast over the drone's own map each step (default 72). */
+  rays?: number;
+  /** After the view phase, sweep unflown voxels for the rest of the budget (default true). */
+  sweep?: boolean;
 }
 
 /** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
@@ -155,6 +172,11 @@ export class SensorPlanner {
   penalty: CandidatePenalty | null;
   readonly tracker: ResolvedTracker | null;
   readonly picker: GoalPicker | null;
+  readonly view: Required<ViewOptions> | null;
+  /** Own-map line-of-sight view mask (SeenMap layout), when `view` is set. */
+  private viewed = new Uint8Array(0);
+  /** The view phase on the current floor found nothing left to look at; goals are unflown voxels again. */
+  private sweeping = false;
   /** Goal choices the picker made (diagnostics). */
   picks = 0;
   private candScore = new Float64Array(0);
@@ -199,6 +221,36 @@ export class SensorPlanner {
     this.penalty = opts.penalty ?? null;
     this.tracker = opts.tracker ? resolveTracker(opts.tracker) : null;
     this.picker = opts.picker ?? null;
+    this.view = opts.view ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true } : null;
+  }
+
+  /** A voxel (SeenMap index) no longer needs a visit: viewed in view mode, else flown. */
+  private covered(f: SensorFrame, k: number): boolean {
+    return this.view && !this.sweeping ? this.viewed[k] === 1 : f.visited[k] === 1;
+  }
+
+  /** Mark what the drone's lidar plane has in line of sight within the view radius, on its own map. */
+  private markView(f: SensorFrame, base: number): void {
+    const v = this.view!;
+    const { vw, vd } = f;
+    const step = VOXEL * 0.4;
+    const n = Math.ceil(v.radius / step);
+    const vx0 = Math.floor(f.pos[0] / VOXEL);
+    const vy0 = Math.floor(f.pos[1] / VOXEL);
+    if (vx0 >= 0 && vy0 >= 0 && vx0 < vw && vy0 < vd) this.viewed[base + vy0 * vw + vx0] = 1;
+    for (let i = 0; i < v.rays; i++) {
+      const a = (i / v.rays) * Math.PI * 2;
+      const ux = Math.cos(a);
+      const uy = Math.sin(a);
+      for (let s = 1; s <= n; s++) {
+        const x = Math.floor((f.pos[0] + ux * s * step) / VOXEL);
+        const y = Math.floor((f.pos[1] + uy * s * step) / VOXEL);
+        if (x < 0 || y < 0 || x >= vw || y >= vd) break;
+        const k = y * vw + x;
+        if (!this.traversable(f, base, k)) break;
+        this.viewed[base + k] = 1;
+      }
+    }
   }
 
   reset(): void {
@@ -212,6 +264,8 @@ export class SensorPlanner {
     this.lastFloor = -1;
     this.idle = 0;
     this.picks = 0;
+    this.sweeping = false;
+    this.viewed.fill(0);
     this.shaper.reset();
     this.picker?.reset?.();
   }
@@ -254,6 +308,7 @@ export class SensorPlanner {
     this.clear = new Uint8Array(this.plane);
     this.heap = new Int32Array(this.plane * 8 + 16);
     this.banned = new Uint8Array(n);
+    this.viewed = new Uint8Array(this.view ? n : 0);
     this.candScore = new Float64Array(this.plane);
     this.candOrder = new Int32Array(this.plane);
     this.candLabel = new Int32Array(this.plane);
@@ -361,7 +416,7 @@ export class SensorPlanner {
       if (done[k]! & 128) continue;
       done[k] = done[k]! | 128;
       const d0 = dist[k]!;
-      if (k !== start && f.visited[base + k] !== 1 && this.traversable(f, base, k) && !this.banned[base + k]) {
+      if (k !== start && !this.covered(f, base + k) && this.traversable(f, base, k) && !this.banned[base + k]) {
         // Prefer frontier voxels that border flown or blocked space: sweeping edges first
         // leaves fewer isolated stragglers to come back for.
         let score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
@@ -633,15 +688,21 @@ export class SensorPlanner {
     if (floor !== this.lastFloor) {
       this.goal = -1;
       this.lastFloor = floor;
+      this.sweeping = false;
     }
+    if (this.view) this.markView(f, base);
     const goalValid =
       this.goal >= 0 &&
       this.goalFloor === floor &&
-      f.visited[this.goal] !== 1 &&
+      !this.covered(f, this.goal) &&
       this.traversable(f, 0, this.goal) &&
       !this.banned[this.goal];
     if (!goalValid || this.sinceReplan >= this.replanEvery) {
-      const g = this.plan(f, floor);
+      let g = this.plan(f, floor);
+      if (g < 0 && this.view && this.view.sweep && !this.sweeping) {
+        this.sweeping = true;
+        g = this.plan(f, floor);
+      }
       const next = g >= 0 ? base + g : -1;
       if (next !== this.goal) {
         this.bestGoalDist = Infinity;

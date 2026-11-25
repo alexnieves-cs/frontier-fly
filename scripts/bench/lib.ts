@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
 import { parsePlanSet, PLAN_SET_PATH, type PlanSet } from '../../src/plans';
 import type { ExplorerEnv } from '../../src/sim/env';
-import { BENCH_TASKS, benchRuns, SAFE_COLLISIONS, type BenchSplit } from '../../src/bench/tasks';
+import { BENCH_TASKS, benchRuns, SAFE_COLLISIONS, type BenchRun, type BenchSplit } from '../../src/bench/tasks';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { bootstrapCi, loadPolicy } from '../study/common';
 import { sandboxedPilot } from './sandbox';
@@ -67,13 +67,32 @@ export function loadPlanSet(): PlanSet {
   return planSet;
 }
 
-/** Fly every task of a split (or the listed ones) with one pilot. */
-export function flyAll(env: ExplorerEnv, pilot: BenchPilot, split: BenchSplit, only: string[] = [], log?: (task: string, eps: BenchEpisode[]) => void): BenchEpisode[] {
+/**
+ * A seed block outside the bench's own splits, for studies that need fresh flights (a practice or
+ * report-only block recorded in the seed ledger): generated task i flies base + 100 i .. + count - 1,
+ * the real-plan task flies `plans` split's plans with env seeds base + 700 + j.
+ */
+export interface SeedBlock {
+  base: number;
+  count: number;
+  plans: 'dev' | 'eval';
+}
+
+function blockRuns(block: SeedBlock, ti: number): BenchRun[] {
+  const task = BENCH_TASKS[ti]!;
+  if (!task.plans) return Array.from({ length: block.count }, (_, i) => ({ seed: block.base + ti * 100 + i }));
+  const set = loadPlanSet();
+  return set.plans.filter((p) => p.split === block.plans).map((record, j) => ({ seed: block.base + 700 + j, plan: { set, record } }));
+}
+
+/** Fly every task of a split (or the listed ones) with one pilot; with `block`, fly that seed block instead. */
+export function flyAll(env: ExplorerEnv, pilot: BenchPilot, split: BenchSplit, only: string[] = [], log?: (task: string, eps: BenchEpisode[]) => void, block?: SeedBlock): BenchEpisode[] {
   const episodes: BenchEpisode[] = [];
   BENCH_TASKS.forEach((task, ti) => {
     if (only.length && !only.includes(task.id)) return;
     const mine: BenchEpisode[] = [];
-    for (const run of benchRuns(split, ti, task.plans ? loadPlanSet() : undefined)) mine.push(runBenchEpisode(env, task, run, pilot));
+    const runs = block ? blockRuns(block, ti) : benchRuns(split, ti, task.plans ? loadPlanSet() : undefined);
+    for (const run of runs) mine.push(runBenchEpisode(env, task, run, pilot));
     episodes.push(...mine);
     log?.(task.id, mine);
   });

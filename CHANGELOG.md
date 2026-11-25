@@ -13,6 +13,15 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
   for the planner-only quad pilot. Most of the crash cut is the braking model; the coverage lead is the picker.
   Missions, teams and FrontierBench are unchanged. Write-up in [docs/QUAD_PICKER.md](docs/QUAD_PICKER.md).
 
+### View-first planner (2026-11-25)
+
+- New baseline `planner-view` (`SensorPlannerOptions.view`): goals are voxels the drone's own lidar has not had in
+  line of sight within 3 m, then a sweep of unflown voxels. On a fresh report-only block (91001+) its footprint
+  coverage is 99.4% against NBVP's 89.6% (paired +9.8, 95% interval +8.4 to +11.2), with 0 crashes in 240 flights
+  (NBVP 7, quad-aware planner 0) and about the same flown coverage. FrontierBench test: 98.7% footprint, 1 crash in
+  240. docs/VIEW_FIRST.md.
+- `bench:score --base N` flies a seed block outside the bench's splits.
+
 ### Claims audit (2026-11-17)
 
 No study was rerun and no number changed; the wording around the numbers did.

@@ -35,3 +35,19 @@ describe('published exploration baselines', () => {
     env.dispose();
   });
 });
+
+describe('view-first planner', () => {
+  it('looks into the building sooner than the sweeping planner and stays deterministic', async () => {
+    const env = await createEnv();
+    const ti = BENCH_TASKS.findIndex((t) => t.id === 'hard');
+    const run = { seed: benchSeeds('dev', ti)[0]! };
+    const view = runBenchEpisode(env, BENCH_TASKS[ti]!, run, BASELINES['planner-view']!());
+    expect(runBenchEpisode(env, BENCH_TASKS[ti]!, run, BASELINES['planner-view']!())).toEqual(view);
+    const sweep = runBenchEpisode(env, BENCH_TASKS[ti]!, run, BASELINES['planner-tracker']!());
+    // Same budget: the view phase sees more of the building early, then sweeps with the time left.
+    expect(view.area.footprint).toBeGreaterThan(sweep.area.footprint);
+    expect(view.footprint).toBeGreaterThanOrEqual(sweep.footprint);
+    expect(view.crashed).toBe(false);
+    env.dispose();
+  });
+});
