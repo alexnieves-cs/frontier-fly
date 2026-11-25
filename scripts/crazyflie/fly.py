@@ -43,6 +43,15 @@ from links import SIM_PROFILES, CflibLink, MockRadioLink, SimLink, mm_to_m  # no
 
 REPO = Path(__file__).resolve().parents[2]
 DT = 0.05
+# Landing (Flight.land): ramp rate, how far the setpoint may lead the measured height, the lowest
+# setpoint, the height that counts as touchdown, how fresh a reading must be to count, and the
+# time allowed past the ramp before the motors stop without a confirmed touchdown.
+LAND_RATE = 0.2       # m/s
+LAND_LEAD = 0.15      # m
+LAND_FLOOR = 0.05     # m
+TOUCHDOWN_Z = 0.08    # m, measured
+FRESH_TEL_SEC = 0.3   # s
+LAND_GRACE = 3.0      # s
 
 
 class Planner:
@@ -187,19 +196,36 @@ class Flight:
         self.link.send_hover(bx, by, cmd.yaw_rate, cmd.z)
 
     def land(self, reason: str):
+        """Bring the height setpoint down at 0.2 m/s and cut the motors once the drone reads touchdown.
+
+        The setpoint never runs more than LAND_LEAD below the last fresh height reading, and it holds
+        while telemetry is stale, so a drone that lags its setpoint, or a radio that drops the
+        setpoints, is not cut off in the air when the ramp runs out. If no fresh reading under
+        TOUCHDOWN_Z arrives by the ramp time plus LAND_GRACE, the motors stop anyway and the
+        landed event says so (confirmed: false).
+        """
         self.reason = self.reason or reason
         tel = self.last_tel
         z = tel.z if tel else 0.3
-        while z > 0.08:
-            z -= 0.2 * DT
-            if tel:
-                self.link.send_hover(0.0, 0.0, 0.0, max(z, 0.05))
+        measured = tel.z if tel and self.last_age <= FRESH_TEL_SEC else None
+        deadline = self.link.now() + max(z, 0.0) / LAND_RATE + LAND_GRACE
+        confirmed = False
+        while True:
+            if measured is not None and measured <= TOUCHDOWN_Z:
+                confirmed = True
+                break
+            if self.link.now() >= deadline:
+                break
+            if measured is not None:
+                z = max(z - LAND_RATE * DT, measured - LAND_LEAD, LAND_FLOOR)
+            if self.last_tel:
+                self.link.send_hover(0.0, 0.0, 0.0, z)
             self.link.sleep(DT)
-            fresh, _ = self.telemetry()
-            self.record('land', fresh, None, Command(0.0, 0.0, 0.0, max(z, 0.05)), 'landing', self.reason)
-            tel = fresh or self.last_tel
+            fresh, age = self.telemetry()
+            self.record('land', fresh, None, Command(0.0, 0.0, 0.0, z), 'landing', self.reason)
+            measured = fresh.z if fresh is not None and age <= FRESH_TEL_SEC else None
         self.link.stop_motors()
-        self.write('landed', self.reason)
+        self.write('landed', self.reason, confirmed=confirmed, height=measured)
 
     def run(self, step_fn, max_sec: float) -> str:
         """step_fn(tel, t_air) -> (Command | None, done: bool). Takes off, flies, lands."""

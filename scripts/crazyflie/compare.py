@@ -239,7 +239,7 @@ def track_svg(arena: dict, real: dict, sims: list[dict], landed: tuple[float, fl
         return f'<polyline points="{d}" fill="none" stroke="{colour}" stroke-width="{width}"{da}/>'
 
     W = max(W, 560.0)  # room for the legend under a small arena
-    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.0f}" height="{H + 30:.0f}" viewBox="0 0 {W:.0f} {H + 30:.0f}" font-family="sans-serif" font-size="12">',
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.0f}" height="{H + 48:.0f}" viewBox="0 0 {W:.0f} {H + 48:.0f}" font-family="sans-serif" font-size="12">',
            f'<rect width="100%" height="100%" fill="#ffffff"/>']
     x0, y0 = px(0, arena['d'])
     out.append(f'<rect x="{x0:.1f}" y="{y0:.1f}" width="{arena["w"] * s:.1f}" height="{arena["d"] * s:.1f}" fill="none" stroke="#222" stroke-width="3"/>')
@@ -259,14 +259,21 @@ def track_svg(arena: dict, real: dict, sims: list[dict], landed: tuple[float, fl
     if landed:
         lp = px(*landed)
         out.append(f'<path d="M{lp[0] - 6:.1f},{lp[1] - 6:.1f} l12,12 m0,-12 l-12,12" stroke="#c0392b" stroke-width="2.5"/>')
-    ly = H + 18
+    # Legend, two rows: one entry for every line and mark drawn above.
+    ly, ly2 = H + 18, H + 38
+    who = 'real flight' if real.get('source') == 'real' else f'this log ({real.get("source", "n/a")})'
     out.append(f'<line x1="{pad}" y1="{ly - 4}" x2="{pad + 24}" y2="{ly - 4}" stroke="#1f5fbf" stroke-width="2.2"/>'
-               f'<text x="{pad + 30}" y="{ly}">{real["source"]} (its own estimate)</text>')
-    out.append(f'<line x1="{pad + 210}" y1="{ly - 4}" x2="{pad + 234}" y2="{ly - 4}" stroke="#e08a2c" stroke-width="1.2" stroke-dasharray="5,4"/>'
-               f'<text x="{pad + 240}" y="{ly}">sim (estimate)</text>')
-    out.append(f'<circle cx="{pad + 350}" cy="{ly - 4}" r="5" fill="#2a9d3a"/><text x="{pad + 360}" y="{ly}">take-off</text>')
+               f'<text x="{pad + 30}" y="{ly}">{who}, its own estimate</text>')
+    if sims:
+        out.append(f'<line x1="{pad + 260}" y1="{ly - 4}" x2="{pad + 284}" y2="{ly - 4}" stroke="#e08a2c" stroke-width="1.2" stroke-dasharray="5,4"/>'
+                   f'<text x="{pad + 290}" y="{ly}">sim runs, estimate</text>')
+    if sims and sims[0].get('track_truth'):
+        out.append(f'<line x1="{pad}" y1="{ly2 - 4}" x2="{pad + 24}" y2="{ly2 - 4}" stroke="#999999" stroke-width="1.0" stroke-dasharray="2,3"/>'
+                   f'<text x="{pad + 30}" y="{ly2}">first sim run, true position</text>')
+    out.append(f'<circle cx="{pad + 266}" cy="{ly2 - 4}" r="5" fill="#2a9d3a"/><text x="{pad + 276}" y="{ly2}">take-off</text>')
     if landed:
-        out.append(f'<text x="{pad + 430}" y="{ly}" fill="#c0392b">x measured landing</text>')
+        out.append(f'<path d="M{pad + 340:.1f},{ly2 - 9:.1f} l10,10 m0,-10 l-10,10" stroke="#c0392b" stroke-width="2.5"/>'
+                   f'<text x="{pad + 356}" y="{ly2}" fill="#c0392b">measured landing</text>')
     out.append('</svg>')
     return '\n'.join(o for o in out if o) + '\n'
 

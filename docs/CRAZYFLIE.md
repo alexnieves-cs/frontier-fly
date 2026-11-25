@@ -2,7 +2,7 @@
 
 frontier-fly's sensor-only explorer is the same code that searches buildings in the sim. This page is the plan for flying it on a real 33 g quadrotor, a Bitcraze Crazyflie, in an ordinary room. It has three parts:
 
-1. **What is done in the cloud.** A Crazyflie version of the explorer, a room-scale simulator, a 60-arena benchmark, a flight script with a safety guard, a props-off radio check, a flight log that is the same for the drone and the sim, a report that compares a real flight with the sim, and 60 tests that fly all of it against the simulator and a simulated radio in CI (`.github/workflows/crazyflie.yml`).
+1. **What is done in the cloud.** A Crazyflie version of the explorer, a room-scale simulator, a 60-arena benchmark, a flight script with a safety guard, a props-off radio check, a flight log that is the same for the drone and the sim, a report that compares a real flight with the sim, and 62 tests that fly all of it against the simulator and a simulated radio in CI (`.github/workflows/crazyflie.yml`).
 2. **What to buy.** About US$500 to $700 of parts.
 3. **How to fly it.** A ladder of seven steps, from "connect with the props off" to "explore two rooms". Each step has a pass rule, and you only move up a step when the one below passes. The kit list and a checklist to print are in [CRAZYFLIE_FIRST_FLIGHT.md](CRAZYFLIE_FIRST_FLIGHT.md).
 
@@ -99,6 +99,8 @@ Every command goes through `scripts/crazyflie/guard.py` before it reaches the ra
 
 The first flights (hover, yaw and square) fly under tighter limits, because none of them needs more: 0.3 m/s, height setpoints up to 0.6 m, land above 0.9 m measured, cut the motors above 1.5 m, and 40 s (hover, yaw) or 60 s (square) in the air (`first_flight_limits` in `fly.py`). When the guard trims a command it says which rule did in the flight log.
 
+Landing brings the height setpoint down at 0.2 m/s and stops the motors only once the drone's own height reading is under 8 cm. The setpoint never runs more than 15 cm below the last fresh reading and holds while telemetry is stale, so a drone that lags or a radio that drops setpoints is not cut off in the air. If no fresh reading shows touchdown by the ramp time plus 3 s, the motors stop anyway and the log's `landed` line says `"confirmed": false`.
+
 Before take-off, `fly.py` refuses to fly if a deck is missing, the battery is under 3.9 V at rest, the height reads over 0.15 m on the ground, any beam reads under 0.35 m, or the estimator did not reset to the take-off point.
 
 ## Flight ladder
@@ -175,7 +177,7 @@ Send the `flights/*.jsonl` logs and the report folders.
 | `scripts/crazyflie/analysis.py` | the measures for one log, including a port of the sim's coverage |
 | `scripts/crazyflie/compare.py` | the sim-versus-real report |
 | `scripts/crazyflie/replay.ts` | one arena in `src/crazyflie/sim`, for `compare.py` |
-| `scripts/crazyflie/tests/` | 60 pytest tests: guard rules, end-to-end sim flights, faults, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie |
+| `scripts/crazyflie/tests/` | 62 pytest tests: guard rules, end-to-end sim flights, faults, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie |
 | `docs/CRAZYFLIE_FIRST_FLIGHT.md` | the kit list and the first-flight checklist |
 
 ## Not done yet

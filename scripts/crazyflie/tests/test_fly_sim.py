@@ -32,6 +32,18 @@ def test_explore_maps_the_arena_without_touching_anything(tmp_path, arena):
     assert all('verdict' in x or 'event' in x for x in lines)
 
 
+def test_motors_stop_only_at_touchdown(tmp_path):
+    # The bench model lags its height setpoint, so the 0.2 m/s landing ramp runs out with the drone still
+    # about 0.2 m up. The motors may stop only once the drone itself reads touchdown.
+    code, r = run(tmp_path, '--arena', str(ARENAS / 'example-room.json'), '--mode', 'hover', '--sim-profile', 'bench')
+    assert code == 0, r
+    lines = [json.loads(x) for x in (tmp_path / 'log.jsonl').read_text().splitlines()]
+    landed = next(x for x in lines if x.get('event') == 'landed')
+    last = [x for x in lines if 'phase' in x][-1]
+    assert landed['confirmed'] is True and landed['height'] <= fly.TOUCHDOWN_Z
+    assert last['truth']['z'] <= fly.TOUCHDOWN_Z + 0.005
+
+
 @pytest.mark.parametrize('mode', ['check', 'hover', 'yaw', 'square'])
 def test_ladder_modes(tmp_path, mode):
     code, r = run(tmp_path, '--arena', str(ARENAS / 'example-room.json'), '--mode', mode)

@@ -39,6 +39,20 @@ def test_outage_lands_on_stale_telemetry(tmp_path):
     assert not r['crashed']
 
 
+def test_landing_holds_through_an_outage(tmp_path):
+    # The radio drops out for 1.2 s in the middle of the landing. The setpoint holds while the drone
+    # can't be heard, and the motors stop only once a fresh reading shows touchdown.
+    code, r, log = fly_sim(tmp_path, '--mode', 'hover', '--mock-radio', 'outage_at=12.3,outage_sec=1.2')
+    assert code == 0 and r['outcome'] == 'complete', r
+    lines = [json.loads(x) for x in log.read_text().splitlines()]
+    landing = [x for x in lines if x.get('phase') == 'land']
+    assert max(x['age'] or 0 for x in landing) > 1.0, 'the outage should fall inside the landing'
+    landed = next(x for x in lines if x.get('event') == 'landed')
+    assert landed['confirmed'] is True
+    assert landing[-1]['truth']['z'] <= fly.TOUCHDOWN_Z + 0.005
+    assert not r['crashed']
+
+
 def test_unknown_setting_is_refused():
     with pytest.raises(ValueError):
         MockRadioLink(SimLink(ARENA), packet_loss=0.1)

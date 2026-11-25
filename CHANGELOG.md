@@ -23,7 +23,10 @@ Nothing has flown on hardware yet; everything below is tested against the simula
   side by side, where the real flight falls outside the sim's spread, the fitted velocity lag and latency, and a
   track picture. `--landed X,Y` turns a tape-measured landing spot into the real flow drift.
 - **Kit and checklist.** `docs/CRAZYFLIE_FIRST_FLIGHT.md`.
-- 31 new tests (60 in the Crazyflie suite).
+- **Landing waits for touchdown.** The landing used to cut the motors when its setpoint ramp ran out, which in
+  the sim left the drone about 0.2 m up, and higher when the radio dropped out mid-landing. It now holds the
+  setpoint close to the measured height and stops the motors once the drone reads under 8 cm.
+- 33 new tests (62 in the Crazyflie suite).
 
 ### Claims audit (2026-11-17)
 
