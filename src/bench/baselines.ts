@@ -82,12 +82,21 @@ export function policyPilot(name: string, policy: (obs: Float32Array) => Float32
   };
 }
 
+/** Braking margin of the view-first planner on the quadrotor, meters. */
+export const VIEW_QUAD_MARGIN = 0.3;
+
 export const BASELINES: Record<string, () => BenchPilot> = {
   planner: () => plannerPilot('Sensor-only planner'),
   'planner-momentum': () => plannerPilot('Sensor-only planner + momentum', { momentum: 1 }),
   // The quad-aware planner the report flies on the quadrotor: the trajectory tracker (sim/tracker.ts)
   // shapes its command there; on the kinematic airframe it is the plain planner.
   'planner-tracker': () => explorerPilot('Sensor-only planner + quad tracker', (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {} } : {}) })),
+  // View-first planner: goals are voxels the drone has not yet had in lidar line of sight within 3 m
+  // (the footprint metric's radius), then it sweeps unflown voxels with the time left. On the
+  // quadrotor it flies the tracker and keeps 0.30 m of braking margin (0.25 default), picked on the
+  // practice block 90501-90600 (docs/VIEW_FIRST.md): view goals mean longer legs at cruise.
+  'planner-view': () =>
+    explorerPilot('Sensor-only planner, view first', (c) => new SensorPlanner({ speed: c.speedH, view: {}, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN } : {}) })),
   waypoint: () => statelessPilot('Frontier waypoint follower', waypointAction),
   heuristic: () => statelessPilot('Lidar wall-follower', heuristicAction),
   // Published exploration methods (src/sim/explorers), on the same maps, flight layer and safety filter.

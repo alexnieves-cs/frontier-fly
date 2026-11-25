@@ -129,7 +129,7 @@ function teamBoard(root) {
 }
 
 /** Baselines that reimplement published exploration methods (src/sim/explorers), beside the house planner. */
-const PUBLISHED = ['planner', 'yamauchi', 'nbvp', 'boustrophedon'];
+const PUBLISHED = ['planner', 'planner-view', 'yamauchi', 'nbvp', 'boustrophedon'];
 
 function publishedTable(rows) {
   rows = current(rows);
@@ -148,7 +148,7 @@ function publishedTable(rows) {
       const area = over(r, (t) => t.area?.footprint);
       const half = over(r, (t) => t.footprintHalfS);
       return [
-        id === 'planner' ? `${r.name} (this repository)` : r.name,
+        id === 'planner' || id === 'planner-view' ? `${r.name} (this repository)` : r.name,
         pct(r.score),
         r.footprintScore === undefined ? '—' : pct(r.footprintScore),
         area === null ? '—' : area.toFixed(2),
