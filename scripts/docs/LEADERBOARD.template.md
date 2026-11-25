@@ -10,7 +10,7 @@ The **footprint score** is reported beside the score and does not rank: the mean
 
 ### Published methods
 
-Three baselines reimplement published exploration methods on the same sensor maps, flight layer and safety filter as the planner (`src/sim/explorers`): nearest frontier (Yamauchi 1997), receding-horizon next-best-view (NBVP, Bircher et al. 2016) and online boustrophedon coverage (BA\*, Viet et al. 2013). The two mapping methods stop once nothing in lidar range is unknown, so they rank low on flown coverage. Judge them on the footprint, where NBVP leads:
+Three baselines reimplement published exploration methods on the same sensor maps, flight layer and safety filter as the planner (`src/sim/explorers`): nearest frontier (Yamauchi 1997), receding-horizon next-best-view (NBVP, Bircher et al. 2016) and online boustrophedon coverage (BA\*, Viet et al. 2013). The two mapping methods stop once nothing in lidar range is unknown, so they rank low on flown coverage. Judge them on the footprint. NBVP leads the sweeping planner there; the view-first planner (`planner-view`, [VIEW_FIRST.md](VIEW_FIRST.md)), which picks goals by what its own lidar has not yet had within 3 m, leads NBVP on the same test flights and on a fresh report-only block:
 
 {{BENCH_PUBLISHED}}
 
