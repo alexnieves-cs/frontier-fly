@@ -2,7 +2,7 @@
 
 Short answer: it works. A small learned network that only chooses *where the quadrotor goes next* covers 54.8% of hard, never-seen buildings, against 46.2% for the published quad pilot (`classicalBrakeTrack`) and 51.1% for the same planner with its knobs tuned on the same budget. It crashes in 21 of 664 flights, against 27 for the published pilot. The planner, lidar braking filter and trajectory tracker still do all the flying. This was the pre-registered test, and it passed on report-only seeds flown once after everything was frozen.
 
-The picker is opt-in (`SensorPlannerOptions.picker`). The published quad pilot, mission defaults and headline numbers are unchanged.
+Since 2026-11-25 the picker, with a more cautious braking model, is the **default quad explorer** (`quadPilot()` in [`src/eval/pilots.ts`](../src/eval/pilots.ts), options in [`src/sim/quadPilot.ts`](../src/sim/quadPilot.ts)). On a fresh report-only block it covers 54.2% with 1 crash in 664 flights, against 45.9% and 30 crashes for the planner-only quad pilot. See [The default quad pilot](#the-default-quad-pilot) below. Missions, drone teams and FrontierBench still fly their own planner settings; the picker was not measured there.
 
 ## Why this split
 
@@ -93,11 +93,60 @@ Against the pre-registered test: the learned picker beats the published pilot wi
 
 The coverage gain holds (+8.7 points, +6.6 to +10.4). On these 60 flights the learned picker crashed 3 times against the published pilot's 0, so its crash rate on this set is no better and plausibly a little worse; the 664-flight report block is the better estimate of the crash rate.
 
+## The default quad pilot
+
+Goal (set before starting): the picker should crash less than the published planner-only pilot on held-out practice flights, and keep its coverage lead on a fresh report block flown once. Stop after three attempts in a row with no improvement. Seeds were recorded in the ledger before use: practice 66001-66160 (training buildings) and 66701-66764, a held-out practice gate 66801-66960, and report-only 89401-89732.
+
+**Why it crashed.** On the practice flights, every crash of both the picker and the planner came within about 10 steps of a goal switch at 1.5-3 m/s, with a wall about a meter away: the new path turns, and the braking filter's stopping model (0.21 s reaction, 5 m/s²) is too optimistic for some of the randomized airframes. So the first attempt changed only the braking model the planner plans with, not the picker.
+
+**Attempt 1: braking settings, chosen on practice (448 flights).** The rule was the fewest crashes within a point of the picker's coverage.
+
+| Setting | Picker coverage | Picker crashes |
+| --- | --- | --- |
+| As published (0.21 s, 5 m/s²) | 53.5% | 18 |
+| Margin 0.35 m | 48.3% | 9 |
+| Speed 1.6 m/s | 49.8% | 7 |
+| Reaction 0.3 s | 52.2% | 8 |
+| Reaction 0.35 s | 51.1% | 5 |
+| **Reaction 0.25 s, decel 4 m/s² (chosen)** | **53.0%** | **5** |
+| Planner-only pilot, as published | 45.4% | 19 |
+
+**Held-out practice gate (66801-66960, 320 flights).** The goal was met on the first attempt, so no further attempts were needed.
+
+| Pilot | Coverage | Crashes |
+| --- | --- | --- |
+| Planner-only pilot, as published | 45.7% | 22 |
+| Planner-only pilot, new braking | 44.9% | 7 |
+| Picker, as published | 54.0% | 17 |
+| **Picker, new braking (default)** | **53.9%** | **4** |
+
+**Report-only block (89401-89732, 664 flights, flown once after freezing; SHA-256 in [`results/picker/default-report/frozen.sha256`](../results/picker/default-report/frozen.sha256)).**
+
+| Pilot | Coverage | Day | Dark night | Crashes |
+| --- | --- | --- | --- | --- |
+| Planner-only pilot, as published | 45.9% | 46.0% | 45.8% | 30 of 664 |
+| Planner-only pilot, new braking | 45.3% | 45.3% | 45.3% | 5 of 664 |
+| Picker, as published | 54.8% | 54.9% | 54.6% | 22 of 664 |
+| **Default quad pilot (picker, new braking)** | **54.2%** | 54.3% | 54.2% | **1 of 664** |
+
+Paired by building and lighting, 10,000 bootstrap resamples:
+
+| Comparison | Coverage (95% CI) | Crashes (95% CI) |
+| --- | --- | --- |
+| Default − planner-only, as published | +8.3 points (+7.9 to +8.8) | −29 (−40 to −19) |
+| Default − planner-only, new braking | +8.9 points (+8.6 to +9.2) | −4 (−9 to 0) |
+| Default − picker, as published | −0.5 points (−1.0 to −0.1) | −21 (−31 to −12) |
+| Planner-only: new braking − as published | −0.6 points (−1.0 to −0.1) | −25 (−36 to −14) |
+
+Read honestly: most of the crash cut comes from the braking model, and the planner-only pilot gets the same cut from it (30 to 5). The coverage lead comes from the picker. With both on the same braking, the picker still crashes less (1 against 5), but that difference is at the edge of noise. The cost is half a point of coverage.
+
+On the coverage study's published quad set (50001-50030, 60 flights) the default covers 55.6% with 1 crash, against 46.8% with 0 for the planner-only pilot.
+
 ## Limits
 
 - Simulation only, same simulator and quadrotor model as every other number in this repository ([PHYSICS_VALIDATION.md](PHYSICS_VALIDATION.md)).
 - Flown coverage only. The 3 m footprint metric was not measured for these arms.
-- Stage 3 buildings with randomized dynamics; the picker was not tried on missions, teams, multi-floor or hazard scenarios, and is not wired into them.
+- Stage 3 buildings with randomized dynamics; the picker was not tried on missions, teams, multi-floor or hazard scenarios, and is not wired into them. The coverage study's quad condition has the new pilot (`quadPicker`), but `docs/study.json` gets it at the next shared rerun.
 - The comparison to the tuned planner is at equal search budget on the planner's 3 knobs; a richer hand-written rule might close some of the gap.
 
 ## Reproduce
@@ -107,5 +156,7 @@ npm run train:picker -- --mode eval --picker results/picker/frozen-ppo.json --se
 npm run train:picker -- --mode eval --picker results/picker/frozen-ppo.json --set report --final   # the report block
 npm run train:picker -- --mode ppo --init results/picker/sweep1-planner-seed2.json --lr 3e-3 --out-dir out  # retrain (hours; use train.yml, run 43145211371 job 2 has the exact flags)
 ```
+
+The default quad pilot's numbers: `npm run train:picker -- --mode eval --picker results/picker/default.json --set gate` (and `--set report2 --final` for the report block; the planner-only control is `--picker rule`, with new braking `--picker results/picker/rule-safe.json`). Crash traces: `npx vite-node scripts/study/picker-crash-diag.ts -- results/picker/default.json`.
 
 The frozen checkpoints are `results/picker/frozen-{planner,linear,ppo}.json`; every flight of the final runs is in `results/picker/final/`, and every number on this page is in [`quad-picker.json`](quad-picker.json).

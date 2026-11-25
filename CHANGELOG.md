@@ -5,6 +5,14 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### The learned quad picker is the default quad explorer (2026-11-25)
+
+- `quadPilot()` (src/eval/pilots.ts, src/sim/quadPilot.ts): the planner with braking filter and tracker, its goal
+  chosen by the frozen learned picker, planning with a more cautious braking model (0.25 s reaction, 4 m/s²).
+- Report-only seeds 89401-89732, flown once: 54.2% coverage with 1 crash in 664 flights, against 45.9% and 30 crashes
+  for the planner-only quad pilot. Most of the crash cut is the braking model; the coverage lead is the picker.
+  Missions, teams and FrontierBench are unchanged. Write-up in [docs/QUAD_PICKER.md](docs/QUAD_PICKER.md).
+
 ### Claims audit (2026-11-17)
 
 No study was rerun and no number changed; the wording around the numbers did.

@@ -14,7 +14,7 @@ import { applyHazards } from '../../src/gen/hazards';
 import type { HazardParams } from '../../src/shared/types';
 import { EpisodeFootprint, FOOTPRINT_META, summarizeFootprint, withoutCurve, type FootprintRecord } from '../../src/eval/footprint';
 import { OracleGain } from '../../src/eval/gainLabels';
-import { classicalPilot, climbingPilot, guardedAction } from '../../src/eval/pilots';
+import { classicalPilot, climbingPilot, guardedAction, quadPilot } from '../../src/eval/pilots';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { CRASH_SPEED } from '../../src/shared/constants';
 import { RNG } from '../../src/shared/rng';
@@ -79,6 +79,7 @@ export const PILOTS = [
   'classicalBrake',
   'classicalTrack',
   'classicalBrakeTrack',
+  'quadPicker',
   'classicalClimb',
   'classicalPredict',
   'classicalOracleGain',
@@ -98,6 +99,7 @@ export const PILOT_CONDITIONS: Partial<Record<PilotId, string[]>> = {
   classicalBrake: ['quad'],
   classicalTrack: ['quad'],
   classicalBrakeTrack: ['quad'],
+  quadPicker: ['quad'],
   guardedBrake: ['quad'],
   classicalClimb: ['floors'],
   classicalPredict: ['hard', 'floors'],
@@ -208,6 +210,11 @@ export async function startEpisode(
   } else if (job.pilot === 'classicalTrack' || job.pilot === 'classicalBrakeTrack') {
     // Quad-aware trajectory tracking (sim/tracker.ts), defaults tuned on 9101-9108.
     const p = classicalPilot({ tracker: {}, ...(job.pilot === 'classicalBrakeTrack' ? { braking: QUAD_BRAKING } : {}) });
+    p.reset();
+    act = p.act;
+  } else if (job.pilot === 'quadPicker') {
+    // The default quad pilot: classicalBrakeTrack with the learned goal picker (docs/QUAD_PICKER.md).
+    const p = quadPilot();
     p.reset();
     act = p.act;
   } else if (job.pilot === 'classicalClimb') {

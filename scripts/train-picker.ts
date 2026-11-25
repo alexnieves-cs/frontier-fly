@@ -8,11 +8,13 @@
 //
 // Seeds (roadmap/next-wave-tracks.md): training flights draw quad buildings 66001-66299; every
 // selection uses the tuning block 66301-66332, day and night; the report block 89001-89332 is flown
-// once, with --set report --final, after everything is frozen.
+// once, with --set report --final, after everything is frozen. Making it the default (2026-11-25) used
+// practice 66001-66160 + diag 66701-66764, the gate 66801-66960, and report2 89401-89732 (--final).
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join } from 'node:path';
 import { RNG } from '../src/shared/rng';
+import { QUAD_BRAKING } from '../src/sim/lidarSafety';
 import { Cma } from '../src/train/cma';
 import { NodeRolloutPool } from '../src/train/nodePool';
 import type { PickerEpisode, PickerEpisodeResult, PickerSpec, PlannerKnobs } from '../src/train/pickerJob';
@@ -32,14 +34,25 @@ export const TUNE_SEEDS = [66301, 66332] as const;
 export const REPORT_SEEDS = [89001, 89332] as const;
 /** A second selection block, for choosing among finished runs without reusing the tuning block they were picked on. */
 export const VAL2_SEEDS = [66401, 66464] as const;
+/** Making the picker the default (2026-11-25): crash diagnosis block, held-out practice gate, fresh report block. */
+export const DIAG_SEEDS = [66701, 66764] as const;
+export const GATE_SEEDS = [66801, 66960] as const;
+export const REPORT2_SEEDS = [89401, 89732] as const;
 const LIGHTS = ['day', 'night-dark'] as const;
 
 export function seedSet(set: string): PickerEpisode[] {
-  const block = set === 'tune' ? TUNE_SEEDS : set === 'val2' ? VAL2_SEEDS : set === 'report' ? REPORT_SEEDS : set === 'published' ? ([50001, 50030] as const) : null;
+  if (set === 'practice') return [...seedRange([66001, 66160]), ...seedRange(DIAG_SEEDS)];
+  const block = set === 'tune' ? TUNE_SEEDS : set === 'val2' ? VAL2_SEEDS : set === 'report' ? REPORT_SEEDS : set === 'diag' ? DIAG_SEEDS : set === 'gate' ? GATE_SEEDS : set === 'report2' ? REPORT2_SEEDS : set === 'published' ? ([50001, 50030] as const) : null;
   if (!block) throw new Error(`unknown set ${set}`);
-  if (set === 'report' && !has('final')) throw new Error('the report block is flown once, after everything is frozen: pass --final');
+  if ((set === 'report' || set === 'report2') && !has('final')) throw new Error('the report block is flown once, after everything is frozen: pass --final');
   const out: PickerEpisode[] = [];
   for (let s = block[0]; s <= block[1]; s++) for (const lighting of LIGHTS) out.push({ stage: 3, seed: s, lighting, quad: 1 });
+  return out;
+}
+
+function seedRange(b: readonly [number, number]): PickerEpisode[] {
+  const out: PickerEpisode[] = [];
+  for (let s = b[0]; s <= b[1]; s++) for (const lighting of LIGHTS) out.push({ stage: 3, seed: s, lighting, quad: 1 });
   return out;
 }
 
@@ -200,6 +213,14 @@ async function main(): Promise<void> {
     if (mode === 'eval') {
       const p = arg('picker') ?? 'rule';
       const spec: PickerSpec = p === 'rule' ? { kind: 'rule' } : (JSON.parse(readFileSync(p, 'utf8')) as { spec: PickerSpec }).spec;
+      // Safety-knob overrides for crash studies: --margin m, --reaction s, --decel m/s², --speed m/s.
+      if (arg('margin') || arg('reaction') || arg('decel') || arg('speed')) {
+        const pl: PlannerKnobs = { ...(spec.planner ?? {}) };
+        if (arg('margin')) pl.brakingMargin = num('margin', 0.25);
+        if (arg('reaction') || arg('decel')) pl.braking = { reaction: num('reaction', QUAD_BRAKING.reaction), decel: num('decel', QUAD_BRAKING.decel) };
+        if (arg('speed')) pl.speed = num('speed', 2);
+        spec.planner = pl;
+      }
       const set = arg('set') ?? 'tune';
       const eps = seedSet(set);
       const t0 = Date.now();
