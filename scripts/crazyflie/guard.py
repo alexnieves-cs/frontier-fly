@@ -142,10 +142,15 @@ class Guard:
         vx, vy = cmd.vx, cmd.vy
         if not all(isinstance(v, (int, float)) and math.isfinite(v) for v in (vx, vy, cmd.yaw_rate, cmd.z)):
             return Verdict('hover', Command(0.0, 0.0, 0.0, hold_z), 'non-finite command')
+        # A fly verdict that changed the command says which rules did it ("clamp: speed, fence"),
+        # so the flight log shows every intervention, not only the landings.
+        clamps: list[str] = []
         sp = math.hypot(vx, vy)
         if sp > L.max_speed:
             vx, vy = vx * L.max_speed / sp, vy * L.max_speed / sp
+            clamps.append('speed')
         # Fence: inside the margin, drop the velocity component that points out of the box.
+        fx, fy = vx, vy
         if tel.x < L.fence_margin:
             vx = max(vx, 0.0)
         if tel.y < L.fence_margin:
@@ -154,9 +159,11 @@ class Guard:
             vx = min(vx, 0.0)
         if tel.y > self.arena_d - L.fence_margin:
             vy = min(vy, 0.0)
+        if (fx, fy) != (vx, vy):
+            clamps.append('fence')
         # Rangers: no velocity toward anything closer than too_close_m.
         yaw = math.radians(tel.yaw_deg)
-        for rng, off in ((tel.front, 0.0), (tel.left, 90.0), (tel.back, 180.0), (tel.right, -90.0)):
+        for rng, off, name in ((tel.front, 0.0, 'front'), (tel.left, 90.0, 'left'), (tel.back, 180.0, 'back'), (tel.right, -90.0, 'right')):
             if rng is None or math.isnan(rng) or rng >= L.too_close_m:
                 continue
             a = yaw + math.radians(off)
@@ -165,8 +172,13 @@ class Guard:
             if toward > 0:
                 vx -= toward * ux
                 vy -= toward * uy
+                clamps.append(f'ranger {name}')
         yr = max(-L.max_yaw_rate, min(L.max_yaw_rate, cmd.yaw_rate))
-        return Verdict('fly', Command(vx, vy, yr, hold_z))
+        if yr != cmd.yaw_rate:
+            clamps.append('yaw rate')
+        if cmd.z != hold_z:
+            clamps.append('height')
+        return Verdict('fly', Command(vx, vy, yr, hold_z), f'clamp: {", ".join(clamps)}' if clamps else '')
 
 
 def arena_to_body(vx: float, vy: float, yaw_deg: float) -> tuple[float, float]:

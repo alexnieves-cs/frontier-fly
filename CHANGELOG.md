@@ -5,6 +5,26 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### Crazyflie: ready for a first real flight (software side)
+
+Nothing has flown on hardware yet; everything below is tested against the simulator and a simulated radio.
+
+- **Bring-up.** `scripts/crazyflie/bringup.py scan` finds the Crazyradio and the drone's URI; `bringup.py link`
+  measures the link for 20 s with the props off (decks, telemetry freshness and gaps, cflib's round trip and link
+  quality) and never starts the motors.
+- **Tighter limits for the first flights.** hover, yaw and square fly at 0.3 m/s at most, under a 0.9 m ceiling,
+  with a 1.5 m motor cut and 40 or 60 s in the air. The guard's log line says which rule trimmed a command.
+- **One flight log for the drone and the sim.** Version 1 of the log (`flightlog.py`) records what flew where, every
+  control step, the sim's true pose and the radio's statistics, and is checked on read.
+- **A simulated radio.** `--mock-radio` adds packet loss, delay, blackouts and the firmware's commander watchdog
+  between `fly.py` and the simulated drone. The simulated drone also has a `bench` profile with the bench model's
+  latency and flow drift.
+- **Sim versus real.** `compare.py` replays a flight's arena and mode in the sim and writes a report: the measures
+  side by side, where the real flight falls outside the sim's spread, the fitted velocity lag and latency, and a
+  track picture. `--landed X,Y` turns a tape-measured landing spot into the real flow drift.
+- **Kit and checklist.** `docs/CRAZYFLIE_FIRST_FLIGHT.md`.
+- 31 new tests (60 in the Crazyflie suite).
+
 ### Claims audit (2026-11-17)
 
 No study was rerun and no number changed; the wording around the numbers did.

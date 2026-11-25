@@ -2,9 +2,9 @@
 
 frontier-fly's sensor-only explorer is the same code that searches buildings in the sim. This page is the plan for flying it on a real 33 g quadrotor, a Bitcraze Crazyflie, in an ordinary room. It has three parts:
 
-1. **What is done in the cloud.** A Crazyflie version of the explorer, a room-scale simulator, a 60-arena benchmark, a flight script with a safety guard, and 29 tests that fly the script against the simulator in CI (`.github/workflows/crazyflie.yml`).
+1. **What is done in the cloud.** A Crazyflie version of the explorer, a room-scale simulator, a 60-arena benchmark, a flight script with a safety guard, a props-off radio check, a flight log that is the same for the drone and the sim, a report that compares a real flight with the sim, and 60 tests that fly all of it against the simulator and a simulated radio in CI (`.github/workflows/crazyflie.yml`).
 2. **What to buy.** About US$500 to $700 of parts.
-3. **How to fly it.** A safety checklist and a ladder of seven steps, from "connect with the props off" to "explore two rooms". Each step has a pass rule, and you only move up a step when the one below passes.
+3. **How to fly it.** A ladder of seven steps, from "connect with the props off" to "explore two rooms". Each step has a pass rule, and you only move up a step when the one below passes. The kit list and a checklist to print are in [CRAZYFLIE_FIRST_FLIGHT.md](CRAZYFLIE_FIRST_FLIGHT.md).
 
 Nothing here has flown on hardware yet. Every number below is from simulation.
 
@@ -89,13 +89,15 @@ Every command goes through `scripts/crazyflie/guard.py` before it reaches the ra
 | Position estimate jumps | over 0.5 m in one step | land |
 | Outside the arena | over 0.15 m | land |
 | Battery under load | under 3.4 V for 1 s | land |
-| Flight time | the mode's limit + 30 s | land |
+| Flight time | explore: `--max-time` + 30 s | land |
 | Measured height | over 1.4 m | land |
 | Tilt | over 30° | land |
 | Tilt | over 60° (a flip) | cut motors |
 | Measured height | over 2.0 m (a fly-away) | cut motors |
 | Ctrl-C | first press | land |
 | Ctrl-C | second press | cut motors |
+
+The first flights (hover, yaw and square) fly under tighter limits, because none of them needs more: 0.3 m/s, height setpoints up to 0.6 m, land above 0.9 m measured, cut the motors above 1.5 m, and 40 s (hover, yaw) or 60 s (square) in the air (`first_flight_limits` in `fly.py`). When the guard trims a command it says which rule did in the flight log.
 
 Before take-off, `fly.py` refuses to fly if a deck is missing, the battery is under 3.9 V at rest, the height reads over 0.15 m on the ground, any beam reads under 0.35 m, or the estimator did not reset to the take-off point.
 
@@ -112,12 +114,12 @@ pip install -r scripts/crazyflie/requirements.txt
 
 Update the Crazyflie firmware to the latest release with the [Bitcraze client](https://www.bitcraze.io/documentation/repository/crazyflie-clients-python/master/) (`cfclient`), and note the radio URI it shows (for example `radio://0/80/2M/E7E7E7E7E7`). On Linux, install the Crazyradio udev rules from the [Bitcraze docs](https://www.bitcraze.io/documentation/repository/crazyflie-lib-python/master/installation/usb_permissions/).
 
-Each step writes a flight log to `flights/`. Do one step per battery. If a step fails, stop and send the log.
+Each step writes a flight log to `flights/`. Do one step per battery, and follow the checklist in [CRAZYFLIE_FIRST_FLIGHT.md](CRAZYFLIE_FIRST_FLIGHT.md). If a step fails, stop and send the log.
 
 | Step | Command (add `--uri <yours>`) | Props | Passes when |
 | --- | --- | --- | --- |
-| 0. Rehearse | `python scripts/crazyflie/fly.py --arena my-room.json --mode explore --sim` | no drone | `"outcome": "complete"` and `"crashed": false` in your room's file |
-| 1. Check | `... --mode check` | **off** | both decks found; the rangers read what a tape measure says (±5 cm); turning the drone by hand turns the yaw; pushing it by hand moves x and y the right way |
+| 0. Rehearse | `python scripts/crazyflie/fly.py --arena my-room.json --mode explore --sim`, then again with `--mock-radio drop=0.05,latency=0.02` | no drone | `"outcome": "complete"` and `"crashed": false` in your room's file |
+| 1. Check | `python scripts/crazyflie/bringup.py scan`, then `bringup.py link --uri <yours>`, then `fly.py ... --mode check` | **off** | the scan finds the drone; the link check says `LINK OK`; both decks found; the rangers read what a tape measure says (±5 cm); turning the drone by hand turns the yaw; pushing it by hand moves x and y the right way |
 | 2. Hover | `... --mode hover` | on | it takes off to 0.4 m, drifts under 20 cm in 10 s, and lands |
 | 3. Yaw | `... --mode yaw` | on | it turns left 90°, and `"yaw_ok": true`. The script lands at once if the estimate turned the wrong way. |
 | 4. Square | `... --mode square` | on | a 0.6 m square at 0.2 m/s, landing within 15 cm of the take-off spot |
@@ -126,9 +128,34 @@ Each step writes a flight log to `flights/`. Do one step per battery. If a step 
 
 Run steps 2 to 6 standing outside the arena, with a hand on Ctrl-C. Keep the battery above 3.7 V at rest between flights.
 
+## Bring-up
+
+`bringup.py` is for the bench, before step 1's `--mode check`, and never starts the motors:
+
+- `bringup.py scan` lists the Crazyradios cflib sees and every Crazyflie that answers, with the URI to pass as `--uri` (or `export CF_URI=...`). If none answers it says what to check: power, the dongle, and on Linux the udev rules.
+- `bringup.py link --uri <yours>` listens for 20 s and passes only with both decks, fresh telemetry (100 ms old or newer) on at least 98% of samples, no gap over 0.25 s (half the guard's landing threshold), and, when cflib reports them, a p95 round trip under 50 ms and a link quality of 90 or more. It notes a battery under 3.9 V, a height that does not read the floor, and rangers that see nothing. `--sim` and `--sim --mock-radio drop=0.3` rehearse a good and a bad link.
+
+## Flight logs
+
+`fly.py` and `bringup.py` write one format (`scripts/crazyflie/flightlog.py`, version 1), whether the link is the radio, the sim or the mock radio. The first line records what flew where: the source, the mode, the arena itself, the guard's limits, the commit, and for the real drone the URI, cflib version, firmware revision and decks. Then one line per 50 ms control step: the drone's telemetry and its age, what the planner asked for, what the guard let through and why. Sim steps add the true pose. The last line is the run's summary, with the radio's packet counts and gaps. Every line is flushed as it is written, so a crash keeps what was flown.
+
+`--mock-radio` puts a simulated Crazyradio between `fly.py` and the simulated drone: lost and late packets both ways, blackouts, and the firmware's watchdog (level out after 0.5 s without a command, motors off after 2 s).
+
 ## After a flight
 
-Send the `flights/*.jsonl` logs. Each line has the telemetry, the planner's command and the guard's verdict. With them the next step in the cloud is a report that compares the real flight with the same arena in the simulator: the track, the coverage, the closest passes and the guard events.
+```sh
+python scripts/crazyflie/compare.py flights/<the log>.jsonl --landed X,Y
+```
+
+`compare.py` flies the same arena, mode, height and time limit through `fly.py --sim` on the bench profile (0.1 s latency, 4% flow drift, the same guard and planner) for five seeds, and for explore also flies `src/crazyflie/sim` (the model behind the table above). It writes a folder next to the log with:
+
+- `report.md`: the measures side by side (time in the air, path, coverage, closest pass, closest ranger reading, landing spot, height hold, telemetry age, guard clamps and stops, the fitted velocity lag and command latency, ranger noise while holding still), and a list of every measure where the real flight falls outside the sim's spread;
+- `track.svg`: the arena with the real track and the sim tracks;
+- `report.json`: all of it, for scripts.
+
+The real track is the drone's own flow estimate, so nothing in the log says where it really was. Mark the landing spot and measure it from the arena's corner; `--landed X,Y` turns that one true point into the flow deck's real drift. If the drone answers its commands slower than the sim assumes, the report says so and gives the `--sim-set tau=...,latency=...` to rerun the sim with, to see whether the other differences close up.
+
+Send the `flights/*.jsonl` logs and the report folders.
 
 ## Files
 
@@ -140,14 +167,20 @@ Send the `flights/*.jsonl` logs. Each line has the telemetry, the planner's comm
 | `src/crazyflie/sim.ts` | the room-scale simulated Crazyflie |
 | `scripts/crazyflie/bench.ts` | the 60-arena benchmark (`docs/crazyflie-bench.json`) |
 | `scripts/crazyflie/planner.ts` | the explorer as a JSON-lines process |
-| `scripts/crazyflie/fly.py` | the flight script: preflight, ladder modes, take-off, landing |
+| `scripts/crazyflie/fly.py` | the flight script: preflight, ladder modes, first-flight limits, take-off, landing |
 | `scripts/crazyflie/guard.py` | the safety guard |
-| `scripts/crazyflie/links.py` | the cflib link and the simulated link |
-| `scripts/crazyflie/tests/` | 29 pytest tests: guard rules, end-to-end sim flights, faults, the cflib link on a stand-in Crazyflie |
+| `scripts/crazyflie/links.py` | the cflib link, the simulated link (ideal and bench profiles) and the mock radio |
+| `scripts/crazyflie/bringup.py` | radio scan and the props-off link check |
+| `scripts/crazyflie/flightlog.py` | the flight log format, its reader and its checker |
+| `scripts/crazyflie/analysis.py` | the measures for one log, including a port of the sim's coverage |
+| `scripts/crazyflie/compare.py` | the sim-versus-real report |
+| `scripts/crazyflie/replay.ts` | one arena in `src/crazyflie/sim`, for `compare.py` |
+| `scripts/crazyflie/tests/` | 60 pytest tests: guard rules, end-to-end sim flights, faults, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie |
+| `docs/CRAZYFLIE_FIRST_FLIGHT.md` | the kit list and the first-flight checklist |
 
 ## Not done yet
 
-- **No hardware flight.** The cflib link is tested against a stand-in Crazyflie object, not a radio.
+- **No hardware flight.** The cflib link, the link check and its radio statistics are tested against a stand-in Crazyflie object, not a radio, and the comparison report has only read sim and mock-radio logs. The link check's thresholds are first guesses to tighten after the first real logs.
 - **No firmware in the loop.** The simulator models the stock velocity loop; it does not run Crazyflie firmware. [CrazySim](https://github.com/gtfactslab/CrazySim) runs the real firmware with Gazebo and would be the next step if the hardware flights disagree with the sim.
 - **No re-localization.** The map drifts with the flow estimate. That is what costs the coverage in the worst flights.
 - **One floor, no target search.** This is the explorer only, not the full search-and-rescue mission.

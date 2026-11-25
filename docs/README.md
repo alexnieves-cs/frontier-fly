@@ -32,6 +32,7 @@ policy is trained and the project's honest limits. The pages below go deeper on 
 | [PX4.md](PX4.md) | Exported missions flown by PX4 in software-in-the-loop |
 | [QGC_EXPORT.md](QGC_EXPORT.md) | Exporting a planned mission to QGroundControl |
 | [CRAZYFLIE.md](CRAZYFLIE.md) | The plan for a real Crazyflie flight (simulated only so far) |
+| [CRAZYFLIE_FIRST_FLIGHT.md](CRAZYFLIE_FIRST_FLIGHT.md) | The Crazyflie kit, what each part is for, and the first-flight checklist |
 | [../python/README.md](../python/README.md) | The Python package: a Gymnasium env and the FrontierBench scorer |
 | [RELEASING.md](RELEASING.md) | How the site, the image, the Python package and releases ship |
 

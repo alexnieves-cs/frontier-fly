@@ -12,7 +12,15 @@ Modes, in the order docs/CRAZYFLIE.md flies them:
   explore  the frontier-fly explorer (scripts/crazyflie/planner.ts) maps the arena, then lands
 
 Every command passes through guard.Guard. Ctrl-C lands; a second Ctrl-C cuts
-the motors. A flight log (JSON lines) is written to --log.
+the motors. A flight log (JSON lines, flightlog.py) is written to --log, in the
+same format for the real drone and the sim, so compare.py can put them side by side.
+
+The ladder modes (hover, yaw, square) fly under tighter limits than explore:
+0.3 m/s, a 0.6 m height setpoint at most, a 0.9 m ceiling, a 1.5 m fly-away cut
+and under a minute in the air (first_flight_limits below).
+
+Before the first real flight, check the radio link with bringup.py, and read
+docs/CRAZYFLIE_FIRST_FLIGHT.md.
 """
 from __future__ import annotations
 
@@ -25,11 +33,13 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from flightlog import FlightLog  # noqa: E402
 from guard import Command, Guard, Limits, Telemetry, arena_to_body, estimate_to_arena  # noqa: E402
-from links import CflibLink, SimLink, mm_to_m  # noqa: E402
+from links import SIM_PROFILES, CflibLink, MockRadioLink, SimLink, mm_to_m  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 DT = 0.05
@@ -90,20 +100,37 @@ class Planner:
             self.p.kill()
 
 
+# Seconds in the air for each first-flight mode before the guard lands it (take-off included).
+FIRST_FLIGHT_SEC = {'hover': 40.0, 'yaw': 40.0, 'square': 60.0}
+
+
+def first_flight_limits(mode: str, max_time: float) -> Limits:
+    """The guard's limits for this mode. explore keeps the defaults; the ladder modes fly tighter.
+
+    hover, yaw and square never need more than 0.2 m/s or 0.4 m of height, so a fault that sends the
+    drone faster or higher is caught sooner than it would be in explore.
+    """
+    if mode not in FIRST_FLIGHT_SEC:
+        return Limits(max_flight_sec=max_time + 30)
+    return Limits(max_speed=0.3, max_height=0.6, ceiling=0.9, flyaway=1.5, max_flight_sec=FIRST_FLIGHT_SEC[mode])
+
+
 class Flight:
-    def __init__(self, link, arena: dict, limits: Limits, log_path: str | None, height: float):
+    def __init__(self, link, arena: dict, limits: Limits, log: FlightLog | None, height: float):
         self.link = link
         self.arena = arena
         self.guard = Guard(arena['w'], arena['d'], limits)
-        self.log = open(log_path, 'w') if log_path else None
+        self.log = log
         self.height = height
         self.stop_requested = 0
         self.outcome = 'aborted'
         self.reason = ''
         self.last_tel: Telemetry | None = None
+        self.last_age = math.inf
 
     def telemetry(self) -> tuple[Telemetry | None, float]:
         raw, age = self.link.read()
+        self.last_age = age
         if raw is None:
             return None, age
         x, y, yaw = estimate_to_arena(raw.x, raw.y, raw.yaw_deg, self.arena['start'])
@@ -117,9 +144,15 @@ class Flight:
         self.last_tel = tel
         return tel, age
 
-    def write(self, **rec):
+    def write(self, event: str, reason: str = '', **extra):
         if self.log:
-            self.log.write(json.dumps(rec, default=lambda o: o.__dict__) + '\n')
+            self.log.event(self.link.now(), event, reason, **extra)
+
+    def record(self, phase: str, tel: Telemetry | None, cmd: Command | None, sent: Command | None, verdict: str, reason: str = ''):
+        """One control step in the flight log: what was measured, asked for, let through and why."""
+        if self.log:
+            truth = self.link.truth() if hasattr(self.link, 'truth') else None
+            self.log.step(self.link.now(), phase, tel, self.last_age, cmd, sent, verdict, reason, truth)
 
     def preflight(self) -> list[str]:
         problems = []
@@ -162,10 +195,11 @@ class Flight:
             if tel:
                 self.link.send_hover(0.0, 0.0, 0.0, max(z, 0.05))
             self.link.sleep(DT)
-            tel, _ = self.telemetry()
-            tel = tel or self.last_tel
+            fresh, _ = self.telemetry()
+            self.record('land', fresh, None, Command(0.0, 0.0, 0.0, max(z, 0.05)), 'landing', self.reason)
+            tel = fresh or self.last_tel
         self.link.stop_motors()
-        self.write(t=self.link.now(), event='landed', reason=self.reason)
+        self.write('landed', self.reason)
 
     def run(self, step_fn, max_sec: float) -> str:
         """step_fn(tel, t_air) -> (Command | None, done: bool). Takes off, flies, lands."""
@@ -177,6 +211,8 @@ class Flight:
             t_air = self.link.now() - t0
             target = min(self.height, 0.1 + 0.3 * t_air)
             v = self.guard.check(tel or self.last_tel, Command(0, 0, 0, target), 0.0, age) if (tel or self.last_tel) else None
+            if v is not None:
+                self.record('takeoff', tel, Command(0, 0, 0, target), v.command, v.action, v.reason)
             if v is None or v.action in ('land', 'kill'):
                 return self.finish(v)
             self.send(v.command, tel or self.last_tel)
@@ -204,7 +240,7 @@ class Flight:
                 if cmd is not None:
                     last_cmd, last_cmd_t = cmd, now
             v = self.guard.check(tel or self.last_tel, last_cmd, now - last_cmd_t, age)
-            self.write(t=now, tel=tel, cmd=last_cmd, verdict=v.action, reason=v.reason)
+            self.record('fly', tel, last_cmd, v.command, v.action, v.reason)
             if v.action in ('land', 'kill'):
                 return self.finish(v)
             self.send(v.command, tel or self.last_tel)
@@ -224,7 +260,7 @@ class Flight:
         else:
             self.outcome = 'guard-landed'
             self.land(v.reason)
-        self.write(t=self.link.now(), event=self.outcome, reason=self.reason)
+        self.write(self.outcome, self.reason)
         return self.outcome
 
 
@@ -234,12 +270,55 @@ def hold(seconds):
     return step
 
 
+def parse_pairs(text: str | None, what: str) -> dict[str, float]:
+    """'drop=0.1,latency=0.03' -> {'drop': 0.1, 'latency': 0.03}."""
+    out: dict[str, float] = {}
+    for part in (text or '').split(','):
+        if not part.strip():
+            continue
+        k, sep, v = part.partition('=')
+        try:
+            out[k.strip()] = float(v)
+        except ValueError:
+            raise SystemExit(f'{what}: expected name=number, got {part!r}')
+        if not sep:
+            raise SystemExit(f'{what}: expected name=number, got {part!r}')
+    return out
+
+
+def git_commit() -> str | None:
+    try:
+        r = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=REPO, capture_output=True, text=True, timeout=5)
+        return r.stdout.strip() or None
+    except Exception:
+        return None
+
+
+def make_link(a, arena: dict):
+    """The real radio, the simulated Crazyflie, or the simulated one behind a mock radio."""
+    if not a.sim:
+        return CflibLink(a.uri), 'real'
+    faults = {}
+    for f in a.fault:
+        k, _, v = f.partition('=')
+        faults[k] = True if v in ('', 'true') else float(v)
+    sim = SimLink(arena, seed=a.seed, faults=faults, profile=a.sim_profile, **parse_pairs(a.sim_set, '--sim-set'))
+    if a.mock_radio is None:
+        return sim, 'sim'
+    return MockRadioLink(sim, seed=a.seed, **parse_pairs(a.mock_radio, '--mock-radio')), 'mock-radio'
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--arena', required=True)
     ap.add_argument('--mode', choices=['check', 'hover', 'yaw', 'square', 'explore'], required=True)
     ap.add_argument('--uri', default=os.environ.get('CF_URI', 'radio://0/80/2M/E7E7E7E7E7'))
     ap.add_argument('--sim', action='store_true', help='fly the simulated Crazyflie instead of the radio')
+    ap.add_argument('--sim-profile', choices=sorted(SIM_PROFILES), default='ideal',
+                    help='sim only: ideal (default) or bench, the model behind npm run crazyflie:bench')
+    ap.add_argument('--sim-set', default=None, help='sim only: override profile values, e.g. latency=0.2,tau=0.5')
+    ap.add_argument('--mock-radio', default=None, metavar='SETTINGS',
+                    help='sim only: put a lossy radio in between, e.g. drop=0.1,latency=0.02,outage_at=20,outage_sec=1')
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--fault', action='append', default=[], help='sim only: name=seconds, e.g. vbat_drop_at=20')
     ap.add_argument('--height', type=float, default=0.5)
@@ -258,14 +337,25 @@ def main(argv=None) -> int:
         print(errs.stdout + errs.stderr, file=sys.stderr)
         return 2
 
-    faults = {}
-    for f in a.fault:
-        k, _, v = f.partition('=')
-        faults[k] = True if v in ('', 'true') else float(v)
-    link = SimLink(arena, seed=a.seed, faults=faults) if a.sim else CflibLink(a.uri)
+    if not a.sim and (a.mock_radio is not None or a.sim_set or a.fault or a.sim_profile != 'ideal'):
+        print('--mock-radio, --sim-profile, --sim-set and --fault need --sim', file=sys.stderr)
+        return 2
+    link, source = make_link(a, arena)
     log_path = a.log or str(REPO / 'flights' / f"{time.strftime('%Y%m%d-%H%M%S')}-{a.mode}{'-sim' if a.sim else ''}.jsonl")
-    Path(log_path).parent.mkdir(parents=True, exist_ok=True)
-    flight = Flight(link, arena, Limits(max_flight_sec=a.max_time + 30), log_path, a.height if a.mode == 'explore' else 0.4)
+    limits = first_flight_limits(a.mode, a.max_time)
+    height = a.height if a.mode == 'explore' else 0.4
+    meta = {
+        'source': source, 'mode': a.mode, 'arena': arena, 'arena_file': Path(a.arena).name,
+        'height': height, 'max_time': a.max_time, 'limits': asdict(limits), 'dt': DT,
+        'started_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'commit': git_commit(),
+    }
+    if a.sim:
+        meta.update(seed=a.seed, faults=a.fault)
+    try:
+        meta['link'] = link.describe() if hasattr(link, 'describe') else {}
+    except Exception as e:  # a describe() problem must never stop a flight
+        meta['link'] = {'error': str(e)}
+    flight = Flight(link, arena, limits, FlightLog(log_path, meta, t0=link.now()), height)
 
     def on_sigint(_s, _f):
         flight.stop_requested += 1
@@ -289,6 +379,7 @@ def main(argv=None) -> int:
         if a.mode == 'check':
             for _ in range(int(5 / DT)):
                 t, _ = flight.telemetry()
+                flight.record('ground', t, None, None, 'idle')
                 if t and abs(t.t * 2 - round(t.t * 2)) < DT / 2 + 1e-9:
                     print(f'  x {t.x:5.2f} y {t.y:5.2f} z {t.z:4.2f} yaw {t.yaw_deg:6.1f}  F {t.front} B {t.back} L {t.left} R {t.right}  {t.vbat:.2f} V')
                 link.sleep(DT)
@@ -352,8 +443,10 @@ def main(argv=None) -> int:
 
         outcome = flight.run(wrapped, a.max_time)
         result.update(outcome=outcome, reason=flight.reason, events=flight.guard.events[-5:])
-        if isinstance(link, SimLink):
+        if a.sim:
             result.update(crashed=link.crashed, min_clearance=round(link.min_clearance, 3), seconds=round(link.t, 1))
+        if hasattr(link, 'stats'):
+            result['link'] = link.stats()
         print(json.dumps(result))
         if a.mode == 'yaw':
             # Asked to turn 90 deg left (counter-clockwise): the estimate must agree, or the yaw sign is wrong.
@@ -365,9 +458,9 @@ def main(argv=None) -> int:
             planner.close()
         if a.report:
             Path(a.report).write_text(json.dumps(result, indent=1) + '\n')
-        link.close()
         if flight.log:
-            flight.log.close()
+            flight.log.close(link.now(), result)
+        link.close()
 
 
 if __name__ == '__main__':

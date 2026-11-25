@@ -100,3 +100,27 @@ def test_commands_reach_cflib(link):
     assert sent[0] == ('hover', (0.2, -0.1, 30.0, 0.5))
     assert ('stop',) in sent and ('notify',) in sent and sent[-1] == ('estop',)
     assert link.decks() == {'flow2': True, 'multiranger': True}
+
+
+def test_link_health_for_bringup(link):
+    pose = {'stateEstimate.x': 0.0, 'stateEstimate.y': 0.0, 'stateEstimate.z': 0.02, 'stateEstimate.yaw': 0.0,
+            'stateEstimate.vx': 0.0, 'stateEstimate.vy': 0.0}
+    rng = {'range.front': 900, 'range.back': 900, 'range.left': 900, 'range.right': 900, 'range.up': 8190,
+           'range.zrange': 20, 'pm.vbat': 4.1, 'stabilizer.roll': 0.0, 'stabilizer.pitch': 0.0}
+    for _ in range(3):
+        link._on_a(0, pose, None)
+        link._on_b(0, rng, None)
+    link._on_radio('latency_ms', 12.34)
+    link._on_radio('link_quality', 98)
+    s = link.stats()
+    assert s['pose_packets'] == 3 and s['rangers_packets'] == 3
+    assert s['latency_ms'] == 12.3 and s['link_quality'] == 98.0
+    assert 0.0 <= s['tel_loss'] <= 1.0 and s['max_gap_s'] >= 0.0
+
+
+def test_describe_for_the_flight_log(link):
+    d = link.describe()
+    assert d['uri'] == 'radio://0/80/2M/E7E7E7E7E7'
+    assert d['decks'] == {'flow2': True, 'multiranger': True}
+    # The stand-in answers '1' for every parameter; a real one gives the firmware's git revision.
+    assert d['firmware.revision0'] == '1'
