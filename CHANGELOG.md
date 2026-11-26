@@ -5,7 +5,6 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
-<<<<<<< HEAD
 ### FrontierBench Hard (2026-11-26)
 
 - New track `npm run bench:hard` (src/bench/hard.ts): 40 x 40 m buildings in 120 s (kinematic and quadrotor), 30 s
@@ -16,7 +15,7 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
   v1 giving up on corridors the lidar had not mapped to the end). Fresh block 94001+: 99.6% footprint vs NBVP 89.3%,
   0 crashes in 240; v3 test 99.0% footprint, 64.6% flown (v1 67.9%).
 - `FootprintCoverage` takes a field of view; bench episodes on camera tasks record `camera`.
-=======
+
 ### The learned quad picker is the default quad explorer (2026-11-25)
 
 - `quadPilot()` (src/eval/pilots.ts, src/sim/quadPilot.ts): the planner with braking filter and tracker, its goal
@@ -24,7 +23,6 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 - Report-only seeds 89401-89732, flown once: 54.2% coverage with 1 crash in 664 flights, against 45.9% and 30 crashes
   for the planner-only quad pilot. Most of the crash cut is the braking model; the coverage lead is the picker.
   Missions, teams and FrontierBench are unchanged. Write-up in [docs/QUAD_PICKER.md](docs/QUAD_PICKER.md).
->>>>>>> origin/main
 
 ### View-first planner (2026-11-25)
 
