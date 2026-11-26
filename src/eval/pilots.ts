@@ -4,6 +4,7 @@ import type { ExplorerEnv } from '../sim/env';
 import { commandToAction, measuredVelocity, sensorFrame, SensorPlanner, type SensorPlannerOptions } from '../sim/sensorPlanner';
 import { guardAction, type BrakingModel } from '../sim/lidarSafety';
 import { OccupancyMap } from '../sim/sensorMap';
+import { quadPilotOptions } from '../sim/quadPilot';
 
 const lidarScratch = new Float64Array(LIDAR_H);
 
@@ -29,6 +30,14 @@ export function classicalPilot(opts: SensorPlannerOptions = {}): { reset(): void
       return commandToAction(planner.act(f), f.yaw, out, env.speedLimit).slice();
     },
   };
+}
+
+/**
+ * The default quadrotor explorer: classicalPilot with the frozen learned goal picker, braking filter
+ * and trajectory tracker (sim/quadPilot.ts, docs/QUAD_PICKER.md).
+ */
+export function quadPilot(extra: SensorPlannerOptions = {}): ReturnType<typeof classicalPilot> {
+  return classicalPilot(quadPilotOptions(extra));
 }
 
 /** Sensor-only planner that takes shafts between floors (sim/climber.ts) as a coverage-env pilot. */

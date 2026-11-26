@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (317 files, 63,255 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (318 files, 63,300 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -116,7 +116,7 @@ flowchart LR
   eval -->|51| mission
   eval -->|3| rl
   eval -->|17| shared
-  eval -->|18| sim
+  eval -->|19| sim
   eval -->|2| targets
   eval -->|2| train
   eval -->|3| vision
@@ -221,7 +221,7 @@ flowchart LR
 | `src/` | 1 | 7 | `ui` | — | — |
 | `src/bench` | 6 | 573 | `app`, `eval`, `shared`, `sim`, `team` | — | — |
 | `src/crazyflie` | 4 | 752 | `shared`, `sim` | — | — |
-| `src/eval` | 18 | 2,965 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
+| `src/eval` | 18 | 2,974 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,876 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 8 | 1,680 | `shared` | — | — |
 | `src/landing` | 2 | 332 | `film`, `ui` | — | — |
@@ -232,7 +232,7 @@ flowchart LR
 | `src/px4` | 8 | 1,618 | `mission`, `shared`, `sim`, `ui`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
 | `src/rl` | 14 | 3,611 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 7 | 766 | `mission` | — | — |
-| `src/sim` | 33 | 7,241 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
+| `src/sim` | 34 | 7,277 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,321 | `gen`, `shared` | Three.js | — |
 | `src/team` | 6 | 1,123 | `eval`, `gen`, `mission`, `shared`, `sim` | — | — |
 | `src/train` | 8 | 2,066 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |

@@ -29,7 +29,7 @@ export type PickerSpec =
   | { kind: 'mlp'; weights: MlpWeights; temperature?: number; record?: boolean; planner?: PlannerKnobs };
 
 /** Planner settings a picker spec may carry (edgeBonus and momentum shape the rule score feature). */
-export type PlannerKnobs = Pick<SensorPlannerOptions, 'edgeBonus' | 'momentum' | 'replanEvery' | 'speed'>;
+export type PlannerKnobs = Pick<SensorPlannerOptions, 'edgeBonus' | 'momentum' | 'replanEvery' | 'speed' | 'braking' | 'brakingMargin'>;
 
 export interface PickerEpisodesPayload {
   /** Episodes to fly, each with its own picker. */
