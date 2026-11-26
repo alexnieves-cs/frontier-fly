@@ -63,7 +63,14 @@ export class FootprintCoverage {
   private floors = 0;
   private floorHeight = 1;
 
-  constructor(radii: readonly number[] = FOOTPRINT_RADII) {
+  /**
+   * `fov`, radians: a forward camera instead of the 360° ring. Only rays within fov / 2 of the
+   * heading passed to observe() count (FrontierBench Hard scores a 90° camera this way).
+   */
+  constructor(
+    radii: readonly number[] = FOOTPRINT_RADII,
+    readonly fov = Math.PI * 2,
+  ) {
     this.radii = [...radii].sort((a, b) => a - b);
   }
 
@@ -88,8 +95,8 @@ export class FootprintCoverage {
     return this.counts.map((c) => (this.total > 0 ? c / this.total : 0));
   }
 
-  /** Mark what the ring sees from (x, y, z). */
-  observe(world: PhysicsWorld, x: number, y: number, z: number): void {
+  /** Mark what the ring (or, with a fov, the camera facing `yaw`) sees from (x, y, z). */
+  observe(world: PhysicsWorld, x: number, y: number, z: number, yaw = 0): void {
     const floor = Math.floor(z / this.floorHeight);
     if (floor < 0 || floor >= this.floors || this.vw === 0) return;
     const vw = this.vw;
@@ -101,7 +108,13 @@ export class FootprintCoverage {
     const maxR = radii[nr - 1]!;
     const ox = x / VOXEL;
     const oy = y / VOXEL;
+    const half = this.fov / 2;
+    const ring = this.fov >= Math.PI * 2 - 1e-9;
     for (let i = 0; i < FOOTPRINT_RAYS; i++) {
+      if (!ring) {
+        const a = (i / FOOTPRINT_RAYS) * Math.PI * 2 - yaw;
+        if (Math.abs(a - Math.round(a / (Math.PI * 2)) * Math.PI * 2) > half + 1e-9) continue;
+      }
       const dx = RAY_COS[i]!;
       const dy = RAY_SIN[i]!;
       const hit = world.cast(x, y, z, dx, dy, 0, maxR);

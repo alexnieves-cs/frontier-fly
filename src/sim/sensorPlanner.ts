@@ -109,8 +109,9 @@ export interface SensorPlannerOptions {
    * View-first exploration: a voxel stops being a goal once the
    * drone's own lidar ring has had it in line of sight within `radius` meters, not only once the
    * drone has flown through it. The drone then visits rooms to look into them instead of sweeping
-   * lanes, which is what sensor-footprint coverage scores. With `sweep`, once nothing on the floor is
-   * left unviewed the planner falls back to the flown-voxel goals and sweeps the rest of the budget.
+   * lanes, which is what sensor-footprint coverage scores. When nothing known is left unviewed it flies
+   * to the edge of unknown space (unflown voxels next to unmapped ones), and with `sweep`, when that
+   * is gone too, to unflown voxels for the rest of the budget. Each replan starts again at the top.
    */
   view?: ViewOptions;
 }
@@ -176,7 +177,7 @@ export class SensorPlanner {
   /** Own-map line-of-sight view mask (SeenMap layout), when `view` is set. */
   private viewed = new Uint8Array(0);
   /** The view phase on the current floor found nothing left to look at; goals are unflown voxels again. */
-  private sweeping = false;
+  private phase: 0 | 1 | 2 = 0;
   /** Goal choices the picker made (diagnostics). */
   picks = 0;
   private candScore = new Float64Array(0);
@@ -224,9 +225,31 @@ export class SensorPlanner {
     this.view = opts.view ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true } : null;
   }
 
-  /** A voxel (SeenMap index) no longer needs a visit: viewed in view mode, else flown. */
+  /**
+   * A voxel (SeenMap index) no longer needs a visit: flown, or in view mode viewed and not on the
+   * edge of unknown space (a viewed doorway into unmapped rooms is still worth flying to).
+   */
   private covered(f: SensorFrame, k: number): boolean {
-    return this.view && !this.sweeping ? this.viewed[k] === 1 : f.visited[k] === 1;
+    if (!this.view || this.phase === 2) return f.visited[k] === 1;
+    if (this.phase === 0) return this.viewed[k] === 1;
+    return f.visited[k] === 1 || !this.bordersUnknown(f, k);
+  }
+
+  /** One of k's four neighbours (same floor) is neither seen nor flown. */
+  private bordersUnknown(f: SensorFrame, k: number): boolean {
+    const plane = f.vw * f.vd;
+    const base = k - (k % plane);
+    const j = k - base;
+    const x = j % f.vw;
+    const y = (j - x) / f.vw;
+    for (let d = 0; d < 4; d++) {
+      const nx = x + DX[d]!;
+      const ny = y + DY[d]!;
+      if (nx < 0 || ny < 0 || nx >= f.vw || ny >= f.vd) continue;
+      const nk = base + ny * f.vw + nx;
+      if (f.seen[nk] !== 1 && f.visited[nk] !== 1) return true;
+    }
+    return false;
   }
 
   /** Mark what the drone's lidar plane has in line of sight within the view radius, on its own map. */
@@ -264,7 +287,7 @@ export class SensorPlanner {
     this.lastFloor = -1;
     this.idle = 0;
     this.picks = 0;
-    this.sweeping = false;
+    this.phase = 0;
     this.viewed.fill(0);
     this.shaper.reset();
     this.picker?.reset?.();
@@ -688,7 +711,6 @@ export class SensorPlanner {
     if (floor !== this.lastFloor) {
       this.goal = -1;
       this.lastFloor = floor;
-      this.sweeping = false;
     }
     if (this.view) this.markView(f, base);
     const goalValid =
@@ -698,10 +720,17 @@ export class SensorPlanner {
       this.traversable(f, 0, this.goal) &&
       !this.banned[this.goal];
     if (!goalValid || this.sinceReplan >= this.replanEvery) {
+      // View mode escalates per replan: unviewed voxels, then the edge of unknown space (a corridor
+      // the sparse lidar ring has not mapped to its end), then, with `sweep`, unflown voxels.
+      if (this.view) this.phase = 0;
       let g = this.plan(f, floor);
-      if (g < 0 && this.view && this.view.sweep && !this.sweeping) {
-        this.sweeping = true;
+      if (g < 0 && this.view) {
+        this.phase = 1;
         g = this.plan(f, floor);
+        if (g < 0 && this.view.sweep) {
+          this.phase = 2;
+          g = this.plan(f, floor);
+        }
       }
       const next = g >= 0 ? base + g : -1;
       if (next !== this.goal) {

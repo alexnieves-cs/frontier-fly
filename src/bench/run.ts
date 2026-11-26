@@ -1,6 +1,9 @@
 /** One FrontierBench episode: the task's building and airframe, flown by a pilot. */
 import { evalEpisodeSetup } from '../eval/coverage';
-import { curveArea, EpisodeFootprint, FOOTPRINT_RADIUS, timeTo } from '../eval/footprint';
+import { CoverageCurve, curveArea, EpisodeFootprint, FOOTPRINT_RADIUS, FootprintCoverage, timeTo } from '../eval/footprint';
+import { generateLargeBuilding } from '../team/largeBuilding';
+import { defaultEpisodeConfig, policyEpisodeLimits } from '../sim/env';
+import { lightingPreset } from '../sim/lighting';
 import { sensorFrame } from '../sim/sensorPlanner';
 import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
@@ -29,16 +32,22 @@ export interface BenchEpisode {
   area: { flown: number; footprint: number };
   /** Seconds until half the building was inside the footprint, or null. */
   footprintHalfS: number | null;
+  /** Tasks with `camera` only: the forward 90° camera footprint at 3 m (FrontierBench Hard), its curve area and half time. */
+  camera?: { footprint: number; area: number; halfS: number | null };
 }
+
+/** Field of view of FrontierBench Hard's camera footprint, radians. */
+export const CAMERA_FOV = Math.PI / 2;
 
 /** Building, env seed and config of one flight of a task (no env touched). */
 export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: BuildingSpec; envSeed: number; cfg: EpisodeConfig & { maxSteps: number } } {
   const seed = run.seed;
-  const setup = run.plan ? planEpisodeSetup(run.plan.set, run.plan.record, task.lighting) : evalEpisodeSetup(task.stage, seed, task.lighting);
+  const setup = run.plan ? planEpisodeSetup(run.plan.set, run.plan.record, task.lighting) : task.large ? largeEpisodeSetup(seed, task.lighting) : evalEpisodeSetup(task.stage, seed, task.lighting);
   const { spec, cfg } = setup;
   // Real plans fly with the bench's own env seed, not the plans study's.
   const envSeed = run.plan ? seed : setup.envSeed;
   cfg.dynamics = task.dynamics;
+  if (task.maxSteps) cfg.maxSteps = task.maxSteps;
   cfg.speedH = task.speedH;
   // v3 flies under the crash rule (shared/constants.ts CRASH_SPEED: a contact faster than 0.5 m/s ends
   // the flight, coverage counts what was flown until then) and prices energy on the current airframe
@@ -49,6 +58,16 @@ export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: Build
     cfg.noise = sampleNoise(rng, task.dr, task.lighting !== 'day');
   }
   return { spec, envSeed, cfg };
+}
+
+/** The 40 x 40 m tiled building (four stage-3 plans, team/largeBuilding.ts) as a single-drone episode. */
+function largeEpisodeSetup(seed: number, lighting: BenchTask['lighting']): { spec: BuildingSpec; envSeed: number; cfg: EpisodeConfig & { maxSteps: number } } {
+  const spec = generateLargeBuilding(seed);
+  const nRooms = spec.floors.reduce((n, f) => n + f.rooms.length, 0);
+  const cfg = defaultEpisodeConfig(3, nRooms);
+  Object.assign(cfg, policyEpisodeLimits(3));
+  cfg.lighting = lightingPreset(lighting, nRooms);
+  return { spec, envSeed: spec.seed, cfg: cfg as EpisodeConfig & { maxSteps: number } };
 }
 
 /**
@@ -62,6 +81,7 @@ export class BenchEpisodeRecorder {
   readonly ctx: BenchContext;
   readonly obs: Float32Array;
   private readonly fp = new EpisodeFootprint();
+  private readonly cam: { fp: FootprintCoverage; curve: CoverageCurve } | null;
   private info = { coverage: 0, collisions: 0, energyWh: 0, crashed: false };
   private halfS: number | null = null;
   private steps = 0;
@@ -76,6 +96,18 @@ export class BenchEpisodeRecorder {
     this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics };
     this.obs = env.reset(spec, envSeed, cfg);
     this.fp.start(env, spec, cfg.maxSteps);
+    this.cam = task.camera ? { fp: new FootprintCoverage([FOOTPRINT_RADIUS], CAMERA_FOV), curve: new CoverageCurve(cfg.maxSteps) } : null;
+    if (this.cam) {
+      this.cam.fp.reset(spec);
+      this.observeCamera();
+    }
+  }
+
+  private observeCamera(): void {
+    const world = this.env.world;
+    if (!this.cam || !world) return;
+    const s = this.env.snapshot();
+    this.cam.fp.observe(world, s.pos[0], s.pos[1], s.pos[2], s.yaw);
   }
 
   /** Record one env step; true when the episode is over. */
@@ -85,12 +117,23 @@ export class BenchEpisodeRecorder {
     this.steps += 1;
     if (this.halfS === null && this.info.coverage >= 0.5) this.halfS = this.steps / 20;
     this.fp.step(this.env, this.steps, this.info.coverage);
+    if (this.cam) {
+      this.observeCamera();
+      this.cam.curve.step(this.steps, [this.cam.fp.coverage(0)]);
+    }
     this.over = s.done || this.steps >= this.ctx.maxSteps;
     return this.over;
   }
 
   finish(): BenchEpisode {
     const rec = this.fp.finish(this.info.coverage);
+    let camera: BenchEpisode['camera'];
+    if (this.cam) {
+      const v = this.cam.fp.coverage(0);
+      this.cam.curve.finish([v]);
+      const series = this.cam.curve.series(0);
+      camera = { footprint: v, area: curveArea(series), halfS: timeTo(series, 0.5, this.ctx.maxSteps / 20) };
+    }
     return {
       task: this.task.id,
       seed: this.run.seed,
@@ -104,6 +147,7 @@ export class BenchEpisodeRecorder {
       footprint: rec.footprint[String(FOOTPRINT_RADIUS)]!,
       area: { flown: curveArea(rec.curve.flown), footprint: curveArea(rec.curve.footprint) },
       footprintHalfS: timeTo(rec.curve.footprint, 0.5, this.ctx.maxSteps / 20),
+      ...(camera ? { camera } : {}),
     };
   }
 }

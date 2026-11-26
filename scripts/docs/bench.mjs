@@ -57,15 +57,15 @@ function mulberry32(seed) {
  * buildings, so flights are resampled as pairs, within each task (the score is a mean over tasks).
  * Null when the two results do not hold the same flights.
  */
-export function pairedScoreGap(a, b, resamples = 4000) {
+export function pairedScoreGap(a, b, resamples = 4000, value = (e) => e.coverage) {
   if (!Array.isArray(a?.episodes) || !Array.isArray(b?.episodes)) return null;
   const key = (e) => `${e.task}:${e.seed}`;
-  const other = new Map(b.episodes.map((e) => [key(e), e.coverage]));
+  const other = new Map(b.episodes.map((e) => [key(e), value(e)]));
   const byTask = new Map();
   for (const e of a.episodes) {
     if (!other.has(key(e))) return null;
     if (!byTask.has(e.task)) byTask.set(e.task, []);
-    byTask.get(e.task).push(e.coverage - other.get(key(e)));
+    byTask.get(e.task).push(value(e) - other.get(key(e)));
   }
   if (a.episodes.length !== b.episodes.length || !byTask.size) return null;
   const tasks = [...byTask.values()];
@@ -181,10 +181,40 @@ export function benchPair(root, a, b) {
   return ra && rb ? { a: ra, b: rb, version: ra.bench } : null;
 }
 
+/** FrontierBench Hard (src/bench/hard.ts): bench/results/hard/*.json, ranked by the camera footprint. */
+function hardBoard(root) {
+  const rows = readResults(root, 'bench/results/hard').filter((r) => r.split === 'test' && r.cameraScore !== undefined);
+  if (!rows.length) return { BENCH_HARD: '_Run `npm run bench:hard -- --only planner-view,nbvp --split test`._', BENCH_HARD_TASKS: '' };
+  const v = Math.max(...rows.map((r) => r.hard ?? 0));
+  const cur = rows.filter((r) => (r.hard ?? 0) === v).sort((a, b) => b.cameraScore - a.cameraScore);
+  const tasks = cur[0].taskDefs;
+  const cam = (e) => e.camera.footprint;
+  return {
+    BENCH_HARD: table(
+      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
+      cur.map((r, i) => [
+        String(i + 1),
+        r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`,
+        `**${pct(r.cameraScore)}**`,
+        ...tasks.map((t) => (r.tasks[t.id]?.camera !== undefined ? pct(r.tasks[t.id].camera) : '—')),
+        r.footprintScore === undefined ? '—' : pct(r.footprintScore),
+        pct(r.score),
+        crashes(r),
+        i === 0 ? '—' : gapCell(pairedScoreGap(r, cur[i - 1], 4000, cam)),
+        `\`${r.commit}\``,
+      ]),
+    ),
+    BENCH_HARD_TASKS: table(
+      ['Task', 'What', 'Airframe', 'Lighting', 'Budget'],
+      tasks.map((t) => [`\`${t.id}\``, t.label, t.dynamics === 'quad' ? 'Quadrotor, randomized' : 'Kinematic', t.lighting === 'day' ? 'Day' : 'Lights off', `${(t.maxSteps ?? 2400) / 20} s`]),
+    ),
+  };
+}
+
 export function benchSection(root) {
   const rows = current(readResults(root).filter((r) => r.split === 'test'));
   const tasks = rows.find((r) => r.taskDefs)?.taskDefs ?? [];
-  if (!rows.length) return { BENCH_BOARD: '_Run `npm run bench:board`._', BENCH_TASKS: '', BENCH_PUBLISHED: publishedTable(rows), BENCH_TEAM: teamBoard(root), BENCH_V2: v2Board(root) };
+  if (!rows.length) return { BENCH_BOARD: '_Run `npm run bench:board`._', BENCH_TASKS: '', BENCH_PUBLISHED: publishedTable(rows), BENCH_TEAM: teamBoard(root), BENCH_V2: v2Board(root), ...hardBoard(root) };
   rows.sort((a, b) => b.score - a.score);
   const board = rows.map((r, i) => [
     String(i + 1),
@@ -201,6 +231,7 @@ export function benchSection(root) {
     BENCH_PUBLISHED: publishedTable(rows),
     BENCH_TEAM: teamBoard(root),
     BENCH_V2: v2Board(root),
+    ...hardBoard(root),
     BENCH_BOARD: table(['#', 'Pilot', 'Score', 'Footprint score', ...tasks.map((t) => t.id), 'Flights ended by a crash', 'Flights that touched nothing', 'Score vs the row above (95% CI)', 'Commit'], board),
     BENCH_TASKS: table(
       ['Task', 'Buildings', 'Airframe', 'Lighting', 'Speed cap'],
