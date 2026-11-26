@@ -9,11 +9,11 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 | # | Pilot | Score | Footprint score | room | hard | dark | fast | floors | quad | apartments | Flights ended by a crash | Flights that touched nothing | Score vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner + quad tracker (baseline) | **68.0%** | 87.7% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 44.6% | 85.5% | 1 of 240 | 99% | — | `160ae15` |
-| 2 | Sensor-only planner, view first (baseline) | **67.9%** | 98.7% | 95.1% | 62.4% | 62.2% | 82.4% | 42.6% | 48.2% | 82.6% | 1 of 240 | 100% | −0.1 (−0.5 to +0.4), tied | `2cd79bc` |
-| 3 | Sensor-only planner (baseline) | **66.2%** | 85.2% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 31.7% | 85.5% | 12 of 240 | 94% | −1.8 (−2.5 to −1.1) | `160ae15` |
-| 4 | Sensor-only planner + momentum (baseline) | **66.0%** | 86.3% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 30.5% | 86.1% | 17 of 240 | 93% | −0.1 (−1.1 to +0.8), tied | `160ae15` |
-| 5 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **65.4%** | 87.4% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 35.1% | 85.6% | 9 of 240 | 95% | −0.6 (−1.8 to +0.5), tied | `160ae15` |
-| 6 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **62.7%** | 80.0% | 95.1% | 73.1% | 74.1% | 66.4% | 38.7% | 25.8% | 65.5% | 51 of 240 | 67% | −2.7 (−4.8 to −0.8) | `160ae15` |
+| 2 | Sensor-only planner (baseline) | **66.2%** | 85.2% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 31.7% | 85.5% | 12 of 240 | 94% | −1.8 (−2.4 to −1.3) | `160ae15` |
+| 3 | Sensor-only planner + momentum (baseline) | **66.0%** | 86.3% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 30.5% | 86.1% | 17 of 240 | 93% | −0.1 (−1.1 to +0.8), tied | `160ae15` |
+| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **65.4%** | 87.4% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 35.1% | 85.6% | 9 of 240 | 95% | −0.6 (−1.8 to +0.5), tied | `160ae15` |
+| 5 | Sensor-only planner, view first (baseline) | **64.6%** | 99.0% | 95.1% | 56.1% | 57.8% | 76.8% | 40.5% | 46.0% | 80.0% | 0 of 240 | 100% | −0.8 (−1.8 to +0.3), tied | `22742fa` |
+| 6 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **62.7%** | 80.0% | 95.1% | 73.1% | 74.1% | 66.4% | 38.7% | 25.8% | 65.5% | 51 of 240 | 67% | −1.9 (−4.0 to −0.1) | `160ae15` |
 | 7 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.5%** | 83.1% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 39.7% | 80.6% | 5 of 240 | 96% | −3.2 (−5.0 to −1.2) | `160ae15` |
 | 8 | Shipped policy (DAgger + PPO) (baseline) | **46.4%** | 65.3% | 95.1% | 69.8% | 73.9% | 6.0% | 35.9% | 9.2% | 35.0% | 152 of 240 | 28% | −13.0 (−14.8 to −11.3) | `160ae15` |
 | 9 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **27.1%** | 89.7% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 22.8% | 31.1% | 5 of 240 | 98% | −19.4 (−21.4 to −17.3) | `160ae15` |
@@ -30,7 +30,7 @@ Three baselines reimplement published exploration methods on the same sensor map
 | Pilot | Score (flown) | Footprint score | Footprint curve area | Half seen, s | Flights ended by a crash | Flights that touched nothing |
 | --- | --- | --- | --- | --- | --- | --- |
 | Sensor-only planner (this repository) | 66.2% | 85.2% | 0.65 | 39.0 | 12 of 240 | 94% |
-| Sensor-only planner, view first (this repository) | 67.9% | 98.7% | 0.89 | 12.4 | 1 of 240 | 100% |
+| Sensor-only planner, view first (this repository) | 64.6% | 99.0% | 0.90 | 13.1 | 0 of 240 | 100% |
 | Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 2 of 240 | 99% |
 | Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.1% | 89.7% | 0.84 | 10.5 | 5 of 240 | 98% |
 | Boustrophedon coverage (BA*, Viet et al. 2013) | 65.4% | 87.4% | 0.67 | 35.0 | 9 of 240 | 95% |
@@ -69,6 +69,29 @@ Scored without the crash rule and with the old airframe's power model, so these 
 | 8 | Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.5% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 25.8% | 31.1% | 98% | `f0f5cab` |
 | 9 | Lidar wall-follower | 17.0% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 18.5% | 10.1% | 97% | `20aa664` |
 | 10 | Nearest frontier (Yamauchi 1997) | 8.8% | 3.3% | 10.0% | 11.6% | 10.3% | 4.6% | 10.2% | 11.9% | 99% | `f0f5cab` |
+
+## FrontierBench Hard
+
+v3's footprint column saturates: the view-first planner sees 99% of the test buildings within 3 m. The hard track ([`src/bench/hard.ts`](../src/bench/hard.ts), `npm run bench:hard`) leaves v3 frozen and asks for more on four axes at once. **Scale**: a 40 x 40 m building (four hard plans tiled 2 x 2) with the 120 s a 20 m building gets, so no pilot finishes. **Time**: the 20 m buildings in 30 s. **Airframe and light**: the randomized quadrotor on the large building, in the dark and across floors. **Sensor**: the score is a forward 90° *camera* footprint, the share of the reachable building that came within 3 m of the drone *in front of it* (the same ground-truth rays as the ring, kept to 45° either side of the heading), so a pilot has to turn to look. The 360° ring footprint and flown coverage are reported beside it. The crash rule holds. Seeds: dev 92001+ (20 per task), test 93001+ (30 per task, scored once).
+
+| # | Pilot | Camera score | large | large-quad | sprint | quad-dark | floors-quad | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sensor-only planner, view first (baseline) | **79.1%** | 68.2% | 68.9% | 93.9% | 91.3% | 73.2% | 87.9% | 25.3% | 2 of 150 | — | `22742fa` |
+| 2 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **65.6%** | 58.9% | 45.1% | 76.4% | 85.0% | 62.5% | 70.6% | 17.8% | 25 of 150 | −13.5 (−16.7 to −10.3) | `22742fa` |
+| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **58.4%** | 73.3% | 46.1% | 61.0% | 73.0% | 38.8% | 66.9% | 10.3% | 15 of 150 | −7.2 (−10.5 to −3.9) | `22742fa` |
+| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **44.6%** | 27.0% | 23.6% | 43.0% | 69.5% | 60.0% | 49.0% | 23.2% | 11 of 150 | −13.8 (−17.4 to −10.4) | `22742fa` |
+| 5 | Sensor-only planner + quad tracker (baseline) | **39.5%** | 23.3% | 16.8% | 44.5% | 60.1% | 53.1% | 43.0% | 24.2% | 3 of 150 | −5.1 (−7.2 to −2.9) | `22742fa` |
+| 6 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **38.6%** | 27.3% | 21.0% | 50.0% | 60.0% | 34.8% | 42.4% | 19.4% | 46 of 150 | −0.9 (−3.3 to +1.5), tied | `22742fa` |
+
+| Task | What | Airframe | Lighting | Budget |
+| --- | --- | --- | --- | --- |
+| `large` | 40 x 40 m building, 120 s | Kinematic | Day | 120 s |
+| `large-quad` | 40 x 40 m building, quadrotor, 120 s | Quadrotor, randomized | Day | 120 s |
+| `sprint` | Rooms, hallways, loops in 30 s | Kinematic | Day | 30 s |
+| `quad-dark` | Quadrotor, lights off | Quadrotor, randomized | Lights off | 120 s |
+| `floors-quad` | Several floors, quadrotor | Quadrotor, randomized | Day | 120 s |
+
+The hard track found a flaw in the view-first planner on its dev split: on 40 m buildings it treated a corridor as done once it had viewed the mapped part, though the sparse lidar ring had not mapped the corridor to its end, and fell back to sweeping half the building early. The fix (fly to the edge of unknown space before sweeping) was tuned on hard dev and the practice block and re-checked on a fresh block ([VIEW_FIRST.md](VIEW_FIRST.md)). The task design was also settled on dev only. Nearest frontier (Yamauchi) leads on `large`, where leaving each room from the doorway is the right call when time is short; the view-first planner leads overall and on every quadrotor task.
 
 ## Team track
 

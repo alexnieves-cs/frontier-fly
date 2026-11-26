@@ -30,6 +30,16 @@ Scored without the crash rule and with the old airframe's power model, so these 
 
 {{BENCH_V2}}
 
+## FrontierBench Hard
+
+v3's footprint column saturates: the view-first planner sees 99% of the test buildings within 3 m. The hard track ([`src/bench/hard.ts`](../src/bench/hard.ts), `npm run bench:hard`) leaves v3 frozen and asks for more on four axes at once. **Scale**: a 40 x 40 m building (four hard plans tiled 2 x 2) with the 120 s a 20 m building gets, so no pilot finishes. **Time**: the 20 m buildings in 30 s. **Airframe and light**: the randomized quadrotor on the large building, in the dark and across floors. **Sensor**: the score is a forward 90° *camera* footprint, the share of the reachable building that came within 3 m of the drone *in front of it* (the same ground-truth rays as the ring, kept to 45° either side of the heading), so a pilot has to turn to look. The 360° ring footprint and flown coverage are reported beside it. The crash rule holds. Seeds: dev 92001+ (20 per task), test 93001+ (30 per task, scored once).
+
+{{BENCH_HARD}}
+
+{{BENCH_HARD_TASKS}}
+
+The hard track found a flaw in the view-first planner on its dev split: on 40 m buildings it treated a corridor as done once it had viewed the mapped part, though the sparse lidar ring had not mapped the corridor to its end, and fell back to sweeping half the building early. The fix (fly to the edge of unknown space before sweeping) was tuned on hard dev and the practice block and re-checked on a fresh block ([VIEW_FIRST.md](VIEW_FIRST.md)). The task design was also settled on dev only. Nearest frontier (Yamauchi) leads on `large`, where leaving each room from the doorway is the right call when time is short; the view-first planner leads overall and on every quadrotor task.
+
 ## Team track
 
 {{BENCH_TEAM}}

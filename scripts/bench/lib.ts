@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
 import { parsePlanSet, PLAN_SET_PATH, type PlanSet } from '../../src/plans';
 import type { ExplorerEnv } from '../../src/sim/env';
-import { BENCH_TASKS, benchRuns, SAFE_COLLISIONS, type BenchRun, type BenchSplit } from '../../src/bench/tasks';
+import { BENCH_TASKS, benchRuns, SAFE_COLLISIONS, type BenchRun, type BenchSplit, type BenchTask } from '../../src/bench/tasks';
 import { SHIPPED_CHECKPOINT_PATH } from '../../src/rl/checkpoint';
 import { bootstrapCi, loadPolicy } from '../study/common';
 import { sandboxedPilot } from './sandbox';
@@ -21,12 +21,13 @@ export async function loadPilot(id: string): Promise<{ make: () => Promise<Bench
   return { make: () => sandboxedPilot(id), source: id };
 }
 
-export function summarize(episodes: BenchEpisode[]) {
+export function summarize(episodes: BenchEpisode[], taskList: readonly BenchTask[] = BENCH_TASKS) {
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
   const tasks: Record<string, unknown> = {};
   const covs: number[] = [];
   const fps: number[] = [];
-  for (const t of BENCH_TASKS) {
+  const cams: number[] = [];
+  for (const t of taskList) {
     const rs = episodes.filter((e) => e.task === t.id);
     if (!rs.length) continue;
     const cov = rs.map((r) => r.coverage);
@@ -42,10 +43,20 @@ export function summarize(episodes: BenchEpisode[]) {
       energyWh: mean(rs.map((r) => r.energyWh)),
       halfS: half.length ? mean(half) : null,
       ...footprintStats(rs, mean),
+      ...cameraStats(rs, mean),
     };
+    if (rs.every((r) => r.camera)) cams.push(mean(rs.map((r) => r.camera!.footprint)));
     if (rs.every((r) => r.footprint !== undefined)) fps.push(mean(rs.map((r) => r.footprint)));
   }
-  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), crashShare: episodes.filter((e) => e.crashed).length / Math.max(1, episodes.length), tasks };
+  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), ...(cams.length && cams.length === covs.length ? { cameraScore: mean(cams) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), crashShare: episodes.filter((e) => e.crashed).length / Math.max(1, episodes.length), tasks };
+}
+
+/** Camera-footprint columns of a FrontierBench Hard task (absent elsewhere). */
+function cameraStats(rs: BenchEpisode[], mean: (xs: number[]) => number) {
+  if (!rs.length || !rs.every((r) => r.camera)) return {};
+  const c = rs.map((r) => r.camera!.footprint);
+  const half = rs.filter((r) => r.camera!.halfS !== null).map((r) => r.camera!.halfS!);
+  return { camera: mean(c), cameraCi: bootstrapCi(c), cameraArea: mean(rs.map((r) => r.camera!.area)), cameraHalfS: half.length ? mean(half) : null };
 }
 
 /** Footprint columns of a task (absent on results written before the footprint metric existed). */

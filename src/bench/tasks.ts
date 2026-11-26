@@ -35,6 +35,12 @@ export interface BenchTask {
    * buildings: the dev split flies the set's 20 dev plans, the test split its 60 eval plans.
    */
   plans?: boolean;
+  /** FrontierBench Hard (bench/hard.ts): fly the 40 x 40 m tiled building (team/largeBuilding.ts) instead. */
+  large?: boolean;
+  /** Step budget override (20 steps per second); default the stage's own. */
+  maxSteps?: number;
+  /** Also score a forward 90° camera footprint (FrontierBench Hard's headline). */
+  camera?: boolean;
 }
 
 export const BENCH_TASKS: readonly BenchTask[] = [
