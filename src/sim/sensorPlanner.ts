@@ -215,6 +215,12 @@ export class SensorPlanner {
   private path: number[] = [];
   private goal = -1;
   private goalFloor = -1;
+  /** Take-off voxel (SeenMap index), set on the first frame after a reset. */
+  private home = -1;
+  /** Fly back to the take-off voxel instead of exploring (FrontierBench Hard's return tasks). */
+  homing = false;
+  /** Plan toward this voxel (SeenMap index) instead of frontier goals, or -1. */
+  private target = -1;
   private sinceReplan = 0;
   private bestGoalDist = Infinity;
   private noProgress = 0;
@@ -305,6 +311,9 @@ export class SensorPlanner {
     this.path = [];
     this.goal = -1;
     this.goalFloor = -1;
+    this.home = -1;
+    this.homing = false;
+    this.target = -1;
     this.sinceReplan = 0;
     this.bestGoalDist = Infinity;
     this.noProgress = 0;
@@ -465,7 +474,7 @@ export class SensorPlanner {
       if (done[k]! & 128) continue;
       done[k] = done[k]! | 128;
       const d0 = dist[k]!;
-      if (k !== start && !this.covered(f, base + k) && this.traversable(f, base, k) && !this.banned[base + k]) {
+      if (k !== start && (this.target >= 0 ? base + k === this.target : !this.covered(f, base + k) && this.traversable(f, base, k) && !this.banned[base + k])) {
         // Prefer frontier voxels that border flown or blocked space: sweeping edges first
         // leaves fewer isolated stragglers to come back for.
         let score = d0 - this.edgeBonus * this.edgeCount(f, base, k);
@@ -730,6 +739,48 @@ export class SensorPlanner {
     return true;
   }
 
+  /** The take-off voxel's floor-plane index when the drone is on the take-off floor, else -1. */
+  private homeOn(f: SensorFrame): number {
+    if (this.home < 0) {
+      const x = clamp(Math.floor(f.pos[0] / VOXEL), 0, f.vw - 1);
+      const y = clamp(Math.floor(f.pos[1] / VOXEL), 0, f.vd - 1);
+      this.home = this.floorOf(f) * this.plane + y * f.vw + x;
+    }
+    return Math.floor(this.home / this.plane) === this.floorOf(f) ? this.home % this.plane : -1;
+  }
+
+  /**
+   * Meters of known-free path from the drone back to its take-off voxel (Infinity when there is none on
+   * this floor). Plans on the current maps and leaves the goal being flown alone.
+   */
+  homeDistance(f: SensorFrame): number {
+    this.ensure(f);
+    const h = this.homeOn(f);
+    if (h < 0) return Infinity;
+    const hx = ((h % f.vw) + 0.5) * VOXEL;
+    const hy = (Math.floor(h / f.vw) + 0.5) * VOXEL;
+    if (Math.hypot(hx - f.pos[0], hy - f.pos[1]) < VOXEL * 1.5) return 0;
+    const floor = this.floorOf(f);
+    const flying = this.path;
+    this.target = floor * this.plane + h;
+    const g = this.plan(f, floor);
+    this.target = -1;
+    const back = this.path;
+    this.path = flying;
+    if (g < 0) return Infinity;
+    let d = 0;
+    let px = f.pos[0];
+    let py = f.pos[1];
+    for (const k of back) {
+      const x = ((k % f.vw) + 0.5) * VOXEL;
+      const y = (Math.floor(k / f.vw) + 0.5) * VOXEL;
+      d += Math.hypot(x - px, y - py);
+      px = x;
+      py = y;
+    }
+    return d;
+  }
+
   act(f: SensorFrame): SensorCommand {
     this.ensure(f);
     const floor = this.floorOf(f);
@@ -738,14 +789,29 @@ export class SensorPlanner {
       this.goal = -1;
       this.lastFloor = floor;
     }
-    if (this.view) this.markView(f, base);
-    const goalValid =
-      this.goal >= 0 &&
-      this.goalFloor === floor &&
-      !this.covered(f, this.goal) &&
-      this.traversable(f, 0, this.goal) &&
-      !this.banned[this.goal];
-    if (!goalValid || this.sinceReplan >= this.replanEvery) {
+    const h = this.homeOn(f);
+    const homing = this.homing && h >= 0;
+    if (homing) {
+      const hx = ((h % f.vw) + 0.5) * VOXEL;
+      const hy = (Math.floor(h / f.vw) + 0.5) * VOXEL;
+      // Back over the take-off voxel: hold there.
+      if (Math.hypot(hx - f.pos[0], hy - f.pos[1]) < 0.4) {
+        const zt = floor * f.floorHeight + this.flyHeight;
+        return { vx: 0, vy: 0, vz: clamp((zt - f.pos[2]) * 2, -0.6, 0.6), yawRate: 0, exploring: false };
+      }
+    }
+    if (this.view && !homing) this.markView(f, base);
+    const goalValid = homing
+      ? this.goal === base + h && this.goalFloor === floor
+      : this.goal >= 0 && this.goalFloor === floor && !this.covered(f, this.goal) && this.traversable(f, 0, this.goal) && !this.banned[this.goal];
+    if (homing && (!goalValid || this.sinceReplan >= this.replanEvery)) {
+      this.target = base + h;
+      const g = this.plan(f, floor);
+      this.target = -1;
+      this.goal = g >= 0 ? base + g : -1;
+      this.goalFloor = floor;
+      this.sinceReplan = 0;
+    } else if (!goalValid || this.sinceReplan >= this.replanEvery) {
       // View mode escalates per replan: unviewed voxels, then the edge of unknown space (a corridor
       // the sparse lidar ring has not mapped to its end), then, with `sweep`, unflown voxels.
       if (this.view) this.phase = 0;
@@ -792,7 +858,7 @@ export class SensorPlanner {
     if (dGoal < this.bestGoalDist - 0.05) {
       this.bestGoalDist = dGoal;
       this.noProgress = 0;
-    } else if (++this.noProgress > 60) {
+    } else if (++this.noProgress > 60 && !homing) {
       this.banned[this.goal] = 1;
       this.goal = -1;
       this.noProgress = 0;
@@ -842,7 +908,7 @@ export class SensorPlanner {
     // A cut by the safety filter is where the next ramp starts from.
     if (tr && (vx !== sx || vy !== sy)) this.shaper.hold(vx, vy);
     let yawRate = 0;
-    const aim = this.view?.look ? this.lookHeading() : null;
+    const aim = this.view?.look && !homing ? this.lookHeading() : null;
     if (aim !== null) {
       const v = this.view!;
       const cap = v.lookYawRate > 0 ? Math.min(v.lookYawRate, MAX_YAW_RATE) : tr ? Math.min(tr.yawRate, MAX_YAW_RATE) : MAX_YAW_RATE;

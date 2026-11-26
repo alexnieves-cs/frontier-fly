@@ -87,6 +87,29 @@ evidence either way. On the hard test split (93001+) v3 scores 86.0% (v2 79.1%) 
 The wall fix also changes v3 on FrontierBench v3: test split 99.1% footprint (v2 99.0%), 67.4% flown (v2 64.6%), no
 crash in 240 flights. `bench/results/planner-view.json` and `bench/results/hard/planner-view.json` now hold v3.
 
+## Round 2: the return track, and a change that did not hold up
+
+Round 2 added FrontierBench Hard's return track ([LEADERBOARD.md](LEADERBOARD.md#return-track)): the camera score
+counts only for a flight that ends back at take-off. Every explorer pilot flies under the same return supervisor,
+so the view-first planner needed no homing code of its own; `SensorPlanner` gained `homing` and `homeDistance()`
+for the supervisor to use. Goal on dev (96001+): at least 70% camera score, at least 95% of flights home, ahead
+on every task. v3 as shipped scores 72.5% on dev with 79 of 80 home.
+
+Two attempts to do better, both tuned on dev:
+
+1. *Steer homeward late in the flight* (goal cost plus a weight times the goal's distance from take-off, rising
+   over the last 70% or 50% of the flight). No change on dev (61.4% to 61.7% against 61.6% under the first
+   supervisor). Dropped.
+2. *Prefer goals with more unknown space around them* (`UnknownGain`, the classic information-gain proxy, 0.15
+   path steps per voxel on the kinematic airframe and 0.1 on the quadrotor). Dev: return track 72.5% to 77.2%,
+   hard track 86.6% to 87.6%. On the test splits it did not hold: return 75.0% against v3's 74.0% (+1.0), hard
+   85.6% against 86.0%, and FrontierBench v3 flown 65.0% against 67.4% with one crash in 240. **Not shipped.**
+   Twenty dev flights per task is not enough to see a 1 to 4 point effect, and this was the fifth setting tried
+   on the same seeds.
+
+Test split 97001+ (30 per task, every pilot once): v3 74.0%, 120 of 120 home, no crash; nearest frontier 53.1%
+(103 home, 17 crashes); NBVP 49.7% (98, 22); BA* 32.3%; planner + quad tracker 26.0%.
+
 ## Results of version 1
 
 Seed blocks are in the project's seed ledger. Tuning used the FrontierBench dev split and a practice block

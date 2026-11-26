@@ -13,6 +13,11 @@ export interface BenchContext {
   /** Policy steps in this episode (20 per second). */
   maxSteps: number;
   dynamics: 'kinematic' | 'quad';
+  /**
+   * A return task (FrontierBench Hard, bench/hard.ts): the flight counts only if the drone is back
+   * within HOME_RADIUS of where it took off when time runs out.
+   */
+  home?: boolean;
 }
 
 export interface BenchPilot {

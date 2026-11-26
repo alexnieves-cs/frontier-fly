@@ -41,6 +41,10 @@ export interface BenchTask {
   maxSteps?: number;
   /** Also score a forward 90° camera footprint (FrontierBench Hard's headline). */
   camera?: boolean;
+  /** Return task: the camera footprint counts only if the drone ends back within HOME_RADIUS of take-off. */
+  home?: boolean;
+  /** Steady wind, m/s, in a direction drawn from the seed. */
+  wind?: number;
 }
 
 export const BENCH_TASKS: readonly BenchTask[] = [

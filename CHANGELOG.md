@@ -5,6 +5,16 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### FrontierBench Hard: the return track (2026-11-26)
+
+- `npm run bench:hard -- --track return`: four tasks (40 m and back on the quadrotor, the same in 1 m/s wind, dark
+  rooms in 40 s, a 30 s sprint) where the camera score counts only if the drone ends within 1.5 m of take-off.
+  Every explorer pilot shares one return supervisor (`HOME_RETURN`); `SensorPlanner` gained `homing` and
+  `homeDistance()`; bench tasks take `home` and `wind`.
+- Test 97001+: view-first planner 74.0% with 120 of 120 home and no crash, nearest frontier 53.1% (17 crashes),
+  NBVP 49.7% (22), BA* 32.3%, quad-aware planner 26.0%.
+- Tried and not shipped: information-gain goal scoring (+4.6 on dev, +1.0 on test, slightly worse on v3).
+
 ### View-first planner v3: camera aiming and a wall fix (2026-11-26)
 
 - `ViewOptions.look`: the planner keeps a camera view mask and turns a 90° forward camera toward what it has not

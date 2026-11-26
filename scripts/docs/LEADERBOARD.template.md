@@ -40,6 +40,16 @@ v3's footprint column saturates: the view-first planner sees 99% of the test bui
 
 The hard track found two flaws in the view-first planner on its dev split, both fixed and tuned on dev only. On 40 m buildings it treated a corridor as done once it had viewed the mapped part, though the sparse lidar ring had not mapped the corridor to its end (v2: fly to the edge of unknown space before sweeping). And its edge-of-unknown test counted mapped walls as unknown, so in some large buildings it spent the flight working along the walls of one quarter (v3). v3 also aims the quadrotor's forward camera at what it has not yet had in view. On a fresh report-only block flown once by every pilot (95001+, 900 flights) v3 scores 85.8% against NBVP's 64.5% and nearest frontier's 57.1% ([VIEW_FIRST.md](VIEW_FIRST.md)). Nearest frontier (Yamauchi) still ties it on `large`, the kinematic 40 m building (75.3% against 76.0%, paired gap +0.6, 95% interval −3.4 to +5.2), where leaving each room from the doorway is the right call when time is short.
 
+### Return track
+
+A search drone that does not come back loses what it saw, and no pilot on the hard track had to come back. The return track ([`src/bench/hard.ts`](../src/bench/hard.ts) `RETURN_TASKS`, `npm run bench:hard -- --track return`) scores the same forward camera footprint, but a flight counts only if the drone ends within 1.5 m of where it took off, on its floor, without a crash; otherwise it scores 0. Four tasks: the 40 m building and back on the quadrotor, the same in a steady 1 m/s wind, the 20 m rooms in the dark in 40 s, and a 30 s kinematic sprint. So the tasks compare exploration, not homing code, every explorer pilot gets the same return supervisor (`HOME_RETURN` in [`src/bench/baselines.ts`](../src/bench/baselines.ts)): every half second it plans the known-free path home, and once that path at 0.9 × the task speed plus 5 s no longer fits in the time left (or the explorer says it is done) it flies the sensor-only planner home. Its two numbers were chosen on dev with the baselines, not the view-first planner, as the fastest return that did not lose more flights. Seeds: dev 96001+ (20 per task), test 97001+ (30 per task, scored once). The guarded policy is not an explorer pilot, so it has no supervisor and is not on this board.
+
+{{BENCH_RETURN}}
+
+{{BENCH_RETURN_TASKS}}
+
+The view-first planner brings back 120 of 120 flights with no crash and leads every task; most of the baselines' lost flights are crashes. Its lead is +20.8 points over nearest frontier (95% interval +16.1 to +26.1) and +24.3 over NBVP (+20.6 to +28.4), but on the 30 s sprint the lead over nearest frontier (+6.0, −2.0 to +14.2) is within noise. A goal-scoring change that looked like +4.6 points on dev (preferring goals with more unknown space around them) was worth +1.0 on these test flights and cost a little on the other tracks, so it was not shipped ([VIEW_FIRST.md](VIEW_FIRST.md)).
+
 ## Team track
 
 {{BENCH_TEAM}}
