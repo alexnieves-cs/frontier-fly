@@ -12,7 +12,8 @@ Modes, in the order docs/CRAZYFLIE.md flies them:
   explore  the frontier-fly explorer (scripts/crazyflie/planner.ts) maps the arena, then lands
 
 Every command passes through guard.Guard. Ctrl-C lands; a second Ctrl-C cuts
-the motors. A flight log (JSON lines, flightlog.py) is written to --log, in the
+the motors. An error between take-off and touchdown (the planner dying or sending a
+reply that is not a command, a bug in a mode) lands the drone too (Flight.abort). A flight log (JSON lines, flightlog.py) is written to --log, in the
 same format for the real drone and the sim, so compare.py can put them side by side.
 
 The ladder modes (hover, yaw, square) fly under tighter limits than explore:
@@ -53,32 +54,59 @@ TOUCHDOWN_Z = 0.08    # m, measured
 FRESH_TEL_SEC = 0.3   # s
 LAND_GRACE = 3.0      # s
 
+# The planner and the arena check are TypeScript, run through vite-node. Tests swap these for
+# stand-ins. How long a step waits for the planner's reply: the sim runs slower than real time.
+PLANNER_CMD = ['npx', 'vite-node', 'scripts/crazyflie/planner.ts']
+CHECK_ARENA_CMD = ['npx', 'vite-node', 'scripts/crazyflie/check-arena.ts']
+PLANNER_TIMEOUT = {'sim': 5.0, 'radio': 0.04}
+
+
+class PlannerError(RuntimeError):
+    """The planner can no longer answer: it exited, closed its pipes, or sent something that is not a reply."""
+
 
 class Planner:
     """scripts/crazyflie/planner.ts as a child process, one JSON line each way."""
 
     def __init__(self, arena_path: str):
-        cmd = ['npx', 'vite-node', 'scripts/crazyflie/planner.ts', '--', '--arena', arena_path]
+        cmd = [*PLANNER_CMD, '--', '--arena', arena_path]
         self.p = subprocess.Popen(cmd, cwd=REPO, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
         self.lines: list[str] = []
+        self.eof = False
         self.cv = threading.Condition()
         threading.Thread(target=self._pump, daemon=True).start()
         self.sent = 0
         self.taken = 0
         first = self._next(60.0)
-        if not first or not json.loads(first).get('ready'):
-            raise RuntimeError(f'planner did not start: {first!r}')
+        try:
+            ready = bool(first) and json.loads(first).get('ready')
+        except (ValueError, AttributeError):
+            ready = False
+        if not ready:
+            raise PlannerError(f'planner did not start: {first!r}')
 
     def _pump(self):
-        for line in self.p.stdout:
+        try:
+            for line in self.p.stdout:
+                with self.cv:
+                    self.lines.append(line)
+                    self.cv.notify()
+        except (OSError, ValueError):
+            pass
+        finally:
             with self.cv:
-                self.lines.append(line)
-                self.cv.notify()
+                self.eof = True
+                self.cv.notify_all()
 
     def _next(self, timeout: float) -> str | None:
+        """The next line, or None once timeout passes or the planner's output has closed."""
+        deadline = time.monotonic() + timeout
         with self.cv:
-            if not self.lines:
-                self.cv.wait(timeout)
+            while not self.lines and not self.eof:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    break
+                self.cv.wait(left)
             return self.lines.pop(0) if self.lines else None
 
     def ask(self, reading: dict, timeout: float) -> dict | None:
@@ -88,18 +116,36 @@ class Planner:
         its timeout is dropped when the next reading is asked, never handed back as that reading's
         answer. Without the count a single slow step left every later command one step stale, and
         the caller stamped each as fresh, which hid them from the guard's stale-command watchdog.
+
+        Raises PlannerError when no answer can come any more (the process exited, a pipe closed)
+        or the answer is not a JSON object. A late answer is only a missed step; a broken planner
+        lands the drone (Flight.abort) instead of hovering out the 2 s watchdog first.
         """
-        self.p.stdin.write(json.dumps(reading) + '\n')
-        self.p.stdin.flush()
+        if self.p.poll() is not None:
+            raise PlannerError(f'planner exited (code {self.p.returncode})')
+        try:
+            self.p.stdin.write(json.dumps(reading) + '\n')
+            self.p.stdin.flush()
+        except (OSError, ValueError) as e:
+            raise PlannerError(f'planner input closed ({e})') from e
         self.sent += 1
         deadline = time.monotonic() + timeout
         while True:
             line = self._next(max(0.0, deadline - time.monotonic()))
             if line is None:
+                if self.eof:
+                    code = self.p.poll()
+                    raise PlannerError('planner closed its output' + (f' (exited, code {code})' if code is not None else ''))
                 return None
             self.taken += 1
             if self.taken == self.sent:
-                return json.loads(line)
+                try:
+                    out = json.loads(line)
+                except ValueError as e:
+                    raise PlannerError(f'planner reply is not JSON: {line.strip()[:80]!r}') from e
+                if not isinstance(out, dict):
+                    raise PlannerError(f'planner reply is not an object: {line.strip()[:80]!r}')
+                return out
 
     def close(self):
         try:
@@ -107,6 +153,32 @@ class Planner:
             self.p.wait(5)
         except Exception:
             self.p.kill()
+
+
+def planner_command(out: dict) -> tuple[Command | None, bool]:
+    """A planner reply as (Command, done), the way Flight.run's step_fn returns it.
+
+    An {"error": ...} reply, or a number that is null or not finite (JSON.stringify writes NaN as
+    null), is a missed step: (None, False), and the guard hovers, then lands if it goes on. A reply
+    with a field missing or of the wrong type means the planner and fly.py disagree on the protocol,
+    so it raises PlannerError and the drone lands now.
+    """
+    if 'error' in out:
+        return None, False
+    vals = {}
+    for key in ('vx', 'vy', 'yawRate', 'z'):
+        if key not in out:
+            raise PlannerError(f'planner reply has no {key!r}: {json.dumps(out)[:80]}')
+        v = out[key]
+        if v is not None and (isinstance(v, bool) or not isinstance(v, (int, float))):
+            raise PlannerError(f'planner reply {key!r} is not a number: {v!r}')
+        vals[key] = v
+    phase = out.get('phase')
+    if not isinstance(phase, str):
+        raise PlannerError(f'planner reply has no phase: {json.dumps(out)[:80]}')
+    if any(v is None or not math.isfinite(v) for v in vals.values()):
+        return None, False
+    return Command(vals['vx'], vals['vy'], math.degrees(vals['yawRate']), vals['z']), phase == 'done'
 
 
 # Seconds in the air for each first-flight mode before the guard lands it (take-off included).
@@ -136,6 +208,10 @@ class Flight:
         self.reason = ''
         self.last_tel: Telemetry | None = None
         self.last_age = math.inf
+        # True from the arming request until the motors are stopped or cut: main lands any flight
+        # that ends with this still set.
+        self.armed = False
+        self.log_failed = False
 
     def telemetry(self) -> tuple[Telemetry | None, float]:
         raw, age = self.link.read()
@@ -155,13 +231,35 @@ class Flight:
 
     def write(self, event: str, reason: str = '', **extra):
         if self.log:
-            self.log.event(self.link.now(), event, reason, **extra)
+            try:
+                self.log.event(self.link.now(), event, reason, **extra)
+            except Exception as e:
+                self._log_error(e)
 
     def record(self, phase: str, tel: Telemetry | None, cmd: Command | None, sent: Command | None, verdict: str, reason: str = ''):
         """One control step in the flight log: what was measured, asked for, let through and why."""
         if self.log:
-            truth = self.link.truth() if hasattr(self.link, 'truth') else None
-            self.log.step(self.link.now(), phase, tel, self.last_age, cmd, sent, verdict, reason, truth)
+            try:
+                truth = self.link.truth() if hasattr(self.link, 'truth') else None
+                self.log.step(self.link.now(), phase, tel, self.last_age, cmd, sent, verdict, reason, truth)
+            except Exception as e:
+                self._log_error(e)
+
+    def _log_error(self, e: Exception):
+        # A full disk must not end a flight: losing the log is better than losing the landing.
+        if not self.log_failed:
+            self.log_failed = True
+            print(f'WARNING: cannot write the flight log ({e}); flying on without it', file=sys.stderr)
+
+    def stop_motors(self):
+        self.link.stop_motors()
+        self.armed = False
+
+    def kill(self):
+        try:
+            self.link.kill()
+        finally:
+            self.armed = False
 
     def preflight(self) -> list[str]:
         problems = []
@@ -224,11 +322,53 @@ class Flight:
             fresh, age = self.telemetry()
             self.record('land', fresh, None, Command(0.0, 0.0, 0.0, z), 'landing', self.reason)
             measured = fresh.z if fresh is not None and age <= FRESH_TEL_SEC else None
-        self.link.stop_motors()
+        self.stop_motors()
         self.write('landed', self.reason, confirmed=confirmed, height=measured)
 
+    def abort(self, reason: str) -> str:
+        """Land after an error in the flight loop, whatever failed. Never raises.
+
+        First the ordinary landing (land). If that fails too, the link's onboard landing where it
+        has one (CflibLink.land_onboard: the firmware's high-level commander flies the descent),
+        then the motors stop. With no way to land at all the motors stop where it is, which is
+        still better than leaving them on the last setpoint until the firmware's watchdog cuts them.
+        """
+        self.outcome, self.reason = 'error-landed', reason
+        self.write('error', reason)
+        if self.armed:
+            try:
+                self.land(reason)
+            except Exception as e:
+                self.write('error', f'landing failed: {type(e).__name__}: {e}')
+                print(f'ERROR: landing failed ({e})', file=sys.stderr)
+                self._land_without_the_loop()
+        self.write(self.outcome, self.reason)
+        return self.outcome
+
+    def _land_without_the_loop(self):
+        onboard = getattr(self.link, 'land_onboard', None)
+        if onboard:
+            z = self.last_tel.z if self.last_tel and math.isfinite(self.last_tel.z) else 0.5
+            duration = max(1.0, min(z, 1.5) / LAND_RATE)
+            try:
+                onboard(duration)
+                self.write('onboard-landing', self.reason, duration=duration)
+                self.link.sleep(duration + 0.5)
+            except Exception as e:
+                self.write('error', f'onboard landing failed: {type(e).__name__}: {e}')
+        try:
+            self.stop_motors()
+        except Exception as e:
+            self.write('error', f'could not stop the motors: {type(e).__name__}: {e}')
+            print(f'ERROR: could not stop the motors ({e}); the firmware cuts them 2 s after the last setpoint', file=sys.stderr)
+
     def run(self, step_fn, max_sec: float) -> str:
-        """step_fn(tel, t_air) -> (Command | None, done: bool). Takes off, flies, lands."""
+        """step_fn(tel, t_air) -> (Command | None, done: bool). Takes off, flies, lands.
+
+        An exception from step_fn or the link goes out to the caller with the drone still in the
+        air (self.armed): the caller lands it with abort, as main does.
+        """
+        self.armed = True
         self.link.arm()
         t0 = self.link.now()
         # Take-off: ramp the height setpoint so the flow deck sees the floor the whole way.
@@ -278,10 +418,10 @@ class Flight:
 
     def finish(self, v) -> str:
         if v is None:
-            self.link.stop_motors()
+            self.stop_motors()
             self.outcome, self.reason = 'aborted', 'no telemetry at take-off'
         elif v.action == 'kill':
-            self.link.kill()
+            self.kill()
             self.outcome, self.reason = 'killed', v.reason
         else:
             self.outcome = 'guard-landed'
@@ -356,7 +496,7 @@ def main(argv=None) -> int:
 
     arena = json.loads(Path(a.arena).read_text())
     errs = subprocess.run(
-        ['npx', 'vite-node', 'scripts/crazyflie/check-arena.ts', '--', str(Path(a.arena).resolve())],
+        [*CHECK_ARENA_CMD, '--', str(Path(a.arena).resolve())],
         cwd=REPO, capture_output=True, text=True,
     )
     if errs.returncode != 0:
@@ -448,7 +588,7 @@ def main(argv=None) -> int:
                 return Command(dx / max(d, 1e-6) * sp, dy / max(d, 1e-6) * sp, 0, None), False
         else:
             planner = Planner(str(Path(a.arena).resolve()))
-            timeout = 5.0 if a.sim else 0.04
+            timeout = PLANNER_TIMEOUT['sim' if a.sim else 'radio']
 
             def step(tel, t):
                 out = planner.ask({
@@ -456,10 +596,10 @@ def main(argv=None) -> int:
                     'vx': tel.vx, 'vy': tel.vy, 'front': tel.front, 'back': tel.back,
                     'left': tel.left, 'right': tel.right, 'up': tel.up,
                 }, timeout)
-                if not out or 'error' in out:
+                if out is None or 'error' in out:
                     return None, False
                 result['known'] = out.get('known')
-                return Command(out['vx'], out['vy'], math.degrees(out['yawRate']), out['z']), out['phase'] == 'done'
+                return planner_command(out)
 
         def wrapped(tel, t):
             cmd, done = step(tel, t)
@@ -467,7 +607,12 @@ def main(argv=None) -> int:
                 cmd.z = flight.height
             return cmd, done
 
-        outcome = flight.run(wrapped, a.max_time)
+        try:
+            outcome = flight.run(wrapped, a.max_time)
+        except Exception as e:
+            why = str(e) if isinstance(e, PlannerError) else f'{type(e).__name__} in the flight loop: {e}'
+            print(f'ERROR: {why}: landing', file=sys.stderr)
+            outcome = flight.abort(why)
         result.update(outcome=outcome, reason=flight.reason, events=flight.guard.events[-5:])
         if a.sim:
             result.update(crashed=link.crashed, min_clearance=round(link.min_clearance, 3), seconds=round(link.t, 1))
@@ -480,6 +625,15 @@ def main(argv=None) -> int:
         ok = outcome in ('complete', 'checked') and not result.get('crashed') and result.get('yaw_ok', True)
         return 0 if ok else 1
     finally:
+        # Whatever ended the script (an exception that is not an Exception, a bug above), it does
+        # not close the link with the motors on: a closed link means no setpoints, and the
+        # firmware cuts the motors 2 s later wherever the drone is.
+        if flight.armed:
+            exc = sys.exc_info()[1]
+            why = f'{type(exc).__name__} with the motors on' if exc else 'the flight ended with the motors on'
+            print(f'ERROR: {why}: landing', file=sys.stderr)
+            flight.abort(why)
+            result.update(outcome=flight.outcome, reason=flight.reason)
         if planner:
             planner.close()
         if a.report:

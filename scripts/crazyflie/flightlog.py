@@ -12,8 +12,10 @@ fly.py and bringup.py write it; compare.py reads it. A log has three kinds of li
       (guard.Telemetry), age how old it was, cmd what the planner asked for, sent what the guard
       let through (arena frame). truth is the simulator's real pose; a real flight has none.
   {"event": "<name>", "t": s, "reason": str, ...}
-      Anything else that happened: "landed", "guard-landed", "killed", and "end" as the last line,
-      which carries the run's summary.
+      Anything else that happened: "landed", "guard-landed", "killed", "error" (what failed in the
+      flight script), "error-landed" (it landed because of that error), "onboard-landing" (the
+      firmware flew the descent because the script's own landing failed), and "end" as the last
+      line, which carries the run's summary.
 
 Logs written before version 1 have no start line. read_log still reads them; meta is then empty.
 """
@@ -116,7 +118,7 @@ class Log:
         if self.summary and 'outcome' in self.summary:
             return self.summary['outcome'], self.summary.get('reason', '')
         for e in reversed(self.events):
-            if e['event'] in ('complete', 'guard-landed', 'killed', 'aborted', 'operator'):
+            if e['event'] in ('complete', 'guard-landed', 'error-landed', 'killed', 'aborted', 'operator'):
                 return e['event'], e.get('reason', '')
         return 'unknown', ''
 

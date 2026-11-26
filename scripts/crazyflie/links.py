@@ -595,6 +595,18 @@ class CflibLink(Link):
         self.cf.commander.send_stop_setpoint()
         self.cf.commander.send_notify_setpoint_stop()
 
+    def land_onboard(self, duration_s: float):
+        """Have the firmware fly the descent, for when fly.py's own landing loop cannot run.
+
+        Streamed setpoints (send_hover) outrank the high-level commander, so they are released
+        first (notify_setpoint_stop); otherwise the firmware holds the last hover setpoint and
+        ignores the landing. The high-level commander then descends to 0 m over duration_s,
+        keeping the current yaw, on the firmware's own height estimate. It does not stop the
+        motors: the caller waits out duration_s, then calls stop_motors.
+        """
+        self.cf.commander.send_notify_setpoint_stop()
+        self.cf.high_level_commander.land(0.0, duration_s, yaw=None)
+
     def kill(self):
         try:
             self.cf.commander.send_stop_setpoint()

@@ -74,7 +74,7 @@ Local rules: a 33 g drone flown indoors in your own home is outside most countri
 
 ## Safety guard
 
-Every command goes through `scripts/crazyflie/guard.py` before it reaches the radio. The guard trusts only the drone's own telemetry and the arena box, never the planner. Tests in `scripts/crazyflie/tests/test_guard.py` cover each rule.
+Every command goes through `scripts/crazyflie/guard.py` before it reaches the radio. The guard trusts only the drone's own telemetry and the arena box, never the planner. Tests in `scripts/crazyflie/tests/test_guard.py` cover each rule, and `test_fly_failsafe.py` covers the flight script's own failures (the last three rows before Ctrl-C).
 
 | Rule | Limit | Action |
 | --- | --- | --- |
@@ -94,6 +94,9 @@ Every command goes through `scripts/crazyflie/guard.py` before it reaches the ra
 | Tilt | over 30° | land |
 | Tilt | over 60° (a flip) | cut motors |
 | Measured height | over 2.0 m (a fly-away) | cut motors |
+| Planner reply with a number that is null or not finite | that step | counts as no reply: hover at 0.5 s, land at 2 s |
+| Planner exits, closes its pipes, or sends a reply that is not a command | at once | land |
+| Any other error in `fly.py` between take-off and touchdown | at once | land; if the landing loop fails too, the firmware's onboard landing, then the motors stop |
 | Ctrl-C | first press | land |
 | Ctrl-C | second press | cut motors |
 
@@ -177,7 +180,7 @@ Send the `flights/*.jsonl` logs and the report folders.
 | `scripts/crazyflie/analysis.py` | the measures for one log, including a port of the sim's coverage |
 | `scripts/crazyflie/compare.py` | the sim-versus-real report |
 | `scripts/crazyflie/replay.ts` | one arena in `src/crazyflie/sim`, for `compare.py` |
-| `scripts/crazyflie/tests/` | 62 pytest tests: guard rules, end-to-end sim flights, faults, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie |
+| `scripts/crazyflie/tests/` | 78 pytest tests: guard rules, end-to-end sim flights, faults, failures inside the flight script, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie |
 | `docs/CRAZYFLIE_FIRST_FLIGHT.md` | the kit list and the first-flight checklist |
 
 ## Not done yet

@@ -59,6 +59,7 @@ In hover, yaw and square, `fly.py` flies under tighter limits than explore: 0.3 
 - **Never catch it or reach for it.** Let it land, or cut it.
 - If it drifts toward you or out of the arena, press Ctrl-C, twice if it is close.
 - If it flips, the guard cuts the motors. If it hits something and the props keep turning, press Ctrl-C twice. Wait until the props have stopped before you touch it, then unplug the battery.
+- If `fly.py` prints `ERROR` and lands on its own, let it land. The flight script lands on any error of its own (the planner stopping, a bad reply, a bug), and the flight log's `error` event says what failed. Read it before the next flight.
 - After any surprise, stop for that battery. Do not retry straight away.
 
 ### After every flight

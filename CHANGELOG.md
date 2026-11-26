@@ -26,7 +26,17 @@ Nothing has flown on hardware yet; everything below is tested against the simula
 - **Landing waits for touchdown.** The landing used to cut the motors when its setpoint ramp ran out, which in
   the sim left the drone about 0.2 m up, and higher when the radio dropped out mid-landing. It now holds the
   setpoint close to the measured height and stops the motors once the drone reads under 8 cm.
-- 33 new tests (62 in the Crazyflie suite).
+- **An error mid-flight lands the drone.** An exception between take-off and touchdown (the planner process
+  dying, a reply that is not JSON or has a field missing, a bug in a mode's step) used to go straight out of
+  `fly.py`, which closed the radio link with the motors on; on the real drone the firmware would have cut them
+  2 s later, wherever it was. It now lands at once and logs an `error` event (outcome `error-landed`). If the
+  landing loop fails too, `CflibLink.land_onboard` hands the descent to the firmware, then the motors stop.
+- **A planner sending NaN no longer passes as a finished flight.** A reply with a null or non-finite number
+  refreshed the stale-command watchdog every step, so the drone hovered until the time limit and the run
+  reported `complete`. It now counts as no reply: the guard hovers, then lands after 2 s.
+- A flight log that cannot be written (a full disk) no longer stops a flight, and a planner that dies at start-up
+  is reported at once instead of after 60 s.
+- 49 new tests (78 in the Crazyflie suite).
 
 ### Claims audit (2026-11-17)
 
