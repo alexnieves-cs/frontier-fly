@@ -13,81 +13,23 @@
  * Every v3 rule holds: the crash rule ends a flight, scores are means over tasks, the dev split is
  * for tuning and the test split is scored once.
  */
-import type { BenchRun, BenchTask } from "./tasks";
+import type { BenchRun, BenchTask } from './tasks';
 
 export const HARD_VERSION = 1;
 
 export const HARD_TASKS: readonly BenchTask[] = [
-  {
-    id: "large",
-    label: "40 x 40 m building, 120 s",
-    stage: 3,
-    dynamics: "kinematic",
-    lighting: "day",
-    speedH: 2,
-    dr: 0,
-    large: true,
-    maxSteps: 2400,
-    camera: true,
-  },
-  {
-    id: "large-quad",
-    label: "40 x 40 m building, quadrotor, 120 s",
-    stage: 3,
-    dynamics: "quad",
-    lighting: "day",
-    speedH: 2,
-    dr: 1,
-    large: true,
-    maxSteps: 2400,
-    camera: true,
-  },
-  {
-    id: "sprint",
-    label: "Rooms, hallways, loops in 30 s",
-    stage: 3,
-    dynamics: "kinematic",
-    lighting: "day",
-    speedH: 2,
-    dr: 0,
-    maxSteps: 600,
-    camera: true,
-  },
-  {
-    id: "quad-dark",
-    label: "Quadrotor, lights off",
-    stage: 3,
-    dynamics: "quad",
-    lighting: "night-dark",
-    speedH: 2,
-    dr: 1,
-    camera: true,
-  },
-  {
-    id: "floors-quad",
-    label: "Several floors, quadrotor",
-    stage: 4,
-    dynamics: "quad",
-    lighting: "day",
-    speedH: 2,
-    dr: 1,
-    camera: true,
-  },
+  { id: 'large', label: '40 x 40 m building, 120 s', stage: 3, dynamics: 'kinematic', lighting: 'day', speedH: 2, dr: 0, large: true, maxSteps: 2400, camera: true },
+  { id: 'large-quad', label: '40 x 40 m building, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true },
+  { id: 'sprint', label: 'Rooms, hallways, loops in 30 s', stage: 3, dynamics: 'kinematic', lighting: 'day', speedH: 2, dr: 0, maxSteps: 600, camera: true },
+  { id: 'quad-dark', label: 'Quadrotor, lights off', stage: 3, dynamics: 'quad', lighting: 'night-dark', speedH: 2, dr: 1, camera: true },
+  { id: 'floors-quad', label: 'Several floors, quadrotor', stage: 4, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, camera: true },
 ];
 
 /** Dev 92001+ (tune freely), test 93001+ (score once); task i offsets the block by 100 i. */
-export const HARD_SEEDS = {
-  dev: { base: 92001, count: 20 },
-  test: { base: 93001, count: 30 },
-} as const;
+export const HARD_SEEDS = { dev: { base: 92001, count: 20 }, test: { base: 93001, count: 30 } } as const;
 
 /** A split, or a fresh ledger block ({ base, count }) scored once for a report. */
-export function hardRuns(
-  split: "dev" | "test" | { base: number; count: number },
-  taskIndex: number,
-): BenchRun[] {
-  const { base, count } = typeof split === "string" ? HARD_SEEDS[split] : split;
-  return Array.from({ length: count }, (_, i) => ({
-    seed: base + taskIndex * 100 + i,
-  }));
+export function hardRuns(split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
+  const { base, count } = typeof split === 'string' ? HARD_SEEDS[split] : split;
+  return Array.from({ length: count }, (_, i) => ({ seed: base + taskIndex * 100 + i }));
 }
