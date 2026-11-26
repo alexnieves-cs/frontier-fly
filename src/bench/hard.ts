@@ -50,7 +50,23 @@ export const RETURN_TASKS: readonly BenchTask[] = [
 /** Return track seeds: dev 96001+ (tune freely), test 97001+ (score once); task i offsets the block by 100 i. */
 export const RETURN_SEEDS = { dev: { base: 96001, count: 20 }, test: { base: 97001, count: 30 } } as const;
 
-export function trackRuns(track: 'hard' | 'return', split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
-  const { base, count } = typeof split === 'string' ? (track === 'return' ? RETURN_SEEDS : HARD_SEEDS)[split] : split;
+/**
+ * The drift track (round 3): no pilot reads its true pose. Each flies on the src/loc estimator's
+ * pose (IMU, optical flow, range finder, lidar matched against its own map), with its seen and flown
+ * maps painted from that estimate (bench/drift.ts). The score is still measured on the truth, so a
+ * drone that thinks it is home but is not scores 0. Lights off, the flow sensor drops most samples.
+ */
+export const DRIFT_TASKS: readonly BenchTask[] = [
+  { id: 'drift-large-quad', label: '40 x 40 m and back on its own pose, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, home: true, drift: true },
+  { id: 'drift-wind-quad', label: '40 x 40 m and back on its own pose, quadrotor, 1 m/s wind, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, home: true, wind: 1, drift: true },
+  { id: 'drift-dark-quad', label: 'Rooms and back on its own pose, quadrotor, lights off, 40 s', stage: 3, dynamics: 'quad', lighting: 'night-dark', speedH: 2, dr: 1, maxSteps: 800, camera: true, home: true, drift: true },
+  { id: 'drift-quad', label: 'Rooms, hallways, loops on its own pose, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, camera: true, drift: true },
+];
+
+/** Drift track seeds: dev 98001+ (tune freely), test 99001+ (score once); task i offsets the block by 100 i. */
+export const DRIFT_SEEDS = { dev: { base: 98001, count: 20 }, test: { base: 99001, count: 30 } } as const;
+
+export function trackRuns(track: 'hard' | 'return' | 'drift', split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
+  const { base, count } = typeof split === 'string' ? { hard: HARD_SEEDS, return: RETURN_SEEDS, drift: DRIFT_SEEDS }[track][split] : split;
   return Array.from({ length: count }, (_, i) => ({ seed: base + taskIndex * 100 + i }));
 }

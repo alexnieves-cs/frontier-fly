@@ -45,6 +45,8 @@ export interface BenchTask {
   home?: boolean;
   /** Steady wind, m/s, in a direction drawn from the seed. */
   wind?: number;
+  /** Drift task: the pilot flies on its own pose estimate, with maps painted from it (bench/drift.ts). */
+  drift?: boolean;
 }
 
 export const BENCH_TASKS: readonly BenchTask[] = [

@@ -5,6 +5,7 @@ import { generateLargeBuilding } from '../team/largeBuilding';
 import { defaultEpisodeConfig, policyEpisodeLimits } from '../sim/env';
 import { lightingPreset } from '../sim/lighting';
 import { sensorFrame } from '../sim/sensorPlanner';
+import { DriftFrames, type DriftStats } from './drift';
 import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import type { ExplorerEnv } from '../sim/env';
@@ -39,6 +40,8 @@ export interface BenchEpisode {
    * When it did not, `camera.footprint` is 0 and `camera.seen` holds what it had seen.
    */
   returned?: boolean;
+  /** Drift tasks only: how far the pilot's pose estimate was from the truth, horizontal metres. */
+  drift?: DriftStats;
 }
 
 /** How close to the take-off point a return task's flight has to end, m (horizontal). */
@@ -179,10 +182,14 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
   const rec = new BenchEpisodeRecorder(env, task, run);
   pilot.reset(rec.ctx);
   let obs = rec.obs;
+  const drift = task.drift ? new DriftFrames(env, run.seed, task.lighting !== 'day') : null;
+  let first = true;
   for (;;) {
-    const s = env.step(pilot.act(obs, sensorFrame(env, obs)));
+    const s = env.step(pilot.act(obs, drift ? drift.frame(obs, first) : sensorFrame(env, obs)));
+    first = false;
     obs = s.obs;
     if (rec.record(s)) break;
   }
-  return rec.finish();
+  const ep = rec.finish();
+  return drift ? { ...ep, drift: drift.stats() } : ep;
 }

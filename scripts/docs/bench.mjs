@@ -183,11 +183,18 @@ export function benchPair(root, a, b) {
 
 /** FrontierBench Hard (src/bench/hard.ts): bench/results/hard/*.json, ranked by the camera footprint. */
 function hardBoard(root) {
-  return { ...trackBoard(root, 'bench/results/hard', 'BENCH_HARD', ''), ...trackBoard(root, 'bench/results/hard-return', 'BENCH_RETURN', ' --track return') };
+  return {
+    ...trackBoard(root, 'bench/results/hard', 'BENCH_HARD', ''),
+    ...trackBoard(root, 'bench/results/hard-return', 'BENCH_RETURN', ' --track return'),
+    ...trackBoard(root, 'bench/results/hard-drift', 'BENCH_DRIFT', ' --track drift', 'bench/results/hard-drift-truth'),
+  };
 }
 
-/** One FrontierBench Hard track's board and task table; return tasks add the share of flights that came home. */
-function trackBoard(root, dir, key, flag) {
+/**
+ * One FrontierBench Hard track's board and task table; return tasks add the share of flights that came home.
+ * With `control` (the drift track), each pilot's same flights on the true pose and its mean pose error join the row.
+ */
+function trackBoard(root, dir, key, flag, control) {
   const rows = readResults(root, dir).filter((r) => r.split === 'test' && r.cameraScore !== undefined);
   if (!rows.length) return { [key]: `_Run \`npm run bench:hard --${flag} --only planner-view,nbvp --split test\`._`, [`${key}_TASKS`]: '' };
   const v = Math.max(...rows.map((r) => r.hard ?? 0));
@@ -195,19 +202,29 @@ function trackBoard(root, dir, key, flag) {
   const tasks = cur[0].taskDefs;
   const cam = (e) => e.camera.footprint;
   const home = tasks.some((t) => t.home);
+  const ctl = control ? readResults(root, control).filter((r) => r.split === 'test' && r.cameraScore !== undefined) : [];
+  const onTruth = (r) => {
+    const c = ctl.find((x) => x.name === r.name && (x.hard ?? 0) === v);
+    return c ? pct(c.cameraScore) : '—';
+  };
+  const poseErr = (r) => {
+    const eps = (r.episodes ?? []).filter((e) => e.drift);
+    return eps.length ? `${(eps.reduce((a, e) => a + e.drift.mean, 0) / eps.length).toFixed(2)} m` : '—';
+  };
   const back = (r) => {
     const eps = (r.episodes ?? []).filter((e) => e.returned !== undefined);
     return eps.length ? `${eps.filter((e) => e.returned).length} of ${eps.length}` : '—';
   };
   return {
     [key]: table(
-      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), ...(home ? ['Came home'] : []), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
+      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), ...(home ? ['Came home'] : []), ...(control ? ['Same flights on the true pose', 'Mean pose error'] : []), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
       cur.map((r, i) => [
         String(i + 1),
         r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`,
         `**${pct(r.cameraScore)}**`,
         ...tasks.map((t) => (r.tasks[t.id]?.camera !== undefined ? pct(r.tasks[t.id].camera) : '—')),
         ...(home ? [back(r)] : []),
+        ...(control ? [onTruth(r), poseErr(r)] : []),
         r.footprintScore === undefined ? '—' : pct(r.footprintScore),
         pct(r.score),
         crashes(r),

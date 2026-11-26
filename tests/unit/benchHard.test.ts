@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BASELINES, explorerPilot, VIEW_QUAD_MARGIN } from '../../src/bench/baselines';
-import { HARD_SEEDS, HARD_TASKS, hardRuns, RETURN_TASKS, trackRuns } from '../../src/bench/hard';
+import { DRIFT_TASKS, HARD_SEEDS, HARD_TASKS, hardRuns, RETURN_TASKS, trackRuns } from '../../src/bench/hard';
 import { benchEpisodeSetup, runBenchEpisode } from '../../src/bench/run';
 import { BENCH_SEEDS } from '../../src/bench/tasks';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
@@ -91,6 +91,32 @@ describe('FrontierBench Hard', () => {
     expect(away.returned).toBe(false);
     expect(away.camera!.footprint).toBe(0);
     expect(away.camera!.seen).toBeGreaterThan(back.camera!.seen!);
+    env.dispose();
+  });
+
+  it('a drift task flies on the pose estimate, never the true pose or the env maps', async () => {
+    const env = await createEnv();
+    const ti = DRIFT_TASKS.findIndex((t) => t.id === 'drift-dark-quad');
+    const run = trackRuns('drift', 'dev', ti)[0]!;
+    const inner = BASELINES['planner-view']!();
+    let offTruth = 0;
+    let envMaps = 0;
+    const spy = {
+      name: 'spy',
+      reset: inner.reset.bind(inner),
+      act: (o: Float32Array, f: Parameters<typeof inner.act>[1]) => {
+        const s = env.snapshot();
+        if (Math.hypot(f.pos[0] - s.pos[0], f.pos[1] - s.pos[1]) > 1e-6) offTruth += 1;
+        if (f.seen === env.seenGrid || f.visited === env.visitedGrid) envMaps += 1;
+        return inner.act(o, f);
+      },
+    };
+    const ep = runBenchEpisode(env, DRIFT_TASKS[ti]!, run, spy);
+    expect(envMaps).toBe(0);
+    expect(offTruth).toBe(ep.steps);
+    expect(ep.drift!.mean).toBeGreaterThan(0);
+    expect(ep.drift!.max).toBeLessThan(1);
+    expect(ep.returned).toBe(true);
     env.dispose();
   });
 });
