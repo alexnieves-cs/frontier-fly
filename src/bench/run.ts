@@ -33,8 +33,16 @@ export interface BenchEpisode {
   /** Seconds until half the building was inside the footprint, or null. */
   footprintHalfS: number | null;
   /** Tasks with `camera` only: the forward 90° camera footprint at 3 m (FrontierBench Hard), its curve area and half time. */
-  camera?: { footprint: number; area: number; halfS: number | null };
+  camera?: { footprint: number; area: number; halfS: number | null; seen?: number };
+  /**
+   * Return tasks only: the drone ended within HOME_RADIUS of take-off, on its floor, without a crash.
+   * When it did not, `camera.footprint` is 0 and `camera.seen` holds what it had seen.
+   */
+  returned?: boolean;
 }
+
+/** How close to the take-off point a return task's flight has to end, m (horizontal). */
+export const HOME_RADIUS = 1.5;
 
 /** Field of view of FrontierBench Hard's camera footprint, radians. */
 export const CAMERA_FOV = Math.PI / 2;
@@ -52,6 +60,12 @@ export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: Build
   // v3 flies under the crash rule (shared/constants.ts CRASH_SPEED: a contact faster than 0.5 m/s ends
   // the flight, coverage counts what was flown until then) and prices energy on the current airframe
   // (shared/airframe.ts), the same as every study in the report. v2 did neither (bench/results/v2/).
+  // A return flight crosses air it has already flown, so the no-new-voxels stall cut is off.
+  if (task.home) cfg.stallSteps = cfg.maxSteps + 1;
+  if (task.wind) {
+    const a = new RNG(seed, 'bench-wind').next() * Math.PI * 2;
+    cfg.wind = [Math.cos(a) * task.wind, Math.sin(a) * task.wind];
+  }
   if (task.dynamics === 'quad' && task.dr > 0) {
     const rng = new RNG(seed, 'bench-dr');
     cfg.dyn = sampleDynParams(rng, defaultDynParams(), task.dr);
@@ -86,6 +100,7 @@ export class BenchEpisodeRecorder {
   private halfS: number | null = null;
   private steps = 0;
   private over = false;
+  private start: [number, number, number] = [0, 0, 0];
 
   constructor(
     private readonly env: ExplorerEnv,
@@ -93,8 +108,10 @@ export class BenchEpisodeRecorder {
     private readonly run: BenchRun,
   ) {
     const { spec, envSeed, cfg } = benchEpisodeSetup(task, run);
-    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics };
+    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics, ...(task.home ? { home: true } : {}) };
     this.obs = env.reset(spec, envSeed, cfg);
+    const p0 = env.snapshot().pos;
+    this.start = [p0[0], p0[1], p0[2]];
     this.fp.start(env, spec, cfg.maxSteps);
     this.cam = task.camera ? { fp: new FootprintCoverage([FOOTPRINT_RADIUS], CAMERA_FOV), curve: new CoverageCurve(cfg.maxSteps) } : null;
     if (this.cam) {
@@ -128,11 +145,16 @@ export class BenchEpisodeRecorder {
   finish(): BenchEpisode {
     const rec = this.fp.finish(this.info.coverage);
     let camera: BenchEpisode['camera'];
+    let returned: boolean | undefined;
+    if (this.task.home) {
+      const p = this.env.snapshot().pos;
+      returned = !this.info.crashed && Math.hypot(p[0] - this.start[0], p[1] - this.start[1]) <= HOME_RADIUS && Math.abs(p[2] - this.start[2]) < 1.5;
+    }
     if (this.cam) {
       const v = this.cam.fp.coverage(0);
       this.cam.curve.finish([v]);
       const series = this.cam.curve.series(0);
-      camera = { footprint: v, area: curveArea(series), halfS: timeTo(series, 0.5, this.ctx.maxSteps / 20) };
+      camera = { footprint: returned === false ? 0 : v, area: curveArea(series), halfS: timeTo(series, 0.5, this.ctx.maxSteps / 20), ...(returned === undefined ? {} : { seen: v }) };
     }
     return {
       task: this.task.id,
@@ -148,6 +170,7 @@ export class BenchEpisodeRecorder {
       area: { flown: curveArea(rec.curve.flown), footprint: curveArea(rec.curve.footprint) },
       footprintHalfS: timeTo(rec.curve.footprint, 0.5, this.ctx.maxSteps / 20),
       ...(camera ? { camera } : {}),
+      ...(returned === undefined ? {} : { returned }),
     };
   }
 }

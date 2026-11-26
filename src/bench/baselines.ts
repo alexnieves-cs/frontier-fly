@@ -13,6 +13,14 @@ import { BoustrophedonExplorer } from '../sim/explorers/boustrophedon';
 import type { BenchContext, BenchPilot } from './pilot';
 
 /**
+ * The return supervisor every explorer pilot shares on return tasks (BenchContext.home), so the
+ * tasks compare exploration, not homing code. Every `every` steps it plans the known-free path back
+ * to take-off; once that path at `speed` × the task speed, plus `reserve` seconds, no longer fits in
+ * the time left, it stops the explorer and flies the sensor-only planner home.
+ */
+export const HOME_RETURN = { speed: 0.9, reserve: 5, every: 10 } as const;
+
+/**
  * A pilot over any exploration strategy on the sensor frame, with its own
  * lidar occupancy map. On buildings with more than one floor it takes shafts
  * (sim/climber.ts) between floors.
@@ -23,6 +31,8 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
   let explorer: Explorer = make(ctx);
   let climber: Climber | null = null;
   let occ: OccupancyMap | null = null;
+  let homer: SensorPlanner | null = null;
+  let steps = 0;
   return {
     name,
     reset(c) {
@@ -30,17 +40,32 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
       explorer = make(c);
       climber = null;
       occ = null;
+      steps = 0;
+      homer = c.home ? new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN } : {}) }) : null;
     },
     act(obs: Float32Array, f: SensorFrame) {
       if (!occ || occ.occupied.length !== f.seen.length) occ = new OccupancyMap(f.vw, f.vd, f.floors);
       const floor = Math.max(0, Math.min(f.floors - 1, Math.floor(f.pos[2] / f.floorHeight)));
       occ.mark(floor, f.pos[0], f.pos[1], f.yaw, f.lidar);
       const frame = { ...f, occupied: occ.occupied };
+      if (homer) {
+        if (!homer.homing && steps % HOME_RETURN.every === 0) {
+          const left = (ctx.maxSteps - steps) / 20;
+          const d = homer.homeDistance(frame);
+          // No known path home (a map glitch): keep exploring and ask again next time.
+          if (d < Infinity && d / (HOME_RETURN.speed * ctx.speedH) + HOME_RETURN.reserve >= left) homer.homing = true;
+        }
+        steps += 1;
+        if (homer.homing) return commandToAction(homer.act(frame), f.yaw, out, ctx.speedH).slice();
+      }
       if (f.floors > 1) {
         climber ??= new Climber(explorer, { floorSteps: (0.8 * ctx.maxSteps) / f.floors });
         return commandToAction(climber.act(frame, obs[OBS.ceil]! * f.floorHeight), f.yaw, out, ctx.speedH).slice();
       }
-      return commandToAction(explorer.act(frame), f.yaw, out, ctx.speedH).slice();
+      const cmd = explorer.act(frame);
+      // An explorer that has finished goes home at once.
+      if (homer && !cmd.exploring) homer.homing = true;
+      return commandToAction(cmd, f.yaw, out, ctx.speedH).slice();
     },
   };
 }

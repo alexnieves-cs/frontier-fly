@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BASELINES, explorerPilot, VIEW_QUAD_MARGIN } from '../../src/bench/baselines';
-import { HARD_SEEDS, HARD_TASKS, hardRuns } from '../../src/bench/hard';
+import { HARD_SEEDS, HARD_TASKS, hardRuns, RETURN_TASKS, trackRuns } from '../../src/bench/hard';
 import { benchEpisodeSetup, runBenchEpisode } from '../../src/bench/run';
 import { BENCH_SEEDS } from '../../src/bench/tasks';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
@@ -73,6 +73,24 @@ describe('FrontierBench Hard', () => {
     const face = runBenchEpisode(env, HARD_TASKS[ti]!, run, facing);
     expect(look.camera!.footprint).toBeGreaterThan(face.camera!.footprint);
     expect(look.crashed).toBe(false);
+    env.dispose();
+  });
+
+  it('a return task counts the camera only for a drone that came home', async () => {
+    const env = await createEnv();
+    const ti = RETURN_TASKS.findIndex((t) => t.id === 'return-sprint');
+    const run = trackRuns('return', 'dev', ti)[0]!;
+    // Every explorer pilot gets the shared return supervisor and comes back in time.
+    const back = runBenchEpisode(env, RETURN_TASKS[ti]!, run, BASELINES['planner-view']!());
+    expect(back.returned).toBe(true);
+    expect(back.camera!.footprint).toBeGreaterThan(0.3);
+    expect(back.camera!.seen).toBe(back.camera!.footprint);
+    // A pilot that does not know about returning loses the flight.
+    const plain = BASELINES['planner-view']!();
+    const away = runBenchEpisode(env, RETURN_TASKS[ti]!, run, { name: 'no return', reset: (c) => plain.reset({ ...c, home: false }), act: (o, f) => plain.act(o, f) });
+    expect(away.returned).toBe(false);
+    expect(away.camera!.footprint).toBe(0);
+    expect(away.camera!.seen).toBeGreaterThan(back.camera!.seen!);
     env.dispose();
   });
 });

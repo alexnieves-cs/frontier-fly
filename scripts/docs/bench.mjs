@@ -183,20 +183,31 @@ export function benchPair(root, a, b) {
 
 /** FrontierBench Hard (src/bench/hard.ts): bench/results/hard/*.json, ranked by the camera footprint. */
 function hardBoard(root) {
-  const rows = readResults(root, 'bench/results/hard').filter((r) => r.split === 'test' && r.cameraScore !== undefined);
-  if (!rows.length) return { BENCH_HARD: '_Run `npm run bench:hard -- --only planner-view,nbvp --split test`._', BENCH_HARD_TASKS: '' };
+  return { ...trackBoard(root, 'bench/results/hard', 'BENCH_HARD', ''), ...trackBoard(root, 'bench/results/hard-return', 'BENCH_RETURN', ' --track return') };
+}
+
+/** One FrontierBench Hard track's board and task table; return tasks add the share of flights that came home. */
+function trackBoard(root, dir, key, flag) {
+  const rows = readResults(root, dir).filter((r) => r.split === 'test' && r.cameraScore !== undefined);
+  if (!rows.length) return { [key]: `_Run \`npm run bench:hard --${flag} --only planner-view,nbvp --split test\`._`, [`${key}_TASKS`]: '' };
   const v = Math.max(...rows.map((r) => r.hard ?? 0));
   const cur = rows.filter((r) => (r.hard ?? 0) === v).sort((a, b) => b.cameraScore - a.cameraScore);
   const tasks = cur[0].taskDefs;
   const cam = (e) => e.camera.footprint;
+  const home = tasks.some((t) => t.home);
+  const back = (r) => {
+    const eps = (r.episodes ?? []).filter((e) => e.returned !== undefined);
+    return eps.length ? `${eps.filter((e) => e.returned).length} of ${eps.length}` : '—';
+  };
   return {
-    BENCH_HARD: table(
-      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
+    [key]: table(
+      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), ...(home ? ['Came home'] : []), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
       cur.map((r, i) => [
         String(i + 1),
         r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`,
         `**${pct(r.cameraScore)}**`,
         ...tasks.map((t) => (r.tasks[t.id]?.camera !== undefined ? pct(r.tasks[t.id].camera) : '—')),
+        ...(home ? [back(r)] : []),
         r.footprintScore === undefined ? '—' : pct(r.footprintScore),
         pct(r.score),
         crashes(r),
@@ -204,7 +215,7 @@ function hardBoard(root) {
         `\`${r.commit}\``,
       ]),
     ),
-    BENCH_HARD_TASKS: table(
+    [`${key}_TASKS`]: table(
       ['Task', 'What', 'Airframe', 'Lighting', 'Budget'],
       tasks.map((t) => [`\`${t.id}\``, t.label, t.dynamics === 'quad' ? 'Quadrotor, randomized' : 'Kinematic', t.lighting === 'day' ? 'Day' : 'Lights off', `${(t.maxSteps ?? 2400) / 20} s`]),
     ),

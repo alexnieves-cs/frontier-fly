@@ -33,3 +33,24 @@ export function hardRuns(split: 'dev' | 'test' | { base: number; count: number }
   const { base, count } = typeof split === 'string' ? HARD_SEEDS[split] : split;
   return Array.from({ length: count }, (_, i) => ({ seed: base + taskIndex * 100 + i }));
 }
+
+/**
+ * The return track (round 2): a search drone that does not come back loses the flight, so each
+ * task's camera footprint counts only if the drone ends within HOME_RADIUS of take-off (bench/run.ts).
+ * Every explorer pilot gets the same return supervisor (baselines.ts HOME_RETURN), so the tasks
+ * compare how much each sees in the time it can afford to be away. Same crash rule and camera.
+ */
+export const RETURN_TASKS: readonly BenchTask[] = [
+  { id: 'return-large-quad', label: '40 x 40 m building and back, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, home: true },
+  { id: 'return-wind-quad', label: '40 x 40 m and back, quadrotor, 1 m/s wind, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, home: true, wind: 1 },
+  { id: 'return-dark-quad', label: 'Rooms, hallways, loops and back, quadrotor, lights off, 40 s', stage: 3, dynamics: 'quad', lighting: 'night-dark', speedH: 2, dr: 1, maxSteps: 800, camera: true, home: true },
+  { id: 'return-sprint', label: 'Rooms, hallways, loops and back in 30 s', stage: 3, dynamics: 'kinematic', lighting: 'day', speedH: 2, dr: 0, maxSteps: 600, camera: true, home: true },
+];
+
+/** Return track seeds: dev 96001+ (tune freely), test 97001+ (score once); task i offsets the block by 100 i. */
+export const RETURN_SEEDS = { dev: { base: 96001, count: 20 }, test: { base: 97001, count: 30 } } as const;
+
+export function trackRuns(track: 'hard' | 'return', split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
+  const { base, count } = typeof split === 'string' ? (track === 'return' ? RETURN_SEEDS : HARD_SEEDS)[split] : split;
+  return Array.from({ length: count }, (_, i) => ({ seed: base + taskIndex * 100 + i }));
+}
