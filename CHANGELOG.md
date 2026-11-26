@@ -5,6 +5,16 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### View-first planner v3: camera aiming and a wall fix (2026-11-26)
+
+- `ViewOptions.look`: the planner keeps a camera view mask and turns a 90° forward camera toward what it has not
+  had in view (quadrotor only in `planner-view`, up to 0.8 rad/s). Fix: the edge-of-unknown test counted mapped
+  walls as unknown, so in some 40 m buildings the drone worked along walls (one dev building 32% to 70%).
+- Fresh report-only hard block 95001+ (900 flights, every pilot once): camera score 85.8% (v2 78.9%) against NBVP
+  64.5%, nearest frontier 57.1%; ties nearest frontier on the kinematic 40 m task (+0.6, −3.4 to +5.2). Crashes
+  4 of 150 (v2 2, NBVP 18). Hard test 86.0% (v2 79.1%); v3 test 99.1% footprint, 67.4% flown, 0 crashes.
+- `bench:hard --base N --count M` flies a ledger block.
+
 ### FrontierBench Hard (2026-11-26)
 
 - New track `npm run bench:hard` (src/bench/hard.ts): 40 x 40 m buildings in 120 s (kinematic and quadrotor), 30 s
