@@ -50,6 +50,16 @@ A search drone that does not come back loses what it saw, and no pilot on the ha
 
 The view-first planner brings back 120 of 120 flights with no crash and leads every task; most of the baselines' lost flights are crashes. Its lead is +20.8 points over nearest frontier (95% interval +16.1 to +26.1) and +24.3 over NBVP (+20.6 to +28.4), but on the 30 s sprint the lead over nearest frontier (+6.0, −2.0 to +14.2) is within noise. A goal-scoring change that looked like +4.6 points on dev (preferring goals with more unknown space around them) was worth +1.0 on these test flights and cost a little on the other tracks, so it was not shipped ([VIEW_FIRST.md](VIEW_FIRST.md)).
 
+### Drift track
+
+Every other board hands the pilot its true position. A real drone indoors has no GPS: it knows where it is only from its own sensors, and that estimate drifts. On the drift track ([`src/bench/drift.ts`](../src/bench/drift.ts), `DRIFT_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts), `npm run bench:hard -- --track drift`) nothing in the pilot's loop reads the truth. Its pose comes from the indoor estimator in [`src/loc`](../src/loc) (gyro, accelerometer, optical flow, range finder, and a 10 Hz lidar matched against the map it builds as it flies), its seen and flown maps are painted from that estimate, and its measured velocity is turned by the estimated heading. Its commands are flown in the real body frame, so a heading error turns every command. The score is still measured on the true pose, so a drone that thinks it is home but is not scores 0. Lights off, the flow sensor drops most of its samples. Three of the four tasks are return tasks with the shared return supervisor. Each pilot also flies the same seeds on the true pose (`--truth`), the paired control that prices the estimate. Seeds: dev 98001+ (20 per task), test 99001+ (30 per task, scored once).
+
+{{BENCH_DRIFT}}
+
+{{BENCH_DRIFT_TASKS}}
+
+On its own estimate the view-first planner scores 78.7%, with 89 of 90 return flights home and no crash in 120 flights. That is +22.8 points over NBVP (95% interval +19.4 to +26.6) and +27.7 over nearest frontier (+23.5 to +32.1). The estimate itself costs it nothing measurable: the same flights on the true pose score 78.5% (difference +0.2, −1.4 to +1.5). No pilot loses more than noise to the estimate, because the estimator holds the pose to 0.12 to 0.22 m on average (worst 0.80 m, in the wind). So this board shows the pilots do not depend on ground truth; it does not show that drift is hard for them. One oddity: the planner + quad tracker scores 3.4 points higher on its estimate than on the truth (+2.0 to +4.8); we have not found why. Nothing was tuned for this track: every pilot is the one on the boards above, and dev met the round's goal before any change.
+
 ## Team track
 
 {{BENCH_TEAM}}

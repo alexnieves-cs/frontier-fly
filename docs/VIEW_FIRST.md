@@ -110,6 +110,20 @@ Two attempts to do better, both tuned on dev:
 Test split 97001+ (30 per task, every pilot once): v3 74.0%, 120 of 120 home, no crash; nearest frontier 53.1%
 (103 home, 17 crashes); NBVP 49.7% (98, 22); BA* 32.3%; planner + quad tracker 26.0%.
 
+## Round 3: flying on its own pose estimate
+
+Every result above hands the planner its true position. Round 3's goal was to take that away and keep at least 90% of the true-pose score, with a lead of 15 points or more over every baseline. The drift track ([`src/bench/drift.ts`](../src/bench/drift.ts), `DRIFT_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts)) feeds each pilot the src/loc estimator's pose and maps painted from that pose; its commands are flown in the real body frame, and the score is measured on the truth. Dev (98001+) met the goal with no change, so nothing was tuned. On test (99001-99330, flown once per pilot, with a paired true-pose control on the same seeds):
+
+| Pilot | On its estimate | Same flights, true pose | Crashes (estimate) |
+| --- | --- | --- | --- |
+| View-first planner | **78.7%** | 78.5% | 0/120 |
+| NBVP | 55.9% | 54.5% | 20/120 |
+| Nearest frontier | 51.0% | 50.4% | 28/120 |
+| BA* | 41.5% | 41.2% | 13/120 |
+| Planner + quad tracker | 36.2% | 32.8% | 3/120 |
+
+The lead is +22.8 points over NBVP (+19.4 to +26.6) and +27.7 over nearest frontier (+23.5 to +32.1). The estimate costs the view-first planner +0.2 points (−1.4 to +1.5), that is, nothing measurable, because the estimator keeps the error at 0.12 to 0.22 m on average (worst 0.80 m). The honest reading: the planner does not depend on ground truth, but this level of drift is not hard for any pilot. A harsher sensor model (lidar sector loss, glass, flow failure) is the next stressor. The quad tracker's +3.4 points on its estimate is unexplained.
+
 ## Results of version 1
 
 Seed blocks are in the project's seed ledger. Tuning used the FrontierBench dev split and a practice block

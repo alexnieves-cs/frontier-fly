@@ -5,6 +5,15 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### FrontierBench Hard: the drift track (2026-11-26)
+
+- `npm run bench:hard -- --track drift`: four quadrotor tasks flown with no ground truth in the pilot's loop. The
+  pose is the src/loc estimator's (IMU, flow, range finder, lidar matched to its own map), the seen and flown maps
+  are painted from it (`src/bench/drift.ts`), and the score stays on the true pose. `--truth` flies the same seeds
+  on the true pose as a paired control.
+- Test 99001+: view-first planner 78.7% (89 of 90 home, no crash) vs 78.5% on the true pose; NBVP 55.9%
+  (20 crashes), nearest frontier 51.0% (28), BA* 41.5%, quad-aware planner 36.2%. Mean pose error 0.12 to 0.22 m.
+
 ### FrontierBench Hard: the return track (2026-11-26)
 
 - `npm run bench:hard -- --track return`: four tasks (40 m and back on the quadrotor, the same in 1 m/s wind, dark
