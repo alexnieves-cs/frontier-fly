@@ -38,7 +38,7 @@ v3's footprint column saturates: the view-first planner sees 99% of the test bui
 
 {{BENCH_HARD_TASKS}}
 
-The hard track found a flaw in the view-first planner on its dev split: on 40 m buildings it treated a corridor as done once it had viewed the mapped part, though the sparse lidar ring had not mapped the corridor to its end, and fell back to sweeping half the building early. The fix (fly to the edge of unknown space before sweeping) was tuned on hard dev and the practice block and re-checked on a fresh block ([VIEW_FIRST.md](VIEW_FIRST.md)). The task design was also settled on dev only. Nearest frontier (Yamauchi) leads on `large`, where leaving each room from the doorway is the right call when time is short; the view-first planner leads overall and on every quadrotor task.
+The hard track found two flaws in the view-first planner on its dev split, both fixed and tuned on dev only. On 40 m buildings it treated a corridor as done once it had viewed the mapped part, though the sparse lidar ring had not mapped the corridor to its end (v2: fly to the edge of unknown space before sweeping). And its edge-of-unknown test counted mapped walls as unknown, so in some large buildings it spent the flight working along the walls of one quarter (v3). v3 also aims the quadrotor's forward camera at what it has not yet had in view. On a fresh report-only block flown once by every pilot (95001+, 900 flights) v3 scores 85.8% against NBVP's 64.5% and nearest frontier's 57.1% ([VIEW_FIRST.md](VIEW_FIRST.md)). Nearest frontier (Yamauchi) still ties it on `large`, the kinematic 40 m building (75.3% against 76.0%, paired gap +0.6, 95% interval −3.4 to +5.2), where leaving each room from the doorway is the right call when time is short.
 
 ## Team track
 

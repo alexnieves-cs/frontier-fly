@@ -42,6 +42,51 @@ to +12.3). On the v3 test split v2 scores 99.0% footprint and 64.6% flown with n
 +16.8), with 2 crashes in 150 flights against NBVP's 25; nearest frontier beats it on the kinematic 40 m task (73.3%
 against 68.2%).
 
+## Version 3: a camera to aim, and walls that are not unknown (FrontierBench Hard)
+
+FrontierBench Hard scores a forward 90° camera, and v2 was built for a 360° ring. Round 1 of the hard track set a
+goal on its dev split (92001+): a camera score of at least 85%, ahead of every baseline on every task, with no more
+crashes. Three attempts, all tuned on dev only:
+
+1. *Narrow the view mask to the camera* (a voxel counts as viewed only when it was within 45° of the heading).
+   It helped the quadrotor tasks and hurt the 40 m building, 74.5% to 80.7% overall against v2's 79.0%. Dropped.
+2. *Keep the ring for goals, aim the camera.* The planner keeps a second mask of what the camera has had in
+   view, and turns toward the 90° window with the most voxels within 3 m it has not (`ViewOptions.look`), up to
+   0.8 rad/s; with fewer than 4 left it faces travel as before. 82.2% on dev, no crash in 100 flights. On the
+   kinematic airframe, which already turns as fast as it likes along its path, aiming cost coverage on both
+   kinematic tasks, so the shipped baseline aims on the quadrotor only.
+3. *A bug the per-seed numbers showed.* Some 40 m buildings scored 32% where nearest frontier scored 86%. The
+   trace showed the drone working along the walls of one quarter of the building for 1,500 steps: the
+   edge-of-unknown test treated a mapped wall voxel as unknown (walls are in the occupancy map, not in the seen
+   map), so every wall was a goal. Counting walls as known took that building from 32% to 70% and the dev
+   camera score to **86.6%**, 1 crash in 100 flights.
+
+A crash check on 240 more quadrotor flights from the dev range (92001-92080 per task) gave 2 crashes with aiming
+and 9 without it, so aiming does not add crashes.
+
+The code was then frozen and a fresh report-only block, **95001-95430** (30 flights per task, task i at 95001 + 100 i),
+was flown once by every pilot, including v2 from the commit before this change. Results: `bench/results/hard-95001/`.
+
+| Pilot | Camera score | Ring footprint | Flown | Crashes | large | large-quad | sprint | quad-dark | floors-quad |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| View-first planner v3 | **85.8%** | 90.5% | 26.0% | 4 of 150 | 76.0 | 76.6 | 94.1 | 98.7 | 83.7 |
+| View-first planner v2 (before this change) | 78.9% | 87.9% | 25.5% | 2 of 150 | 69.0 | 70.7 | 93.1 | 91.2 | 70.7 |
+| Next-best-view RRT (NBVP) | 64.5% | 69.8% | 17.8% | 18 of 150 | 58.8 | 43.2 | 78.3 | 93.4 | 49.0 |
+| Nearest frontier (Yamauchi) | 57.1% | 65.8% | 10.0% | 21 of 150 | 75.3 | 41.7 | 68.2 | 66.1 | 34.3 |
+| Boustrophedon (BA*) | 45.0% | 48.5% | 23.2% | 13 of 150 | 26.7 | 24.1 | 44.2 | 78.0 | 51.9 |
+| Sensor-only planner + quad tracker | 39.1% | 42.5% | 24.1% | 5 of 150 | 24.2 | 16.7 | 42.5 | 68.7 | 43.6 |
+| Guarded policy | 38.7% | 42.4% | 20.2% | 43 of 150 | 31.6 | 18.1 | 48.9 | 61.6 | 33.2 |
+
+Paired camera-score gaps (flights resampled within each task, 2000 draws): +21.3 points over NBVP (95% interval
++18.7 to +24.1), +28.7 over nearest frontier (+25.8 to +31.7), +6.9 over v2 (+4.6 to +9.2). On the kinematic 40 m
+task the gap to nearest frontier is +0.6 (−3.4 to +5.2): **a tie, not a win**, so the "every task" half of the goal
+is met on dev (74.8 against 72.0) but not shown on fresh seeds. Crashes: 4 of 150, the fewest of any pilot but two
+more than v2 on the same block; with counts this small (and 2 against 9 on the 240-flight dev check) that is not
+evidence either way. On the hard test split (93001+) v3 scores 86.0% (v2 79.1%) with 3 crashes in 150 (v2 2).
+
+The wall fix also changes v3 on FrontierBench v3: test split 99.1% footprint (v2 99.0%), 67.4% flown (v2 64.6%), no
+crash in 240 flights. `bench/results/planner-view.json` and `bench/results/hard/planner-view.json` now hold v3.
+
 ## Results of version 1
 
 Seed blocks are in the project's seed ledger. Tuning used the FrontierBench dev split and a practice block
@@ -62,13 +107,13 @@ the same count as the quad-aware planner (NBVP 89.7%, 5 crashes). `bench/results
 
 ## Limits
 
-- **The rule was designed with the metric in view.** It uses the metric's 3 m radius and its 360° horizontal
-  plane, so the result says the planner can be pointed at footprint coverage, not that it would see more with a
-  real camera. A forward camera with a narrow field of view would need goals that also say which way to look.
+- **The rule was designed with the metric in view.** It uses the metric's 3 m radius, and v3's camera aiming uses
+  the hard track's 90° field of view, so the result says the planner can be pointed at footprint coverage, not that
+  a real camera would see as much: no occlusion by the drone itself, no motion blur, no detection model.
 - **NBVP still sees half the building sooner** (10.4 s against 13.5 s on the 94001 block). It wins early and then
   stops; the view-first planner keeps going until nothing is left unviewed.
 - NBVP runs on its paper's parameters and was not tuned; the view-first planner was tuned on the dev split and the
   practice block. The crash counts are small (0 against 7 and 0 in 240), so they say "no more crashes", not "safer".
 
 Reproduce: `npm run bench:score -- --pilot planner-view --base 91001 --plans eval` (and `--pilot nbvp`,
-`--pilot planner-tracker`).
+`--pilot planner-tracker`); v3's fresh block: `npm run bench:hard -- --only planner-view,nbvp,yamauchi --base 95001 --count 30 --out bench/results/hard-95001`.
