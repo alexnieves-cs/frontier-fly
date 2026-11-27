@@ -199,12 +199,15 @@ const split = arg('split', 'test') as 'dev' | 'test';
 let raw: Raw;
 const mergeAt = process.argv.indexOf('--merge');
 if (mergeAt >= 0) {
-  const files = process.argv.slice(mergeAt + 1).filter((a) => a.endsWith('.json') && a !== out && a !== arg('control', ''));
+  const files = process.argv.slice(mergeAt + 1).filter((a) => a.endsWith('.json') && a !== out && a !== arg('control', '') && a !== arg('first', ''));
   raw = files.flatMap((f) => (JSON.parse(readFileSync(f, 'utf8')) as { raw: Raw }).raw);
 } else {
   raw = await fly(split, arg('pilots', PILOTS.join(',')).split(','));
 }
 const controlPath = arg('control', '');
+// --first: an earlier report run of the same study on the same seeds (its summaries are kept, not its flights).
+const firstPath = arg('first', '');
+const first = firstPath ? (JSON.parse(readFileSync(firstPath, 'utf8')) as { commit: string; cells: { pilot: string; budget: string; set: string }[] }) : null;
 const control = controlPath ? (JSON.parse(readFileSync(controlPath, 'utf8')) as { commit: string; cells: { pilot: string; budget: string; set: string }[] }) : null;
 const homeSet = parseHomeSet(JSON.parse(readFileSync(HOME_SET_PATH, 'utf8')));
 const result = {
@@ -222,5 +225,6 @@ const result = {
   // Shards keep the raw flights for --merge; the merged file has them under cells[].episodes.
   ...(mergeAt < 0 ? { raw } : {}),
   ...(control ? { control: { commit: control.commit, cells: control.cells.map((c) => ({ ...c, episodes: undefined })) } } : {}),
+  ...(first ? { firstRun: { commit: first.commit, cells: first.cells.map((c) => ({ ...c, episodes: undefined })) } } : {}),
 };
 writeFileSync(out, `${JSON.stringify(result, null, 1)}\n`);

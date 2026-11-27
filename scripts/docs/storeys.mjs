@@ -10,7 +10,9 @@ const NAMES = {
   nbvp: 'NBVP (Bircher et al. 2016)',
   yamauchi: 'Nearest frontier (Yamauchi 1997)',
 };
-const SETS = { generated: 'generated multi-floor buildings', homes: 'real multi-storey homes' };
+const SETS = { generated: 'generated multi-floor buildings', homes: 'real multi-storey homes', holdout: 'held-out real homes' };
+const SET_ORDER = ['generated', 'homes', 'holdout'];
+const SET_SHORT = { generated: 'Generated', homes: 'Real homes', holdout: 'Held-out homes' };
 
 function find(cells, pilot, budget, set) {
   return cells.find((c) => c.pilot === pilot && c.budget === budget && c.set === set);
@@ -24,7 +26,7 @@ function pilotsOf(study) {
 export function storeysTables(study) {
   if (!study) return '_Not measured yet._';
   const out = [];
-  for (const set of ['generated', 'homes']) {
+  for (const set of SET_ORDER) {
     const any = study.cells.find((c) => c.set === set);
     if (!any) continue;
     out.push(`**${any.flights} ${SETS[set]}**`, '');
@@ -48,7 +50,7 @@ export function storeysTables(study) {
 export function storeysControlTable(study) {
   if (!study?.control) return '_No paired control in this run._';
   const out = ['| Pilot | Buildings | 120 s: seen, main → this | 120 s: every floor reached, main → this | Battery: seen, main → this | Battery: every floor reached, main → this |', '| --- | --- | --- | --- | --- | --- |'];
-  for (const set of ['generated', 'homes']) {
+  for (const set of SET_ORDER) {
     for (const pilot of pilotsOf(study)) {
       const nb = find(study.cells, pilot, 'bench', set);
       const mb = find(study.control.cells, pilot, 'bench', set);
@@ -56,7 +58,7 @@ export function storeysControlTable(study) {
       const my = find(study.control.cells, pilot, 'battery', set);
       if (!nb || !mb || !ny || !my) continue;
       out.push(
-        `| ${NAMES[pilot] ?? pilot} | ${set === 'generated' ? 'Generated' : 'Real homes'} | ${pct(mb.footprint)} → ${pct(nb.footprint)} | ${mb.allFloorsReached} → ${nb.allFloorsReached} of ${nb.flights} | ${pct(my.footprint)} → ${pct(ny.footprint)} | ${my.allFloorsReached} → ${ny.allFloorsReached} of ${ny.flights} |`,
+        `| ${NAMES[pilot] ?? pilot} | ${SET_SHORT[set]} | ${pct(mb.footprint)} → ${pct(nb.footprint)} | ${mb.allFloorsReached} → ${nb.allFloorsReached} of ${nb.flights} | ${pct(my.footprint)} → ${pct(ny.footprint)} | ${my.allFloorsReached} → ${ny.allFloorsReached} of ${ny.flights} |`,
       );
     }
   }
@@ -73,7 +75,9 @@ export function storeysNote(study) {
   const vb = g('planner-view', 'bench');
   const hv = h('planner-view', 'bench');
   if (!pb || !hb || !vb || !hv) return '';
-  return `- **On a real battery the multi-floor number is not 40%.** [MULTI_FLOOR.md](MULTI_FLOOR.md) flies ${pb.flights} fresh generated multi-floor buildings and ${hb.flights} real two- and three-storey homes from Swiss Dwellings (their own staircases as shafts) under three budgets. Given the airframe's own pack (explore until 70% of the usable energy is spent) the planner flies ${pct(pb.coverage)} of the generated buildings and ${pct(hb.coverage)} of the real homes (the env stops a flight at 95%), reaching every floor in ${pb.allFloorsReached} of ${pb.flights} and ${hb.allFloorsReached} of ${hb.flights}, in ${(pb.seconds / 60).toFixed(1)} and ${(hb.seconds / 60).toFixed(1)} minutes on ${pb.batteryPct.toFixed(0)}% and ${hb.batteryPct.toFixed(0)}% of the pack. Inside the 120 s budget the view-first planner already brings ${pct(vb.footprint)} and ${pct(hv.footprint)} of them within 3 m of its sensor. The climber now searches for stairs when a floor is done, which mostly helps the published methods: they map a floor from its doorways and used to finish it without ever flying under the shaft.`;
+  const ob = find(study.cells, 'planner', 'battery', 'holdout');
+  const held = ob ? ` On ${ob.flights} held-out real homes flown once it flies ${pct(ob.coverage)}, every floor in ${ob.allFloorsReached} of ${ob.flights}.` : '';
+  return `- **On a real battery the multi-floor number is not 40%.** [MULTI_FLOOR.md](MULTI_FLOOR.md) flies ${pb.flights} fresh generated multi-floor buildings and ${hb.flights} real two- and three-storey homes from Swiss Dwellings (their own staircases as shafts) under three budgets. Given the airframe's own pack (explore until 70% of the usable energy is spent) the planner flies ${pct(pb.coverage)} of the generated buildings and ${pct(hb.coverage)} of the real homes (the env stops a flight at 95%), reaching every floor in ${pb.allFloorsReached} of ${pb.flights} and ${hb.allFloorsReached} of ${hb.flights}, in ${(pb.seconds / 60).toFixed(1)} and ${(hb.seconds / 60).toFixed(1)} minutes on ${pb.batteryPct.toFixed(0)}% and ${hb.batteryPct.toFixed(0)}% of the pack.${held} Inside the 120 s budget the view-first planner already brings ${pct(vb.footprint)} and ${pct(hv.footprint)} of them within 3 m of its sensor. The climber now searches for stairs when a floor is done, which mostly helps the published methods: they map a floor from its doorways and used to finish it without ever flying under the shaft.`;
 }
 
 /** The GUIDE "Honest limits" sentence. */
@@ -83,4 +87,19 @@ export function storeysLimit(study) {
   const hb = find(study.cells, 'planner', 'battery', 'homes');
   if (!pb || !hb) return '';
   return `- That multi-floor number is the 120 s budget, not the pilot: on the airframe's battery the planner flies ${pct(pb.coverage)} of fresh multi-floor buildings and ${pct(hb.coverage)} of ${hb.flights} real two- and three-storey homes, every floor reached, on about ${Math.round((pb.batteryPct + hb.batteryPct) / 2)}% of the pack ([MULTI_FLOOR.md](MULTI_FLOOR.md)). The real homes' stairs are flown as open shafts: the stair flight itself is not modelled.`;
+}
+
+/** Before and after the stairwell fix, on the sets the first report run flew (the fix was found on the real homes). */
+export function storeysFirstRunTable(study) {
+  if (!study?.firstRun) return '_Flown once._';
+  const out = ['| Pilot | Buildings | Battery: flown, first run → final | Battery: every floor reached, first run → final |', '| --- | --- | --- | --- |'];
+  for (const set of ['generated', 'homes']) {
+    for (const pilot of pilotsOf(study)) {
+      const a = find(study.firstRun.cells, pilot, 'battery', set);
+      const b = find(study.cells, pilot, 'battery', set);
+      if (!a || !b) continue;
+      out.push(`| ${NAMES[pilot] ?? pilot} | ${SET_SHORT[set]} | ${pct(a.coverage)} → ${pct(b.coverage)} | ${a.allFloorsReached} → ${b.allFloorsReached} of ${b.flights} |`);
+    }
+  }
+  return out.join('\n');
 }

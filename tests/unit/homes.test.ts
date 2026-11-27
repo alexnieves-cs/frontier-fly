@@ -5,7 +5,7 @@ import { benchEpisodeSetup } from '../../src/bench/run';
 import { BENCH_TASKS } from '../../src/bench/tasks';
 import { isFullyReachable, computeFlightMap } from '../../src/gen/validate';
 import { floorsToBuilding } from '../../src/plans/convert';
-import { HOME_SET_PATH, homeBuilding, homeEpisodeSetup, parseHomeSet } from '../../src/plans/homes';
+import { HOME_HOLDOUT_PATH, HOME_SET_PATH, homeBuilding, homeEpisodeSetup, parseHomeSet } from '../../src/plans/homes';
 import type { PlanStorey } from '../../src/plans/convert';
 import { CELL } from '../../src/shared/constants';
 import { createEnv } from '../../src/sim/env';
@@ -118,4 +118,18 @@ describe('shaft search', () => {
     env.dispose();
     expect(floors.size).toBe(spec.floors.length);
   }, 60_000);
+});
+
+describe('held-out real homes', () => {
+  it('are further eval homes from other buildings, none in the main set, and all convert', () => {
+    const main = parseHomeSet(JSON.parse(readFileSync(HOME_SET_PATH, 'utf8')));
+    const holdout = parseHomeSet(JSON.parse(readFileSync(HOME_HOLDOUT_PATH, 'utf8')));
+    expect(holdout.homes.length).toBeGreaterThanOrEqual(10);
+    const buildings = new Set(main.homes.map((h) => h.source.building));
+    for (const h of holdout.homes) {
+      expect(h.split).toBe('eval');
+      expect(buildings.has(h.source.building), h.id).toBe(false);
+      expect(homeBuilding(h), h.id).not.toBeNull();
+    }
+  });
 });

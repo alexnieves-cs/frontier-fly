@@ -18,7 +18,7 @@ import { footprintSection } from './footprint.mjs';
 import { benchPair, benchSection } from './bench.mjs';
 import { visionSection } from './vision.mjs';
 import { floorsBudgetNote, hazardsSection } from './hazards.mjs';
-import { storeysControlTable, storeysLimit, storeysNote, storeysTables } from './storeys.mjs';
+import { storeysControlTable, storeysFirstRunTable, storeysLimit, storeysNote, storeysTables } from './storeys.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -1463,6 +1463,7 @@ const storeys = readJson('docs/storeys-study.json');
 let multiFloor = read('docs/MULTI_FLOOR.md');
 multiFloor = replaceBlock(multiFloor, 'storeys', storeysTables(storeys));
 multiFloor = replaceBlock(multiFloor, 'storeys-control', storeysControlTable(storeys));
+multiFloor = replaceBlock(multiFloor, 'storeys-first', storeysFirstRunTable(storeys));
 outputs['docs/MULTI_FLOOR.md'] = multiFloor;
 
 let stale = false;
