@@ -221,7 +221,7 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
     const before = policy.getWeights().map((b) => b.slice(0));
     const m = await trainer.update(
       { obs, actions, logp, advantages: adv, returns: ret, n },
-      { epochs: num('ppo-epochs', 3), minibatch: num('minibatch', 1024), clipEps: num('clip', 0.1), entropyCoef: 0, valueOnly, anchor: valueOnly ? undefined : { bc: { obs, actions: labels, n }, bcCoef } },
+      { epochs: num('ppo-epochs', 3), minibatch: num('minibatch', 1024), clipEps: num('clip', 0.1), entropyCoef: 0, valueOnly, anchor: valueOnly ? undefined : { bc: { obs, actions: labels, n }, bcCoef, bcActionSpace: !args.includes('--bc-atanh'), bcActionWeights: (arg('action-weights') ?? '1,1,4,2').split(',').map(Number) } },
     );
     let reverted = false;
     if (!(m.kl <= num('max-kl', 0.1))) {
