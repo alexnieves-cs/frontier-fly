@@ -62,6 +62,10 @@ export interface PpoAnchor {
   bcCoef?: number;
   /** BC minibatch size; defaults to the PPO minibatch size. */
   bcMinibatch?: number;
+  /** Compare squashed actions with the labels (clipped to ±0.98) instead of pre-tanh means with atanh(labels). */
+  bcActionSpace?: boolean;
+  /** Per-dimension BC loss weights [actDim]. */
+  bcActionWeights?: number[];
 }
 
 export interface PpoMetrics {
@@ -253,7 +257,8 @@ export class TfTrainer {
     }
     const bcCoef = anchor?.bcCoef ?? 0;
     const bc = anchor?.bc && bcCoef > 0 && anchor.bc.n > 0 ? anchor.bc : null;
-    const bcTargets = bc ? atanhTargets(bc.actions, bc.n * actDim) : null;
+    const bcSquash = !!anchor?.bcActionSpace;
+    const bcTargets = bc ? (bcSquash ? bc.actions.map((v) => Math.max(-0.98, Math.min(0.98, v))) : atanhTargets(bc.actions, bc.n * actDim)) : null;
     const bcMb = Math.max(1, anchor?.bcMinibatch ?? minibatch);
     let totPolicy = 0;
     let totValue = 0;
@@ -282,6 +287,8 @@ export class TfTrainer {
             anchorArgs.bcTargets = gatherFlat(bcTargets, idx, actDim);
             anchorArgs.bcWeights = bc.weights ? gatherFlat(bc.weights, idx, 1) : undefined;
             anchorArgs.bcN = k;
+            anchorArgs.bcSquash = bcSquash;
+            anchorArgs.bcActionWeights = anchor?.bcActionWeights;
           }
         }
         const metrics = this.applyMinibatch(
@@ -335,6 +342,8 @@ export class TfTrainer {
       weights?: Float32Array;
       /** Per-action-dimension loss weights [actDim], e.g. to stop a small-magnitude vz label from being ignored. */
       actionWeights?: number[];
+      /** Compare tanh(mean) with the actions themselves instead of pre-tanh means with atanh targets. */
+      actionSpace?: boolean;
     },
   ): Promise<number> {
     await this.ready();
@@ -343,7 +352,9 @@ export class TfTrainer {
     const minibatch = opts?.minibatch ?? 256;
     const weights = opts?.weights;
     if (weights && weights.length < n) throw new Error('imitate: weights shorter than n');
-    const targets = atanhTargets(actions, n * this.policy.actDim);
+    // Action-space targets stop short of ±1, or a saturated label would drive the pre-tanh mean without bound.
+    const targets = opts?.actionSpace ? actions.map((v) => Math.max(-0.98, Math.min(0.98, v))) : atanhTargets(actions, n * this.policy.actDim);
+    this.squashLoss = opts?.actionSpace ?? false;
     this.actionWeights = opts?.actionWeights ? tf.keep(tf.tensor1d(opts.actionWeights)) : null;
     let last = 0;
     for (let epoch = 0; epoch < epochs; epoch++) {
@@ -367,6 +378,7 @@ export class TfTrainer {
     }
     this.actionWeights?.dispose();
     this.actionWeights = null;
+    this.squashLoss = false;
     this.pullWeights();
     return last;
   }
@@ -413,6 +425,8 @@ export class TfTrainer {
 
   /** Weighted (or plain) mean squared error between mean rows and targets. */
   private actionWeights: tf.Tensor1D | null = null;
+  /** imitate() with actionSpace: the loss compares squashed actions. */
+  private squashLoss = false;
 
   private static weightedMse(mean: tf.Tensor, tgt: tf.Tensor, w: tf.Tensor | null, dims: tf.Tensor | null = null): tf.Tensor {
     const sq = tf.square(tf.sub(mean, tgt));
@@ -429,7 +443,8 @@ export class TfTrainer {
     let before = Number.NaN;
     const cost = this.optimizerFor('policy').minimize(
       () => {
-        const loss = TfTrainer.weightedMse(this.policyMean(obsT), tgt, wT, this.actionWeights) as tf.Scalar;
+        const mean = this.policyMean(obsT);
+        const loss = TfTrainer.weightedMse(this.squashLoss ? tf.tanh(mean) : mean, tgt, wT, this.actionWeights) as tf.Scalar;
         before = loss.dataSync()[0] ?? Number.NaN;
         return loss;
       },
@@ -468,7 +483,8 @@ export class TfTrainer {
     const bcObsT = useBc ? tf.tensor2d(anchor.bcObs!, [bcN, this.policy.obsDim]) : null;
     const bcTgtT = useBc ? tf.tensor2d(anchor.bcTargets!, [bcN, this.policy.actDim]) : null;
     const bcWT = useBc && anchor.bcWeights ? tf.tensor1d(anchor.bcWeights) : null;
-    for (const t of [refMeanT, refLogStdT, bcObsT, bcTgtT, bcWT]) if (t) owned.push(t);
+    const bcDimT = useBc && anchor.bcActionWeights ? tf.tensor1d(anchor.bcActionWeights) : null;
+    for (const t of [refMeanT, refLogStdT, bcObsT, bcTgtT, bcWT, bcDimT]) if (t) owned.push(t);
     const logStd = this.vars[6]!;
     const vw1 = this.vars[7]!;
     const vb1 = this.vars[8]!;
@@ -504,7 +520,8 @@ export class TfTrainer {
         loss = tf.add(loss, tf.mul(anchor!.klCoef, akl));
       }
       if (bcObsT && bcTgtT) {
-        const bcLoss = TfTrainer.weightedMse(this.policyMean(bcObsT), bcTgtT, bcWT);
+        const bcMean = this.policyMean(bcObsT);
+        const bcLoss = TfTrainer.weightedMse(anchor!.bcSquash ? tf.tanh(bcMean) : bcMean, bcTgtT, bcWT, bcDimT);
         out.bcLoss = read(bcLoss);
         loss = tf.add(loss, tf.mul(anchor!.bcCoef, bcLoss));
       }
@@ -528,4 +545,6 @@ interface MinibatchAnchor {
   bcTargets?: Float32Array;
   bcWeights?: Float32Array;
   bcN?: number;
+  bcSquash?: boolean;
+  bcActionWeights?: number[];
 }

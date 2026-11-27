@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (328 files, 66,127 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (330 files, 66,686 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -157,7 +157,7 @@ flowchart LR
   px4 -->|2| world_outdoor_viz
   rl -->|1| eval
   rl -->|2| gen
-  rl -->|20| shared
+  rl -->|22| shared
   rl -->|8| sim
   rl -->|1| workers
   shared -->|1| mission
@@ -175,11 +175,11 @@ flowchart LR
   team -->|1| mission
   team -->|12| shared
   team -->|9| sim
-  train -->|5| eval
+  train -->|6| eval
   train -->|1| gen
-  train -->|9| rl
-  train -->|10| shared
-  train -->|23| sim
+  train -->|11| rl
+  train -->|12| shared
+  train -->|26| sim
   train -->|3| workers
   ui_mission -->|29| mission
   ui_mission -->|1| rl
@@ -236,12 +236,12 @@ flowchart LR
 | `src/perception` | 8 | 865 | `gen`, `shared`, `sim`, `targets` | — | — |
 | `src/plans` | 5 | 925 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 8 | 1,618 | `mission`, `shared`, `sim`, `ui`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
-| `src/rl` | 14 | 3,611 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
+| `src/rl` | 15 | 3,763 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 7 | 766 | `mission` | — | — |
-| `src/sim` | 38 | 8,249 | `bench`, `eval`, `gen`, `loc`, `mission`, `rl`, `shared` | Rapier | — |
+| `src/sim` | 38 | 8,254 | `bench`, `eval`, `gen`, `loc`, `mission`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,321 | `gen`, `shared` | Three.js | — |
 | `src/team` | 6 | 1,123 | `eval`, `gen`, `mission`, `shared`, `sim` | — | — |
-| `src/train` | 8 | 2,066 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
+| `src/train` | 9 | 2,468 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |
 | `src/ui` | 44 | 6,856 | `app`, `eval`, `gen`, `landing`, `mission`, `rl`, `shared`, `sim`, `targets`, `team`, `vision`, `viz`, `workers`, `world/outdoor/viz`, `world/outdoor` | uPlot | `src/ui/race/race.worker.ts` |
 | `src/ui/mission` | 6 | 2,265 | `mission`, `rl`, `ui` | — | — |
 | `src/vision` | 9 | 1,874 | `mission`, `perception`, `shared`, `sim`, `targets`, `world/outdoor` | TF.js | — |

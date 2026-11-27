@@ -16,6 +16,7 @@ name: train
 # the checkpoints themselves are packed to .bin.
 #
 # With script=train:picker each line is one goal-picker search (scripts/train-picker.ts).
+# With script=train:quad each line is one quad-student run (scripts/train-quad.ts, docs/QUAD_STUDENT.md).
 #
 #   gh workflow run train -f script=train:picker -f runs='--mode cma --arm planner --seed 1|--mode cma --arm linear --seed 1'
 #
@@ -30,7 +31,7 @@ on:
       script:
         description: Trainer each line runs
         type: choice
-        options: ['train:ppo', 'train:indoor', 'train:picker']
+        options: ['train:ppo', 'train:indoor', 'train:picker', 'train:quad']
         default: 'train:ppo'
       ref_note:
         description: Free text recorded in each result commit (what this sweep is testing)
@@ -101,6 +102,16 @@ jobs:
               if [ -f "train-out/$f.json" ]; then npm run pack:checkpoint -- "train-out/$f.json" "train-out/$f.bin"; fi
             done
             rm -f train-out/*.r[0-9]*.json train-out/*.swa*.json "train-out/$name.json" "train-out/$name.ppo.json"
+          elif [ "$SCRIPT" = "train:quad" ]; then
+            # Quad student (docs/QUAD_STUDENT.md): best.bin, last.bin and log.json per run.
+            # A line may start with init=<train branch>:<path> to start from a checkpoint another run pushed.
+            if [[ "$line" =~ ^init=(train/[0-9]+-[0-9]+):([A-Za-z0-9_./-]+)(\ |$)(.*)$ ]]; then
+              git fetch --depth 1 origin "${BASH_REMATCH[1]}"
+              git show "FETCH_HEAD:${BASH_REMATCH[2]}" > init.bin
+              line="--init init.bin ${BASH_REMATCH[4]}"
+            fi
+            # shellcheck disable=SC2086
+            npm run train:quad -- --out-dir train-out $line 2>&1 | grep --line-buffered -v "already registered" | tee train-out/train.log
           elif [ "$SCRIPT" = "train:picker" ]; then
             # Goal-picker search on the quad (docs/QUAD_PICKER.md): log.jsonl and best.json per run.
             # shellcheck disable=SC2086
@@ -118,7 +129,10 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
           b="train/${{ github.run_id }}-${{ matrix.k }}"
-          git checkout -b "$b"
+          # Results go on a branch off main: a branch that changes workflow files (a training branch
+          # often does) cannot be pushed with this token.
+          git fetch --depth 1 origin main
+          git checkout -f -b "$b" FETCH_HEAD
           git add -f train-out
           git commit -m "train:ppo run ${{ github.run_id }} #${{ matrix.k }}: $(cat train-out/args.txt) $NOTE"
           git push origin "$b"

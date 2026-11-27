@@ -433,6 +433,9 @@ export class SensorPlanner {
    * it was not this planner's own: the acceleration limit then ramps from that command. Used when
    * the planner labels another pilot's states (train/ppoJob.ts, labels 'planner').
    */
+  /** How much the safety filter cut the last horizontal command, m/s (0 = untouched). */
+  lastSafetyCut = 0;
+
   holdCommand(vx: number, vy: number): void {
     this.shaper.hold(vx, vy);
   }
@@ -889,6 +892,7 @@ export class SensorPlanner {
 
   act(f: SensorFrame): SensorCommand {
     this.ensure(f);
+    this.lastSafetyCut = 0;
     const floor = this.floorOf(f);
     const base = floor * this.plane;
     if (floor !== this.lastFloor) {
@@ -1012,6 +1016,7 @@ export class SensorPlanner {
     [vx, vy] = this.braking
       ? brakingFilter(vx, vy, f.yaw, lidar, f.vel, this.braking, this.brakingMargin)
       : filterVelocity(vx, vy, f.yaw, lidar, SAFETY_MARGIN, this.horizon);
+    this.lastSafetyCut = Math.hypot(sx - vx, sy - vy);
     // A cut by the safety filter is where the next ramp starts from.
     if (tr && (vx !== sx || vy !== sy)) this.shaper.hold(vx, vy);
     if (this.sensorFault) {

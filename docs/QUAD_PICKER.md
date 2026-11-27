@@ -6,7 +6,7 @@ Since 2026-11-25 the picker, with a more cautious braking model, is the **defaul
 
 ## Why this split
 
-Flying the quadrotor end to end with the learned policy failed: 11.9% coverage and 30 of 30 crashes ([QUAD_POLICY.md](QUAD_POLICY.md)). The tilt-to-stop dynamics are what the policy got wrong, and the planner plus tracker already handle those. So this study leaves control alone and learns only the goal choice, the step where the planner uses a hand-written rule (lowest path cost, a small bonus for frontier next to flown or blocked space, hysteresis toward the current goal). That is the split learned next-best-view and frontier-selection work usually makes (NBVP, FUEL, and learned frontier rankers): learn the decision, keep a verified planner underneath.
+Flying the quadrotor end to end with the learned policy failed: 11.9% coverage and 30 of 30 crashes ([QUAD_POLICY.md](QUAD_POLICY.md)); a later network trained on the quadrotor itself does fly it ([QUAD_STUDENT.md](QUAD_STUDENT.md)). The tilt-to-stop dynamics are what the policy got wrong, and the planner plus tracker already handle those. So this study leaves control alone and learns only the goal choice, the step where the planner uses a hand-written rule (lowest path cost, a small bonus for frontier next to flown or blocked space, hysteresis toward the current goal). That is the split learned next-best-view and frontier-selection work usually makes (NBVP, FUEL, and learned frontier rankers): learn the decision, keep a verified planner underneath.
 
 ## What the picker sees and does
 
