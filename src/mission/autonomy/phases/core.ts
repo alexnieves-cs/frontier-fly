@@ -356,7 +356,10 @@ export class MissionCore {
     const lost = this.faults?.gnss();
     const n = this.gnssNoise;
     const d = lost && !lost.fix ? lost.errorM : null;
-    const e: V3 = d ? [n[0] + d[0], n[1] + d[1], n[2] + d[2]] : n;
+    const g: V3 = d ? [n[0] + d[0], n[1] + d[1], n[2] + d[2]] : n;
+    // A navigator other than GNSS (the joint mission's map matcher) adds its own error.
+    const x = this.options.outdoorPoseError?.(this.t);
+    const e: V3 = x ? [g[0] + x[0], g[1] + x[1], g[2] + x[2]] : g;
     const truth = this.vehicle.pos;
     this.vehicle.pos = [truth[0] + e[0], truth[1] + e[1], truth[2] + e[2]];
     this.truePos = truth;

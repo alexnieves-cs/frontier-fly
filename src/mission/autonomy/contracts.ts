@@ -394,6 +394,12 @@ export interface RunnerOptions {
   /** Wind at sim time t, world frame, m/s. Default calm. */
   wind?: (tSec: number) => V3;
   /**
+   * Outdoor position error at sim time t, world frame, metres, added to what the drone believes
+   * outdoors on top of the GNSS reading. For a navigator other than GNSS: the joint mission feeds
+   * the error a map-matching navigator made over real aerial imagery. Default none.
+   */
+  outdoorPoseError?: (tSec: number) => V3;
+  /**
    * Faults to inject (faults.ts), for the fault bench and the demo. The
    * failsafe always runs; without faults it only watches the healthy drone.
    * `seed` defaults to the world seed.
