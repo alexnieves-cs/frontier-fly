@@ -5,6 +5,17 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### Fix the planner's known weak spots (2026-11-27)
+
+- View-first planner v4 (`ViewOptions.frontiers`, kinematic airframe): the edge of unmapped space competes with
+  unviewed voxels by path cost from the start. The kinematic 40 m tie with nearest frontier is now a lead: fresh
+  block 153001+ 84.5% vs 73.4% (+11.1, +6.6 to +16.1); hard 87.0% vs v3's 84.7%. Hard test 87.8% (v3 86.0%), return
+  test 75.5% (74.0%). Off on the quadrotor, where it cost 11 points flying on the pose estimate.
+- Quadrotor mission touches at stairwells: the shaft-centring probe now centres on the stretch it saw open and
+  settles between probes, and indoors the up and down range finders veto a climb or descent into a slab. Practice
+  compound sweeps: touched flights 8 to 0 (estimate) and 4 to 0 (true pose) of 152; fresh 79401+: 8 to 4 of 240,
+  the four left on one seed with a different cause.
+
 ### FrontierBench Hard: the drift track (2026-11-26)
 
 - `npm run bench:hard -- --track drift`: four quadrotor tasks flown with no ground truth in the pilot's loop. The
