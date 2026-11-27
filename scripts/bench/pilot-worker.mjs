@@ -1,7 +1,7 @@
 // Runs one submitted FrontierBench pilot in a worker thread (see sandbox.ts for the protocol).
 // The worker has its own heap and its own module instances: the pilot cannot reach the scorer's
 // env, the building it is flying or the scorer's code. It sees only what the scorer copies into
-// the shared buffers, and the scorer reads back only the four action numbers.
+// the shared buffers, and the scorer reads back only the four action numbers and the protection level.
 import { receiveMessageOnPort, workerData } from 'node:worker_threads';
 import { createServer } from 'vite';
 import { ViteNodeRunner } from 'vite-node/client';
@@ -66,10 +66,20 @@ for (;;) {
         lidar: new Float64Array(lidarBuf, 0, meta[M.lidarLen]),
         alt: meta[M.alt],
         ...(meta[M.hasVel] ? { vel: [meta[M.vel], meta[M.vel + 1]] } : {}),
+        ...(meta[M.hasPerson] === 2
+          ? { person: { pos: [meta[M.person], meta[M.person + 1], meta[M.person + 2]], range: meta[M.personRange], bearing: meta[M.personBearing] } }
+          : meta[M.hasPerson] === 1
+            ? { person: null }
+            : {}),
+        ...(meta[M.hasHealth]
+          ? { health: { ok: meta[M.healthOk] === 1, sigmaM: meta[M.sigmaM], sigmaMapM: meta[M.sigmaMapM], sigmaYawRad: meta[M.sigmaYaw], state: layout.healthStates[meta[M.healthState]] ?? 'lost' } }
+          : {}),
       };
       const a = pilot.act(new Float32Array(obsBuf, 0, meta[M.obsLen]), frame);
       if (!a || a.length !== 4) throw new Error('act() must return four numbers');
       for (let i = 0; i < 4; i++) action[i] = a[i];
+      const pl = typeof pilot.protectionLevel === 'function' ? Number(pilot.protectionLevel()) : NaN;
+      action[4] = pl;
     }
     reply(true);
   } catch (e) {

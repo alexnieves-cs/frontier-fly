@@ -16,7 +16,8 @@ import { resolve } from 'node:path';
 import type { BenchContext, BenchPilot } from '../../src/bench/pilot';
 import type { SensorFrame } from '../../src/sim/sensorPlanner';
 
-const META = { speedH: 0, maxSteps: 1, dynamics: 2, cells: 3, hasOccupied: 4, vw: 5, vd: 6, floors: 7, floorHeight: 8, pos: 9, yaw: 12, lidarLen: 13, alt: 14, hasVel: 15, vel: 16, obsLen: 18 } as const;
+const META = { speedH: 0, maxSteps: 1, dynamics: 2, cells: 3, hasOccupied: 4, vw: 5, vd: 6, floors: 7, floorHeight: 8, pos: 9, yaw: 12, lidarLen: 13, alt: 14, hasVel: 15, vel: 16, obsLen: 18, hasPerson: 19, person: 20, personRange: 23, personBearing: 24, hasHealth: 25, healthOk: 26, sigmaM: 27, sigmaMapM: 28, sigmaYaw: 29, healthState: 30 } as const;
+const HEALTH_STATES = ['tracking', 'degraded', 'lost'] as const;
 const CMD = { reset: 1, act: 2, quit: 3 } as const;
 const OBS_CAP = 1 << 14;
 const LIDAR_CAP = 1 << 12;
@@ -37,7 +38,8 @@ export async function sandboxedPilot(file: string, opts: { stepMs?: number } = {
   const obsBuf = new SharedArrayBuffer(OBS_CAP * Float32Array.BYTES_PER_ELEMENT);
   const lidarBuf = new SharedArrayBuffer(LIDAR_CAP * Float64Array.BYTES_PER_ELEMENT);
   const gridBuf = new SharedArrayBuffer(3 * GRID_CAP);
-  const actionBuf = new SharedArrayBuffer(4 * Float32Array.BYTES_PER_ELEMENT);
+  // Four action numbers, then the pilot's protection level (NaN when it reports none).
+  const actionBuf = new SharedArrayBuffer(5 * Float32Array.BYTES_PER_ELEMENT);
   const ctrl = new Int32Array(ctrlBuf);
   const meta = new Float64Array(metaBuf);
   const obsShared = new Float32Array(obsBuf);
@@ -46,7 +48,7 @@ export async function sandboxedPilot(file: string, opts: { stepMs?: number } = {
   const action = new Float32Array(actionBuf);
   const { port1, port2 } = new MessageChannel();
   const worker = new Worker(fileURLToPath(new URL('./pilot-worker.mjs', import.meta.url)), {
-    workerData: { port: port2, file: resolve(file), ctrl: ctrlBuf, meta: metaBuf, obs: obsBuf, lidar: lidarBuf, grids: gridBuf, action: actionBuf, layout: { meta: META, cmd: CMD, gridCap: GRID_CAP } },
+    workerData: { port: port2, file: resolve(file), ctrl: ctrlBuf, meta: metaBuf, obs: obsBuf, lidar: lidarBuf, grids: gridBuf, action: actionBuf, layout: { meta: META, cmd: CMD, gridCap: GRID_CAP, healthStates: HEALTH_STATES } },
     transferList: [port2],
     // No secrets, tokens or CI variables reach the pilot.
     env: { PATH: process.env.PATH ?? '', NODE_ENV: process.env.NODE_ENV ?? 'production' },
@@ -130,8 +132,28 @@ export async function sandboxedPilot(file: string, opts: { stepMs?: number } = {
         meta[META.vel] = frame.vel[0];
         meta[META.vel + 1] = frame.vel[1];
       }
+      meta[META.hasPerson] = frame.person === undefined ? 0 : frame.person ? 2 : 1;
+      if (frame.person) {
+        meta[META.person] = frame.person.pos[0];
+        meta[META.person + 1] = frame.person.pos[1];
+        meta[META.person + 2] = frame.person.pos[2];
+        meta[META.personRange] = frame.person.range;
+        meta[META.personBearing] = frame.person.bearing;
+      }
+      meta[META.hasHealth] = frame.health ? 1 : 0;
+      if (frame.health) {
+        meta[META.healthOk] = frame.health.ok ? 1 : 0;
+        meta[META.sigmaM] = frame.health.sigmaM;
+        meta[META.sigmaMapM] = frame.health.sigmaMapM;
+        meta[META.sigmaYaw] = frame.health.sigmaYawRad;
+        meta[META.healthState] = HEALTH_STATES.indexOf(frame.health.state);
+      }
       call(CMD.act);
-      return Float32Array.from(action);
+      return Float32Array.from(action.subarray(0, 4));
+    },
+    protectionLevel(): number {
+      const pl = action[4]!;
+      return Number.isNaN(pl) ? 0 : pl;
     },
     async close(): Promise<void> {
       if (!dead) {

@@ -5,6 +5,8 @@ import { approachSpeed, CommandShaper, cornerSpeed, profileSpeed, uTurnSpeed, re
 import { MAX_CANDIDATES, PICK_DIM, type GoalPicker, type PickCandidates } from './picker';
 import { BRAKING_MARGIN, brakingFilter, descentClear, filterVelocity, SAFETY_HORIZON, SAFETY_MARGIN, type BrakingModel } from './lidarSafety';
 import { voxelLayout } from '../shared/voxels';
+import type { PersonSighting } from '../bench/overwatch';
+import type { PoseHealth } from '../loc/types';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -42,6 +44,13 @@ export interface SensorFrame {
   vel?: readonly [number, number];
   /** Fraction of the step budget left, when the pilot knows it (a feature for SensorPlannerOptions.picker). */
   timeLeft?: number;
+  /**
+   * Overwatch tasks only (bench/overwatch.ts): the camera's sighting of the person this step, or null
+   * when they are not in view. Absent on every other task.
+   */
+  person?: PersonSighting | null;
+  /** Drift tasks only: the pose estimator's own health (loc/types.ts). It never reads the truth. */
+  health?: PoseHealth;
 }
 
 /** World-frame command. */

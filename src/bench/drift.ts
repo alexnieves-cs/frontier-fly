@@ -216,7 +216,13 @@ export class DriftFrames {
       alt: obs[C.OBS.alt]! * this.floorHeight,
       vel: measuredVelocity(obs, e.yaw),
       timeLeft: obs[C.OBS.time]!,
+      health: e.health,
     };
+  }
+
+  /** Horizontal error of the pose the last frame gave the pilot, metres (the truth; the pilot never sees it). */
+  error(): number {
+    return this.errLast;
   }
 
   /** The pose the pilot flies on: the estimator's, or the graph's carried forward by the estimator's motion since its last sweep. */

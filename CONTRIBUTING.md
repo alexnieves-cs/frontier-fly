@@ -8,6 +8,10 @@ Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md). Security
 
 This project is civilian and defensive only. Contributions that add pursuit, targeting, weapons, payload release, surveillance of real people, or evasion of real-world detection will be closed. Avoidance behavior means the drone moves out of the way. It does not track or engage.
 
+## The benchmark rule
+
+No capability lands without a scored track and a number attached. A new behavior, sensor, estimator or planner change comes with the FrontierBench track that measures it (an existing one, or a new one in `src/bench/hard.ts` with its own dev and test seed blocks), its dev numbers in the pull request, and the test split scored once for every pilot on the scoreboard. If the number goes down, say so. The scoreboard on the homepage and in the README is generated from `bench/results` by `npm run docs`, so a new track shows up there once its results are committed.
+
 ## Setup
 
 Node 22 or newer and npm (`.nvmrc` pins 22; `nvm use` picks it up).

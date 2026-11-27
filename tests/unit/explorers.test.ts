@@ -27,6 +27,23 @@ describe('published exploration baselines', () => {
     env.dispose();
   });
 
+  it('add greedy information gain, rapid frontier and a random-walk floor, all deterministic', async () => {
+    const env = await createEnv();
+    const room = BENCH_TASKS[0]!;
+    const seed = benchSeeds('dev', 0)[0]!;
+    for (const id of ['info-gain', 'rapid-frontier']) {
+      const a = runBenchEpisode(env, room, { seed }, BASELINES[id]!());
+      expect(runBenchEpisode(env, room, { seed }, BASELINES[id]!()), id).toEqual(a);
+      expect(a.footprint, id).toBeGreaterThan(0.6);
+      expect(a.collisions, id).toBe(0);
+    }
+    // The floor keeps no map: it is deterministic (its random stream restarts on reset) and sees something.
+    const walk = runBenchEpisode(env, room, { seed }, BASELINES['random-walk']!());
+    expect(runBenchEpisode(env, room, { seed }, BASELINES['random-walk']!())).toEqual(walk);
+    expect(walk.footprint).toBeGreaterThan(0.1);
+    env.dispose();
+  });
+
   it('take shafts on multi-floor buildings through the climber', async () => {
     const env = await createEnv();
     const ti = BENCH_TASKS.findIndex((t) => t.id === 'floors');
