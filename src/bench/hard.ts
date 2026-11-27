@@ -66,7 +66,24 @@ export const DRIFT_TASKS: readonly BenchTask[] = [
 /** Drift track seeds: dev 98001+ (tune freely), test 99001+ (score once); task i offsets the block by 100 i. */
 export const DRIFT_SEEDS = { dev: { base: 98001, count: 20 }, test: { base: 99001, count: 30 } } as const;
 
-export function trackRuns(track: 'hard' | 'return' | 'drift', split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
-  const { base, count } = typeof split === 'string' ? { hard: HARD_SEEDS, return: RETURN_SEEDS, drift: DRIFT_SEEDS }[track][split] : split;
+/**
+ * The degraded-sensor track (round 4): the drift track's estimate, with sensors that are broken or
+ * break mid-flight (bench/drift.ts SensorFaults). A fault hits the pilot's lidar and the estimator's
+ * alike, so a dead sector is blind to the safety layer, the map and the scan matcher at once.
+ */
+export const SENSOR_TASKS: readonly BenchTask[] = [
+  { id: 'sector-large-quad', label: '40 x 40 m and back, quadrotor, a 90° lidar sector dead, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, home: true, drift: true, faults: { lidarSector: Math.PI / 2 } },
+  { id: 'flowless-dark-quad', label: 'Rooms and back, quadrotor, lights off, flow sensor dead, 40 s', stage: 3, dynamics: 'quad', lighting: 'night-dark', speedH: 2, dr: 1, maxSteps: 800, camera: true, home: true, drift: true, faults: { flowDead: true } },
+  { id: 'sparse-quad', label: 'Rooms and back, quadrotor, 1 lidar ray in 4, 60 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, maxSteps: 1200, camera: true, home: true, drift: true, faults: { lidarKeep: 4 } },
+  { id: 'failing-quad', label: 'Rooms, quadrotor, 120° of lidar and the flow sensor fail at 20-60 s, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, camera: true, drift: true, faults: { lidarSector: (2 * Math.PI) / 3, flowDead: true, failAt: [20, 60] } },
+];
+
+/** Degraded-sensor seeds: dev 140001+ (tune freely), test 141001+ (score once); task i offsets the block by 100 i. */
+export const SENSOR_SEEDS = { dev: { base: 140001, count: 20 }, test: { base: 141001, count: 30 } } as const;
+
+export type HardTrack = 'hard' | 'return' | 'drift' | 'sensor';
+
+export function trackRuns(track: HardTrack, split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
+  const { base, count } = typeof split === 'string' ? { hard: HARD_SEEDS, return: RETURN_SEEDS, drift: DRIFT_SEEDS, sensor: SENSOR_SEEDS }[track][split] : split;
   return Array.from({ length: count }, (_, i) => ({ seed: base + taskIndex * 100 + i }));
 }

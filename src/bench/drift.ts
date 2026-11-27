@@ -26,6 +26,22 @@ import type { ExplorerEnv } from '../sim/env';
 const START_SIGMA_XY = 0.1;
 const START_SIGMA_YAW = 0.03;
 
+/**
+ * Sensor faults of the degraded-sensor track (round 4, hard.ts SENSOR_TASKS). They hit what the pilot
+ * reads and what the estimator reads alike: a dead lidar ray reads as no return, a dead flow sensor
+ * reports nothing. A fault starts at take-off, or at a time drawn from `failAt` (seconds) per seed.
+ */
+export interface SensorFaults {
+  /** A contiguous dead lidar sector this wide, radians, at a body angle drawn per seed. */
+  lidarSector?: number;
+  /** Only every k-th lidar ray returns (a sparse or partly blocked scanner). */
+  lidarKeep?: number;
+  /** The optical-flow sensor reports nothing. */
+  flowDead?: boolean;
+  /** The faults start at a time drawn uniformly from this range, s; otherwise at take-off. */
+  failAt?: readonly [number, number];
+}
+
 /** How far the estimate was from the truth over a flight, horizontal metres. */
 export interface DriftStats {
   mean: number;
@@ -52,12 +68,17 @@ export class DriftFrames {
   private errMax = 0;
   private errLast = 0;
   private ticks = 0;
+  private readonly faults: SensorFaults | null;
+  /** Body angle where the dead lidar sector starts, and the policy step the faults start. */
+  private readonly sector0: number;
+  private readonly failStep: number;
   private lost = 0;
 
   constructor(
     private readonly env: ExplorerEnv,
     seed: number,
     dark: boolean,
+    faults: SensorFaults | null = null,
   ) {
     const spec = env.building!;
     const world = env.world!;
@@ -75,6 +96,23 @@ export class DriftFrames {
     this.visited = new Uint8Array(this.seen.data.length);
     this.prevVel = [s.vel[0], s.vel[1], s.vel[2]];
     this.prevYaw = s.yaw;
+    this.faults = faults;
+    const frng = new RNG(seed >>> 0, 'sensor-faults');
+    this.sector0 = frng.next() * Math.PI * 2;
+    this.failStep = faults?.failAt ? Math.round((faults.failAt[0] + frng.next() * (faults.failAt[1] - faults.failAt[0])) / C.POLICY_DT) : 0;
+  }
+
+  /** Whether ray i of n (body angle i * 2π / n) is dead right now. */
+  private dead(i: number, n: number): boolean {
+    const f = this.faults;
+    if (!f || this.ticks < this.failStep) return false;
+    if (f.lidarKeep && f.lidarKeep > 1 && i % f.lidarKeep !== 0) return true;
+    if (f.lidarSector) {
+      const a = (i / n) * Math.PI * 2 - this.sector0;
+      const w = a - Math.floor(a / (Math.PI * 2)) * Math.PI * 2;
+      if (w < f.lidarSector) return true;
+    }
+    return false;
   }
 
   /** Feed one policy step of sensor readings, then build the pilot's frame from the estimate. */
@@ -91,7 +129,15 @@ export class DriftFrames {
         yawRate: Math.atan2(Math.sin(dyaw), Math.cos(dyaw)) / dt,
         dt,
       };
-      this.current = this.est.step(this.sensors.read(truth));
+      const lf = this.sensors.read(truth);
+      if (this.faults && this.ticks >= this.failStep) {
+        if (this.faults.flowDead) lf.flow = null;
+        if (lf.scan) {
+          const r = lf.scan.ranges;
+          for (let i = 0; i < r.length; i++) if (this.dead(i, r.length)) r[i] = lf.scan.maxRange;
+        }
+      }
+      this.current = this.est.step(lf);
       this.prevVel = truth.vel;
       this.prevYaw = s.yaw;
     }
@@ -103,7 +149,7 @@ export class DriftFrames {
     this.ticks += 1;
     if (e.health.state === 'lost') this.lost += 1;
 
-    for (let i = 0; i < C.LIDAR_H; i++) this.lidar[i] = obs[C.OBS.lidar + i]! * C.LIDAR_MAX;
+    for (let i = 0; i < C.LIDAR_H; i++) this.lidar[i] = this.dead(i, C.LIDAR_H) ? C.LIDAR_MAX : obs[C.OBS.lidar + i]! * C.LIDAR_MAX;
     const floor = Math.floor(e.pos[2] / this.floorHeight);
     this.seen.markRing(e.pos[0], e.pos[1], floor, e.yaw, this.lidar);
     const vx = Math.floor(e.pos[0] / C.VOXEL);

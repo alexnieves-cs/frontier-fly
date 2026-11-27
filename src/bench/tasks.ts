@@ -10,6 +10,7 @@
  *
  * The seed blocks 81001+ (dev) and 82001+ (test) are used nowhere else.
  */
+import type { SensorFaults } from './drift';
 import type { PlanRecord, PlanSet } from '../plans';
 import type { LightingPreset } from '../sim/lighting';
 
@@ -47,6 +48,8 @@ export interface BenchTask {
   wind?: number;
   /** Drift task: the pilot flies on its own pose estimate, with maps painted from it (bench/drift.ts). */
   drift?: boolean;
+  /** Degraded-sensor task: faults on the drift task's sensors (bench/drift.ts SensorFaults). Needs `drift`. */
+  faults?: SensorFaults;
 }
 
 export const BENCH_TASKS: readonly BenchTask[] = [
