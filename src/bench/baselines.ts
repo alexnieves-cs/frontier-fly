@@ -10,6 +10,9 @@ import type { Explorer } from '../sim/explorers/common';
 import { NearestFrontierExplorer } from '../sim/explorers/nearestFrontier';
 import { NbvpExplorer } from '../sim/explorers/nbvp';
 import { BoustrophedonExplorer } from '../sim/explorers/boustrophedon';
+import { InformationGainExplorer } from '../sim/explorers/informationGain';
+import { RandomWalkExplorer } from '../sim/explorers/randomWalk';
+import { RapidFrontierExplorer } from '../sim/explorers/rapidFrontier';
 import type { BenchContext, BenchPilot } from './pilot';
 
 /**
@@ -138,4 +141,9 @@ export const BASELINES: Record<string, () => BenchPilot> = {
   yamauchi: () => explorerPilot('Nearest frontier (Yamauchi 1997)', (c) => new NearestFrontierExplorer(airframe(c))),
   nbvp: () => explorerPilot('Next-best-view RRT (NBVP, Bircher et al. 2016)', (c) => new NbvpExplorer(airframe(c))),
   boustrophedon: () => explorerPilot('Boustrophedon coverage (BA*, Viet et al. 2013)', (c) => new BoustrophedonExplorer(airframe(c))),
+  // λ = 0.1 per meter, picked on FrontierBench Hard dev 92001+ from 0.05, 0.1, 0.2, 0.5 and 1 (mean camera 68.5, 70.1, 67.7, 68.1, 67.6%).
+  'info-gain': () => explorerPilot('Greedy information gain (Gonzalez-Banos & Latombe 2002)', (c) => new InformationGainExplorer(airframe(c))),
+  'rapid-frontier': () => explorerPilot('Rapid frontier (Cieslewski et al. 2017)', (c) => new RapidFrontierExplorer(airframe(c))),
+  // The floor: a random walk through the same safety filter (no map, no plan).
+  'random-walk': () => explorerPilot('Random walk', (c) => new RandomWalkExplorer(airframe(c))),
 };
