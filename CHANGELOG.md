@@ -5,6 +5,18 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### FrontierBench Hard: the hard drift track (2026-11-27)
+
+- `npm run bench:hard -- --track drift-hard`: four return tasks on the drift estimate with a short-range
+  ranging ring (24 beams to 4 m, `TOF_RING` in `src/bench/hard.ts`) instead of 90 beams to 8 m: the 40 m
+  building and back in 120 s and 240 s, in wind, and dark rooms. `DriftProfile` in `src/bench/drift.ts` sets
+  the sensor suite and estimator per task.
+- Test 111001+: view-first 48.1% on its estimate vs 77.1% on the true pose (−29.0, CI −35.5 to −22.7; 77 vs
+  118 of 120 flights home); still +14.2 over nearest frontier and +16.7 over NBVP.
+- Loop closure in flight (`--loop`, `LoopCloser` with multi-sweep keyframes, `accumulate`): 47.8%, a tie
+  (−0.3, −8.4 to +8.1). More flights home (90 of 120) but less seen. Looked +10 on tuning seeds, −3.7 on
+  held-out dev, so not the default.
+
 ### FrontierBench Hard: the degraded-sensor track (2026-11-27)
 
 - `npm run bench:hard -- --track sensor`: four quadrotor tasks on the drift estimate with sensor faults that hit
