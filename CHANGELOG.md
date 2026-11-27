@@ -5,6 +5,13 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### View-first rows re-scored on main's code (2026-11-27)
+
+- The view-first planner's hard, return, drift and FrontierBench v3 test rows had been flown without main's
+  map-backed safety filter (`mapFill`), so main's code no longer replayed them. Re-flown at `6f511e9`: hard 87.8%
+  (5 crashes in 150, was 3), return 75.3% (75.5%), drift 78.0% (78.7%, 1 crash in 120), v3 unchanged. Only
+  quadrotor flights changed. Details in `docs/VIEW_FIRST.md`.
+
 ### Multi-floor round 2: real multi-storey homes, shaft search, battery budget (2026-11-27)
 
 - New page `docs/MULTI_FLOOR.md`: five sensor-only pilots fly 30 fresh generated multi-floor buildings, 60 real
