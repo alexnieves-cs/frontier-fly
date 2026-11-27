@@ -120,15 +120,15 @@ export const BASELINES: Record<string, () => BenchPilot> = {
   // shapes its command there; on the kinematic airframe it is the plain planner.
   'planner-tracker': () => explorerPilot('Sensor-only planner + quad tracker', (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {} } : {}) })),
   // View-first planner: goals are voxels the drone has not yet had in lidar line of sight within 3 m
-  // (the footprint metric's radius) and, from v4, the edge of unmapped space on the same path-cost
-  // footing; then it sweeps unflown voxels with the time left. On the
+  // (the footprint metric's radius), then the edge of unmapped space (from v4, on the kinematic
+  // airframe, both on the same path-cost footing), then it sweeps unflown voxels with the time left. On the
   // quadrotor it flies the tracker and keeps 0.30 m of braking margin (0.25 default), picked on the
   // practice block 90501-90600 (docs/VIEW_FIRST.md): view goals mean longer legs at cruise.
   // On the quadrotor it also aims a forward camera (VIEW_LOOK) at what it has not had in view, turning
   // at up to 0.8 rad/s (the tracker's own yaw cap is 0.3), picked on FrontierBench Hard dev 92001+.
   'planner-view': () =>
     explorerPilot('Sensor-only planner, view first', (c) =>
-      new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { view: VIEW_LOOK, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN } : { view: {} }) }),
+      new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { view: VIEW_LOOK, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN } : { view: { frontiers: true } }) }),
     ),
   waypoint: () => statelessPilot('Frontier waypoint follower', waypointAction),
   heuristic: () => statelessPilot('Lidar wall-follower', heuristicAction),
