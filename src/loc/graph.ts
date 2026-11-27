@@ -697,6 +697,18 @@ export class LoopCloser {
     return compose(this.graph.pose(k), rel);
   }
 
+  /** Sweeps fed so far. */
+  get sweeps(): number {
+    return this.sweepKey.length;
+  }
+
+  /** Sweep i's pose as the graph has it now (its keyframe's pose composed with the front end's motion since), no optimisation. */
+  sweepPose(i: number): Pose2 {
+    const k = this.sweepKey[i]!;
+    const rel = between(this.keys[k]!.front, [this.sweepFront[i * 3]!, this.sweepFront[i * 3 + 1]!, this.sweepFront[i * 3 + 2]!]);
+    return compose(this.graph.pose(k), rel);
+  }
+
   /** Final optimisation; every sweep's pose (x, y, yaw per sweep). */
   finish(): Float64Array {
     const g = this.graph;
