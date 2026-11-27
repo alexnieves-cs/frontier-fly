@@ -17,7 +17,7 @@ A drone indoors has no GPS. On the drift tracks nothing in the pilot's loop read
 
 | Pilot | On its estimate | Same flights, true pose | What the estimate costs (95% CI) | Home on the estimate | Home on the truth | Mean pose error | Worst pose error |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Sensor-only planner, view first | **78.7%** | 78.5% | +0.2 (−1.4 to +1.4), tied | 89 of 90 | 90 of 90 | 0.18 m | 0.8 m |
+| Sensor-only planner, view first | **78.0%** | 78.7% | −0.7 (−2.7 to +0.7), tied | 89 of 90 | 90 of 90 | 0.19 m | 0.8 m |
 | Greedy information gain (Gonzalez-Banos & Latombe 2002) | **63.1%** | 64.4% | −1.4 (−6.3 to +3.5), tied | 73 of 90 | 78 of 90 | 0.18 m | 0.8 m |
 | Next-best-view RRT (NBVP, Bircher et al. 2016) | **55.9%** | 54.5% | +1.4 (−3.6 to +6.4), tied | 73 of 90 | 73 of 90 | 0.16 m | 0.5 m |
 | Rapid frontier (Cieslewski et al. 2017) | **55.6%** | 52.2% | +3.4 (−0.1 to +7.1), tied | 83 of 90 | 83 of 90 | 0.18 m | 1.0 m |

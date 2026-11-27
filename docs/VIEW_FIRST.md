@@ -198,7 +198,20 @@ The test splits, rescored once for v4: hard 87.8% (v3 86.0%, paired +1.8, +1.0 t
 frontier's 73.3%, +9.9, +6.0 to +14.0), 3 crashes in 150 as before; return 75.5% (v3 74.0%, +1.5, +0.7 to +2.4), 120 of
 120 home, no crash, and the 30 s sprint's lead over nearest frontier is now +12.1 (+6.4 to +18.2) where it was within
 noise; FrontierBench v3 99.7% footprint and 67.6% flown (v3 99.1%, 67.4%), no crash in 240. The drift track is all
-quadrotor, and v4 leaves the quadrotor unchanged, so the drift, degraded-sensor and hard drift results stand as published.
+quadrotor, and v4 leaves the quadrotor as v3 flew it, so v4 itself did not change the drift, degraded-sensor and hard
+drift results.
+
+**Re-scored on main (2026-11-27).** Version 4 was built on a branch that started before the degraded-sensor round's
+map-backed safety filter (`mapFill`, above) reached main, so the test-split rows above, and the drift track's rows
+flown before that round, had no `mapFill`. Main's view-first planner flies the quadrotor with it, and main's code
+no longer replayed those rows, so they were flown again at `6f511e9`: hard 87.8% as before but 5 crashes in 150
+(was 3), return 75.3% (was 75.5%), drift 78.0% on the estimate (was 78.7%; 1 crash in 120, was none) and 78.7% on
+the true pose (was 78.5%), FrontierBench v3 unchanged at 99.7% footprint and 67.6% flown. Only quadrotor flights
+changed: 59 of 150 on hard, 17 of 120 on return, 99 and 47 of 120 on drift, 23 of 240 on v3. Every kinematic flight
+is identical. The hard drift, degraded-sensor and overwatch rows already flew with `mapFill` and replay exactly.
+The report-only blocks above (151001, 152001, 153001) stay as flown, because they are paired with v3 controls from
+`848a9da`, which had no `mapFill` either. Flown again on main they move by 0.1 points or less (153001 87.1%, 152001
+88.9%, 151001 identical).
 
 ## Results of version 1
 

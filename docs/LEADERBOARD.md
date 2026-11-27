@@ -9,8 +9,8 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 | # | Pilot | Score | Footprint score | room | hard | dark | fast | floors | quad | apartments | Flights ended by a crash | Flights that touched nothing | Score vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner + quad tracker (baseline) | **68.0%** | 87.7% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 44.6% | 85.5% | 1 of 240 | 99% | — | `160ae15` |
-| 2 | Sensor-only planner, view first (baseline) | **67.6%** | 99.7% | 95.1% | 61.8% | 61.8% | 83.5% | 42.4% | 47.5% | 81.1% | 0 of 240 | 100% | −0.4 (−0.8 to +0.0), tied | `d65e8a5` |
-| 3 | Sensor-only planner (baseline) | **66.2%** | 85.2% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 31.7% | 85.5% | 12 of 240 | 94% | −1.4 (−2.2 to −0.7) | `160ae15` |
+| 2 | Sensor-only planner, view first (baseline) | **67.6%** | 99.7% | 95.1% | 61.8% | 61.8% | 83.5% | 42.4% | 47.5% | 81.1% | 0 of 240 | 100% | −0.4 (−0.8 to +0.1), tied | `6f511e9` |
+| 3 | Sensor-only planner (baseline) | **66.2%** | 85.2% | 95.1% | 63.3% | 63.2% | 82.0% | 42.4% | 31.7% | 85.5% | 12 of 240 | 94% | −1.4 (−2.2 to −0.8) | `160ae15` |
 | 4 | Sensor-only planner + momentum (baseline) | **66.0%** | 86.3% | 95.1% | 63.0% | 62.8% | 82.0% | 42.6% | 30.5% | 86.1% | 17 of 240 | 93% | −0.1 (−1.1 to +0.8), tied | `160ae15` |
 | 5 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **65.4%** | 87.4% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 35.1% | 85.6% | 9 of 240 | 95% | −0.6 (−1.8 to +0.5), tied | `160ae15` |
 | 6 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **62.7%** | 80.0% | 95.1% | 73.1% | 74.1% | 66.4% | 38.7% | 25.8% | 65.5% | 51 of 240 | 67% | −2.7 (−4.8 to −0.8) | `160ae15` |
@@ -82,8 +82,8 @@ v3's footprint column saturates: the view-first planner sees 99% of the test bui
 
 | # | Pilot | Camera score | large | large-quad | sprint | quad-dark | floors-quad | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Sensor-only planner, view first (baseline) | **87.8%** | 83.3% | 75.6% | 95.5% | 97.7% | 86.8% | 92.6% | 26.3% | 3 of 150 | — | `d65e8a5` |
-| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **68.0%** | 78.0% | 67.6% | 69.1% | 80.2% | 44.9% | 76.5% | 13.7% | 14 of 150 | −19.8 (−23.0 to −16.9) | `28c6f50` |
+| 1 | Sensor-only planner, view first (baseline) | **87.8%** | 83.3% | 75.8% | 95.5% | 97.2% | 87.0% | 92.9% | 25.4% | 5 of 150 | — | `6f511e9` |
+| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **68.0%** | 78.0% | 67.6% | 69.1% | 80.2% | 44.9% | 76.5% | 13.7% | 14 of 150 | −19.8 (−23.1 to −16.9) | `28c6f50` |
 | 3 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **65.6%** | 58.9% | 45.1% | 76.4% | 85.0% | 62.5% | 70.6% | 17.8% | 25 of 150 | −2.4 (−6.2 to +1.6), tied | `3e69af9` |
 | 4 | Nearest frontier (Yamauchi 1997) (baseline) | **58.4%** | 73.3% | 46.1% | 61.0% | 73.0% | 38.8% | 66.9% | 10.3% | 15 of 150 | −7.2 (−10.5 to −3.9) | `3e69af9` |
 | 5 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **55.0%** | 67.7% | 43.3% | 55.7% | 72.3% | 36.0% | 64.3% | 10.4% | 9 of 150 | −3.4 (−6.7 to −0.3) | `28c6f50` |
@@ -108,8 +108,8 @@ A search drone that does not come back loses what it saw, and no pilot on the ha
 
 | # | Pilot | Camera score | return-large-quad | return-wind-quad | return-dark-quad | return-sprint | Came home | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Sensor-only planner, view first (baseline) | **75.5%** | 64.5% | 67.2% | 89.8% | 80.4% | 120 of 120 | 81.6% | 15.5% | 0 of 120 | — | `d65e8a5` |
-| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **62.0%** | 56.8% | 47.7% | 73.9% | 69.6% | 103 of 120 | 73.9% | 13.3% | 17 of 120 | −13.5 (−18.1 to −9.0) | `28c6f50` |
+| 1 | Sensor-only planner, view first (baseline) | **75.3%** | 64.4% | 66.8% | 89.6% | 80.4% | 120 of 120 | 81.5% | 15.4% | 0 of 120 | — | `6f511e9` |
+| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **62.0%** | 56.8% | 47.7% | 73.9% | 69.6% | 103 of 120 | 73.9% | 13.3% | 17 of 120 | −13.3 (−17.9 to −8.9) | `28c6f50` |
 | 3 | Nearest frontier (Yamauchi 1997) (baseline) | **53.1%** | 40.3% | 40.0% | 64.0% | 68.3% | 103 of 120 | 63.8% | 10.6% | 17 of 120 | −8.9 (−14.4 to −3.3) | `b3f30bb` |
 | 4 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **50.6%** | 37.1% | 36.9% | 69.6% | 58.7% | 115 of 120 | 58.5% | 10.4% | 5 of 120 | −2.6 (−7.2 to +2.2), tied | `28c6f50` |
 | 5 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **49.7%** | 31.4% | 34.3% | 65.8% | 67.1% | 98 of 120 | 59.5% | 12.6% | 22 of 120 | −0.9 (−5.6 to +3.8), tied | `b3f30bb` |
@@ -132,8 +132,8 @@ Every other board hands the pilot its true position. A real drone indoors has no
 
 | # | Pilot | Camera score | drift-large-quad | drift-wind-quad | drift-dark-quad | drift-quad | Came home | Same flights on the true pose | Mean pose error | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Sensor-only planner, view first (baseline) | **78.7%** | 66.2% | 63.3% | 87.3% | 97.9% | 89 of 90 | 78.5% | 0.18 m | 84.3% | 23.0% | 0 of 120 | — | `f08db77` |
-| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **63.1%** | 44.5% | 44.1% | 76.9% | 86.7% | 73 of 90 | 64.4% | 0.18 m | 72.8% | 15.4% | 18 of 120 | −15.7 (−19.5 to −11.8) | `28c6f50` |
+| 1 | Sensor-only planner, view first (baseline) | **78.0%** | 66.6% | 64.0% | 83.9% | 97.5% | 89 of 90 | 78.7% | 0.19 m | 83.5% | 22.5% | 1 of 120 | — | `6f511e9` |
+| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **63.1%** | 44.5% | 44.1% | 76.9% | 86.7% | 73 of 90 | 64.4% | 0.18 m | 72.8% | 15.4% | 18 of 120 | −15.0 (−19.1 to −10.8) | `28c6f50` |
 | 3 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **55.9%** | 30.8% | 34.8% | 67.8% | 90.2% | 73 of 90 | 54.5% | 0.16 m | 62.9% | 17.0% | 20 of 120 | −7.2 (−11.6 to −2.8) | `f08db77` |
 | 4 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **55.6%** | 40.8% | 37.6% | 65.9% | 78.0% | 83 of 90 | 52.2% | 0.18 m | 63.6% | 13.9% | 8 of 120 | −0.3 (−4.4 to +4.0), tied | `28c6f50` |
 | 5 | Nearest frontier (Yamauchi 1997) (baseline) | **51.0%** | 35.0% | 32.6% | 64.9% | 71.4% | 65 of 90 | 50.4% | 0.17 m | 63.7% | 13.0% | 28 of 120 | −4.6 (−9.1 to −0.4) | `f08db77` |
@@ -148,7 +148,7 @@ Every other board hands the pilot its true position. A real drone indoors has no
 | `drift-dark-quad` | Rooms and back on its own pose, quadrotor, lights off, 40 s | Quadrotor, randomized | Lights off | 40 s |
 | `drift-quad` | Rooms, hallways, loops on its own pose, quadrotor, 120 s | Quadrotor, randomized | Day | 120 s |
 
-On its own estimate the view-first planner scores 78.7%, with 89 of 90 return flights home and no crash in 120 flights. That is +22.8 points over NBVP (95% interval +19.4 to +26.6) and +27.7 over nearest frontier (+23.5 to +32.1). The estimate itself costs it nothing measurable: the same flights on the true pose score 78.5% (difference +0.2, −1.4 to +1.5). No pilot loses more than noise to the estimate, because the estimator holds the pose to 0.12 to 0.22 m on average (worst 0.80 m, in the wind). So this board shows the pilots do not depend on ground truth; it does not show that drift is hard for them. One oddity: the planner + quad tracker scores 3.4 points higher on its estimate than on the truth (+2.0 to +4.8); we have not found why. Nothing was tuned for this track: every pilot is the one on the boards above, and dev met the round's goal before any change.
+On its own estimate the view-first planner scores 78.0%, with 89 of 90 return flights home and 1 crash in 120 flights. That is +22.1 points over NBVP (95% interval +18.7 to +25.8) and +27.0 over nearest frontier (+22.4 to +31.7). The estimate itself costs it nothing measurable: the same flights on the true pose score 78.7% (difference −0.7, −2.7 to +0.7). No pilot loses more than noise to the estimate, because the estimator holds the pose to 0.12 to 0.22 m on average (worst 0.80 m, in the wind). So this board shows the pilots do not depend on ground truth; it does not show that drift is hard for them. One oddity: the planner + quad tracker scores 3.4 points higher on its estimate than on the truth (+2.0 to +4.8); we have not found why. Nothing was tuned for this track: every pilot is the one on the boards above, and dev met the round's goal before any change.
 
 ### Hard drift track
 
