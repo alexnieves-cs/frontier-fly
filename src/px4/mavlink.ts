@@ -10,14 +10,32 @@
 
 export const MSG = {
   HEARTBEAT: 0,
+  PARAM_VALUE: 22,
+  PARAM_SET: 23,
+  ATTITUDE: 30,
+  LOCAL_POSITION_NED: 32,
   COMMAND_LONG: 76,
+  COMMAND_ACK: 77,
+  SET_POSITION_TARGET_LOCAL_NED: 84,
   HIL_ACTUATOR_CONTROLS: 93,
   HIL_SENSOR: 107,
   HIL_GPS: 113,
+  EXTENDED_SYS_STATE: 245,
+  STATUSTEXT: 253,
+  ODOMETRY: 331,
 } as const;
 
 const CRC_EXTRA: Record<number, number> = {
   [MSG.HEARTBEAT]: 50,
+  [MSG.PARAM_VALUE]: 220,
+  [MSG.PARAM_SET]: 168,
+  [MSG.ATTITUDE]: 39,
+  [MSG.LOCAL_POSITION_NED]: 185,
+  [MSG.COMMAND_ACK]: 143,
+  [MSG.SET_POSITION_TARGET_LOCAL_NED]: 143,
+  [MSG.EXTENDED_SYS_STATE]: 130,
+  [MSG.STATUSTEXT]: 83,
+  [MSG.ODOMETRY]: 91,
   [MSG.COMMAND_LONG]: 152,
   [MSG.HIL_ACTUATOR_CONTROLS]: 47,
   [MSG.HIL_SENSOR]: 108,
@@ -27,6 +45,15 @@ const CRC_EXTRA: Record<number, number> = {
 /** Full (untruncated) payload length of each message we decode. */
 const PAYLOAD_LEN: Record<number, number> = {
   [MSG.HEARTBEAT]: 9,
+  [MSG.PARAM_VALUE]: 25,
+  [MSG.PARAM_SET]: 23,
+  [MSG.ATTITUDE]: 28,
+  [MSG.LOCAL_POSITION_NED]: 28,
+  [MSG.COMMAND_ACK]: 10,
+  [MSG.SET_POSITION_TARGET_LOCAL_NED]: 53,
+  [MSG.EXTENDED_SYS_STATE]: 2,
+  [MSG.STATUSTEXT]: 54,
+  [MSG.ODOMETRY]: 233,
   [MSG.COMMAND_LONG]: 33,
   [MSG.HIL_ACTUATOR_CONTROLS]: 81,
   [MSG.HIL_SENSOR]: 65,
@@ -136,6 +163,89 @@ export class MavlinkWriter {
     b[36] = g.id ?? 0;
     v.setUint16(37, 0, true);
     return this.frame(MSG.HIL_GPS, b);
+  }
+
+  /** COMMAND_LONG to a target system and component. */
+  commandLong(c: { command: number; params?: readonly number[]; targetSystem?: number; targetComponent?: number; confirmation?: number }): Uint8Array {
+    const b = new Uint8Array(33);
+    const v = new DataView(b.buffer);
+    for (let i = 0; i < 7; i++) v.setFloat32(4 * i, c.params?.[i] ?? 0, true);
+    v.setUint16(28, c.command, true);
+    b[30] = c.targetSystem ?? 1;
+    b[31] = c.targetComponent ?? 1;
+    b[32] = c.confirmation ?? 0;
+    return this.frame(MSG.COMMAND_LONG, b);
+  }
+
+  /** PARAM_SET, as a float (PX4 sends every parameter's bits in a float field: an int32 goes as its bit pattern). */
+  paramSet(p: { id: string; value: number; type: 'int32' | 'real32'; targetSystem?: number; targetComponent?: number }): Uint8Array {
+    const b = new Uint8Array(23);
+    const v = new DataView(b.buffer);
+    if (p.type === 'int32') v.setInt32(0, Math.round(p.value), true);
+    else v.setFloat32(0, p.value, true);
+    b[4] = p.targetSystem ?? 1;
+    b[5] = p.targetComponent ?? 1;
+    for (let i = 0; i < 16; i++) b[6 + i] = i < p.id.length ? p.id.charCodeAt(i) : 0;
+    b[22] = p.type === 'int32' ? 6 : 9;
+    return this.frame(MSG.PARAM_SET, b);
+  }
+
+  /**
+   * SET_POSITION_TARGET_LOCAL_NED with only a velocity and either a yaw or a yaw rate (type mask:
+   * position, acceleration and the other yaw field ignored), in MAV_FRAME_LOCAL_NED.
+   */
+  velocityTarget(t: { timeBootMs: number; vn: number; ve: number; vd: number; yaw?: number; yawRate?: number; targetSystem?: number; targetComponent?: number }): Uint8Array {
+    const b = new Uint8Array(53);
+    const v = new DataView(b.buffer);
+    v.setUint32(0, Math.round(t.timeBootMs) >>> 0, true);
+    v.setFloat32(16, t.vn, true);
+    v.setFloat32(20, t.ve, true);
+    v.setFloat32(24, t.vd, true);
+    v.setFloat32(40, t.yaw ?? 0, true);
+    v.setFloat32(44, t.yawRate ?? 0, true);
+    // Ignore position (bits 0-2) and acceleration (6-8); keep velocity; ignore yaw (10) or yaw rate (11).
+    const mask = 0b111 | 0b111000000 | (t.yaw === undefined ? 1 << 10 : 1 << 11);
+    v.setUint16(48, mask, true);
+    b[50] = t.targetSystem ?? 1;
+    b[51] = t.targetComponent ?? 1;
+    b[52] = 1; // MAV_FRAME_LOCAL_NED
+    return this.frame(MSG.SET_POSITION_TARGET_LOCAL_NED, b);
+  }
+
+  /**
+   * ODOMETRY from an external estimator (a VIO or lidar odometry), position and velocity both in
+   * MAV_FRAME_LOCAL_NED (a frame already aligned with north), which PX4's EKF2 fuses as external
+   * vision. Variances go on the covariance diagonals; the attitude is left unknown (NaN), so EKF2
+   * keeps its own heading.
+   */
+  odometry(o: { timeUsec: number; pos: readonly number[]; vel: readonly number[]; posVar: number; velVar: number; resetCounter?: number; quality?: number }): Uint8Array {
+    const b = new Uint8Array(233);
+    const v = new DataView(b.buffer);
+    v.setBigUint64(0, BigInt(Math.round(o.timeUsec)), true);
+    v.setFloat32(8, o.pos[0] ?? 0, true);
+    v.setFloat32(12, o.pos[1] ?? 0, true);
+    v.setFloat32(16, o.pos[2] ?? 0, true);
+    for (let i = 0; i < 4; i++) v.setFloat32(20 + 4 * i, Number.NaN, true);
+    v.setFloat32(36, o.vel[0] ?? 0, true);
+    v.setFloat32(40, o.vel[1] ?? 0, true);
+    v.setFloat32(44, o.vel[2] ?? 0, true);
+    for (let i = 0; i < 3; i++) v.setFloat32(48 + 4 * i, Number.NaN, true);
+    // Upper-triangle 6x6 covariances, row-major: diagonal entries sit at 0, 6, 11, 15, 18, 20.
+    const diag = [0, 6, 11, 15, 18, 20];
+    for (let i = 0; i < 21; i++) {
+      v.setFloat32(60 + 4 * i, Number.NaN, true);
+      v.setFloat32(144 + 4 * i, Number.NaN, true);
+    }
+    for (let k = 0; k < 3; k++) {
+      v.setFloat32(60 + 4 * diag[k]!, o.posVar, true);
+      v.setFloat32(144 + 4 * diag[k]!, o.velVar, true);
+    }
+    b[228] = 1; // frame_id MAV_FRAME_LOCAL_NED
+    b[229] = 1; // child_frame_id: the velocity is in MAV_FRAME_LOCAL_NED too
+    b[230] = o.resetCounter ?? 0;
+    b[231] = 3; // MAV_ESTIMATOR_TYPE_VIO
+    v.setInt8(232, o.quality ?? 100);
+    return this.frame(MSG.ODOMETRY, b);
   }
 }
 
@@ -285,4 +395,56 @@ export class MavlinkParser {
     this.buf = merged.slice(i);
     return out;
   }
+}
+
+
+export interface LocalPositionNed {
+  timeBootMs: number;
+  pos: [number, number, number];
+  vel: [number, number, number];
+}
+
+export function decodeLocalPositionNed(f: Frame): LocalPositionNed {
+  const v = f.payload;
+  return {
+    timeBootMs: v.getUint32(0, true),
+    pos: [v.getFloat32(4, true), v.getFloat32(8, true), v.getFloat32(12, true)],
+    vel: [v.getFloat32(16, true), v.getFloat32(20, true), v.getFloat32(24, true)],
+  };
+}
+
+export function decodeAttitude(f: Frame): { timeBootMs: number; roll: number; pitch: number; yaw: number } {
+  const v = f.payload;
+  return { timeBootMs: v.getUint32(0, true), roll: v.getFloat32(4, true), pitch: v.getFloat32(8, true), yaw: v.getFloat32(12, true) };
+}
+
+export function decodeCommandAck(f: Frame): { command: number; result: number } {
+  const v = f.payload;
+  return { command: v.getUint16(0, true), result: v.getUint8(2) };
+}
+
+export function decodeStatusText(f: Frame): { severity: number; text: string } {
+  const v = f.payload;
+  let text = '';
+  for (let i = 1; i < 51; i++) {
+    const c = v.getUint8(i);
+    if (c === 0) break;
+    text += String.fromCharCode(c);
+  }
+  return { severity: v.getUint8(0), text };
+}
+
+export function decodeExtendedSysState(f: Frame): { landedState: number } {
+  return { landedState: f.payload.getUint8(1) };
+}
+
+export function decodeParamValue(f: Frame): { id: string; raw: DataView; type: number } {
+  const v = f.payload;
+  let id = '';
+  for (let i = 8; i < 24; i++) {
+    const c = v.getUint8(i);
+    if (c === 0) break;
+    id += String.fromCharCode(c);
+  }
+  return { id, raw: new DataView(v.buffer, v.byteOffset, 4), type: v.getUint8(24) };
 }

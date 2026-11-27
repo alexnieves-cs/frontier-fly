@@ -5,6 +5,8 @@ import { classLabel, formatClock, OUTCOME_LABELS, PHASE_LABELS, PHASE_STEPS, row
 import type { FilmFrame } from './director';
 import { phaseSpans, sampleFlight, type FlightLog } from './flight';
 import { phaseColor, toThree } from './scene';
+import { ekfError, Px4Hud } from './px4Hud';
+import { px4Facts } from './px4Film';
 
 const CARD_SEC = 3.6;
 
@@ -54,6 +56,7 @@ export class FilmOverlay {
   private readonly spans: { phase: Phase; t0: number; t1: number }[];
   private readonly logRows: HTMLElement;
   private lastLogCount = -1;
+  private readonly px4: Px4Hud | null;
 
   constructor(
     parent: HTMLElement,
@@ -84,7 +87,10 @@ export class FilmOverlay {
     this.speed = stat('SPEED');
     this.battery = stat('BATTERY');
     this.batteryBar = el('div', 'film-battery-bar', this.battery.parentElement!);
+    const facts = px4Facts(log);
+    if (facts) el('div', 'film-badge film-badge-px4', top, 'PX4 SITL');
     el('div', 'film-badge', top, world.timeOfDay < 6.5 || world.timeOfDay > 19.5 ? 'NIGHT · FLASHLIGHT' : 'DAYLIGHT');
+    this.px4 = facts ? new Px4Hud(this.root, log, facts) : null;
 
     this.card = el('div', 'film-card', this.root);
     this.cardIndex = el('div', 'film-card-index', this.card);
@@ -134,6 +140,10 @@ export class FilmOverlay {
     metric(report.landedHome ? 'Yes' : 'No', 'Landed home');
     const rows = rowsFor(report).filter((r) => /Entries|Battery|Outdoor|False clears|Missed/.test(r.label)).slice(0, 4);
     el('div', 'film-end-foot', this.endCard, rows.map((r) => `${r.label} ${r.value}`).join('  ·  '));
+    if (facts) {
+      const ekf = facts.ekfHorizErrRmsM == null ? '' : ` · EKF2 error RMS ${facts.ekfHorizErrRmsM.toFixed(2)} m, worst ${facts.ekfHorizErrMaxM.toFixed(2)} m`;
+      el('div', 'film-end-px4', this.endCard, `Flown by ${facts.autopilot}: EKF2, position, attitude and rate control in the loop · GNSS denied ${Math.round(facts.gnssDeniedSec)} s${ekf}`);
+    }
     el('div', 'film-end-sig', this.endCard, `Indoor explorer: ${log.explorer === 'policy' ? 'trained policy' : 'frontier planner'} · detector and people are simulated`);
   }
 
@@ -188,6 +198,10 @@ export class FilmOverlay {
     this.drawMap(index, f);
     this.drawLog(f.t);
     this.drawCallouts(f, camera);
+    if (this.px4) {
+      this.px4.update(frame, index, f.t);
+      this.px4.root.style.opacity = f.part === 'flight' ? '1' : '0';
+    }
   }
 
   private subtitle(span: { phase: Phase; t0: number }): string | null {
@@ -260,6 +274,13 @@ export class FilmOverlay {
       const size = Math.max(22, Math.min(140, (900 / Math.max(1, dist(hit.estimate))) * scale));
       bracket(g, c[0], c[1], size, size * 1.1, 'rgba(255, 209, 102, 0.9)', 2 * scale);
       label(g, c[0] - size / 2, c[1] - size * 0.55 - 8 * scale, `${classLabel(hit.classId).toUpperCase()} ${hit.confidence.toFixed(2)}`, '#ffd166', scale);
+    }
+    // PX4 flights: name EKF2's estimate when the camera is close enough to see the ring.
+    const at = this.log.frames[this.indexAt(f.t)];
+    if (at?.px4 && f.part === 'flight') {
+      const d = dist(at.px4.ekf);
+      const c = d < 30 ? project(at.px4.ekf, 0.32) : null;
+      if (c) label(g, c[0] + 18 * scale, c[1], `EKF2 ESTIMATE · ${(ekfError(at) ?? 0).toFixed(2)} m OFF`, '#56e0ff', scale);
     }
     // Confirmed contacts: solid green brackets that stay.
     for (const c of this.log.confirmed) {

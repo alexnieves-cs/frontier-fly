@@ -10,6 +10,8 @@ import { SHIPPED_POLICY_URL } from '../rl/checkpoint';
 import { DEFAULT_SCENARIO, isScenarioId, SCENARIOS, type ScenarioId } from '../mission/autonomy/scenarios';
 import { buildTimeline, Director, FILM_FPS, type DirectorState, type FilmFrame } from './director';
 import { recordFlight, sampleFlight, type FlightLog } from './flight';
+import { fetchPx4Flight } from './px4Film';
+import type { V3 } from '../mission/autonomy/contracts';
 import { FilmOverlay } from './overlay';
 import { FilmScene } from './scene';
 import { prefetchPbrSet } from '../viz/textures';
@@ -162,7 +164,7 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   stage.appendChild(canvas);
   const loading = document.createElement('div');
   loading.className = 'film-loading';
-  loading.textContent = 'Flying the mission headless…';
+  loading.textContent = !embed && params.get('px4') ? 'Loading the PX4 flight…' : 'Flying the mission headless…';
   stage.appendChild(loading);
   const fit = () => {
     const s = recording ? renderScale : embed ? embedScale(root) : Math.min(window.innerWidth / STAGE_W, (window.innerHeight - 64) / STAGE_H);
@@ -181,8 +183,15 @@ export async function startFilm(root: HTMLElement, options: FilmOptions = {}): P
   prefetchPbrSet(`${import.meta.env.BASE_URL}textures/`);
 
   try {
-    const indoor = params.get('indoor') === 'frontier' ? null : await shippedPolicy();
-    const log = await recordFlight(scenario, indoor);
+    // ?px4=<url>: replay a mission flown through PX4 SITL (scripts/px4/mission.ts --film) instead of flying one here.
+    const px4Url = embed ? null : params.get('px4');
+    const log = px4Url
+      ? await fetchPx4Flight(new URL(px4Url, location.href).href)
+      : await recordFlight(scenario, params.get('indoor') === 'frontier' ? null : await shippedPolicy());
+    if (px4Url) {
+      const heading = root.querySelector('h1.film-sr');
+      if (heading) heading.textContent = `Mission film: ${log.loaded.scenario.title}`;
+    }
     loading.textContent = 'Building the world…';
     status('building', loading.textContent);
     const scene = new FilmScene(canvas, log);
@@ -326,7 +335,17 @@ function autoplay(root: HTMLElement, timeline: FilmFrame[], show: (i: number) =>
 
 function apply(scene: FilmScene, log: FlightLog, f: FilmFrame): void {
   const { frame, index, pos, yaw } = sampleFlight(log, f.t);
+  // PX4 flights: EKF2's estimate interpolated between ticks like the truth, so the ring glides.
+  let ekf: V3 | undefined;
+  const a = frame.px4;
+  const b = log.frames[index + 1]?.px4;
+  if (a) {
+    const next = log.frames[index + 1];
+    const u = b && next && next.t > frame.t ? Math.max(0, Math.min(1, (f.t - frame.t) / (next.t - frame.t))) : 0;
+    ekf = b ? [a.ekf[0] + (b.ekf[0] - a.ekf[0]) * u, a.ekf[1] + (b.ekf[1] - a.ekf[1]) * u, a.ekf[2] + (b.ekf[2] - a.ekf[2]) * u] : a.ekf;
+  }
   scene.update({
+    ...(a ? { px4: a, ekf } : {}),
     t: f.t,
     pos,
     yaw,

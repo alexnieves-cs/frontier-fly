@@ -139,6 +139,11 @@ export class Px4SimSession {
   lastControls: ActuatorControls | null = null;
   lastHeartbeat: Heartbeat | null = null;
   armed = false;
+  /**
+   * False denies GNSS: HIL_GPS still arrives at its rate, with no fix, as a receiver reports when it
+   * has lost the sky (indoors). PX4 then flies on whatever else its estimator fuses.
+   */
+  gpsFix = true;
 
   constructor(
     private readonly send: (bytes: Uint8Array) => void,
@@ -255,8 +260,8 @@ export class Px4SimSession {
           vn,
           ve,
           vd,
-          fixType: 3,
-          satellites: 12,
+          fixType: this.gpsFix ? 3 : 0,
+          satellites: this.gpsFix ? 12 : 0,
         }),
       );
     }

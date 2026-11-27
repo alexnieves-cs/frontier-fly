@@ -8,6 +8,7 @@ import type {
   LogEntry,
   Phase,
   RunRecord,
+  RunnerSnapshot,
   V3,
 } from '../mission/autonomy/contracts';
 import type { TargetClass } from '../targets/types';
@@ -27,6 +28,28 @@ export interface FlightFrame {
   hits: FlightHit[];
   /** Confirmed contacts so far. */
   confirmed: number;
+  /** Flight-controller state, when the flight was flown through PX4 (scripts/px4/mission.ts). */
+  px4?: Px4Sample;
+}
+
+/** What PX4 reported on one tick of a PX4-flown mission. */
+export interface Px4Sample {
+  /** EKF2's position estimate in the mission frame (x east, y north, z up), m. */
+  ekf: V3;
+  /** Roll and pitch of the airframe, rad (FLU: roll positive right side down, pitch positive nose down). */
+  roll: number;
+  pitch: number;
+  /** Motor outputs, 0 to 1, in PX4's order. */
+  motors: [number, number, number, number];
+  /** PX4's flight mode, as named in its custom mode (offboard, auto.land, …). */
+  mode: string;
+  armed: boolean;
+  /** GNSS denied on this tick (inside a building): PX4 got no fix. */
+  denied: boolean;
+  /** External vision (odometry) fed to EKF2 on this tick. */
+  vision: boolean;
+  /** Velocity setpoint the mission sent, m/s, mission frame. */
+  sp: V3;
 }
 
 export interface FlightHit {
@@ -75,6 +98,51 @@ function breathe(): Promise<void> {
 }
 
 /**
+ * Keeps one FlightFrame per control tick from the runner's snapshots, and each distinct planner
+ * path once. Shared by the film page's headless flight and scripts/px4/mission.ts, which records
+ * a PX4 flight for the same film.
+ */
+export class FlightRecorder {
+  readonly frames: FlightFrame[] = [];
+  readonly plans: V3[][] = [];
+  private readonly seenHits = new Set<string>();
+
+  constructor(private readonly dt: number) {}
+
+  capture(snap: RunnerSnapshot): FlightFrame {
+    const last = this.plans[this.plans.length - 1];
+    if (!last || !samePlan(last, snap.plan)) this.plans.push(snap.plan.map((p) => [p[0], p[1], p[2]] as V3));
+    const hits: FlightHit[] = [];
+    for (const contact of snap.contacts) {
+      const key = `${contact.id}@${contact.tSec.toFixed(2)}`;
+      if (this.seenHits.has(key) || Math.abs(contact.tSec - snap.tSec) > this.dt * 0.6) continue;
+      this.seenHits.add(key);
+      hits.push({
+        id: contact.id,
+        classId: contact.classId,
+        confidence: contact.confidence,
+        estimate: [contact.estimate[0], contact.estimate[1], contact.estimate[2]],
+        kind: contact.truth.kind,
+      });
+    }
+    const frame: FlightFrame = {
+      t: snap.tSec,
+      pos: [snap.pose.pos[0], snap.pose.pos[1], snap.pose.pos[2]],
+      yaw: snap.pose.yaw,
+      vel: [snap.pose.vel[0], snap.pose.vel[1], snap.pose.vel[2]],
+      phase: snap.phase,
+      inside: snap.inside,
+      battery: snap.batteryPct,
+      plan: this.plans.length - 1,
+      hits,
+      confirmed: snap.confirmed.length,
+    };
+    this.frames.push(frame);
+    return frame;
+  }
+}
+
+/**
  * Fly a scenario headless and keep every tick. The run is the same seeded
  * mission the demo page flies, so the film shows a real run, not a script.
  */
@@ -87,40 +155,9 @@ export async function recordFlight(id: string, policy: NormalizedPolicy | null):
     indoor: policy ? 'auto' : 'frontier',
     policy: policy ?? undefined,
   });
-  const frames: FlightFrame[] = [];
-  const plans: V3[][] = [];
+  const recorder = new FlightRecorder(dt);
+  const capture = () => recorder.capture(runner.snapshot());
   const limit = Math.ceil((loaded.mission.budgets.timeSec + 5) / dt);
-  const seenHits = new Set<string>();
-  const capture = () => {
-    const snap = runner.snapshot();
-    const last = plans[plans.length - 1];
-    if (!last || !samePlan(last, snap.plan)) plans.push(snap.plan.map((p) => [p[0], p[1], p[2]] as V3));
-    const hits: FlightHit[] = [];
-    for (const contact of snap.contacts) {
-      const key = `${contact.id}@${contact.tSec.toFixed(2)}`;
-      if (seenHits.has(key) || Math.abs(contact.tSec - snap.tSec) > dt * 0.6) continue;
-      seenHits.add(key);
-      hits.push({
-        id: contact.id,
-        classId: contact.classId,
-        confidence: contact.confidence,
-        estimate: [contact.estimate[0], contact.estimate[1], contact.estimate[2]],
-        kind: contact.truth.kind,
-      });
-    }
-    frames.push({
-      t: snap.tSec,
-      pos: [snap.pose.pos[0], snap.pose.pos[1], snap.pose.pos[2]],
-      yaw: snap.pose.yaw,
-      vel: [snap.pose.vel[0], snap.pose.vel[1], snap.pose.vel[2]],
-      phase: snap.phase,
-      inside: snap.inside,
-      battery: snap.batteryPct,
-      plan: plans.length - 1,
-      hits,
-      confirmed: snap.confirmed.length,
-    });
-  };
   capture();
   // The compound sweep is about 22,000 ticks, several seconds of work: hand the main thread back
   // every few milliseconds so the page (the landing hero included) keeps scrolling and painting.
@@ -137,8 +174,8 @@ export async function recordFlight(id: string, policy: NormalizedPolicy | null):
   const report = buildReport(record, loaded.source, loaded.world);
   return {
     loaded,
-    frames,
-    plans,
+    frames: recorder.frames,
+    plans: recorder.plans,
     confirmed: record.confirmed,
     log: record.log,
     record,

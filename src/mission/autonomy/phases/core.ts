@@ -176,13 +176,17 @@ export class MissionCore {
     this.outdoorLook = new OutdoorLook(world);
     this.battery = this.faults ? this.faults.wrapBattery(createBattery()) : createBattery();
     this.batteryStart = this.battery.remainingPct();
-    this.vehicle =
-      options.vehicle === 'quad'
+    this.vehicle = options.vehicleFactory
+      ? options.vehicleFactory({ physics, battery: this.battery, start: world.home, yaw: world.homeYaw, outdoor: world.outdoor })
+      : options.vehicle === 'quad'
         ? new QuadVehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor)
         : new Vehicle(physics, this.battery, world.home, world.homeYaw, world.outdoor);
     this.monitor = createSafetyMonitor(mission, world);
     // Outdoor views come from the gimbal lens, which resolves GIMBAL_RANGE_SCALE times farther.
-    this.tracker = new ConfirmTracker(mission, { outdoorRangeScale: GIMBAL_RANGE_SCALE });
+    this.tracker = new ConfirmTracker(mission, {
+      outdoorRangeScale: GIMBAL_RANGE_SCALE,
+      ...(options.unresolvedFloor !== undefined ? { unresolvedFloor: options.unresolvedFloor } : {}),
+    });
     const search = options.search;
     const spacing = search?.mode === 'lanes' ? search.laneSpacingM : undefined;
     // planCoverage spaces lanes by camera footprint and overlap; a requested spacing maps onto the overlap.

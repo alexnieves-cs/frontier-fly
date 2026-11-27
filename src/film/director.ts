@@ -195,7 +195,7 @@ export class Director {
     this.lastShot = shot;
     this.shot = shot;
     // Snap in front of an occluder at once, ease back out once it clears.
-    const clear = this.clearance(this.pos, drone, shot);
+    const clear = this.clearance(this.pos, drone, shot, frame.inside);
     this.pull = cut || clear < this.pull ? clear : this.pull + (clear - this.pull) * 0.08;
     const offset = this.pos.clone().sub(drone);
     const reach = offset.length();
@@ -290,7 +290,7 @@ export class Director {
         return { pos, look, fov: 46, cutaway: 1 };
       }
       case 'close': {
-        const target = this.nextConfirmTarget(f.t);
+        const target = this.nextConfirmTarget(f.t, drone);
         const look = target ? drone.clone().lerp(target, 0.6) : drone.clone().addScaledVector(fwd, 2);
         if (inside) {
           // Indoors, rooms are too tight for an over-the-shoulder shot: look steeply
@@ -327,9 +327,28 @@ export class Director {
     return best;
   }
 
-  private nextConfirmTarget(t: number): THREE.Vector3 | null {
-    const next = this.log.confirmed.find((c) => c.tSec >= t - 3) ?? this.log.confirmed[this.log.confirmed.length - 1];
-    return next ? toThree(next.estimate) : null;
+  /**
+   * What the drone is re-viewing: the contact it goes on to confirm, if that is close by, else the
+   * last detection it saw. A contact that ends up rejected has no confirmation, and framing the next
+   * confirmed one (often in another building) pointed the camera at open ground.
+   */
+  private nextConfirmTarget(t: number, drone: THREE.Vector3): THREE.Vector3 | null {
+    const near = (p: THREE.Vector3) => p.distanceTo(drone) < 9;
+    const next = this.log.confirmed.find((c) => c.tSec >= t - 3 && c.tSec <= t + 30);
+    if (next) {
+      const p = toThree(next.estimate);
+      if (near(p)) return p;
+    }
+    const { index } = sampleFlight(this.log, t);
+    const frames = this.log.frames;
+    for (let i = index; i >= 0 && frames[i]!.t > t - 8; i--) {
+      const hit = frames[i]!.hits[0];
+      if (hit) {
+        const p = toThree(hit.estimate);
+        if (near(p)) return p;
+      }
+    }
+    return null;
   }
 
   /**
@@ -337,8 +356,10 @@ export class Director {
    * also go to points around the camera so a trunk or canopy just beside the lens
    * (which the centre ray misses) still pulls it in.
    */
-  private clearance(want: THREE.Vector3, drone: THREE.Vector3, shot: ShotKind): number {
-    if (shot === 'aerial' || shot === 'cutaway' || shot === 'outro') return 1;
+  private clearance(want: THREE.Vector3, drone: THREE.Vector3, shot: ShotKind, inside: string | null): number {
+    // An indoor close-up looks down through the removed ceiling: the side probes would catch the
+    // room's own walls and pull the lens against one (seconds of a blank wall on a PX4 replay).
+    if (shot === 'aerial' || shot === 'cutaway' || shot === 'outro' || (shot === 'close' && inside)) return 1;
     const dir = want.clone().sub(drone);
     const dist = dir.length();
     if (dist < 1e-3) return 1;

@@ -4,6 +4,7 @@ import { gimbalFootprint } from '../mission/autonomy/perception';
 import { TargetView } from '../targets/meshes';
 import { resolveScene } from '../targets/motion';
 import { buildDrone, type DroneRig } from '../viz/droneMesh';
+import type { Px4Sample } from './flight';
 import { applyPbr, makeMaterials, type MaterialSet } from '../viz/three/materials';
 import { SiteDressing } from '../viz/site/site';
 import { glowTexture, scanGrid } from '../viz/site/textures';
@@ -26,6 +27,9 @@ export interface FilmState {
   index: number;
   inside: string | null;
   coverage: boolean;
+  /** PX4-flown flights: the tick's flight-controller state, and EKF2's estimate interpolated to t. */
+  px4?: Px4Sample;
+  ekf?: V3;
 }
 
 interface BuiltShell {
@@ -64,6 +68,7 @@ export class FilmScene {
   private readonly markers = new THREE.Group();
   private markerPool: THREE.Mesh[] = [];
   private homePad!: THREE.Group;
+  private px4Rig: { ghost: THREE.Group; link: THREE.Line; arrow: THREE.ArrowHelper } | null = null;
   private spin = 0;
   private cutaway = 0;
   private time = 0;
@@ -141,7 +146,10 @@ export class FilmScene {
     const speed = Math.hypot(state.vel[0], state.vel[1]);
     const fwd = state.vel[0] * Math.cos(state.yaw) + state.vel[1] * Math.sin(state.yaw);
     const side = -state.vel[0] * Math.sin(state.yaw) + state.vel[1] * Math.cos(state.yaw);
-    this.drone.group.rotation.set(Math.max(-0.35, Math.min(0.35, side * 0.09)), 0, Math.max(-0.35, Math.min(0.35, -fwd * 0.09)));
+    // A PX4 flight carries the airframe's true attitude; otherwise lean into the velocity.
+    if (state.px4) this.drone.group.rotation.set(-state.px4.roll, 0, -state.px4.pitch);
+    else this.drone.group.rotation.set(Math.max(-0.35, Math.min(0.35, side * 0.09)), 0, Math.max(-0.35, Math.min(0.35, -fwd * 0.09)));
+    this.updatePx4(state, p);
     this.spin += 0.9 + speed * 0.1;
     for (const rotor of this.drone.rotors) rotor.rotation.y = this.spin;
     this.drone.updateWash(state.t, 0.6 + speed * 0.1);
@@ -262,6 +270,64 @@ export class FilmScene {
       this.droneRoot.add(spot, spot.target);
     }
     this.scene.add(this.droneRoot);
+    if (this.log.frames.some((f) => f.px4)) this.buildPx4Rig();
+  }
+
+  /**
+   * PX4 flights: a cyan ring where EKF2 believes the drone is, tied to the airframe by a thin line
+   * (the estimator's error, to scale), and an amber arrow for the velocity the mission asked PX4 for.
+   */
+  private buildPx4Rig(): void {
+    const cyan = new THREE.Color('#56e0ff');
+    const ghost = new THREE.Group();
+    const ringMat = new THREE.MeshBasicMaterial({ color: cyan, transparent: true, opacity: 0.9, depthWrite: false, fog: false });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.014, 8, 48), ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ghost.add(ring);
+    const inner = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.008, 6, 32), ringMat);
+    inner.rotation.x = Math.PI / 2;
+    ghost.add(inner);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshBasicMaterial({ color: cyan, fog: false }));
+    ghost.add(dot);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: cyan, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    glow.scale.setScalar(0.5);
+    ghost.add(glow);
+    ghost.renderOrder = 5;
+    const linkGeom = new THREE.BufferGeometry();
+    linkGeom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    const link = new THREE.Line(linkGeom, new THREE.LineDashedMaterial({ color: cyan, dashSize: 0.06, gapSize: 0.04, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+    link.frustumCulled = false;
+    const arrow = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(), 1, 0xffd166, 0.14, 0.08);
+    (arrow.line.material as THREE.LineBasicMaterial).fog = false;
+    (arrow.cone.material as THREE.MeshBasicMaterial).fog = false;
+    this.scene.add(ghost, link, arrow);
+    this.px4Rig = { ghost, link, arrow };
+  }
+
+  private updatePx4(state: FilmState, drone: THREE.Vector3): void {
+    const rig = this.px4Rig;
+    if (!rig) return;
+    const on = state.px4 !== undefined && state.ekf !== undefined;
+    rig.ghost.visible = on;
+    rig.link.visible = on;
+    rig.arrow.visible = false;
+    if (!on) return;
+    const e = toThree(state.ekf!);
+    rig.ghost.position.copy(e);
+    rig.ghost.rotation.y = state.t * 0.8;
+    const pos = rig.link.geometry.getAttribute('position') as THREE.BufferAttribute;
+    pos.setXYZ(0, drone.x, drone.y, drone.z);
+    pos.setXYZ(1, e.x, e.y, e.z);
+    pos.needsUpdate = true;
+    rig.link.computeLineDistances();
+    const sp = state.px4!.sp;
+    const speed = Math.hypot(sp[0], sp[1], sp[2]);
+    if (speed > 0.05) {
+      rig.arrow.visible = true;
+      rig.arrow.position.copy(drone);
+      rig.arrow.setDirection(new THREE.Vector3(sp[0], sp[2], sp[1]).normalize());
+      rig.arrow.setLength(Math.min(2.4, 0.25 + speed * 0.45), 0.14, 0.08);
+    }
   }
 
   private buildOverlays(): void {

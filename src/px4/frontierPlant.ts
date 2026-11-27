@@ -174,6 +174,21 @@ export class FrontierPlant {
     this.sync(resting);
   }
 
+  /**
+   * Put the airframe somewhere else, NED from the pad, with a new velocity: a contact resolved by a
+   * world the plant does not know (the mission's walls and floors push it back).
+   */
+  teleport(posNed: ArrayLike<number>, velNed: ArrayLike<number>): void {
+    const st = this.state;
+    st.pos[0] = posNed[1] ?? 0;
+    st.pos[1] = posNed[0] ?? 0;
+    st.pos[2] = -(posNed[2] ?? 0);
+    st.vel[0] = velNed[1] ?? 0;
+    st.vel[1] = velNed[0] ?? 0;
+    st.vel[2] = -(velNed[2] ?? 0);
+    this.sync(this.s.onGround);
+  }
+
   private sync(onGround: boolean): void {
     const st = this.state;
     this.s.pos = enuToNed(st.pos);

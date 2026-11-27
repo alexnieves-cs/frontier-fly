@@ -177,3 +177,51 @@ html.film-page, html.film-page body { height: 100%; overflow: hidden; }
 /* Embedded in another page (the landing hero): fits its container, no controls bar. */
 .film-root.film-embed { width: 100%; height: 100%; display: block; overflow: hidden; background: #05080b; }
 .film-embed .film-stage { position: absolute; left: 50%; top: 50%; transform-origin: center; }
+
+/* PX4 flight-controller panel (film.html?px4=…, src/film/px4Hud.ts) */
+.film-badge-px4 { color: #061016; background: var(--film-cyan); }
+.px4-hud {
+  position: absolute; left: 40px; top: 124px; width: 430px; padding: 16px 18px 16px;
+  border-radius: 16px; background: rgba(6, 11, 16, 0.7); border: 1px solid rgba(86, 224, 255, 0.28); backdrop-filter: blur(8px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; gap: 12px; transition: opacity 0.4s;
+}
+.px4-hud.px4-off { opacity: 0 !important; }
+.film-is-intro .px4-hud { opacity: 0 !important; }
+.px4-head { display: flex; align-items: center; gap: 12px; }
+.px4-mark {
+  width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex: none;
+  font: 800 16px var(--film-font); letter-spacing: 0.04em; color: #061016;
+  background: linear-gradient(140deg, #9df3ff, #56e0ff 55%, #1d9ec2); box-shadow: 0 0 22px rgba(86, 224, 255, 0.4);
+}
+.px4-kicker { font: 700 12px var(--film-font); letter-spacing: 0.16em; color: var(--film-cyan); }
+.px4-sub { font: 500 13px var(--film-font); color: var(--film-muted); margin-top: 3px; }
+.px4-chips { display: flex; gap: 8px; }
+.px4-chip { padding: 6px 12px; border-radius: 999px; font: 700 13px var(--film-mono); letter-spacing: 0.08em; }
+.px4-mode { color: #061016; background: var(--film-cyan); }
+.px4-armed { color: #061016; background: var(--film-green); }
+.px4-armed.px4-disarmed { color: var(--film-ink); background: rgba(255, 255, 255, 0.14); }
+.px4-nav {
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px;
+  background: rgba(61, 255, 154, 0.1); border: 1px solid rgba(61, 255, 154, 0.35); font: 700 13px var(--film-font); letter-spacing: 0.06em; color: #c8ffe2;
+}
+.px4-nav-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--film-green); box-shadow: 0 0 10px var(--film-green); flex: none; }
+.px4-nav.px4-denied { background: rgba(255, 209, 102, 0.12); border-color: rgba(255, 209, 102, 0.5); color: #ffe7ad; }
+.px4-nav.px4-denied .px4-nav-dot { background: var(--film-amber); box-shadow: 0 0 10px var(--film-amber); }
+.px4-label { font: 650 11px var(--film-font); letter-spacing: 0.16em; color: var(--film-muted); margin-bottom: 6px; }
+.px4-err-row { display: flex; align-items: baseline; gap: 14px; white-space: nowrap; }
+.px4-err { font: 650 30px var(--film-mono); font-variant-numeric: tabular-nums; color: var(--film-cyan); }
+.px4-err-note { font: 500 12px var(--film-mono); color: var(--film-muted); }
+.px4-spark { width: 100%; height: 55px; display: block; margin-top: 4px; border-radius: 6px; background: rgba(255, 255, 255, 0.03); }
+.px4-lower { display: grid; grid-template-columns: 150px 1fr; gap: 18px; }
+.px4-horizon { width: 120px; height: 120px; display: block; }
+.px4-angles { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; font: 600 12px var(--film-mono); color: #dbe6ec; }
+.px4-bars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; height: 104px; }
+.px4-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.px4-bar { position: relative; flex: 1; width: 100%; border-radius: 6px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.px4-bar-fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, #1d9ec2, #9df3ff); border-radius: 6px; }
+.px4-bar-fill.px4-sat { background: linear-gradient(to top, #c7781c, #ffd166); }
+.px4-bar-label { font: 600 11px var(--film-mono); color: var(--film-muted); }
+.px4-track { margin-top: 8px; font: 600 12px var(--film-mono); color: #ffe7ad; }
+.film-end-px4 { margin-top: 14px; font: 600 16px var(--film-font); color: var(--film-cyan); }
+.film-tiny .px4-hud { display: none; }

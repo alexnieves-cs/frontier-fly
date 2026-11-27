@@ -16,7 +16,7 @@ import {
   toWorld,
 } from '../planner/indoor';
 import { ENTRY_SIGMA_XY, ENTRY_SIGMA_YAW, Localizer } from '../localizer';
-import { QuadVehicle } from '../quadVehicle';
+import type { QuadVehicle } from '../quadVehicle';
 import { type VehicleCommand } from '../vehicle';
 import {
   type Job,
@@ -101,7 +101,9 @@ export class IndoorPhase {
     v.sensing ??= new IndoorSensing(v.grid, this.c.loc ? this.c.loc.frameLidar(lidar) : lidar, lighting, this.c.world.seed);
     v.sensing.lastNewVoxelSec = this.c.t;
     v.sensing.hazardAware = this.c.options.hazardAware ?? true;
-    if (this.c.vehicle instanceof QuadVehicle) v.sensing.braking = this.c.vehicle.braking;
+    // The quad, and PX4 flying it, carry a stopping model; the kinematic vehicle has none.
+    const braking = (this.c.vehicle as Partial<Pick<QuadVehicle, 'braking'>>).braking;
+    if (braking) v.sensing.braking = braking;
     v.sensing.rangeHook = (lidar) => this.pilot.lidarHook(lidar);
     // Trust the camera only where it can see: in the dark without IR, that is the flashlight cone.
     const dark = nightFactor(lighting) > 0.5 && lighting.sensorMode === 'rgb';

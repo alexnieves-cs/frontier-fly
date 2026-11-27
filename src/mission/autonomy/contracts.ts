@@ -386,6 +386,11 @@ export interface RunnerOptions {
    * and an angle-mode flight controller, and indoors uses the braking filter.
    */
   vehicle?: 'kinematic' | 'quad';
+  /**
+   * Builds the airframe instead of `vehicle`, for an airframe that lives outside the runner: PX4 SITL
+   * flying the mission quad (px4Vehicle.ts, scripts/px4/mission.ts).
+   */
+  vehicleFactory?: (args: VehicleFactoryArgs) => import('./vehicle').Vehicle;
   /** Wind at sim time t, world frame, m/s. Default calm. */
   wind?: (tSec: number) => V3;
   /**
@@ -413,6 +418,11 @@ export interface RunnerOptions {
   search?: OutdoorSearchOptions;
   /** Track the closest approach to any solid every tick (RunRecord.clearance). Off by default: it costs a query per tick. */
   measureClearance?: boolean;
+  /**
+   * Mean confidence under which a target track that ran out of re-views is rejected as a lookalike
+   * (above it, the track stays unresolved and blocks a clear). Default UNRESOLVED_FLOOR (planner/confirm.ts).
+   */
+  unresolvedFloor?: number;
   /**
    * Hazard awareness indoors, default on: a shut door with unsearched space behind it blocks a clear,
    * and the look estimate only trusts the camera where smoke leaves it contrast. Off is the control
@@ -479,4 +489,13 @@ export interface AutonomyReport {
   entries: EntryRecord[];
   safetyEvents: number;
   notes: string[];
+}
+
+/** What RunnerOptions.vehicleFactory gets to build an airframe on the pad. */
+export interface VehicleFactoryArgs {
+  physics: import('../../world/outdoor/physics').OutdoorPhysics;
+  battery: BatteryModel;
+  start: V3;
+  yaw: number;
+  outdoor: import('../../world/outdoor/types').OutdoorWorld;
 }

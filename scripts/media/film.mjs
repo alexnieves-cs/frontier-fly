@@ -7,6 +7,8 @@
 //   FILM_SCALE=1 FILM_FRAMES=0-300              full 1080p, or a frame range for a quick look
 //   FILM_SHARD=2/6 KEEP_FRAMES=1                render only shard 2 of 6 of the frames (media.yml)
 //   FILM_ENCODE_ONLY=1                          encode frames already in FILM_RAW, no browser
+//   npm run media:film -- px4:find-person-2     a flight PX4 SITL flew (scripts/px4/mission.ts --film),
+//                                               read from public/px4-flights/<id>.film.json
 //
 // The film is deterministic: the mission is flown headless once, and window.__film.render(i)
 // draws frame i with every effect on (shadows, bloom, SMAA) however slowly the GPU or software
@@ -73,7 +75,8 @@ async function renderFilm(browser, base, film) {
   const dir = join(RAW, film.scenario);
   const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT } });
   page.on('pageerror', (e) => console.error(`  page error: ${e.message}`));
-  const url = `${base}film.html?record=1&scenario=${film.scenario}&scale=${SCALE}&length=${film.length}`;
+  const source = film.px4 ? `px4=${encodeURIComponent(film.px4)}` : `scenario=${film.scenario}`;
+  const url = `${base}film.html?record=1&${source}&scale=${SCALE}&length=${film.length}`;
   await page.goto(url);
   await page.waitForFunction(() => window.__film?.ready || window.__film?.error, undefined, { timeout: 600_000 });
   const error = await page.evaluate(() => window.__film.error);
@@ -159,7 +162,14 @@ function encodeOnly(films) {
 }
 
 const wanted = process.argv.slice(2);
-const films = wanted.length ? FILMS.filter((f) => wanted.includes(f.scenario)) : FILMS;
+/** PX4 flights are opt-in by name: their recordings are written by scripts/px4/mission.ts --film, not committed. */
+const px4Films = wanted
+  .filter((w) => w.startsWith('px4:'))
+  .map((w) => {
+    const id = w.slice(4);
+    return { scenario: `px4-${id}`, px4: `px4-flights/${id}.film.json`, title: `PX4 SITL: ${id}`, length: Number(process.env.FILM_LENGTH ?? 60) };
+  });
+const films = wanted.length ? [...FILMS.filter((f) => wanted.includes(f.scenario)), ...px4Films] : FILMS;
 const partial = Boolean(process.env.FILM_FRAMES || process.env.FILM_SHARD);
 let results = [];
 if (process.env.FILM_ENCODE_ONLY) {
@@ -168,7 +178,8 @@ if (process.env.FILM_ENCODE_ONLY) {
   const server = await startServer();
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_PATH || undefined,
-    args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'],
+    // ANGLE on SwiftShader when there is no GPU; a headless shell without it draws no WebGL.
+    args: ['--enable-webgl', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', ...(process.env.FILM_SWIFTSHADER ? ['--use-gl=angle', '--use-angle=swiftshader'] : [])],
   });
   try {
     for (const film of films) {
@@ -181,7 +192,10 @@ if (process.env.FILM_ENCODE_ONLY) {
     server.stop();
   }
 }
-if (results.length) {
+// PX4 films stay out of the site's film index (docs/media/film.json); the pages list only the scenario films.
+const indexed = results.filter((r) => !r.scenario.startsWith('px4-'));
+if (indexed.length) {
+  results = indexed;
   const index = join(OUT, 'film.json');
   const prev = existsSync(index) ? JSON.parse(readFileSync(index, 'utf8')) : { films: [] };
   const films = [...prev.films.filter((f) => !results.some((r) => r.scenario === f.scenario)), ...results];
