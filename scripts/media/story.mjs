@@ -48,7 +48,7 @@ function headline() {
   };
   return {
     coverage: find(/learned policy add|search/i),
-    night: find(/dark/i),
+    night: find(/dark|need light/i),
     missions: find(/missions/i),
     falseClear: find(/clear with someone inside/i),
     crash: find(/hit something/i),
@@ -165,7 +165,7 @@ const cards = {
   </div></div>`,
   numbers: `<div class="card"><div class="kicker">What it does well</div><div class="grid">
     <div class="stat"><div class="big">${esc(pct(h.coverage.measured))}</div><div class="lbl">of a new, hard building searched by the trained pilot under its lidar guard</div></div>
-    <div class="stat"><div class="big">${esc(h.night.measured.match(/(\d+(?:\.\d+)?%) of day/)?.[1] ?? pct(h.night.measured))}</div><div class="lbl">of its daytime coverage at night with the lights off</div></div>
+    <div class="stat"><div class="big">${esc(h.night.measured.match(/(\d+(?:\.\d+)?%) of day/)?.[1] ?? pct(h.night.measured))}</div><div class="lbl">${/of day/.test(h.night.measured) ? 'of its daytime coverage at night with the lights off' : 'of a hard building searched at night with every light off'}</div></div>
     <div class="stat"><div class="big">${esc(pct(h.missions.measured))}</div><div class="lbl">of whole missions end the right way: target found, or correctly cleared</div></div>
     <div class="stat"><div class="big">${esc(pct(h.faults.measured))}</div><div class="lbl">of flights end safely after a sensor, motor, battery, link, GNSS or wind fault</div></div>
   </div><p style="font-size:22px">Fresh seeds, 95% intervals, and every number regenerated from the benchmark JSON in CI.</p></div>`,
