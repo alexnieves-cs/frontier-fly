@@ -68,6 +68,8 @@ the protection level, and a ghost that trusts GPS while it is spoofed. Each fram
 # in DSS
 PYTHONPATH=src python tools/footage/export_leg.py runs/0582_15-03 pairs/0582_15-03 clips/0582_15-03 \
     --out ../frontier-fly/public/joint/0582_15-03
+# optional: the 24 tiles around it, dimmed, so wide shots see real ground to the horizon
+PYTHONPATH=src python tools/footage/pnoa_context.py ../frontier-fly/public/joint/0582_15-03 --tile 0582_15-03
 # in frontier-fly
 npx vite --open /joint.html?leg=0582_15-03
 ```

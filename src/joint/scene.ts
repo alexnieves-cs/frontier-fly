@@ -146,9 +146,10 @@ export class LegScene {
     this.cx = (ext.xmin + ext.xmax) / 2;
     this.cy = (ext.ymin + ext.ymax) / 2;
 
-    const sky = new THREE.Color('#0b1620');
-    this.scene.background = sky;
-    this.scene.fog = new THREE.Fog('#16232d', 900, 3800);
+    // Background and fog share one colour, so the ground fades into haze at the horizon instead of ending.
+    const haze = new THREE.Color('#1a2833');
+    this.scene.background = haze;
+    this.scene.fog = new THREE.Fog(haze, 1400, 5200);
     this.scene.add(new THREE.HemisphereLight('#dfefff', '#3a3226', 1.3));
     const sun = new THREE.DirectionalLight('#fff2dc', 2.4);
     sun.position.set(-400, 900, 300);
@@ -258,7 +259,21 @@ export class LegScene {
     geo.rotateX(-Math.PI / 2);
     const ground = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
     this.scene.add(ground);
-    // Beyond the tile: no imagery, so a dark plain with a faint survey grid, and the tile's edge marked.
+    // Around the tile, when the bundle has them: the neighbouring tiles of the same flight, coarser and dimmed so the
+    // tile the run used still reads as the data. Its edge stays marked below.
+    const ctx = this.leg.context;
+    if (ctx) {
+      const ctex = await loader.loadAsync(new URL(ctx.file, base).href);
+      ctex.colorSpace = THREE.SRGBColorSpace;
+      ctex.anisotropy = tex.anisotropy;
+      const ce = ctx.extent;
+      const cgeo = new THREE.PlaneGeometry(ce.xmax - ce.xmin, ce.ymax - ce.ymin);
+      cgeo.rotateX(-Math.PI / 2);
+      const around = new THREE.Mesh(cgeo, new THREE.MeshBasicMaterial({ map: ctex, color: '#7f898f' }));
+      this.w((ce.xmin + ce.xmax) / 2, (ce.ymin + ce.ymax) / 2, -0.3, around.position);
+      this.scene.add(around);
+    }
+    // Beyond the imagery: a dark plain with a faint survey grid. The tile's own edge is marked on top.
     const far = new THREE.Mesh(
       new THREE.PlaneGeometry(12000, 12000).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ color: '#0f1a21' }),

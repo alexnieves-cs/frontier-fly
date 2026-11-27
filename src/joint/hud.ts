@@ -42,12 +42,15 @@ export class LegHud {
   private readonly tags: { drone: HTMLElement; ghost: HTMLElement; svg: SVGSVGElement; lines: SVGLineElement[] };
   private mapImg: HTMLImageElement | null = null;
   private readonly frames = new Map<number, HTMLImageElement>();
+  /** Epochs on which the gated solution's true error is over its published protection level. */
+  private readonly overBound: number;
 
   constructor(
     stage: HTMLElement,
     private readonly leg: LegBundle,
     private readonly base: string,
   ) {
+    this.overBound = leg.epochs.filter((e) => e.gated.pub !== null && e.gated.pl !== null && (dist(e.gated.pub, e.truth) ?? 0) > e.gated.pl).length;
     this.root = el('div', 'leg-hud', stage);
     const top = el('div', 'leg-title', this.root);
     el('div', 'leg-kicker', top, 'GNSS-denied ingress · real aerial imagery');
@@ -330,7 +333,7 @@ export class LegHud {
     const ts = leg.spoof.startS;
     const trj = leg.firstRejectS.gated;
     let cap = '';
-    if (t < t0 + 0.5) cap = 'No GNSS is fused. Every position below comes from matching the camera to an old map.';
+    if (t < t0 + 0.5) cap = 'GPS is used only while it agrees with the map. Each map fix comes from matching the camera to a 2009 survey.';
     else if (t < ts - 1) cap = 'Each patch of ground the camera sees is searched for on the 2009 map. Green: a fix the filter takes.';
     else if (t < ts + 4) cap = `GNSS spoofing starts at ${ts} s: the receiver is dragged ${leg.spoof.rateMps} m/s to the north-east.`;
     else if (trj !== null && t < trj && (pl ?? 0) > leg.alertLimitM)
@@ -338,7 +341,10 @@ export class LegHud {
     else if (trj !== null && t < trj) cap = 'The gate compares each GPS reading with where the map fixes say the drone is.';
     else if (trj !== null && t < trj + 6) cap = `GPS rejected at ${trj.toFixed(1)} s. DSS keeps navigating on the map alone.`;
     else if (t < t1 - 6) cap = 'In red, where a GPS-trusting autopilot thinks it is. DSS stays on the true path.';
-    else if (t <= t1) cap = 'The protection level is the bound DSS publishes: the true error never crossed it on this leg.';
+    else if (t <= t1)
+      cap = this.overBound === 0
+        ? 'The protection level is the bound DSS publishes: the true error never crossed it on this leg.'
+        : `The protection level is the bound DSS publishes: the true error crossed it on ${this.overBound} of ${leg.epochs.length} epochs.`;
     this.caption.textContent = cap;
     this.caption.style.opacity = cap ? '1' : '0';
     this.clock.textContent = `t = ${Math.max(0, tc).toFixed(1)} s`;

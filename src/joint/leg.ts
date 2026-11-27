@@ -60,6 +60,8 @@ export interface LegBundle {
   firstRejectS: Record<string, number | null>;
   ground: { file: string; w: number; h: number; extent: Extent; title: string; attribution: string };
   map: { file: string; w: number; h: number; extent: Extent; title: string; attribution: string };
+  /** The tiles around the ground tile, coarser, for context out to the horizon (DSS tools/footage/pnoa_context.py). */
+  context?: { file: string; w: number; h: number; extent: Extent; tiles: number; attribution: string };
   patches: { file: string; px: number; cols: number } | null;
   camera: { hfovDeg: number; patchM: number; framesDir: string; frameW: number };
   summary: Record<string, number | string | null>;
