@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BASELINES, explorerPilot, VIEW_QUAD_MARGIN } from '../../src/bench/baselines';
-import { DRIFT_TASKS, HARD_SEEDS, HARD_TASKS, hardRuns, RETURN_TASKS, trackRuns } from '../../src/bench/hard';
+import { DRIFT_HARD_TASKS, DRIFT_TASKS, HARD_SEEDS, HARD_TASKS, hardRuns, LOOP_IN_FLIGHT, RETURN_TASKS, SPARSE_RANGING, trackRuns } from '../../src/bench/hard';
 import { benchEpisodeSetup, runBenchEpisode } from '../../src/bench/run';
 import { BENCH_SEEDS } from '../../src/bench/tasks';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
@@ -117,6 +117,28 @@ describe('FrontierBench Hard', () => {
     expect(ep.drift!.mean).toBeGreaterThan(0);
     expect(ep.drift!.max).toBeLessThan(1);
     expect(ep.returned).toBe(true);
+    env.dispose();
+  });
+
+  it('the hard drift track flies every task home on the sparse ranging suite, on seeds no other track uses', () => {
+    for (const t of DRIFT_HARD_TASKS) {
+      expect(t.drift && t.home && t.camera).toBe(true);
+      expect(t.driftProfile).toBe(SPARSE_RANGING);
+    }
+    const seeds = (track: Parameters<typeof trackRuns>[0], tasks: readonly unknown[]) => tasks.flatMap((_, i) => [...trackRuns(track, 'dev', i), ...trackRuns(track, 'test', i)].map((r) => r.seed));
+    const mine = new Set(seeds('drift-hard', DRIFT_HARD_TASKS));
+    for (const [track, tasks] of [['hard', HARD_TASKS], ['return', RETURN_TASKS], ['drift', DRIFT_TASKS]] as const) for (const s of seeds(track, tasks)) expect(mine.has(s)).toBe(false);
+  });
+
+  it('with loop closure in flight the pilot flies on the graph, and the estimator alone is reported beside it', async () => {
+    const env = await createEnv();
+    const ti = DRIFT_HARD_TASKS.findIndex((t) => t.id === 'sparse-dark-quad');
+    const task = { ...DRIFT_HARD_TASKS[ti]!, driftProfile: { ...SPARSE_RANGING, ...LOOP_IN_FLIGHT } };
+    const ep = runBenchEpisode(env, task, trackRuns('drift-hard', 'dev', ti)[0]!, BASELINES['planner-view']!());
+    expect(ep.drift!.loop!.keyframes).toBeGreaterThan(10);
+    expect(ep.drift!.loop!.seqMatched).toBeGreaterThan(0);
+    expect(ep.drift!.other!.mean).toBeGreaterThan(0);
+    expect(ep.drift!.other!.mean).not.toBe(ep.drift!.mean);
     env.dispose();
   });
 });

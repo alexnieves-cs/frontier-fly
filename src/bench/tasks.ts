@@ -12,6 +12,7 @@
  */
 import type { PlanRecord, PlanSet } from '../plans';
 import type { LightingPreset } from '../sim/lighting';
+import type { DriftProfile } from './drift';
 
 /**
  * v2 added the real-apartments task. v3 flies under the crash rule (a contact faster than
@@ -47,6 +48,8 @@ export interface BenchTask {
   wind?: number;
   /** Drift task: the pilot flies on its own pose estimate, with maps painted from it (bench/drift.ts). */
   drift?: boolean;
+  /** Drift task: the sensor suite and estimator settings, when not round 3's defaults. */
+  driftProfile?: DriftProfile;
 }
 
 export const BENCH_TASKS: readonly BenchTask[] = [

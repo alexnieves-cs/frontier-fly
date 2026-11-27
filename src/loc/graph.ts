@@ -430,6 +430,15 @@ export interface LoopClosureOptions {
   /** Gauss-Newton iterations after each closure and at the end. */
   itersOnline: number;
   itersFinal: number;
+  /**
+   * Sweeps a keyframe holds, at most: its own and the ones since the previous keyframe, placed by the front
+   * end's motion (1: the keyframe's sweep alone; pair a larger value with a larger keyDist). A sparse ranging ring sees too few walls in one sweep to match on;
+   * a few sweeps together, while the drone moves and turns, do (Cartographer's accumulated range data).
+   */
+  accumulate: number;
+  /** Returns a keyframe needs before it is matched sequentially, and before a loop is tried on it. */
+  seqMinPts: number;
+  loopMinPts: number;
 }
 
 export function defaultLoopClosureOptions(): LoopClosureOptions {
@@ -460,6 +469,9 @@ export function defaultLoopClosureOptions(): LoopClosureOptions {
     cauchy: 3,
     itersOnline: 4,
     itersFinal: 15,
+    accumulate: 1,
+    seqMinPts: 21,
+    loopMinPts: 30,
   };
 }
 
@@ -478,7 +490,8 @@ interface Keyframe {
   sweep: number;
   /** Front-end pose at the keyframe. */
   front: Pose2;
-  ranges: Float64Array;
+  /** The sweeps it holds, each with its pose in the keyframe's frame (the keyframe's own sweep last, at the origin). */
+  rings: { rel: Pose2; ranges: Float64Array }[];
   pts: { bx: Float64Array; by: Float64Array; n: number };
 }
 
@@ -497,6 +510,8 @@ export class LoopCloser {
   private pathSinceLoop = 0;
   private pendingLoops = 0;
   private readonly match: MatchOptions;
+  /** The last `accumulate - 1` sweeps before the newest, for the next keyframe (front pose and ranges). */
+  private readonly recent: { front: Pose2; ranges: Float64Array }[] = [];
 
   constructor(opts: Partial<LoopClosureOptions> = {}) {
     this.opts = { ...defaultLoopClosureOptions(), ...opts };
@@ -510,15 +525,25 @@ export class LoopCloser {
     const sweep = this.sweepKey.length;
     this.sweepFront.push(f[0], f[1], f[2]);
     const last = this.keys[this.keys.length - 1];
+    const r = Float64Array.from(ranges);
+    const keep = (): void => {
+      if (this.opts.accumulate <= 1) return;
+      this.recent.push({ front: f, ranges: r });
+      if (this.recent.length > this.opts.accumulate - 1) this.recent.shift();
+    };
     if (last) {
       const d = between(last.front, f);
       if (Math.hypot(d[0], d[1]) < this.opts.keyDist && Math.abs(d[2]) < this.opts.keyYaw) {
         this.sweepKey.push(this.keys.length - 1);
+        keep();
         return;
       }
     }
-    const r = Float64Array.from(ranges);
-    const key: Keyframe = { sweep, front: f, ranges: r, pts: endpoints(r, this.opts.maxRange) };
+    const rings = this.recent.map((q) => ({ rel: between(f, q.front), ranges: q.ranges }));
+    rings.push({ rel: [0, 0, 0], ranges: r });
+    // A sweep belongs to one keyframe only, so neighbouring keyframes never match the same returns.
+    this.recent.length = 0;
+    const key: Keyframe = { sweep, front: f, rings, pts: ringPoints(rings, this.opts.maxRange) };
     this.keys.push(key);
     this.sweepKey.push(this.keys.length - 1);
     this.addKeyframe(key);
@@ -554,7 +579,7 @@ export class LoopCloser {
     // prior = R Ω Rᵀ
     for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) prior[i * 3 + j] = tmp[i * 3] * R[j * 3]! + tmp[i * 3 + 1]! * R[j * 3 + 1]! + tmp[i * 3 + 2]! * R[j * 3 + 2]!;
     let m = null;
-    if (grid && key.pts.n > 20) {
+    if (grid && key.pts.n >= o.seqMinPts) {
       // A short correlative search first: wheel odometry can be degrees off after a turn, beyond what Gauss-Newton pulls in.
       const sr = o.seqSearchXY > 0 ? searchScan(grid, key.pts, guess[0], guess[1], guess[2], o.seqSearchXY, o.seqSearchYaw, this.match) : { x: guess[0], y: guess[1], yaw: guess[2] };
       m = matchScan(grid, key.pts, sr.x, sr.y, sr.yaw, prior, this.match);
@@ -608,7 +633,7 @@ export class LoopCloser {
       const grid = this.submap(lo, hi);
       if (!grid) continue;
       const pts = this.keys[k]!.pts;
-      if (pts.n < 30) continue;
+      if (pts.n < o.loopMinPts) continue;
       const sr = searchScan(grid, pts, here[0], here[1], here[2], half, o.loopSearchYaw, this.match);
       if (sr.score < o.loopMinInliers * 0.8) continue;
       const m = matchScan(grid, pts, sr.x, sr.y, sr.yaw, null, this.match);
@@ -651,7 +676,10 @@ export class LoopCloser {
     const grid = new LikelihoodGrid(ox, oy, x1 + R - ox + res, y1 + R - oy + res, res, 1);
     for (let q = lo; q <= hi; q++) {
       const p = g.pose(q);
-      grid.integrate(p[0], p[1], p[2], this.keys[q]!.ranges, this.opts.maxRange);
+      for (const ring of this.keys[q]!.rings) {
+        const at = ring.rel[0] === 0 && ring.rel[1] === 0 && ring.rel[2] === 0 ? p : compose(p, ring.rel);
+        grid.integrate(at[0], at[1], at[2], ring.ranges, this.opts.maxRange);
+      }
     }
     grid.refresh();
     return grid;
@@ -685,6 +713,26 @@ export class LoopCloser {
     }
     return out;
   }
+}
+
+/** Every ring's returns in the keyframe's frame, as one point set. */
+function ringPoints(rings: readonly { rel: Pose2; ranges: Float64Array }[], maxRange: number): { bx: Float64Array; by: Float64Array; n: number } {
+  if (rings.length === 1) return endpoints(rings[0]!.ranges, maxRange);
+  const parts = rings.map((q) => ({ rel: q.rel, pts: endpoints(q.ranges, maxRange) }));
+  const total = parts.reduce((a, q) => a + q.pts.n, 0);
+  const bx = new Float64Array(total);
+  const by = new Float64Array(total);
+  let n = 0;
+  for (const { rel, pts } of parts) {
+    const c = Math.cos(rel[2]);
+    const s = Math.sin(rel[2]);
+    for (let i = 0; i < pts.n; i++) {
+      bx[n] = rel[0] + c * pts.bx[i]! - s * pts.by[i]!;
+      by[n] = rel[1] + s * pts.bx[i]! + c * pts.by[i]!;
+      n += 1;
+    }
+  }
+  return { bx, by, n };
 }
 
 /**

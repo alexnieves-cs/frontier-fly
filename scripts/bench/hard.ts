@@ -7,7 +7,7 @@
 //
 import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { DRIFT_TASKS, HARD_TASKS, HARD_VERSION, RETURN_TASKS, trackRuns } from '../../src/bench/hard';
+import { LOOP_IN_FLIGHT, HARD_VERSION, trackRuns, trackTasks, type DriftTrack } from '../../src/bench/hard';
 import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
 import { createEnv } from '../../src/sim/env';
 import { loadPilot, summarize } from './lib';
@@ -23,12 +23,16 @@ const split = block ? 'report' : (arg('split', 'dev') as 'dev' | 'test');
 if (split !== 'dev' && split !== 'test' && !block) throw new Error('--split dev|test, or --base N [--count M]');
 const only = arg('tasks', '').split(',').filter(Boolean);
 const ids = arg('only', arg('pilot', 'planner')).split(',');
-const track = arg('track', 'hard') as 'hard' | 'return' | 'drift';
-if (track !== 'hard' && track !== 'return' && track !== 'drift') throw new Error('--track hard|return|drift');
+const track = arg('track', 'hard') as DriftTrack;
+if (!['hard', 'return', 'drift', 'drift-hard'].includes(track)) throw new Error('--track hard|return|drift|drift-hard');
 // --truth flies the drift tasks on the true pose: the paired control that prices the estimate.
 const truth = process.argv.includes('--truth');
-const TASKS = track === 'return' ? RETURN_TASKS : track === 'drift' ? DRIFT_TASKS.map((t) => (truth ? { ...t, drift: false } : t)) : HARD_TASKS;
-const outDir = arg('out', split === 'test' ? (track === 'hard' ? 'bench/results/hard' : `bench/results/hard-${track}`) : '');
+// --loop flies the drift tasks on the in-flight loop closer's pose (hard.ts LOOP_IN_FLIGHT).
+const loop = process.argv.includes('--loop');
+if (truth && loop) throw new Error('--truth and --loop exclude each other');
+const TASKS = trackTasks(track).map((t) => (!t.drift ? t : truth ? { ...t, drift: false } : loop ? { ...t, driftProfile: { ...t.driftProfile, ...LOOP_IN_FLIGHT } } : t));
+// A loop-closure row sits on the same board as the estimator-only rows (file <id>-loop.json); the true-pose control has its own folder.
+const outDir = arg('out', split === 'test' ? (track === 'hard' ? 'bench/results/hard' : `bench/results/hard-${track}${truth ? '-truth' : ''}`) : '');
 const commit = execSync('git rev-parse --short HEAD').toString().trim();
 const env = await createEnv();
 for (const id of ids) {
@@ -45,11 +49,11 @@ for (const id of ids) {
   });
   await pilot.close?.();
   const tasks = TASKS.filter((t) => !only.length || only.includes(t.id));
-  const result = { hard: HARD_VERSION, ...(track !== 'hard' ? { track } : {}), ...(truth ? { truth } : {}), name: pilot.name, source, split, ...(block ? { block } : {}), commit, baseline: source.startsWith('baseline:'), taskDefs: tasks, ...summarize(episodes, tasks), episodes };
+  const result = { hard: HARD_VERSION, ...(track !== 'hard' ? { track } : {}), ...(truth ? { truth } : {}), ...(loop ? { loop: LOOP_IN_FLIGHT } : {}), name: loop ? `${pilot.name} + loop closure` : pilot.name, source, split, ...(block ? { block } : {}), commit, baseline: source.startsWith('baseline:'), taskDefs: tasks, ...summarize(episodes, tasks), episodes };
   console.log(`${id}: camera score ${((result.cameraScore ?? 0) * 100).toFixed(1)}%, ring ${((result.footprintScore ?? 0) * 100).toFixed(1)}%, flown ${(result.score * 100).toFixed(1)}%, crashes ${episodes.filter((e) => e.crashed).length}/${episodes.length}`);
   if (outDir) {
     mkdirSync(outDir, { recursive: true });
-    writeFileSync(`${outDir}/${id}.json`, `${JSON.stringify(result, null, 2)}\n`);
+    writeFileSync(`${outDir}/${id}${loop ? '-loop' : ''}.json`, `${JSON.stringify(result, null, 2)}\n`);
   }
 }
 env.dispose();
