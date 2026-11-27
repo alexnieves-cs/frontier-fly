@@ -1,0 +1,112 @@
+
+> frontier-fly@1.2.0 train:quad
+> vite-node scripts/train-quad.ts -- --out-dir train-out --iters 16 --val 40 --noise 0.08 --vz-noise 0.1 --beta-min 0.1 --brake-boost 3 --seed 2 --rl 80 --rl-episodes 48 --rl-lr 5e-5 --log-std -2.5 --crash-penalty -200 --bc 0.8:0.3 --critic-warmup 6 --val-every 10
+
+Platform node has already been set. Overwriting the platform with node.
+2026-11-27 02:40:14.573499: I tensorflow/core/util/util.cc:169] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-11-27 02:40:14.595460: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F AVX512_VNNI AVX512_BF16 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+backend tensorflow, 4 workers, hidden 512,256, 80 practice flights, init none
+(node:2350) [DEP0051] DeprecationWarning: The `util.isNullOrUndefined` API is deprecated. Please use `arg === null || arg === undefined` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+iter 0 beta 1.00 rows 224983 data 224983 rollout 49.0% crash 8/96 loss 0.0079 | alone 2.1% crashes 80/80 score -22.9% | collect 23s train 30s
+iter 1 beta 0.60 rows 125047 data 350030 rollout 35.6% crash 27/64 loss 0.0079 | alone 20.0% crashes 80/80 score -5.0% | collect 18s train 44s
+iter 2 beta 0.36 rows 115699 data 465729 rollout 35.1% crash 37/64 loss 0.0085 | alone 19.1% crashes 77/80 score -5.0% | collect 20s train 59s
+iter 3 beta 0.22 rows 105679 data 571408 rollout 30.8% crash 45/64 loss 0.0088 | alone 19.7% crashes 52/80 score 3.4% | collect 19s train 72s
+iter 4 beta 0.13 rows 85579 data 656987 rollout 21.6% crash 53/64 loss 0.0079 | alone 32.0% crashes 18/80 score 26.4% | collect 17s train 82s
+iter 5 beta 0.10 rows 138635 data 795622 rollout 36.0% crash 20/64 loss 0.0077 | alone 31.7% crashes 19/80 score 25.7% | collect 28s train 100s
+iter 6 beta 0.10 rows 127025 data 922647 rollout 33.2% crash 31/64 loss 0.0079 | alone 24.0% crashes 28/80 score 15.2% | collect 26s train 117s
+iter 7 beta 0.10 rows 127056 data 1049703 rollout 29.5% crash 23/64 loss 0.0069 | alone 33.2% crashes 27/80 score 24.8% | collect 25s train 133s
+iter 8 beta 0.10 rows 136912 data 1186615 rollout 34.8% crash 17/64 loss 0.0070 | alone 32.0% crashes 3/80 score 31.1% | collect 27s train 151s
+iter 9 beta 0.10 rows 143943 data 1330558 rollout 36.3% crash 12/64 loss 0.0066 | alone 37.2% crashes 8/80 score 34.7% | collect 28s train 169s
+iter 10 beta 0.10 rows 134364 data 1464922 rollout 34.6% crash 21/64 loss 0.0065 | alone 35.8% crashes 13/80 score 31.8% | collect 27s train 187s
+iter 11 beta 0.10 rows 133195 data 1500000 rollout 34.4% crash 17/64 loss 0.0066 | alone 31.1% crashes 6/80 score 29.2% | collect 27s train 190s
+iter 12 beta 0.10 rows 148748 data 1500000 rollout 35.0% crash 6/64 loss 0.0065 | alone 35.3% crashes 14/80 score 30.9% | collect 29s train 191s
+iter 13 beta 0.10 rows 135295 data 1500000 rollout 35.4% crash 18/64 loss 0.0062 | alone 23.5% crashes 1/80 score 23.2% | collect 26s train 190s
+iter 14 beta 0.10 rows 146376 data 1500000 rollout 31.6% crash 8/64 loss 0.0061 | alone 31.0% crashes 7/80 score 28.8% | collect 27s train 189s
+iter 15 beta 0.10 rows 148860 data 1500000 rollout 34.7% crash 7/64 loss 0.0060 | alone 33.0% crashes 4/80 score 31.7% | collect 28s train 189s
+iter 16 beta 0.10 rows 141933 data 1500000 rollout 33.5% crash 11/64 loss 0.0058 | alone 30.3% crashes 4/80 score 29.1% | collect 25s train 188s
+dagger done in 52.0 min; best practice score 34.7%
+rl start: alone 37.2% crashes 8/80 score 34.7%
+rl 1 steps 110334 rollout 38.3% crash 5/48 pi 0.000 v 0.263 kl 0.0001 bc 0.000x0.80 (critic warm-up) 34s
+rl 2 steps 103651 rollout 35.9% crash 13/48 pi -0.000 v 0.401 kl 0.0001 bc 0.000x0.79 (critic warm-up) 34s
+rl 3 steps 107578 rollout 37.5% crash 9/48 pi 0.000 v 0.240 kl 0.0001 bc 0.000x0.79 (critic warm-up) 34s
+rl 4 steps 106987 rollout 37.4% crash 10/48 pi 0.000 v 0.176 kl 0.0001 bc 0.000x0.78 (critic warm-up) 33s
+rl 5 steps 110741 rollout 39.5% crash 6/48 pi -0.000 v 0.162 kl 0.0001 bc 0.000x0.77 (critic warm-up) 34s
+rl 6 steps 107798 rollout 39.8% crash 10/48 pi 0.000 v 0.239 kl 0.0001 bc 0.000x0.77 (critic warm-up) 33s
+rl 7 steps 103935 rollout 36.3% crash 12/48 pi 0.008 v 0.542 kl 0.0245 bc 0.023x0.76 45s
+rl 8 steps 111748 rollout 41.4% crash 5/48 pi 0.012 v 0.233 kl 0.0300 bc 0.023x0.76 47s
+rl 9 steps 108045 rollout 38.9% crash 9/48 pi 0.009 v 0.401 kl 0.0304 bc 0.022x0.75 46s
+rl 10 steps 110113 rollout 40.6% crash 8/48 pi 0.033 v 0.330 kl 0.1633 bc 0.024x0.74 | alone 37.9% crashes 5/80 score 36.3% 76s
+rl 11 steps 108430 rollout 38.7% crash 10/48 pi 0.022 v 0.427 kl 0.0690 bc 0.023x0.74 47s
+rl 12 steps 110695 rollout 41.5% crash 6/48 pi 0.011 v 0.259 kl 0.0269 bc 0.024x0.73 47s
+rl 13 steps 112314 rollout 40.8% crash 6/48 pi 0.011 v 0.274 kl 0.0349 bc 0.024x0.72 48s
+rl 14 steps 107162 rollout 40.8% crash 9/48 pi 0.010 v 0.389 kl 0.0243 bc 0.025x0.72 45s
+rl 15 steps 107536 rollout 39.6% crash 8/48 pi 0.007 v 0.331 kl 0.0238 bc 0.025x0.71 46s
+rl 16 steps 107705 rollout 40.8% crash 9/48 pi 0.014 v 0.415 kl 0.0311 bc 0.026x0.71 46s
+rl 17 steps 108765 rollout 42.3% crash 8/48 pi 0.020 v 0.352 kl 0.0737 bc 0.026x0.70 47s
+rl 18 steps 103935 rollout 40.2% crash 11/48 pi 0.015 v 0.443 kl 0.0377 bc 0.025x0.69 46s
+rl 19 steps 105693 rollout 38.4% crash 11/48 pi 0.004 v 0.487 kl 0.0175 bc 0.025x0.69 44s
+rl 20 steps 109469 rollout 42.2% crash 9/48 pi 0.012 v 0.395 kl 0.0297 bc 0.026x0.68 | alone 41.2% crashes 12/80 score 37.5% 75s
+rl 21 steps 104642 rollout 40.8% crash 11/48 pi 0.009 v 0.455 kl 0.0268 bc 0.025x0.67 45s
+rl 22 steps 110892 rollout 42.5% crash 8/48 pi 0.017 v 0.333 kl 0.0466 bc 0.025x0.67 48s
+rl 23 steps 108068 rollout 40.4% crash 8/48 pi 0.014 v 0.365 kl 0.0417 bc 0.025x0.66 46s
+rl 24 steps 110661 rollout 43.4% crash 6/48 pi 0.028 v 0.275 kl 0.1194 bc 0.025x0.65 47s
+rl 25 steps 105570 rollout 39.4% crash 8/48 pi 0.024 v 0.364 kl 0.1017 bc 0.024x0.65 45s
+rl 26 steps 108431 rollout 41.3% crash 12/48 pi 0.006 v 0.422 kl 0.0183 bc 0.025x0.64 47s
+rl 27 steps 107723 rollout 42.8% crash 6/48 pi 0.005 v 0.307 kl 0.0154 bc 0.024x0.64 47s
+rl 28 steps 106117 rollout 42.3% crash 13/48 pi 0.007 v 0.562 kl 0.0252 bc 0.025x0.63 45s
+rl 29 steps 111480 rollout 43.4% crash 6/48 pi 0.005 v 0.279 kl 0.0155 bc 0.025x0.62 49s
+rl 30 steps 110543 rollout 43.2% crash 10/48 pi 0.005 v 0.350 kl 0.0183 bc 0.025x0.62 | alone 41.2% crashes 7/80 score 39.0% 75s
+rl 31 steps 108929 rollout 42.2% crash 6/48 pi 0.006 v 0.303 kl 0.0170 bc 0.025x0.61 47s
+rl 32 steps 108480 rollout 43.5% crash 10/48 pi 0.013 v 0.372 kl 0.0395 bc 0.025x0.60 46s
+rl 33 steps 104565 rollout 41.8% crash 11/48 pi 0.015 v 0.456 kl 0.0371 bc 0.025x0.60 45s
+rl 34 steps 110347 rollout 43.0% crash 6/48 pi 0.053 v 0.290 kl 0.4671 bc 0.025x0.59 48s
+rl 35 steps 106088 rollout 41.2% crash 8/48 pi 0.003 v 0.378 kl 0.0154 bc 0.025x0.58 46s
+rl 36 steps 101731 rollout 39.7% crash 18/48 pi 0.010 v 0.695 kl 0.0311 bc 0.027x0.58 43s
+rl 37 steps 107657 rollout 39.4% crash 9/48 pi 0.005 v 0.369 kl 0.0142 bc 0.026x0.57 46s
+rl 38 steps 103557 rollout 40.5% crash 13/48 pi 0.016 v 0.590 kl 0.0625 bc 0.025x0.57 45s
+rl 39 steps 110295 rollout 41.8% crash 6/48 pi 0.005 v 0.268 kl 0.0126 bc 0.025x0.56 47s
+rl 40 steps 108492 rollout 44.3% crash 9/48 pi 0.024 v 0.390 kl 0.0805 bc 0.026x0.55 | alone 43.7% crashes 10/80 score 40.6% 74s
+rl 41 steps 104789 rollout 42.5% crash 11/48 pi 0.007 v 0.487 kl 0.0212 bc 0.027x0.55 44s
+rl 42 steps 98630 rollout 38.2% crash 13/48 pi 0.011 v 0.613 kl 0.0353 bc 0.027x0.54 42s
+rl 43 steps 106457 rollout 43.0% crash 9/48 pi 0.010 v 0.412 kl 0.0286 bc 0.027x0.53 47s
+rl 44 steps 104216 rollout 42.4% crash 10/48 pi 0.004 v 0.453 kl 0.0139 bc 0.026x0.53 46s
+rl 45 steps 106285 rollout 43.3% crash 11/48 pi 0.008 v 0.393 kl 0.0208 bc 0.027x0.52 45s
+rl 46 steps 109410 rollout 43.0% crash 8/48 pi 0.009 v 0.403 kl 0.0241 bc 0.027x0.52 47s
+rl 47 steps 102675 rollout 41.0% crash 15/48 pi 0.014 v 0.596 kl 0.0516 bc 0.027x0.51 46s
+rl 48 steps 103397 rollout 41.4% crash 13/48 pi 0.016 v 0.500 kl 0.0465 bc 0.028x0.50 47s
+rl 49 steps 104671 rollout 42.3% crash 11/48 pi 0.007 v 0.455 kl 0.0195 bc 0.027x0.50 44s
+rl 50 steps 107054 rollout 42.1% crash 8/48 pi 0.006 v 0.401 kl 0.0167 bc 0.027x0.49 | alone 42.8% crashes 14/80 score 38.4% 72s
+rl 51 steps 107888 rollout 42.7% crash 10/48 pi 0.010 v 0.370 kl 0.0285 bc 0.027x0.48 46s
+rl 52 steps 102748 rollout 42.0% crash 16/48 pi 0.010 v 0.600 kl 0.0359 bc 0.028x0.48 44s
+rl 53 steps 104229 rollout 43.4% crash 14/48 pi 0.013 v 0.562 kl 0.0378 bc 0.029x0.47 45s
+rl 54 steps 110440 rollout 44.4% crash 5/48 pi 0.009 v 0.265 kl 0.0248 bc 0.029x0.46 47s
+rl 55 steps 105481 rollout 43.6% crash 10/48 pi 0.102 v 0.422 kl 1.3087 bc 0.031x0.46 45s
+rl 56 steps 100377 rollout 41.3% crash 14/48 pi 0.005 v 0.661 kl 0.0118 bc 0.031x0.45 43s
+rl 57 steps 99736 rollout 40.1% crash 15/48 pi 0.001 v 0.604 kl 0.0085 bc 0.031x0.45 45s
+rl 58 steps 104838 rollout 42.3% crash 9/48 pi 0.001 v 0.380 kl 0.0078 bc 0.030x0.44 46s
+rl 59 steps 99362 rollout 41.3% crash 15/48 pi 0.003 v 0.745 kl 0.0138 bc 0.030x0.43 43s
+rl 60 steps 97985 rollout 40.2% crash 16/48 pi 0.012 v 0.627 kl 0.0444 bc 0.030x0.43 | alone 41.2% crashes 24/80 score 33.7% 68s
+rl 61 steps 96543 rollout 39.8% crash 22/48 pi 0.003 v 0.937 kl 0.0144 bc 0.030x0.42 41s
+rl 62 steps 103979 rollout 42.8% crash 14/48 pi 0.014 v 0.561 kl 0.0312 bc 0.030x0.41 45s
+rl 63 steps 101032 rollout 42.0% crash 16/48 pi 0.006 v 0.675 kl 0.0153 bc 0.030x0.41 43s
+rl 64 steps 105441 rollout 42.4% crash 13/48 pi 0.002 v 0.536 kl 0.0102 bc 0.029x0.40 45s
+rl 65 steps 99605 rollout 40.6% crash 16/48 pi 0.006 v 0.639 kl 0.0206 bc 0.028x0.39 43s
+rl 66 steps 101958 rollout 41.7% crash 13/48 pi 0.014 v 0.460 kl 0.0422 bc 0.029x0.39 44s
+rl 67 steps 89417 rollout 39.0% crash 23/48 pi 0.003 v 1.146 kl 0.0138 bc 0.032x0.38 39s
+rl 68 steps 95763 rollout 41.8% crash 21/48 pi 0.006 v 0.987 kl 0.0178 bc 0.032x0.38 41s
+rl 69 steps 103950 rollout 44.6% crash 14/48 pi 0.009 v 0.591 kl 0.0292 bc 0.031x0.37 44s
+rl 70 steps 94231 rollout 40.2% crash 19/48 pi 0.009 v 0.905 kl 0.0214 bc 0.033x0.36 | alone 41.7% crashes 24/80 score 34.2% 65s
+rl 71 steps 99526 rollout 42.1% crash 19/48 pi 0.008 v 0.862 kl 0.0234 bc 0.033x0.36 43s
+rl 72 steps 92602 rollout 40.3% crash 22/48 pi 0.004 v 0.990 kl 0.0179 bc 0.033x0.35 40s
+rl 73 steps 94095 rollout 40.3% crash 18/48 pi 0.004 v 0.858 kl 0.0147 bc 0.031x0.34 40s
+rl 74 steps 101495 rollout 43.5% crash 15/48 pi 0.010 v 0.711 kl 0.0256 bc 0.031x0.34 44s
+rl 75 steps 92666 rollout 39.7% crash 26/48 pi 0.043 v 1.046 kl 0.4080 bc 0.032x0.33 40s
+rl 76 steps 95424 rollout 40.9% crash 21/48 pi 0.005 v 1.049 kl 0.0170 bc 0.032x0.33 42s
+rl 77 steps 101338 rollout 43.6% crash 16/48 pi 0.007 v 0.683 kl 0.0163 bc 0.032x0.32 44s
+rl 78 steps 101490 rollout 43.4% crash 17/48 pi 0.005 v 0.737 kl 0.0141 bc 0.032x0.31 43s
+rl 79 steps 92390 rollout 38.7% crash 22/48 pi 0.003 v 1.039 kl 0.0130 bc 0.031x0.31 40s
+rl 80 steps 88154 rollout 38.6% crash 27/48 pi 0.008 v 1.200 kl 0.0295 bc 0.032x0.30 | alone 42.4% crashes 25/80 score 34.6% 63s
+rl best practice score 40.6%
+done in 114.6 min
