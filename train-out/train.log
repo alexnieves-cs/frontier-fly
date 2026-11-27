@@ -1,0 +1,18 @@
+
+> frontier-fly@1.2.0 train:quad
+> vite-node scripts/train-quad.ts -- --out-dir train-out --init init.bin --iters 0 --val 40 --seed 12 --rl 120 --rl-episodes 48 --rl-lr 4e-5 --log-std -2.5 --crash-penalty -100 --bc 0.3:0.3 --critic-warmup 4 --val-every 10 --shield --shield-penalty 10
+
+Platform node has already been set. Overwriting the platform with node.
+2026-11-27 06:13:16.702956: I tensorflow/core/util/util.cc:169] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-11-27 06:13:16.728600: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F AVX512_VNNI FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+backend tensorflow, 4 workers, hidden 512,256, 80 practice flights, init init.bin
+rl start: alone 45.7% crashes 36/80 score 34.4%
+rl 1 steps 115061 rollout 49.2% crash 1/48 pi 0.000 v 0.064 kl 0.0001 bc 0.000x0.30 (critic warm-up) 48s
+(node:2556) [DEP0051] DeprecationWarning: The `util.isNullOrUndefined` API is deprecated. Please use `arg === null || arg === undefined` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+rl 2 steps 112584 rollout 49.5% crash 3/48 pi -0.000 v 0.040 kl 0.0001 bc 0.000x0.30 (critic warm-up) 45s
+rl 3 steps 114701 rollout 50.2% crash 1/48 pi 0.001 v 0.025 kl 0.0001 bc 0.000x0.30 (critic warm-up) 46s
+rl 4 steps 113701 rollout 51.3% crash 1/48 pi 0.000 v 0.023 kl 0.0001 bc 0.000x0.30 (critic warm-up) 46s
+rl 5 steps 112557 rollout 50.9% crash 5/48 pi 0.000 v 0.099 kl 0.0071 bc 0.014x0.30 61s
+rl 6 steps 115200 rollout 50.2% crash 0/48 pi -0.002 v 0.030 kl 0.0075 bc 0.014x0.30 61s
