@@ -4,6 +4,10 @@
 //   curl -L -o sd.zip https://zenodo.org/api/records/7788422/files/swiss-dwellings-v3.0.0.zip/content
 //   unzip sd.zip 'swiss-dwellings-v3.0.0/geometries.csv'
 //   vite-node scripts/plans/import-swiss-homes.ts -- swiss-dwellings-v3.0.0/geometries.csv [--dev 20 --eval 60]
+//   vite-node scripts/plans/import-swiss-homes.ts -- geometries.csv --dev 0 --skip-eval 60 --eval 60 --out public/plans/swiss-homes-holdout.json
+//
+// The second form is the held-out set: the next 60 eval homes in the same order, none of them in
+// swiss-homes.json (same selection rule, same split by building).
 //
 // Deterministic, like import-swiss-dwellings.ts: homes are ordered by a hash of their id, at most one
 // per building, and buildings are split dev/eval by a hash of the building id (one in four is dev).
@@ -100,6 +104,7 @@ async function main(): Promise<void> {
   const path = process.argv.slice(2).find((a) => !a.startsWith('--') && a.endsWith('.csv'));
   if (!path) throw new Error('usage: import-swiss-homes.ts -- geometries.csv');
   const want = { dev: Number(arg('dev', '20')), eval: Number(arg('eval', '60')) };
+  let skipEval = Number(arg('skip-eval', '0'));
   const out = arg('out', 'public/plans/swiss-homes.json');
 
   const metas = new Map<string, Meta>();
@@ -181,6 +186,11 @@ async function main(): Promise<void> {
     }
     if (home.storeys.some((s, k) => rooms[k]! < s.areas.length - 1)) {
       bump('rejectLostRooms');
+      continue;
+    }
+    if (split === 'eval' && skipEval > 0) {
+      skipEval -= 1;
+      bump('skippedEval');
       continue;
     }
     homes.push(home);

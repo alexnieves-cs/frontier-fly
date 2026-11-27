@@ -20,6 +20,7 @@ policy is trained and the project's honest limits. The pages below go deeper on 
 | [SAFETY_CASE.md](SAFETY_CASE.md) | False clears, collisions and fault recovery, with the runs behind them |
 | [ATLAS.md](ATLAS.md) | The failure atlas: importance-sampled searches for rare mistakes |
 | [REAL_PLANS.md](REAL_PLANS.md) | The pilots on 60 real apartment floor plans |
+| [MULTI_FLOOR.md](MULTI_FLOOR.md) | Multi-floor flight on generated buildings and 60 real multi-storey homes, under the 120 s budget and on a battery |
 | [QUAD_POLICY.md](QUAD_POLICY.md) | A negative result: the learned policy flying the quadrotor |
 | [QUAD_PICKER.md](QUAD_PICKER.md) | A learned goal picker for the quadrotor planner |
 | [VIEW_FIRST.md](VIEW_FIRST.md) | The view-first planner, which beats NBVP on 3 m footprint coverage |

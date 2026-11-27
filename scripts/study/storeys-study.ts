@@ -19,15 +19,16 @@
 // most four voxels a second, which `ceiling` gives per flight.
 //
 // Seeds (roadmap/next-wave-tracks.md): test = generated block 88101-88130 and the 60 eval homes with
-// env seeds 88201+, report only; dev = FrontierBench dev 81401-81420 and the 20 dev homes (88601+).
+// env seeds 88201+, plus the 12 held-out homes (public/plans/swiss-homes-holdout.json, env seeds
+// 88801+), report only; dev = FrontierBench dev 81401-81420 and the 20 dev homes (88601+).
 import { execSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { BASELINES } from '../../src/bench/baselines';
 import { benchEpisodeSetup } from '../../src/bench/run';
 import { BENCH_TASKS } from '../../src/bench/tasks';
 import { EpisodeFootprint, FOOTPRINT_RADIUS } from '../../src/eval/footprint';
 import { DEFAULT_BATTERY } from '../../src/mission/autonomy/battery';
-import { HOME_SET_PATH, homeBuilding, homeEpisodeSetup, parseHomeSet } from '../../src/plans/homes';
+import { HOME_HOLDOUT_PATH, HOME_HOLDOUT_SEED_BASE, HOME_SET_PATH, homeBuilding, homeEpisodeSetup, parseHomeSet } from '../../src/plans/homes';
 import { VOXEL } from '../../src/shared/constants';
 import { createEnv } from '../../src/sim/env';
 import { sensorFrame } from '../../src/sim/sensorPlanner';
@@ -53,7 +54,7 @@ function arg(name: string, fallback: string): string {
 }
 
 interface Flight {
-  set: 'generated' | 'homes';
+  set: 'generated' | 'homes' | 'holdout';
   id: string;
   seed: number;
   floors: number;
@@ -100,17 +101,21 @@ async function fly(split: 'dev' | 'test', pilots: string[]): Promise<{ pilot: st
   const task = BENCH_TASKS.find((t) => t.id === 'floors')!;
   const homeSet = parseHomeSet(JSON.parse(readFileSync(HOME_SET_PATH, 'utf8')));
   const homes = homeSet.homes.filter((h) => h.split === (split === 'dev' ? 'dev' : 'eval'));
+  const holdoutSet = split === 'test' && existsSync(HOME_HOLDOUT_PATH) ? parseHomeSet(JSON.parse(readFileSync(HOME_HOLDOUT_PATH, 'utf8'))) : null;
+  const wanted = new Set(arg('sets', 'generated,homes,holdout').split(','));
   const gen = split === 'dev' ? STOREYS_DEV.generated : STOREYS_TEST.generated;
   const episodes = [
     ...Array.from({ length: gen.count }, (_, i) => ({ set: 'generated' as const, id: `gen-${gen.base + i}`, setup: () => benchEpisodeSetup(task, { seed: gen.base + i }) })),
     ...homes.map((h) => ({ set: 'homes' as const, id: h.id, setup: () => homeEpisodeSetup(homeSet, h, 'day') })),
-  ];
+    ...(holdoutSet?.homes ?? []).map((h) => ({ set: 'holdout' as const, id: h.id, setup: () => homeEpisodeSetup(holdoutSet!, h, 'day', 0, HOME_HOLDOUT_SEED_BASE) })),
+  ].filter((ep) => wanted.has(ep.set));
+  for (const h of holdoutSet?.homes ?? []) if (!homeBuilding(h)) throw new Error(`home ${h.id} does not convert`);
   for (const h of homes) if (!homeBuilding(h)) throw new Error(`home ${h.id} does not convert`);
   const env = await createEnv();
   const out = [];
   for (const pilotId of pilots) {
     for (const budget of BUDGETS) {
-      const bySet: Record<Flight['set'], Flight[]> = { generated: [], homes: [] };
+      const bySet: Record<Flight['set'], Flight[]> = { generated: [], homes: [], holdout: [] };
       for (const ep of episodes) {
         const { spec, envSeed, cfg } = ep.setup();
         const floors = spec.floors.length;
@@ -167,7 +172,8 @@ async function fly(split: 'dev' | 'test', pilots: string[]): Promise<{ pilot: st
           t90Coverage: first.c90,
         });
       }
-      for (const set of ['generated', 'homes'] as const) {
+      for (const set of ['generated', 'homes', 'holdout'] as const) {
+        if (bySet[set].length === 0) continue;
         out.push({ pilot: pilotId, budget: budget.id, set, flights: bySet[set] });
         const s = summarize(bySet[set]);
         console.log(
@@ -205,7 +211,10 @@ const result = {
   schema: 1,
   commit: execSync('git rev-parse --short HEAD').toString().trim(),
   split,
-  seeds: split === 'test' ? { generated: STOREYS_TEST.generated, homes: { envBase: 88201, count: homeSet.homes.filter((h) => h.split === 'eval').length } } : { generated: STOREYS_DEV.generated, homes: { envBase: 88601 } },
+  seeds:
+    split === 'test'
+      ? { generated: STOREYS_TEST.generated, homes: { envBase: 88201, count: homeSet.homes.filter((h) => h.split === 'eval').length }, holdout: { envBase: HOME_HOLDOUT_SEED_BASE, file: HOME_HOLDOUT_PATH } }
+      : { generated: STOREYS_DEV.generated, homes: { envBase: 88601 } },
   budgets: BUDGETS,
   batteryExploreShare: BATTERY_EXPLORE_SHARE,
   homes: { dataset: homeSet.dataset.name, version: homeSet.dataset.version, license: homeSet.dataset.license, file: HOME_SET_PATH },

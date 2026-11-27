@@ -10,6 +10,10 @@ import type { HomeRecord, HomeSet } from './types';
  */
 export const HOME_SET_PATH = 'public/plans/swiss-homes.json';
 export const HOME_SET_URL = 'plans/swiss-homes.json';
+/** A second, smaller held-out set: the further eval homes the same selection rule yields, none in HOME_SET_PATH. */
+export const HOME_HOLDOUT_PATH = 'public/plans/swiss-homes-holdout.json';
+/** Env seeds of the held-out set (report only). */
+export const HOME_HOLDOUT_SEED_BASE = 88801;
 
 /** Homes fly the multi-floor protocol (FrontierBench's `floors` task is stage 4). */
 export const HOME_STAGE = 4;
@@ -35,9 +39,9 @@ export function homeBuilding(home: HomeRecord): ConvertedPlan | null {
   return cache.get(home)!;
 }
 
-export function homeEnvSeed(set: HomeSet, home: HomeRecord, rep = 0): number {
+export function homeEnvSeed(set: HomeSet, home: HomeRecord, rep = 0, base: number = HOME_SEED_BASE[home.split]): number {
   const index = set.homes.filter((h) => h.split === home.split).indexOf(home);
-  return HOME_SEED_BASE[home.split] + Math.max(0, index) + 100 * rep;
+  return base + Math.max(0, index) + 100 * rep;
 }
 
 /** Same shape as evalEpisodeSetup, for a real home: the stage-4 limits (120 s), day lighting by default. */
@@ -46,6 +50,7 @@ export function homeEpisodeSetup(
   home: HomeRecord,
   lighting: LightingPreset,
   rep = 0,
+  seedBase?: number,
 ): { spec: BuildingSpec; envSeed: number; cfg: EpisodeConfig & { maxSteps: number } } {
   const conv = homeBuilding(home);
   if (!conv) throw new Error(`home ${home.id} does not convert`);
@@ -55,5 +60,5 @@ export function homeEpisodeSetup(
   Object.assign(cfg, policyEpisodeLimits(HOME_STAGE));
   cfg.dynamics = 'kinematic';
   cfg.lighting = lightingPreset(lighting, nRooms);
-  return { spec, envSeed: homeEnvSeed(set, home, rep), cfg: cfg as EpisodeConfig & { maxSteps: number } };
+  return { spec, envSeed: homeEnvSeed(set, home, rep, seedBase), cfg: cfg as EpisodeConfig & { maxSteps: number } };
 }

@@ -29,7 +29,8 @@ const SHAFT_EXTRA = 0.8;
 /**
  * Centre of the group of marked voxels nearest `from` on one floor plane, or
  * null when none is marked. The centre is the mean of the 8-connected group,
- * so a climb on it stays inside the column.
+ * so a climb on it stays inside the column; when the mean falls outside the
+ * group (an L-shaped stairwell), the marked voxel nearest it.
  */
 export function shaftCentre(map: Uint8Array, base: number, vw: number, vd: number, from: readonly [number, number]): [number, number] | null {
   let best = -1;
@@ -66,7 +67,34 @@ export function shaftCentre(map: Uint8Array, base: number, vw: number, vd: numbe
       }
     }
   }
-  return [sx / group.length, sy / group.length];
+  const mx = sx / group.length;
+  const my = sy / group.length;
+  // A real staircase can mark an L- or U-shaped group whose mean lies outside it or against its wall.
+  // Keep the mean when the group surrounds it (always so for a straight shaft); otherwise climb from
+  // the most enclosed marked voxel (most marked neighbours), nearest the mean on a tie.
+  const at = (x: number, y: number) => {
+    const gx = Math.floor(x / VOXEL);
+    const gy = Math.floor(y / VOXEL);
+    return gx >= 0 && gy >= 0 && gx < vw && gy < vd && seen.has(gy * vw + gx);
+  };
+  const r = 0.2;
+  if (at(mx, my) && at(mx - r, my) && at(mx + r, my) && at(mx, my - r) && at(mx, my + r)) return [mx, my];
+  let pick = group[0]!;
+  let pickN = -1;
+  let pickD = Infinity;
+  for (const k of group) {
+    const x = k % vw;
+    const y = (k - x) / vw;
+    let n = 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && seen.has((y + dy) * vw + x + dx) && x + dx >= 0 && x + dx < vw) n += 1;
+    const d = Math.hypot((x + 0.5) * VOXEL - mx, (y + 0.5) * VOXEL - my);
+    if (n > pickN || (n === pickN && d < pickD)) {
+      pickN = n;
+      pickD = d;
+      pick = k;
+    }
+  }
+  return [((pick % vw) + 0.5) * VOXEL, (Math.floor(pick / vw) + 0.5) * VOXEL];
 }
 
 export interface ClimberOptions {
