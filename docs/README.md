@@ -22,6 +22,7 @@ policy is trained and the project's honest limits. The pages below go deeper on 
 | [REAL_PLANS.md](REAL_PLANS.md) | The pilots on 60 real apartment floor plans |
 | [QUAD_POLICY.md](QUAD_POLICY.md) | A negative result: the learned policy flying the quadrotor |
 | [QUAD_PICKER.md](QUAD_PICKER.md) | A learned goal picker for the quadrotor planner |
+| [QUAD_STUDENT.md](QUAD_STUDENT.md) | A learned policy that flies the quadrotor end to end |
 | [VIEW_FIRST.md](VIEW_FIRST.md) | The view-first planner, which beats NBVP on 3 m footprint coverage |
 | [PHYSICS_VALIDATION.md](PHYSICS_VALIDATION.md) | The quadrotor model checked against PX4 and rotor measurements |
 
