@@ -82,6 +82,26 @@ The drift track's sensors all work. On the degraded-sensor track (`SENSOR_TASKS`
 
 With broken sensors the view-first planner scores 80.0%, with 88 of 90 return flights home and 3 crashes in 120 flights (all on the mid-flight failure task). Every baseline crashes in 20% to 51% of flights. The lead is +27.0 points over NBVP (95% interval +21.7 to +32.2) and +33.0 over nearest frontier (+27.2 to +38.2). The faults cost it 7.2 points against the same flights with healthy sensors (−9.9 to −5.2), less than NBVP (−11.9) or nearest frontier (−10.5). The view-first planner was changed for this track, on dev only. Its quadrotor safety filter is now map-backed: a lidar ray with no return brakes for the walls and unknown space the drone's own map has along it. When two or more rays keep reading nothing where the map has a wall within 4 m (10 steps in a row), it declares the lidar faulty and flies at 0.6× speed. On dev, that took its crashes from 18 of 80 to 0. The cost is speed: the slow-down holds for the whole flight, so the 40 m task with a dead sector from take-off drops 18 points against healthy sensors. A version that slowed only toward the dead rays false-alarmed on healthy flights (−13 points on the return track's dev split) and was dropped. The same change made no difference on the healthy tracks' dev splits (hard 86.9% vs 86.6%, return 72.1% vs 72.5%, drift 78.8% vs 79.1%). The baselines fly the shared safety filter without it.
 
+### Overwatch track
+
+The tracks above score how much of a building a pilot sees. The overwatch track (`OVERWATCH_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts), the person in [`src/bench/overwatch.ts`](../src/bench/overwatch.ts), `npm run bench:hard -- --track overwatch`) asks what search and rescue asks next: once you find the lost person, can you keep them in view while help comes? A simulated person walks a fixed loop through up to four rooms at 0.6 m/s, starting in the half of the building far from take-off, and never reacts to the drone. The sensor frame carries the camera's sighting (range, bearing and a noisy position, 15 cm 1σ) whenever the person is inside the forward camera's 90° view, within 8 m, on the same floor and not hidden by walls or furniture, and null otherwise. The **score** is the share of the flight the person is in view from 2 m or more. Nothing counts closer than 2 m, and the time spent closer is reported, so the track rewards a standoff, not an approach. A flight a crash ends early counts the person out of view for the rest of its 120 s, and the stall cut that ends other flights after 10 s without new ground is off, so a pilot can hold still and watch. Three tasks: rooms on the kinematic airframe, rooms on the randomized quadrotor, and the 40 m building on the quadrotor, 120 s each. Seeds: dev 150001+ (20 per task), test 151001+ (30 per task, scored once).
+
+This is overwatch for a rescue, not pursuit. The person walks a route chosen before take-off and does not flee, hide or respond, and the pilot is scored for watching from a distance, never for closing in.
+
+{{BENCH_OVERWATCH}}
+
+{{BENCH_OVERWATCH_TASKS}}
+
+
+### Integrity track
+
+Every pilot above flies on its pose estimate and says nothing about how good it is. The integrity track (`INTEGRITY_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts), scoring in [`src/bench/integrity.ts`](../src/bench/integrity.ts), `npm run bench:hard -- --track integrity`) asks the pilot to say when its pose has gone bad. After every action it may report a **protection level** (`BenchPilot.protectionLevel`, metres): a horizontal radius it claims holds its true position. The terms are satellite navigation's. The **alert limit** is 1.5 m, the return tasks' home radius. A step is *available* when the claimed level is within the alert limit. It is *hazardously misleading* when the pilot claims a level within the limit while its true error is over it, for longer than the 2 s **time to alert** in one run. The **score** is availability minus 10 × the hazardously misleading rate, on every step of the flight. Honest doubt costs a step's availability; confident error costs ten times as much, so a pilot that is confidently wrong for more than a tenth of a flight scores below zero. A flight a crash ends early is unavailable for the rest of its budget, so crashing out of a bad pose does not pay, and the stall cut is off, so every flight runs its full budget on its estimate unless it crashes. A pilot that reports nothing claims a level of 0 on every step: it flies as if its pose were exact, which is what every pilot on the boards above does. Four tasks, all on the quadrotor and its own estimate: the 40 m building with the short-range ToF ring (120 s), dark rooms with the ToF ring (40 s), rooms where 120° of lidar and the flow sensor fail at 20-60 s (120 s), and rooms with healthy sensors (120 s). Seeds: dev 160001+ (20 per task), test 161001+ (30 per task, scored once).
+
+{{BENCH_INTEGRITY}}
+
+{{BENCH_INTEGRITY_TASKS}}
+
+
 ## Team track
 
 {{BENCH_TEAM}}
@@ -95,9 +115,9 @@ An entry here is a team configuration, not a new pilot: the number of drones (1 
 A pilot implements `BenchPilot` ([`src/bench/pilot.ts`](../src/bench/pilot.ts)). Each step it gets:
 
 - the observation vector ([OBS_LAYOUT.md](../src/sim/OBS_LAYOUT.md)): lidar, IMU, altitude, its own coarse maps and frontier features;
-- the sensor frame: its pose, its 32-beam lidar in meters, the voxels it has seen and flown, and its measured velocity.
+- the sensor frame: its pose, its 32-beam lidar in meters, the voxels it has seen and flown, and its measured velocity. On the drift, sensor and integrity tracks the pose is its estimator's, and `health` carries the estimator's own 1σ and state (tracking, degraded, lost). On the overwatch track `person` carries the camera's sighting of the lost person, or null.
 
-It never sees the floor plan. It returns the env's action: forward, left, up and yaw rate, each in [-1, 1], with full horizontal action equal to the task's speed cap.
+It never sees the floor plan. It returns the env's action: forward, left, up and yaw rate, each in [-1, 1], with full horizontal action equal to the task's speed cap. On the integrity track it may also implement `protectionLevel()`, read after each action.
 
 ## Submit an entry
 

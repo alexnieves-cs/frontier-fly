@@ -189,6 +189,88 @@ function hardBoard(root) {
     ...trackBoard(root, 'bench/results/hard-drift', 'BENCH_DRIFT', ' --track drift', 'bench/results/hard-drift-truth'),
     ...trackBoard(root, 'bench/results/hard-drift-hard', 'BENCH_DRIFT_HARD', ' --track drift-hard', 'bench/results/hard-drift-hard-truth'),
     ...trackBoard(root, 'bench/results/hard-sensor', 'BENCH_SENSOR', ' --track sensor', 'bench/results/hard-sensor-healthy', 'Same flights, healthy sensors'),
+    ...watchBoard(root),
+    ...integrityBoard(root),
+  };
+}
+
+/** Test rows of a Hard track that carry `field`, at the newest bench version, best first by it. */
+function currentBy(root, dir, field) {
+  const rows = readResults(root, dir).filter((r) => r.split === 'test' && r[field] !== undefined);
+  const v = Math.max(0, ...rows.map((r) => r.hard ?? 0));
+  return rows.filter((r) => (r.hard ?? 0) === v).sort((a, b) => b[field] - a[field]);
+}
+
+const pilotCell = (r) => (r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`);
+const seconds = (v) => (v === null || v === undefined ? '—' : `${v.toFixed(1)} s`);
+const meanOf = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/** The overwatch track's board (bench/overwatch.ts): the share of the flight the lost person was in camera view from 2 m or more. */
+function watchBoard(root) {
+  const cur = currentBy(root, 'bench/results/hard-overwatch', 'watchScore');
+  if (!cur.length) return { BENCH_OVERWATCH: '_Run `npm run bench:hard -- --track overwatch --only planner-view,nbvp --split test`._', BENCH_OVERWATCH_TASKS: '' };
+  const tasks = cur[0].taskDefs;
+  const eps = (r) => r.episodes ?? [];
+  const found = (r) => `${eps(r).filter((e) => e.watch.found).length} of ${eps(r).length}`;
+  const findS = (r) => meanOf(eps(r).filter((e) => e.watch.found).map((e) => e.watch.findS));
+  const kept = (r) => meanOf(eps(r).filter((e) => e.watch.found).map((e) => e.watch.kept));
+  const breach = (r) => meanOf(eps(r).map((e) => e.watch.breachS));
+  return {
+    BENCH_OVERWATCH: table(
+      ['#', 'Pilot', 'In view', ...tasks.map((t) => t.id), 'Found', 'Time to find', 'Kept in view after the find', 'Inside 2 m', 'Flights ended by a crash', 'In view vs the row above (95% CI)', 'Commit'],
+      cur.map((r, i) => [
+        String(i + 1),
+        pilotCell(r),
+        `**${pct(r.watchScore)}**`,
+        ...tasks.map((t) => (r.tasks[t.id]?.watch !== undefined ? pct(r.tasks[t.id].watch) : '—')),
+        found(r),
+        seconds(findS(r)),
+        kept(r) === null ? '—' : pct(kept(r)),
+        seconds(breach(r)),
+        crashes(r),
+        i === 0 ? '—' : gapCell(pairedScoreGap(r, cur[i - 1], 4000, (e) => e.watch.score)),
+        `\`${r.commit}\``,
+      ]),
+    ),
+    BENCH_OVERWATCH_TASKS: table(
+      ['Task', 'What', 'Airframe', 'Budget'],
+      tasks.map((t) => [`\`${t.id}\``, t.label, t.dynamics === 'quad' ? 'Quadrotor, randomized' : 'Kinematic', `${(t.maxSteps ?? 2400) / 20} s`]),
+    ),
+  };
+}
+
+/** The integrity track's board (bench/integrity.ts): availability minus ten times the rate of hazardously misleading confidence. */
+function integrityBoard(root) {
+  const cur = currentBy(root, 'bench/results/hard-integrity', 'integrityScore');
+  if (!cur.length) return { BENCH_INTEGRITY: '_Run `npm run bench:hard -- --track integrity --only planner-view,nbvp --split test`._', BENCH_INTEGRITY_TASKS: '' };
+  const tasks = cur[0].taskDefs;
+  const eps = (r) => r.episodes ?? [];
+  const col = (r, f) => meanOf(eps(r).map((e) => e.integrity[f]));
+  const caught = (r) => meanOf(eps(r).filter((e) => e.integrity.caught !== null).map((e) => e.integrity.caught));
+  // A pilot that reports nothing claims a level of 0: always available, and its true error is over 0 on every step.
+  const reports = (r) => (col(r, 'availability') === 1 && col(r, 'misleadShare') > 0.99 ? 'Nothing (claims 0)' : 'A protection level');
+  return {
+    BENCH_INTEGRITY: table(
+      ['#', 'Pilot', 'Integrity score', ...tasks.map((t) => t.id), 'Reports', 'Available', 'Hazardously misleading', 'Bad-pose steps', 'Bad pose flagged', 'Camera', 'Integrity vs the row above (95% CI)', 'Commit'],
+      cur.map((r, i) => [
+        String(i + 1),
+        pilotCell(r),
+        `**${pct(r.integrityScore)}**`,
+        ...tasks.map((t) => (r.tasks[t.id]?.integrity !== undefined ? pct(r.tasks[t.id].integrity) : '—')),
+        reports(r),
+        pct(col(r, 'availability')),
+        `${(col(r, 'hmiRate') * 100).toFixed(2)}%`,
+        pct(col(r, 'badShare')),
+        caught(r) === null ? '—' : pct(caught(r)),
+        r.cameraScore === undefined ? '—' : pct(r.cameraScore),
+        i === 0 ? '—' : gapCell(pairedScoreGap(r, cur[i - 1], 4000, (e) => e.integrity.score)),
+        `\`${r.commit}\``,
+      ]),
+    ),
+    BENCH_INTEGRITY_TASKS: table(
+      ['Task', 'What', 'Airframe', 'Lighting', 'Budget'],
+      tasks.map((t) => [`\`${t.id}\``, t.label, t.dynamics === 'quad' ? 'Quadrotor, randomized' : 'Kinematic', t.lighting === 'day' ? 'Day' : 'Lights off', `${(t.maxSteps ?? 2400) / 20} s`]),
+    ),
   };
 }
 

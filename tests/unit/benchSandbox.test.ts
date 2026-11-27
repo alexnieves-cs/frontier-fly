@@ -33,6 +33,23 @@ describe('bench pilot sandbox', () => {
     }
   }, 60_000);
 
+  it('passes the overwatch sighting and pose health in, and the protection level out', async () => {
+    const pilot = await sandboxedPilot('tests/fixtures/pilots/integrity.ts');
+    try {
+      pilot.reset({ speedH: 1, maxSteps: 10, dynamics: 'quad' });
+      const health = { ok: true, sigmaM: 0.25, sigmaMapM: 0.1, sigmaYawRad: 0.01, state: 'degraded' as const };
+      const a = pilot.act(new Float32Array(2), { ...frame(), person: { pos: [3, 4, 0], range: 2.5, bearing: 0.1 }, health });
+      expect(Array.from(a)).toEqual([2.5, 1, 0.25, 0]);
+      expect(pilot.protectionLevel!()).toBeCloseTo(1, 6);
+      const b = pilot.act(new Float32Array(2), { ...frame(), person: null });
+      expect(Array.from(b)).toEqual([0, 0, -1, 0]);
+      expect(pilot.protectionLevel!()).toBe(0);
+      expect(pilot.act(new Float32Array(2), frame())[0]).toBe(-1);
+    } finally {
+      await pilot.close();
+    }
+  }, 60_000);
+
   it('fails the run when the pilot throws', async () => {
     const pilot = await sandboxedPilot('tests/fixtures/pilots/throws.ts');
     pilot.reset({ speedH: 1, maxSteps: 10, dynamics: 'kinematic' });

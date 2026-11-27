@@ -115,13 +115,46 @@ export const LOOP_IN_FLIGHT: DriftProfile = {
 /** Hard drift track seeds: dev 110001+ (tune freely), test 111001+ (score once); task i offsets the block by 100 i. */
 export const DRIFT_HARD_SEEDS = { dev: { base: 110001, count: 20 }, test: { base: 111001, count: 30 } } as const;
 
-export type HardTrack = 'hard' | 'return' | 'drift' | 'sensor' | 'drift-hard';
+/**
+ * The overwatch track (round 5, bench/overwatch.ts): a lost person walks a loop through four rooms of
+ * the take-off floor, starting far from take-off. The score is the share of the flight they are in the
+ * forward camera's view from at least 2 m; closer counts nothing and is reported as a standoff breach.
+ * A search-and-rescue task: the person never reacts to the drone, and the drone has no reason to close in.
+ */
+export const OVERWATCH_TASKS: readonly BenchTask[] = [
+  { id: 'watch-rooms', label: 'Find a lost person and keep them in view, rooms, 120 s', stage: 3, dynamics: 'kinematic', lighting: 'day', speedH: 2, dr: 0, maxSteps: 2400, camera: true, person: true },
+  { id: 'watch-quad', label: 'Find a lost person and keep them in view, rooms, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, maxSteps: 2400, camera: true, person: true },
+  { id: 'watch-large-quad', label: 'Find a lost person and keep them in view, 40 x 40 m, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, person: true },
+];
+
+/** Overwatch seeds: dev 150001+ (tune freely), test 151001+ (score once); task i offsets the block by 100 i. */
+export const OVERWATCH_SEEDS = { dev: { base: 150001, count: 20 }, test: { base: 151001, count: 30 } } as const;
+
+/**
+ * The integrity track (round 6, bench/integrity.ts): drift-track flights where the pilot also reports a
+ * protection level each step. Three tasks where the estimate goes bad on some flights (the short-range
+ * ToF ring, sensors failing mid-flight) and one where it stays good, so a pilot cannot win by never
+ * trusting itself.
+ */
+export const INTEGRITY_TASKS: readonly BenchTask[] = [
+  { id: 'pl-tof-large-quad', label: 'Report pose integrity, 40 x 40 m, short-range ToF ring, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, large: true, maxSteps: 2400, camera: true, drift: true, driftProfile: TOF_RING, integrity: true },
+  { id: 'pl-tof-dark-quad', label: 'Report pose integrity, rooms, short-range ToF ring, lights off, quadrotor, 40 s', stage: 3, dynamics: 'quad', lighting: 'night-dark', speedH: 2, dr: 1, maxSteps: 800, camera: true, drift: true, driftProfile: TOF_RING, integrity: true },
+  { id: 'pl-failing-quad', label: 'Report pose integrity, rooms, 120° of lidar and flow fail at 20-60 s, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, camera: true, drift: true, faults: { lidarSector: (2 * Math.PI) / 3, flowDead: true, failAt: [20, 60] }, integrity: true },
+  { id: 'pl-quad', label: 'Report pose integrity, rooms, healthy sensors, quadrotor, 120 s', stage: 3, dynamics: 'quad', lighting: 'day', speedH: 2, dr: 1, camera: true, drift: true, integrity: true },
+];
+
+/** Integrity seeds: dev 160001+ (tune freely), test 161001+ (score once); task i offsets the block by 100 i. */
+export const INTEGRITY_SEEDS = { dev: { base: 160001, count: 20 }, test: { base: 161001, count: 30 } } as const;
+
+export type HardTrack = 'hard' | 'return' | 'drift' | 'sensor' | 'drift-hard' | 'overwatch' | 'integrity';
+
+export const HARD_TRACKS: readonly HardTrack[] = ['hard', 'return', 'drift', 'sensor', 'drift-hard', 'overwatch', 'integrity'];
 
 export function trackTasks(track: HardTrack): readonly BenchTask[] {
-  return { hard: HARD_TASKS, return: RETURN_TASKS, drift: DRIFT_TASKS, sensor: SENSOR_TASKS, 'drift-hard': DRIFT_HARD_TASKS }[track];
+  return { hard: HARD_TASKS, return: RETURN_TASKS, drift: DRIFT_TASKS, sensor: SENSOR_TASKS, 'drift-hard': DRIFT_HARD_TASKS, overwatch: OVERWATCH_TASKS, integrity: INTEGRITY_TASKS }[track];
 }
 
 export function trackRuns(track: HardTrack, split: 'dev' | 'test' | { base: number; count: number }, taskIndex: number): BenchRun[] {
-  const { base, count } = typeof split === 'string' ? { hard: HARD_SEEDS, return: RETURN_SEEDS, drift: DRIFT_SEEDS, sensor: SENSOR_SEEDS, 'drift-hard': DRIFT_HARD_SEEDS }[track][split] : split;
+  const { base, count } = typeof split === 'string' ? { hard: HARD_SEEDS, return: RETURN_SEEDS, drift: DRIFT_SEEDS, sensor: SENSOR_SEEDS, 'drift-hard': DRIFT_HARD_SEEDS, overwatch: OVERWATCH_SEEDS, integrity: INTEGRITY_SEEDS }[track][split] : split;
   return Array.from({ length: count }, (_, i) => ({ seed: base + taskIndex * 100 + i }));
 }
