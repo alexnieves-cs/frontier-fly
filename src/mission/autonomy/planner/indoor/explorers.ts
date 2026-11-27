@@ -103,8 +103,8 @@ export class SensorExplorer {
   private readonly floorsDone = new Set<number>();
   /** Shaft leg: hover point (local xy) and the floor to reach. */
   private shaft: { x: number; y: number; to: number } | null = null;
-  /** Centring on the shaft before climbing: the axis being probed, its direction, and the edges found. */
-  private centring: { axis: 0 | 1; dir: 1 | -1; open: boolean; from: number; ends: number[]; ticks: number } | null = null;
+  /** Centring on the shaft before climbing: the axis being probed, its direction, and the stretch seen open (lo..hi). */
+  private centring: { axis: 0 | 1; dir: 1 | -1; open: boolean; from: number; ticks: number; lo: number; hi: number; settle: boolean } | null = null;
   private centred = false;
   /** Progress watch on the climb: closest the drone has come to the target height, and ticks since. */
   private climbBest = Infinity;
@@ -315,41 +315,75 @@ export class SensorExplorer {
    * fly slowly along each building axis until it stops seeing through, both
    * ways, and centre between the edges. The shaft point alone is only known
    * to be somewhere over the hole, possibly at its rim, and the airframe is
-   * wider than a point.
+   * wider than a point. The centre is the middle of the stretch where the
+   * reading was open, not of the two stops: a probe that starts beside the
+   * hole (the shaft was mapped from a drifted estimate) stops once at its
+   * reach limit, and the middle of that stop and the far edge is under the
+   * slab. An axis with no open reading at all gives the shaft up.
    */
   private centreStep(local: V3, yaw: number): PolicyCommand {
     const shaft = this.shaft!;
     const f = floorOf(this.grid, local[2]);
-    const open = this.sensing.seesThrough(shaft.to > f ? 'up' : 'down', local[2] - f * this.grid.H);
+    const dir = shaft.to > f ? 'up' : 'down';
+    const open = this.sensing.seesThrough(dir, local[2] - f * this.grid.H);
     const at = [shaft.x, shaft.y];
-    const c = (this.centring ??= { axis: 0, dir: 1, open: false, from: at[0]!, ends: [], ticks: 0 });
+    const c = (this.centring ??= { axis: 0, dir: 1, open: false, from: at[0]!, ticks: 0, lo: Infinity, hi: -Infinity, settle: false });
+    if (c.settle) {
+      // Between probes, and before the climb: get over the centre found so far first. A probe that
+      // starts while the drone is still drifting onto the other axis' centre samples the wrong line.
+      c.ticks += 1;
+      if (Math.hypot(at[0]! - local[0], at[1]! - local[1]) > CENTRE_SETTLE_M && c.ticks <= CENTRE_PROBE_TICKS) return this.centreMove(local, yaw, at, null);
+      if (c.axis === 0) {
+        this.centring = { axis: 1, dir: 1, open: false, from: at[1]!, ticks: 0, lo: Infinity, hi: -Infinity, settle: false };
+        return this.centreMove(local, yaw, at, null);
+      }
+      if (!open) return this.dropShaft(local, yaw, f, dir);
+      this.centred = true;
+      this.centring = null;
+      return { vel: [0, 0, this.hold(local)], yawRate: 0 };
+    }
     const p = local[c.axis]!;
     c.open ||= open;
+    if (open) {
+      c.lo = Math.min(c.lo, p);
+      c.hi = Math.max(c.hi, p);
+    }
     c.ticks += 1;
     // An edge: the reading closed after being open, or the probe ran out of room or time (a wall the
     // shield will not let it approach).
     if ((c.open && !open) || Math.abs(p - c.from) > CENTRE_PROBE_M || c.ticks > CENTRE_PROBE_TICKS) {
-      c.ends.push(p);
       c.open = false;
       c.ticks = 0;
       if (c.dir === 1) c.dir = -1;
       else {
-        at[c.axis] = (c.ends[0]! + c.ends[1]!) / 2;
+        // Never saw through along this axis: no hole here to climb through.
+        if (c.hi < c.lo) return this.dropShaft(local, yaw, f, dir);
+        at[c.axis] = (c.lo + c.hi) / 2;
         shaft.x = at[0]!;
         shaft.y = at[1]!;
-        if (c.axis === 1) {
-          this.centred = true;
-          this.centring = null;
-          return { vel: [0, 0, this.hold(local)], yawRate: 0 };
-        }
-        this.centring = { axis: 1, dir: 1, open: false, from: at[1]!, ends: [], ticks: 0 };
+        c.settle = true;
+        return this.centreMove(local, yaw, at, null);
       }
     }
-    const k = this.centring!;
+    return this.centreMove(local, yaw, at, c);
+  }
+
+  /** Hold over `at`, or with a probe, fly along its axis at probe speed while holding the other. */
+  private centreMove(local: V3, yaw: number, at: number[], probe: { axis: 0 | 1; dir: 1 | -1 } | null): PolicyCommand {
     const v: [number, number] = [clamp((at[0]! - local[0]) * 2, -0.3, 0.3), clamp((at[1]! - local[1]) * 2, -0.3, 0.3)];
-    v[k.axis] = k.dir * CENTRE_PROBE_SPEED;
+    if (probe) v[probe.axis] = probe.dir * CENTRE_PROBE_SPEED;
     const [vx, vy] = this.sensing.filter(v[0], v[1], yaw);
     return { vel: [vx, vy, this.hold(local)], yawRate: 0 };
+  }
+
+  /** The probe found no way through here: forget this shaft and pick again. */
+  private dropShaft(local: V3, yaw: number, f: number, dir: 'up' | 'down'): PolicyCommand {
+    const shaft = this.shaft!;
+    this.sensing.forgetShaft(f, dir, [shaft.x, shaft.y]);
+    this.shaft = null;
+    this.centring = null;
+    this.phase = 'look';
+    return this.floorDone(local, yaw);
   }
 }
 
@@ -357,6 +391,8 @@ export class SensorExplorer {
 const CENTRE_PROBE_SPEED = 0.3;
 const CENTRE_PROBE_M = 0.9;
 const CENTRE_PROBE_TICKS = 120;
+/** How close to the centre found so far the drone gets before the next probe or the climb, m. */
+const CENTRE_SETTLE_M = 0.05;
 /** A climb or descent that gains no height for this many ticks gives the shaft up. */
 const CLIMB_STALL_TICKS = 60;
 /** Ticks without progress toward a route waypoint before it is skipped (not the last one). */

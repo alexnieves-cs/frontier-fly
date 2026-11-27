@@ -109,9 +109,10 @@ export interface SensorPlannerOptions {
    * View-first exploration: a voxel stops being a goal once the
    * drone's own lidar ring has had it in line of sight within `radius` meters, not only once the
    * drone has flown through it. The drone then visits rooms to look into them instead of sweeping
-   * lanes, which is what sensor-footprint coverage scores. When nothing known is left unviewed it flies
-   * to the edge of unknown space (unflown voxels next to unmapped ones), and with `sweep`, when that
-   * is gone too, to unflown voxels for the rest of the budget. Each replan starts again at the top.
+   * lanes, which is what sensor-footprint coverage scores. The edge of unknown space (unflown voxels
+   * next to unmapped ones) competes with the unviewed voxels by path cost (`frontiers`); when both are
+   * gone, with `sweep`, it flies to unflown voxels for the rest of the budget. Each replan starts again
+   * at the top.
    */
   view?: ViewOptions;
 }
@@ -134,6 +135,12 @@ export interface ViewOptions {
   lookMin?: number;
   /** Yaw-rate cap while aiming the camera, rad/s (default: the tracker's cap, or the airframe's). */
   lookYawRate?: number;
+  /**
+   * The view phase also takes unflown voxels on the edge of unknown space as goals, not only once
+   * nothing known is left unviewed (default true). Off is v3's rule, which on a 40 m building spends
+   * the whole flight on corners of the mapped part and never opens the unmapped rooms.
+   */
+  frontiers?: boolean;
 }
 
 /** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
@@ -244,7 +251,7 @@ export class SensorPlanner {
     this.tracker = opts.tracker ? resolveTracker(opts.tracker) : null;
     this.picker = opts.picker ?? null;
     this.view = opts.view
-      ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0 }
+      ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0, frontiers: opts.view.frontiers ?? true }
       : null;
   }
 
@@ -254,7 +261,7 @@ export class SensorPlanner {
    */
   private covered(f: SensorFrame, k: number): boolean {
     if (!this.view || this.phase === 2) return f.visited[k] === 1;
-    if (this.phase === 0) return this.viewed[k] === 1;
+    if (this.phase === 0) return this.viewed[k] === 1 && (!this.view.frontiers || f.visited[k] === 1 || !this.bordersUnknown(f, k));
     return f.visited[k] === 1 || !this.bordersUnknown(f, k);
   }
 
