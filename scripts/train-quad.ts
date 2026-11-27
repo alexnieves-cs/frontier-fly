@@ -21,7 +21,7 @@ import { TfTrainer } from '../src/rl/model';
 import { paddedWeights, STUDENT_DIM, STUDENT_HIDDEN } from '../src/rl/quadStudent';
 import { NodeRolloutPool } from '../src/train/nodePool';
 import type { PickerEpisode } from '../src/train/pickerJob';
-import { HEAD, HEAD_ROW, MAPS, type DaggerChunk, type DaggerPayload, type EvalEpisode, type RolloutChunk, type RolloutPayload, type StudentWeights } from '../src/train/quadDistillJob';
+import { HEAD, HEAD_ROW, MAPS, type DaggerChunk, type DaggerPayload, type EvalEpisode, type ExpertKnobs, type RolloutChunk, type RolloutPayload, type StudentWeights } from '../src/train/quadDistillJob';
 import { useFastestBackend } from './lib/tfBackend';
 
 const args = process.argv.slice(2);
@@ -31,6 +31,16 @@ const arg = (name: string) => {
 };
 const num = (name: string, fallback: number) => (arg(name) == null ? fallback : Number(arg(name)));
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+/** Teacher overrides (--expert-decel, --expert-reaction, --expert-margin, --expert-speed): a more cautious teacher leaves the student room for error. */
+function expertKnobs(): ExpertKnobs | undefined {
+  const k: ExpertKnobs = {};
+  if (arg('expert-decel')) k.decel = num('expert-decel', 4);
+  if (arg('expert-reaction')) k.reaction = num('expert-reaction', 0.25);
+  if (arg('expert-margin')) k.brakingMargin = num('expert-margin', 0);
+  if (arg('expert-speed')) k.speed = num('expert-speed', 0);
+  return Object.keys(k).length ? k : undefined;
+}
 
 export const TRAIN_SEEDS = [170001, 179999] as const;
 export const PRACTICE_BASE = 180001;
@@ -174,7 +184,7 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
     const student = { hidden, weights: policy.getWeights() };
     const chunks = await Promise.all(
       split(eps, workers).map((list, k) =>
-        pool.runJob<RolloutChunk>('quadRollout', { episodes: list, student, crashPenalty: num('crash-penalty', -40), rewardScale: num('reward-scale', 0.1), labels: true, shield, shieldPenalty: num('shield-penalty', 2), seed: u * 1000 + k } satisfies RolloutPayload, k),
+        pool.runJob<RolloutChunk>('quadRollout', { episodes: list, student, crashPenalty: num('crash-penalty', -40), rewardScale: num('reward-scale', 0.1), labels: true, expert: expertKnobs(), shield, shieldPenalty: num('shield-penalty', 2), seed: u * 1000 + k } satisfies RolloutPayload, k),
       ),
     );
     const n = chunks.reduce((a, c) => a + c.n, 0);
@@ -318,6 +328,7 @@ async function main() {
       divergeBoost: num('diverge-boost', 1.5),
       brakeBoost: num('brake-boost', 1),
       vzNoise: num('vz-noise', 0.3),
+      expert: expertKnobs(),
       seed: seed * 100000 + it * 100 + w,
     });
     const chunks = await Promise.all(split(eps, workers).map((list, w) => pool.runJob<DaggerChunk>('quadDagger', payload(list, w), w)));
