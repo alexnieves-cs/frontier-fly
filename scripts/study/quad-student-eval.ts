@@ -3,7 +3,7 @@
  * on the same day and night quad episodes, paired by seed (docs/QUAD_STUDENT.md).
  *
  * Usage: vite-node scripts/study/quad-student-eval.ts -- --ckpt best.bin --base 180001 --n 40
- *          [--no-expert] [--out result.json]
+ *          [--no-expert] [--planner] [--out result.json]
  *
  * Practice seeds are 180001-180400. The gate (181001-181160) and the report block (185001-185332)
  * are flown once each, by checkpoints already picked on practice.
@@ -14,7 +14,7 @@ import { parseCheckpoint } from '../../src/rl/checkpoint';
 import { paddedWeights } from '../../src/rl/quadStudent';
 import { NodeRolloutPool } from '../../src/train/nodePool';
 import type { PickerEpisode } from '../../src/train/pickerJob';
-import type { EvalEpisode, StudentWeights } from '../../src/train/quadDistillJob';
+import type { EvalEpisode, ExpertKnobs, StudentWeights } from '../../src/train/quadDistillJob';
 
 const args = process.argv.slice(2);
 const arg = (name: string) => {
@@ -32,10 +32,10 @@ for (let i = 0; i < n; i++) for (const lighting of ['day', 'night-dark'] as cons
 const pool = new NodeRolloutPool({ workers, envsPerWorker: 1, seed: 1, worldPool: { stages: [0], perStage: 1 }, jobModules: ['src/train/quadDistillJob.ts'], autoDagger: false });
 await pool.init();
 
-async function fly(student: StudentWeights | null, shield: boolean): Promise<EvalEpisode[]> {
+async function fly(student: StudentWeights | null, shield: boolean, expert?: ExpertKnobs): Promise<EvalEpisode[]> {
   const parts: PickerEpisode[][] = Array.from({ length: workers }, () => []);
   eps.forEach((e, i) => parts[i % workers]!.push(e));
-  const out = await Promise.all(parts.map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield }, w) : Promise.resolve([]))));
+  const out = await Promise.all(parts.map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield, expert }, w) : Promise.resolve([]))));
   return out.flat();
 }
 
@@ -60,6 +60,7 @@ if (ckPath) {
   result.shielded = line('student + shield', await fly(student, true));
 }
 if (!args.includes('--no-expert')) result.expert = line('default quad pilot', await fly(null, false));
+if (args.includes('--planner')) result.planner = line('planner only', await fly(null, false, { noPicker: true }));
 const out = arg('out');
 if (out) writeFileSync(out, JSON.stringify(result, null, 1));
 await pool.close();

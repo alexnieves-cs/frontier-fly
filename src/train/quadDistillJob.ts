@@ -57,13 +57,14 @@ export interface DaggerPayload {
   seed: number;
 }
 
-export type ExpertKnobs = Pick<SensorPlannerOptions, 'speed' | 'brakingMargin' | 'flyHeight'> & { reaction?: number; decel?: number };
+export type ExpertKnobs = Pick<SensorPlannerOptions, 'speed' | 'brakingMargin' | 'flyHeight'> & { reaction?: number; decel?: number; /** Planner only: no learned goal picker. */ noPicker?: boolean };
 
 /** The expert: the default quad pilot with `k` layered on top. */
 export function makeExpert(k: ExpertKnobs | undefined): ReturnType<typeof quadPilot> {
   if (!k) return quadPilot();
-  const { reaction, decel, ...rest } = k;
+  const { reaction, decel, noPicker, ...rest } = k;
   const extra: SensorPlannerOptions = { ...rest };
+  if (noPicker) extra.picker = undefined;
   if (reaction != null || decel != null) extra.braking = { reaction: reaction ?? QUAD_PICKER_BRAKING.reaction, decel: decel ?? QUAD_PICKER_BRAKING.decel };
   return quadPilot(extra);
 }
