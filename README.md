@@ -21,18 +21,18 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 ## FrontierBench scoreboard
 
 <!-- generated:scoreboard:start -->
-| Track (test seeds) | View-first planner | Information gain | Rapid frontier | Nearest frontier | NBVP | Random walk | BA* coverage | Sensor-only planner |
+| Track (test seeds) | View-first planner | Information gain | Rapid frontier | NBVP | Nearest frontier | Random walk | BA* coverage | Sensor-only planner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **FrontierBench v3** (82001+, 30 per task × 7) | 67.6% | 13.8% | 9.7% | 8.8% | 27.1% | 47.1% | 65.4% | **68.0%** |
-| **Hard** (93001+, 30 per task × 5) | **87.8%** | 68.0% | 55.0% | 58.4% | 65.6% | 52.0% | 44.6% | 39.5% |
-| **Return** (97001+, 30 per task × 4) | **75.5%** | 62.0% | 50.6% | 53.1% | 49.7% | 37.8% | 32.3% | 26.0% |
-| **Drift** (99001+, 30 per task × 4) | **78.7%** | 63.1% | 55.6% | 51.0% | 55.9% | 44.9% | 41.5% | 36.2% |
-| **Hard drift** (111001+, 30 per task × 4) | **48.1%** | 35.4% | 32.9% | 34.0% | 31.4% | 27.5% | 23.1% | 15.0% |
-| **Degraded sensors** (141001+, 30 per task × 4) | **80.0%** | 50.0% | 48.4% | 47.0% | 53.0% | 42.2% | 46.0% | 30.7% |
-| **Overwatch** (151001+, 30 per task × 3) | 54.7% | **61.8%** | 54.1% | 55.7% | 48.2% | 47.2% | 45.8% | 40.8% |
-| **Integrity** (161001+, 30 per task × 4) | 55.7% | 56.9% | 72.3% | 59.5% | 52.7% | 66.2% | **81.5%** | −7.9% |
+| **FrontierBench v3** (82001+, 30 per task × 7) | 67.6% | 13.8% | 9.7% | 27.1% | 8.8% | 47.1% | 65.4% | **68.0%** |
+| **Hard** (93001+, 30 per task × 5) | **87.8%** | 68.0% | 55.0% | 65.6% | 58.4% | 52.0% | 44.6% | 39.5% |
+| **Return** (97001+, 30 per task × 4) | **75.5%** | 62.0% | 50.6% | 49.7% | 53.1% | 37.8% | 32.3% | 26.0% |
+| **Drift** (99001+, 30 per task × 4) | **78.7%** | 63.1% | 55.6% | 55.9% | 51.0% | 44.9% | 41.5% | 36.2% |
+| **Hard drift** (111001+, 30 per task × 4) | **48.1%** | 35.4% | 32.9% | 31.4% | 34.0% | 27.5% | 23.1% | 15.0% |
+| **Degraded sensors** (141001+, 30 per task × 4) | **80.0%** | 50.0% | 48.4% | 53.0% | 47.0% | 42.2% | 46.0% | 30.7% |
+| **Overwatch** (151001+, 30 per task × 3) | 56.3% | **61.8%** | 54.1% | 48.2% | 55.7% | 47.2% | 45.8% | 40.8% |
+| **Integrity** (161001+, 30 per task × 4) | 55.7% | 56.9% | 72.3% | 52.7% | 59.5% | 66.2% | **81.5%** | −7.9% |
 
-Each cell is the mean over the track's tasks of the per-task mean on the test seeds, every pilot on the same flights; bold is the best in the row. V3 scores the share flown through; the frontier and next-best-view methods stop once their lidar has mapped every room, so they rank low there (judge them on the camera tracks). View-first planner: this repository; Information gain: Gonzalez-Banos & Latombe 2002; Rapid frontier: Cieslewski et al. 2017; Nearest frontier: Yamauchi 1997; NBVP: Bircher et al. 2016; Random walk: the floor, no map and no plan; BA* coverage: Viet et al. 2013; Sensor-only planner: this repository. Columns are ordered by mean rank. Intervals, crashes, the control runs and the commit of every cell are in [docs/scoreboard.json](docs/scoreboard.json) and [docs/LEADERBOARD.md](docs/LEADERBOARD.md).
+Each cell is the mean over the track's tasks of the per-task mean on the test seeds, every pilot on the same flights; bold is the best in the row. V3 scores the share flown through; the frontier and next-best-view methods stop once their lidar has mapped every room, so they rank low there (judge them on the camera tracks). View-first planner: this repository; Information gain: Gonzalez-Banos & Latombe 2002; Rapid frontier: Cieslewski et al. 2017; NBVP: Bircher et al. 2016; Nearest frontier: Yamauchi 1997; Random walk: the floor, no map and no plan; BA* coverage: Viet et al. 2013; Sensor-only planner: this repository. Columns are ordered by mean rank. Intervals, crashes, the control runs and the commit of every cell are in [docs/scoreboard.json](docs/scoreboard.json) and [docs/LEADERBOARD.md](docs/LEADERBOARD.md).
 <!-- generated:scoreboard:end -->
 
 Score your own pilot on any track with `npm run bench:hard -- --pilot bench/entries/<you>/pilot.ts --track <track> --split dev`, then test once; [LEADERBOARD.md](docs/LEADERBOARD.md#submit-an-entry) has the rules, every track's full board and how to submit. The [live scoreboard](https://alexnieves-cs.github.io/frontier-fly/) shows the same numbers with intervals, and replays recorded bench flights in the browser.

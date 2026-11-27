@@ -5,6 +5,23 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### FrontierBench: the scoreboard, published baselines, overwatch and integrity (2026-11-27)
+
+- The homepage and the README open on a generated scoreboard: 8 tracks by 8 pilots, every cell from
+  `bench/results` with its test seed block (`docs/scoreboard.json`). Below it, two test flights replayed in the
+  browser, recorded from the bench's own episodes (`npm run bench:replay`) and checked against the result files
+  when the docs are generated.
+- Baselines on every track and the same seeds: random walk, greedy information gain (Gonzalez-Banos & Latombe
+  2002) and rapid frontier (Cieslewski et al. 2017).
+- `npm run bench:hard -- --track overwatch` (dev 150001+, test 151001+): find a lost person who never reacts to
+  the drone and keep them in view from 2 m or more, with one watch layer shared by every explorer pilot.
+  Information gain leads at 61.8%; the view-first planner is 2nd at 56.3% (v4).
+- `npm run bench:hard -- --track integrity` (dev 160001+, test 161001+): the pilot reports a protection level,
+  scored as availability minus 10 x the hazardously misleading rate (alert limit 1.5 m, time to alert 2 s). BA*
+  coverage leads at 81.5% by reporting nothing; the view-first planner, reporting its estimator's 1 sigma, is 6th
+  at 55.7%. Draft writeup: `docs/INTEGRITY.md`.
+- CONTRIBUTING: no capability lands without a scored track and a number attached.
+
 ### Fix the planner's known weak spots (2026-11-27)
 
 - View-first planner v4 (`ViewOptions.frontiers`, kinematic airframe): the edge of unmapped space competes with
