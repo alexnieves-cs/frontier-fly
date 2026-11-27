@@ -44,6 +44,9 @@ export interface AtlasFlight {
   /** The planted target was confirmed (null without a target). */
   targetConfirmed: boolean | null;
   declaredClear: string[];
+  /** Target tracks left unresolved (probable targets flagged for a person), and confirmations of a non-target. */
+  unresolved?: number;
+  falseAlarms?: number;
   score: Record<AtlasEvent, number>;
 }
 
@@ -88,11 +91,21 @@ function watchTargets(source: LiveDetectionSource, targetIds: ReadonlySet<string
 
 let shipped: ReturnType<typeof policyFromFile> | null = null;
 
-export async function flyCase(c: AtlasCase, mode: MissionMode = ATLAS_MODE): Promise<AtlasFlight> {
+/**
+ * Changes to the autopilot a study can fly against the shipped one, each off by default: a thermal
+ * camera beside the visible one (perception/model.ts THERMAL), and the floor under which an
+ * unconfirmed target track is rejected as a lookalike (planner/confirm.ts UNRESOLVED_FLOOR).
+ */
+export interface AtlasVariant {
+  thermal?: boolean;
+  unresolvedFloor?: number;
+}
+
+export async function flyCase(c: AtlasCase, mode: MissionMode = ATLAS_MODE, variant: AtlasVariant = {}): Promise<AtlasFlight> {
   const setup = caseSetup(c);
   const world = buildMissionWorld(setup.world);
   const mission = missionForWorld(world, setup.mission);
-  const raw = createPerceptionSource(world);
+  const raw = createPerceptionSource(world, variant.thermal ? { thermal: true } : {});
   const planted = new Set(raw.truthTargets().filter((t) => t.category !== 'decoy').map((t) => t.id));
   const watched = watchTargets(raw, planted);
   if (mode.startsWith('policy') && !shipped) shipped = policyFromFile(readFileSync(SHIPPED_CHECKPOINT_PATH));
@@ -102,6 +115,7 @@ export async function flyCase(c: AtlasCase, mode: MissionMode = ATLAS_MODE): Pro
     ...missionModeOptions(mode, shipped ?? undefined),
     ...(setup.faults.length ? { faults: { plan: setup.faults, seed: world.seed } } : {}),
     measureClearance: true,
+    ...(variant.unresolvedFloor !== undefined ? { unresolvedFloor: variant.unresolvedFloor } : {}),
   });
   const report = buildReport(run, raw, world);
   const phaseAt = (t: number): Phase => run.phases.find((p) => t >= p.tStart - 1e-9 && t <= p.tEnd + 1e-9)?.phase ?? run.phases[run.phases.length - 1]!.phase;
@@ -132,6 +146,8 @@ export async function flyCase(c: AtlasCase, mode: MissionMode = ATLAS_MODE): Pro
     targetConf: targetConf === null ? null : Math.round(targetConf * 1000) / 1000,
     targetConfirmed,
     declaredClear: run.declaredClear.map((d) => d.scope),
+    unresolved: run.unresolved?.length ?? 0,
+    falseAlarms: report.falseAlarms,
     score: {
       falseClear: falseClearScore(falseClear, targetConf === null ? null : { conf: targetConf, confirmed: !!targetConfirmed, clearedShare }),
       collision: collisionScore(collision, minClearanceM),
