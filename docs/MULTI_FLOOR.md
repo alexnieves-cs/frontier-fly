@@ -60,7 +60,7 @@ Development used FrontierBench's dev split (81401–81420) and the 20 dev homes 
 
 ## What changed in the climber
 
-Two changes, both picked on the dev split.
+Two changes, both picked on the dev split, plus [the stairwell fix](#the-stairwell-fix). All three are opt-in: the study flies `STAIR_BASELINES` ([`src/bench/baselines.ts`](../src/bench/baselines.ts), the climber's `STAIR_CLIMB` and shaft search), while `BASELINES`, the FrontierBench leaderboard and FrontierBench Hard fly the climber as before, so every committed bench result still re-scores bit-identically.
 
 **Shaft search.** The climber finds a shaft only with the up and down range finders, so only by flying under or over it. The planner flies every voxel and finds the stairs on the way. NBVP and nearest frontier map a floor from its doorways: they finish the floor without passing under the shaft, and used to hover there until the flight ended. The climber now flies a shaft search when the explorer is done and a floor it has never entered remains: the plain planner sweeping lanes 1 m apart (`SensorPlannerOptions.lanes`), which passes under every opening at least 1 m across, until a shaft turns up. **Faster climbs.** The climber climbs at the airframe's vertical cap, 1 m/s, easing over the last third of a metre (it was 0.9 m/s, easing over the last half metre).
 
@@ -88,7 +88,7 @@ Main's code flew the same buildings as a paired control:
 
 For the planners the change is small, because they already passed under the stairs. On the real homes their battery rows rise from about 96.5% seen to 99.5–100% and from 55–56 to 60 of 60 homes with every floor reached; most of that is [the stairwell fix](#the-stairwell-fix), since main has neither change. For NBVP and nearest frontier the search is the difference between mapping one floor and mapping the building. Nearest frontier still stops short on some homes (52 of 60 and 9 of 12 with every floor reached): those flights end early (about 1.3 minutes on average), and why the shaft search does not start or does not find the stairs on them is not diagnosed yet. NBVP flies few voxels by design (it views rooms from their doorways), so its *flown* column is low under every budget; *seen* is the column that compares it fairly.
 
-On the quadrotor the search costs crashes. On FrontierBench Hard's `floors-quad` dev split (92401–92420), NBVP's camera footprint rises from 56.7% to 80.0% and nearest frontier's from 34.0% to 56.0%, but crashes rise from 0 to 4 and from 6 to 8 of 20 flights: instead of hovering once the ground floor is done, they now fly the rest of the building. The view-first planner rises from 87.0% to 88.1% with its 1 crash unchanged. Published FrontierBench results stay valid at the commits they name; a re-score after this change will move the published methods' multi-floor cells up.
+On the quadrotor the search costs crashes. On FrontierBench Hard's `floors-quad` dev split (92401–92420), NBVP's camera footprint rises from 56.7% to 80.0% and nearest frontier's from 34.0% to 56.0%, but crashes rise from 0 to 4 and from 6 to 8 of 20 flights: instead of hovering once the ground floor is done, they now fly the rest of the building. The view-first planner rises from 87.0% to 88.1% with its 1 crash unchanged. These are dev flights with `STAIR_BASELINES`; FrontierBench Hard itself still flies the old climber. Turning the stair search on for the benchmarks means re-scoring them, which would move the published methods' multi-floor cells up and the quadrotor crash counts too.
 
 ## The stairwell fix
 

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BASELINES } from '../../src/bench/baselines';
+import { STAIR_BASELINES } from '../../src/bench/baselines';
 import { benchEpisodeSetup } from '../../src/bench/run';
 import { BENCH_TASKS } from '../../src/bench/tasks';
 import { isFullyReachable, computeFlightMap } from '../../src/gen/validate';
@@ -80,7 +80,7 @@ describe('real homes (Swiss Dwellings)', () => {
     const { spec, envSeed, cfg } = homeEpisodeSetup(set, home, 'day');
     cfg.maxSteps *= spec.floors.length;
     const env = await createEnv();
-    const pilot = BASELINES.planner!();
+    const pilot = STAIR_BASELINES.planner!();
     pilot.reset({ speedH: 2, maxSteps: cfg.maxSteps, dynamics: 'kinematic' });
     let obs = env.reset(spec, envSeed, cfg);
     const floors = new Set<number>();
@@ -105,7 +105,7 @@ describe('shaft search', () => {
     const task = BENCH_TASKS.find((t) => t.id === 'floors')!;
     const { spec, envSeed, cfg } = benchEpisodeSetup(task, { seed: 81405 });
     const env = await createEnv();
-    const pilot = BASELINES.nbvp!();
+    const pilot = STAIR_BASELINES.nbvp!();
     pilot.reset({ speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics });
     let obs = env.reset(spec, envSeed, cfg);
     const floors = new Set<number>();

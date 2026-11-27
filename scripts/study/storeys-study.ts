@@ -23,7 +23,7 @@
 // 88801+), report only; dev = FrontierBench dev 81401-81420 and the 20 dev homes (88601+).
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { BASELINES } from '../../src/bench/baselines';
+import { STAIR_BASELINES } from '../../src/bench/baselines';
 import { benchEpisodeSetup } from '../../src/bench/run';
 import { BENCH_TASKS } from '../../src/bench/tasks';
 import { EpisodeFootprint, FOOTPRINT_RADIUS } from '../../src/eval/footprint';
@@ -121,7 +121,7 @@ async function fly(split: 'dev' | 'test', pilots: string[]): Promise<{ pilot: st
         const floors = spec.floors.length;
         if (budget.id === 'per-floor') cfg.maxSteps *= floors;
         if (budget.id === 'battery') cfg.maxSteps = BATTERY_CAP_STEPS;
-        const pilot = BASELINES[pilotId]!();
+        const pilot = STAIR_BASELINES[pilotId]!();
         pilot.reset({ speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics });
         let obs = env.reset(spec, envSeed, cfg);
         const fp = new EpisodeFootprint();

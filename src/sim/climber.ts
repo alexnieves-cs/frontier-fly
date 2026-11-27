@@ -15,13 +15,24 @@ import { filterVelocity, SAFETY_MARGIN } from './lidarSafety';
 import { sensorPath } from './sensorMap';
 
 /**
- * Climb speed in a shaft (MAX_SPEED_V, the airframe's vertical cap) and the gain that eases into the
- * next floor's flight height. Picked on FrontierBench dev 81401-81420, the 20 dev real homes and
- * FrontierBench Hard dev floors-quad (was 0.9 m/s and 1.5: +0.1 / +0.5 points flown coverage,
- * +1.1 points camera footprint on the quadrotor, no new crash).
+ * Default climb in a shaft: 0.9 m/s, easing into the next floor's flight height with gain 1.5. Frozen,
+ * so FrontierBench results (bench/results) stay bit-identical.
  */
-const CLIMB_SPEED = MAX_SPEED_V;
-const CLIMB_GAIN = 3;
+const CLIMB_SPEED = 0.9;
+const CLIMB_GAIN = 1.5;
+
+/**
+ * The faster climb of multi-floor round 2 (docs/MULTI_FLOOR.md): the airframe's vertical cap with gain 3.
+ * Picked on FrontierBench dev 81401-81420, the 20 dev real homes and FrontierBench Hard dev floors-quad:
+ * +0.1 / +0.5 points flown coverage, +1.1 points camera footprint on the quadrotor, no new crash.
+ */
+export const FAST_CLIMB = { climbSpeed: MAX_SPEED_V, climbGain: 3 } as const;
+
+/**
+ * Everything multi-floor round 2 adds to the climb (docs/MULTI_FLOOR.md), short of the shaft search: the
+ * faster climb, climbing from inside L- and U-shaped stairwells, and keeping view masks across floors.
+ */
+export const STAIR_CLIMB = { ...FAST_CLIMB, enclosedCentre: true, keepViews: true } as const;
 
 /** Range past the ceiling (or below the floor) that marks a shaft, meters. */
 const SHAFT_EXTRA = 0.8;
@@ -32,7 +43,7 @@ const SHAFT_EXTRA = 0.8;
  * so a climb on it stays inside the column; when the mean falls outside the
  * group (an L-shaped stairwell), the marked voxel nearest it.
  */
-export function shaftCentre(map: Uint8Array, base: number, vw: number, vd: number, from: readonly [number, number]): [number, number] | null {
+export function shaftCentre(map: Uint8Array, base: number, vw: number, vd: number, from: readonly [number, number], enclosed = true): [number, number] | null {
   let best = -1;
   let bestD = Infinity;
   for (let k = 0; k < vw * vd; k++) {
@@ -78,7 +89,7 @@ export function shaftCentre(map: Uint8Array, base: number, vw: number, vd: numbe
     return gx >= 0 && gy >= 0 && gx < vw && gy < vd && seen.has(gy * vw + gx);
   };
   const r = 0.2;
-  if (at(mx, my) && at(mx - r, my) && at(mx + r, my) && at(mx, my - r) && at(mx, my + r)) return [mx, my];
+  if (!enclosed || (at(mx, my) && at(mx - r, my) && at(mx + r, my) && at(mx, my - r) && at(mx, my + r))) return [mx, my];
   let pick = group[0]!;
   let pickN = -1;
   let pickD = Infinity;
@@ -120,6 +131,17 @@ export interface ClimberOptions {
    * under the stairs. Without it the climber hovers once the explorer is done.
    */
   searcher?: () => Explorer;
+  /** Climb speed in a shaft, m/s (default 0.9; FAST_CLIMB for the round-2 climb). */
+  climbSpeed?: number;
+  /** Gain from height error to climb rate (default 1.5). */
+  climbGain?: number;
+  /**
+   * Climb from inside the marked stairwell (shaftCentre `enclosed`): the mean of an L- or U-shaped group
+   * can lie in the wall the stairs wrap around. Off by default, so FrontierBench flights stay bit-identical.
+   */
+  enclosedCentre?: boolean;
+  /** On a floor change call the explorer's floorChanged() (keep what it has had in view), not reset(). */
+  keepViews?: boolean;
 }
 
 /** Sensor-only planner (or any Explorer) that also takes shafts between floors. */
@@ -128,6 +150,10 @@ export class Climber {
   readonly stallSteps: number;
   readonly speed: number;
   readonly floorSteps: number;
+  readonly climbSpeed: number;
+  readonly climbGain: number;
+  readonly enclosedCentre: boolean;
+  readonly keepViews: boolean;
   private readonly makeSearcher: (() => Explorer) | null;
   private searcher: Explorer | null = null;
   /** Shaft voxels marked so far; the search tries to leave only when it grows. */
@@ -158,6 +184,10 @@ export class Climber {
     this.speed = opts.speed ?? 2;
     this.floorSteps = opts.floorSteps ?? Infinity;
     this.makeSearcher = opts.searcher ?? null;
+    this.climbSpeed = opts.climbSpeed ?? CLIMB_SPEED;
+    this.climbGain = opts.climbGain ?? CLIMB_GAIN;
+    this.enclosedCentre = opts.enclosedCentre ?? false;
+    this.keepViews = opts.keepViews ?? false;
   }
 
   reset(): void {
@@ -298,7 +328,7 @@ export class Climber {
       const hop = floor + Math.sign(g - floor);
       if (tried.has(hop)) continue;
       tried.add(hop);
-      const at = shaftCentre(hop > floor ? this.up : this.down, floor * f.vw * f.vd, f.vw, f.vd, [f.pos[0], f.pos[1]]);
+      const at = shaftCentre(hop > floor ? this.up : this.down, floor * f.vw * f.vd, f.vw, f.vd, [f.pos[0], f.pos[1]], this.enclosedCentre);
       if (!at) continue;
       const path = sensorPath(f, floor, [f.pos[0], f.pos[1]], at);
       if (!path) continue;
@@ -354,7 +384,7 @@ export class Climber {
     }
     if (Math.abs(ez) < 0.08) {
       this.target = null;
-      if (this.planner.floorChanged) this.planner.floorChanged();
+      if (this.keepViews && this.planner.floorChanged) this.planner.floorChanged();
       else this.planner.reset();
       this.floorChanges += 1;
       this.phase = 'sweep';
@@ -365,6 +395,6 @@ export class Climber {
     const vx = Math.max(-0.3, Math.min(0.3, (t.x - f.pos[0]) * 2));
     const vy = Math.max(-0.3, Math.min(0.3, (t.y - f.pos[1]) * 2));
     // Climb at the vertical speed cap through the open column, slowing over the last third of a metre.
-    return { vx, vy, vz: Math.max(-CLIMB_SPEED, Math.min(CLIMB_SPEED, ez * CLIMB_GAIN)), yawRate: 0, exploring: true };
+    return { vx, vy, vz: Math.max(-this.climbSpeed, Math.min(this.climbSpeed, ez * this.climbGain)), yawRate: 0, exploring: true };
   }
 }

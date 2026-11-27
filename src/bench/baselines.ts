@@ -1,6 +1,6 @@
 /** The pilots the leaderboard starts with, written against the bench pilot API only. */
 import { OBS } from '../shared/constants';
-import { Climber } from '../sim/climber';
+import { Climber, STAIR_CLIMB } from '../sim/climber';
 import { heuristicAction } from '../sim/heuristic';
 import { commandToAction, SensorPlanner, type SensorFrame, type SensorPlannerOptions } from '../sim/sensorPlanner';
 import { guardAction, QUAD_BRAKING } from '../sim/lidarSafety';
@@ -25,7 +25,7 @@ export const HOME_RETURN = { speed: 0.9, reserve: 5, every: 10 } as const;
  * lidar occupancy map. On buildings with more than one floor it takes shafts
  * (sim/climber.ts) between floors.
  */
-export function explorerPilot(name: string, make: (ctx: BenchContext) => Explorer): BenchPilot & { climberRef(): Climber | null } {
+export function explorerPilot(name: string, make: (ctx: BenchContext) => Explorer, stairs = false): BenchPilot & { climberRef(): Climber | null } {
   const out = new Float32Array(4);
   let ctx: BenchContext = { speedH: 2, maxSteps: 2400, dynamics: 'kinematic' };
   let explorer: Explorer = make(ctx);
@@ -61,7 +61,7 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
         if (homer.homing) return commandToAction(homer.act(frame), f.yaw, out, ctx.speedH).slice();
       }
       if (f.floors > 1) {
-        climber ??= new Climber(explorer, { floorSteps: (0.8 * ctx.maxSteps) / f.floors, searcher: () => shaftSearcher(ctx) });
+        climber ??= new Climber(explorer, { floorSteps: (0.8 * ctx.maxSteps) / f.floors, ...(stairs ? { ...STAIR_CLIMB, searcher: () => shaftSearcher(ctx) } : {}) });
         return commandToAction(climber.act(frame, obs[OBS.ceil]! * f.floorHeight), f.yaw, out, ctx.speedH).slice();
       }
       const cmd = explorer.act(frame);
@@ -73,7 +73,7 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
 }
 
 /**
- * The shaft search every explorer pilot shares on multi-floor buildings (sim/climber.ts `searcher`):
+ * The shaft search every explorer pilot shares under `stairs` on multi-floor buildings (sim/climber.ts `searcher`):
  * the plain sensor-only planner sweeping 1 m lanes of unflown voxels, with the quad tracker and braking on the
  * quadrotor, so the tasks compare exploration, not stair finding.
  */
@@ -85,8 +85,8 @@ function shaftSearcher(ctx: BenchContext): Explorer {
  * The sensor-only planner. On the quadrotor it brakes with the fitted braking
  * model, and on buildings with more than one floor it takes shafts.
  */
-export function plannerPilot(name: string, opts: SensorPlannerOptions = {}): BenchPilot {
-  return explorerPilot(name, (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING } : {}), ...opts }));
+export function plannerPilot(name: string, opts: SensorPlannerOptions = {}, stairs = false): BenchPilot {
+  return explorerPilot(name, (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING } : {}), ...opts }), stairs);
 }
 
 /** Airframe options a published baseline flies with: cruise at the cap, and the braking filter on the quadrotor. */
@@ -124,29 +124,39 @@ export const VIEW_QUAD_MARGIN = 0.3;
 /** View-first options on the quadrotor: aim a 90° forward camera, yawing at up to 0.8 rad/s. */
 export const VIEW_LOOK = { look: Math.PI / 2, lookYawRate: 0.8 } as const;
 
-export const BASELINES: Record<string, () => BenchPilot> = {
-  planner: () => plannerPilot('Sensor-only planner'),
-  'planner-momentum': () => plannerPilot('Sensor-only planner + momentum', { momentum: 1 }),
-  // The quad-aware planner the report flies on the quadrotor: the trajectory tracker (sim/tracker.ts)
-  // shapes its command there; on the kinematic airframe it is the plain planner.
-  'planner-tracker': () => explorerPilot('Sensor-only planner + quad tracker', (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {} } : {}) })),
-  // View-first planner: goals are voxels the drone has not yet had in lidar line of sight within 3 m
-  // (the footprint metric's radius), then it sweeps unflown voxels with the time left. On the
-  // quadrotor it flies the tracker and keeps 0.30 m of braking margin (0.25 default), picked on the
-  // practice block 90501-90600 (docs/VIEW_FIRST.md): view goals mean longer legs at cruise.
-  // On the quadrotor it also aims a forward camera (VIEW_LOOK) at what it has not had in view, turning
-  // at up to 0.8 rad/s (the tracker's own yaw cap is 0.3), picked on FrontierBench Hard dev 92001+.
-  // Its quadrotor safety filter is map-backed (mapFill): a lidar ray with no return brakes for the walls and
-  // unknown space its own map has along it, and a lidar the map keeps contradicting slows it to 0.6x
-  // (degraded-sensor track, round 4, chosen on dev 140001+; no change on the healthy tracks' dev splits).
-  'planner-view': () =>
-    explorerPilot('Sensor-only planner, view first', (c) =>
-      new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { view: VIEW_LOOK, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN, mapFill: true } : { view: {} }) }),
-    ),
-  waypoint: () => statelessPilot('Frontier waypoint follower', waypointAction),
-  heuristic: () => statelessPilot('Lidar wall-follower', heuristicAction),
-  // Published exploration methods (src/sim/explorers), on the same maps, flight layer and safety filter.
-  yamauchi: () => explorerPilot('Nearest frontier (Yamauchi 1997)', (c) => new NearestFrontierExplorer(airframe(c))),
-  nbvp: () => explorerPilot('Next-best-view RRT (NBVP, Bircher et al. 2016)', (c) => new NbvpExplorer(airframe(c))),
-  boustrophedon: () => explorerPilot('Boustrophedon coverage (BA*, Viet et al. 2013)', (c) => new BoustrophedonExplorer(airframe(c))),
-};
+/**
+ * The baselines. With `stairs`, explorer pilots climb with STAIR_CLIMB and fly the shaft search between floors
+ * (multi-floor round 2, docs/MULTI_FLOOR.md); without it they fly as scored on the leaderboard.
+ */
+function baselines(stairs: boolean): Record<string, () => BenchPilot> {
+  return {
+    planner: () => plannerPilot('Sensor-only planner', {}, stairs),
+    'planner-momentum': () => plannerPilot('Sensor-only planner + momentum', { momentum: 1 }, stairs),
+    // The quad-aware planner the report flies on the quadrotor: the trajectory tracker (sim/tracker.ts)
+    // shapes its command there; on the kinematic airframe it is the plain planner.
+    'planner-tracker': () => explorerPilot('Sensor-only planner + quad tracker', (c) => new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {} } : {}) }), stairs),
+    // View-first planner: goals are voxels the drone has not yet had in lidar line of sight within 3 m
+    // (the footprint metric's radius), then it sweeps unflown voxels with the time left. On the
+    // quadrotor it flies the tracker and keeps 0.30 m of braking margin (0.25 default), picked on the
+    // practice block 90501-90600 (docs/VIEW_FIRST.md): view goals mean longer legs at cruise.
+    // On the quadrotor it also aims a forward camera (VIEW_LOOK) at what it has not had in view, turning
+    // at up to 0.8 rad/s (the tracker's own yaw cap is 0.3), picked on FrontierBench Hard dev 92001+.
+    // Its quadrotor safety filter is map-backed (mapFill): a lidar ray with no return brakes for the walls and
+    // unknown space its own map has along it, and a lidar the map keeps contradicting slows it to 0.6x
+    // (degraded-sensor track, round 4, chosen on dev 140001+; no change on the healthy tracks' dev splits).
+    'planner-view': () =>
+      explorerPilot('Sensor-only planner, view first', (c) =>
+        new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { view: VIEW_LOOK, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN, mapFill: true } : { view: {} }) }), stairs),
+    waypoint: () => statelessPilot('Frontier waypoint follower', waypointAction),
+    heuristic: () => statelessPilot('Lidar wall-follower', heuristicAction),
+    // Published exploration methods (src/sim/explorers), on the same maps, flight layer and safety filter.
+    yamauchi: () => explorerPilot('Nearest frontier (Yamauchi 1997)', (c) => new NearestFrontierExplorer(airframe(c)), stairs),
+    nbvp: () => explorerPilot('Next-best-view RRT (NBVP, Bircher et al. 2016)', (c) => new NbvpExplorer(airframe(c)), stairs),
+    boustrophedon: () => explorerPilot('Boustrophedon coverage (BA*, Viet et al. 2013)', (c) => new BoustrophedonExplorer(airframe(c)), stairs),
+  };
+}
+
+export const BASELINES = baselines(false);
+
+/** The baselines with the round-2 stair search and faster climb (docs/MULTI_FLOOR.md). */
+export const STAIR_BASELINES = baselines(true);
