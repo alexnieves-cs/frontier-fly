@@ -35,7 +35,7 @@ await pool.init();
 async function fly(student: StudentWeights | null, shield: boolean, expert?: ExpertKnobs): Promise<EvalEpisode[]> {
   const parts: PickerEpisode[][] = Array.from({ length: workers }, () => []);
   eps.forEach((e, i) => parts[i % workers]!.push(e));
-  const out = await Promise.all(parts.map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield, expert }, w) : Promise.resolve([]))));
+  const out = await Promise.all(parts.map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield, expert, gain: Number(arg('gain') ?? 0) || undefined }, w) : Promise.resolve([]))));
   return out.flat();
 }
 
@@ -56,7 +56,7 @@ const ckPath = arg('ckpt');
 if (ckPath) {
   const ck = parseCheckpoint(readFileSync(ckPath));
   const student = { hidden: ck.hidden, weights: paddedWeights(ck) };
-  result.alone = line('student alone', await fly(student, false));
+  if (!args.includes('--shield-only')) result.alone = line('student alone', await fly(student, false));
   result.shielded = line('student + shield', await fly(student, true));
 }
 if (!args.includes('--no-expert')) result.expert = line('default quad pilot', await fly(null, false));

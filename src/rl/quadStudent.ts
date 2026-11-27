@@ -88,7 +88,12 @@ export class QuadStudentPilot {
   private readonly input = new StudentInput();
   private readonly rng = new RNG(1, 'quad-student');
 
-  constructor(source: Checkpoint | InferPolicy) {
+  /**
+   * @param gain output scale on the horizontal command. Imitation by squared error shrinks a
+   *   student's speed toward the average of the teacher's (it hedges between the teacher's
+   *   options); a fixed gain, picked on practice flights and kept during RL, restores the pace.
+   */
+  constructor(source: Checkpoint | InferPolicy, readonly gain = 1) {
     if (source instanceof InferPolicy) this.policy = source;
     else {
       if (source.obsDim !== STUDENT_DIM) throw new Error(`quad student expects obsDim ${STUDENT_DIM}, checkpoint has ${source.obsDim}`);
@@ -104,6 +109,10 @@ export class QuadStudentPilot {
   /** The next command; `filter` (a safety shield, say) may change it in place before it is recorded as executed. */
   act(obs: Float32Array, filter?: (a: Float32Array) => void): Float32Array {
     const a = this.policy.actWith(this.input.build(obs), 1, this.rng, true).action;
+    if (this.gain !== 1) {
+      a[0] = Math.max(-1, Math.min(1, a[0]! * this.gain));
+      a[1] = Math.max(-1, Math.min(1, a[1]! * this.gain));
+    }
     filter?.(a);
     this.input.executed(a);
     return a;

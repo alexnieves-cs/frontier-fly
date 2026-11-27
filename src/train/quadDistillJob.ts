@@ -86,6 +86,8 @@ export interface EvalPayload {
   expert?: ExpertKnobs;
   /** Fly the student behind the braking shield. */
   shield?: boolean;
+  /** Output scale on the student's horizontal command (QuadStudentPilot gain), before the shield. */
+  gain?: number;
 }
 
 export interface EvalEpisode extends PickerEpisode {
@@ -109,6 +111,12 @@ function shieldInPlace(a: Float32Array, obs: Float32Array, e: ExplorerEnv): numb
   a[0] = g[0]!;
   a[1] = g[1]!;
   return d;
+}
+
+/** Scale the horizontal command in place (clipped to the action range). */
+function applyGain(a: Float32Array, gain: number): void {
+  a[0] = Math.max(-1, Math.min(1, a[0]! * gain));
+  a[1] = Math.max(-1, Math.min(1, a[1]! * gain));
 }
 
 function makeStudent(w: StudentWeights | null): InferPolicy | null {
@@ -241,6 +249,7 @@ const quadEval: JobFn = (_ctx, raw) => {
       let a: Float32Array;
       if (student) {
         a = student.actWith(input.build(obs), 1, rng, true).action;
+        if (p.gain) applyGain(a, p.gain);
         if (p.shield && shieldInPlace(a, obs, env) > 0.02) interventions++;
         input.executed(a);
       } else a = expert!.act(obs, env);
@@ -273,6 +282,8 @@ export interface RolloutPayload {
   shield?: boolean;
   /** Reward (before scaling) subtracted per unit of shield correction (L2, action units). */
   shieldPenalty?: number;
+  /** Output scale on the horizontal command (QuadStudentPilot gain), applied before the shield. */
+  gain?: number;
   seed: number;
 }
 
@@ -350,6 +361,7 @@ const quadRollout: JobFn = (_ctx, raw) => {
       logp[n] = out.logp[0]!;
       values[n] = out.value[0]!;
       const exec = a.slice();
+      if (p.gain) applyGain(exec, p.gain);
       lastExec = exec;
       const corr = p.shield ? shieldInPlace(exec, obs, env) : 0;
       input.executed(exec);

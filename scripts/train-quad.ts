@@ -112,7 +112,7 @@ function split<T>(xs: T[], k: number): T[][] {
 }
 
 export async function evalEpisodes(pool: NodeRolloutPool, workers: number, eps: PickerEpisode[], student: StudentWeights | null, shield = false): Promise<EvalEpisode[]> {
-  const parts = await Promise.all(split(eps, workers).map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield }, w) : Promise.resolve([]))));
+  const parts = await Promise.all(split(eps, workers).map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield, gain: student ? num('gain', 0) || undefined : undefined }, w) : Promise.resolve([]))));
   return parts.flat();
 }
 
@@ -184,7 +184,7 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
     const student = { hidden, weights: policy.getWeights() };
     const chunks = await Promise.all(
       split(eps, workers).map((list, k) =>
-        pool.runJob<RolloutChunk>('quadRollout', { episodes: list, student, crashPenalty: num('crash-penalty', -40), rewardScale: num('reward-scale', 0.1), labels: true, expert: expertKnobs(), shield, shieldPenalty: num('shield-penalty', 2), seed: u * 1000 + k } satisfies RolloutPayload, k),
+        pool.runJob<RolloutChunk>('quadRollout', { episodes: list, student, crashPenalty: num('crash-penalty', -40), rewardScale: num('reward-scale', 0.1), labels: true, expert: expertKnobs(), shield, shieldPenalty: num('shield-penalty', 2), gain: num('gain', 0) || undefined, seed: u * 1000 + k } satisfies RolloutPayload, k),
       ),
     );
     const n = chunks.reduce((a, c) => a + c.n, 0);
