@@ -7,7 +7,8 @@
 //
 import { execSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { LOOP_IN_FLIGHT, HARD_VERSION, trackRuns, trackTasks, type DriftTrack } from '../../src/bench/hard';
+import { HARD_VERSION, LOOP_IN_FLIGHT, trackRuns, trackTasks, type HardTrack } from '../../src/bench/hard';
+import type { BenchTask } from '../../src/bench/tasks';
 import { runBenchEpisode, type BenchEpisode } from '../../src/bench/run';
 import { createEnv } from '../../src/sim/env';
 import { loadPilot, summarize } from './lib';
@@ -23,16 +24,20 @@ const split = block ? 'report' : (arg('split', 'dev') as 'dev' | 'test');
 if (split !== 'dev' && split !== 'test' && !block) throw new Error('--split dev|test, or --base N [--count M]');
 const only = arg('tasks', '').split(',').filter(Boolean);
 const ids = arg('only', arg('pilot', 'planner')).split(',');
-const track = arg('track', 'hard') as DriftTrack;
-if (!['hard', 'return', 'drift', 'drift-hard'].includes(track)) throw new Error('--track hard|return|drift|drift-hard');
+const track = arg('track', 'hard') as HardTrack;
+if (!['hard', 'return', 'drift', 'sensor', 'drift-hard'].includes(track)) throw new Error('--track hard|return|drift|sensor|drift-hard');
 // --truth flies the drift tasks on the true pose: the paired control that prices the estimate.
+// --healthy flies the sensor tasks without their faults (still on the estimate): the control that prices the faults.
 const truth = process.argv.includes('--truth');
+const healthy = process.argv.includes('--healthy');
 // --loop flies the drift tasks on the in-flight loop closer's pose (hard.ts LOOP_IN_FLIGHT).
 const loop = process.argv.includes('--loop');
 if (truth && loop) throw new Error('--truth and --loop exclude each other');
-const TASKS = trackTasks(track).map((t) => (!t.drift ? t : truth ? { ...t, drift: false } : loop ? { ...t, driftProfile: { ...t.driftProfile, ...LOOP_IN_FLIGHT } } : t));
-// A loop-closure row sits on the same board as the estimator-only rows (file <id>-loop.json); the true-pose control has its own folder.
-const outDir = arg('out', split === 'test' ? (track === 'hard' ? 'bench/results/hard' : `bench/results/hard-${track}${truth ? '-truth' : ''}`) : '');
+const strip = (t: BenchTask): BenchTask =>
+  truth ? { ...t, drift: false, faults: undefined } : healthy ? { ...t, faults: undefined } : loop && t.drift ? { ...t, driftProfile: { ...t.driftProfile, ...LOOP_IN_FLIGHT } } : t;
+const TASKS = trackTasks(track).map(strip);
+// A loop-closure row sits on the same board as the estimator-only rows (file <id>-loop.json).
+const outDir = arg('out', split === 'test' ? (track === 'hard' ? 'bench/results/hard' : `bench/results/hard-${track}`) : '');
 const commit = execSync('git rev-parse --short HEAD').toString().trim();
 const env = await createEnv();
 for (const id of ids) {
@@ -49,7 +54,7 @@ for (const id of ids) {
   });
   await pilot.close?.();
   const tasks = TASKS.filter((t) => !only.length || only.includes(t.id));
-  const result = { hard: HARD_VERSION, ...(track !== 'hard' ? { track } : {}), ...(truth ? { truth } : {}), ...(loop ? { loop: LOOP_IN_FLIGHT } : {}), name: loop ? `${pilot.name} + loop closure` : pilot.name, source, split, ...(block ? { block } : {}), commit, baseline: source.startsWith('baseline:'), taskDefs: tasks, ...summarize(episodes, tasks), episodes };
+  const result = { hard: HARD_VERSION, ...(track !== 'hard' ? { track } : {}), ...(truth ? { truth } : {}), ...(healthy ? { healthy } : {}), ...(loop ? { loop: LOOP_IN_FLIGHT } : {}), name: loop ? `${pilot.name} + loop closure` : pilot.name, source, split, ...(block ? { block } : {}), commit, baseline: source.startsWith('baseline:'), taskDefs: tasks, ...summarize(episodes, tasks), episodes };
   console.log(`${id}: camera score ${((result.cameraScore ?? 0) * 100).toFixed(1)}%, ring ${((result.footprintScore ?? 0) * 100).toFixed(1)}%, flown ${(result.score * 100).toFixed(1)}%, crashes ${episodes.filter((e) => e.crashed).length}/${episodes.length}`);
   if (outDir) {
     mkdirSync(outDir, { recursive: true });

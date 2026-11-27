@@ -1,6 +1,6 @@
 // Dev sweep for the harsh drift track: fly one pilot on drift tasks under sensor profiles given as JSON.
 //   vite-node scripts/study/drift-harsh-dev.ts -- --pilot planner-view --tasks drift-quad --base 98001 --count 6 --profiles '{"base":{},"r4":{"lidarRange":4}}'
-import { trackRuns, trackTasks, type DriftTrack } from '../../src/bench/hard';
+import { trackRuns, trackTasks, type HardTrack } from '../../src/bench/hard';
 import { runBenchEpisode } from '../../src/bench/run';
 import { createEnv } from '../../src/sim/env';
 import { loadPilot } from '../bench/lib';
@@ -13,7 +13,7 @@ const profiles = JSON.parse(arg('profiles', '{"base":{}}')) as Record<string, ob
 const only = arg('tasks', 'drift-quad').split(',');
 const base = Number(arg('base', '98001'));
 const count = Number(arg('count', '6'));
-const track = arg('track', 'drift') as DriftTrack;
+const track = arg('track', 'drift') as HardTrack;
 const env = await createEnv();
 const { make } = await loadPilot(arg('pilot', 'planner-view'));
 const pilot = await make();
