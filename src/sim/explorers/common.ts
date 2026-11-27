@@ -19,6 +19,8 @@ export interface Explorer {
   /** Flight height above the floor, meters. */
   readonly flyHeight: number;
   reset(): void;
+  /** The drone changed floors (sim/climber.ts). Without it the climber calls reset(). */
+  floorChanged?(): void;
   act(f: SensorFrame): SensorCommand;
 }
 

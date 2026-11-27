@@ -25,7 +25,7 @@ export const HOME_RETURN = { speed: 0.9, reserve: 5, every: 10 } as const;
  * lidar occupancy map. On buildings with more than one floor it takes shafts
  * (sim/climber.ts) between floors.
  */
-export function explorerPilot(name: string, make: (ctx: BenchContext) => Explorer): BenchPilot {
+export function explorerPilot(name: string, make: (ctx: BenchContext) => Explorer): BenchPilot & { climberRef(): Climber | null } {
   const out = new Float32Array(4);
   let ctx: BenchContext = { speedH: 2, maxSteps: 2400, dynamics: 'kinematic' };
   let explorer: Explorer = make(ctx);
@@ -35,6 +35,8 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
   let steps = 0;
   return {
     name,
+    /** The floor switcher of the current flight, once the building has more than one floor (diagnostics). */
+    climberRef: () => climber,
     reset(c) {
       ctx = c;
       explorer = make(c);
@@ -59,7 +61,7 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
         if (homer.homing) return commandToAction(homer.act(frame), f.yaw, out, ctx.speedH).slice();
       }
       if (f.floors > 1) {
-        climber ??= new Climber(explorer, { floorSteps: (0.8 * ctx.maxSteps) / f.floors });
+        climber ??= new Climber(explorer, { floorSteps: (0.8 * ctx.maxSteps) / f.floors, searcher: () => shaftSearcher(ctx) });
         return commandToAction(climber.act(frame, obs[OBS.ceil]! * f.floorHeight), f.yaw, out, ctx.speedH).slice();
       }
       const cmd = explorer.act(frame);
@@ -68,6 +70,15 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
       return commandToAction(cmd, f.yaw, out, ctx.speedH).slice();
     },
   };
+}
+
+/**
+ * The shaft search every explorer pilot shares on multi-floor buildings (sim/climber.ts `searcher`):
+ * the plain sensor-only planner sweeping 1 m lanes of unflown voxels, with the quad tracker and braking on the
+ * quadrotor, so the tasks compare exploration, not stair finding.
+ */
+function shaftSearcher(ctx: BenchContext): Explorer {
+  return new SensorPlanner({ speed: ctx.speedH, lanes: true, ...(ctx.dynamics === 'quad' ? { braking: QUAD_BRAKING, tracker: {} } : {}) });
 }
 
 /**

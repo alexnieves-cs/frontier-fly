@@ -8,11 +8,20 @@
  * nearest such column, climbs or descends it, and explores the next floor.
  * It reads only the sensor frame, so it stays sensor-only.
  */
-import { VOXEL } from '../shared/constants';
+import { MAX_SPEED_V, VOXEL } from '../shared/constants';
 import type { SensorCommand, SensorFrame } from './sensorPlanner';
 import type { Explorer } from './explorers/common';
 import { filterVelocity, SAFETY_MARGIN } from './lidarSafety';
 import { sensorPath } from './sensorMap';
+
+/**
+ * Climb speed in a shaft (MAX_SPEED_V, the airframe's vertical cap) and the gain that eases into the
+ * next floor's flight height. Picked on FrontierBench dev 81401-81420, the 20 dev real homes and
+ * FrontierBench Hard dev floors-quad (was 0.9 m/s and 1.5: +0.1 / +0.5 points flown coverage,
+ * +1.1 points camera footprint on the quadrotor, no new crash).
+ */
+const CLIMB_SPEED = MAX_SPEED_V;
+const CLIMB_GAIN = 3;
 
 /** Range past the ceiling (or below the floor) that marks a shaft, meters. */
 const SHAFT_EXTRA = 0.8;
@@ -75,6 +84,14 @@ export interface ClimberOptions {
    * floor is known: a time share of the flight budget per floor.
    */
   floorSteps?: number;
+  /**
+   * Shaft search: a sweeper of unflown voxels (the plain sensor-only planner) flown when the explorer
+   * has finished a floor, no shaft to a floor never entered is known yet, and such a floor exists.
+   * The up and down range finders only see a shaft from right under or over it, so an explorer that
+   * maps rooms from their doorways (NBVP, nearest frontier) can finish a floor without ever passing
+   * under the stairs. Without it the climber hovers once the explorer is done.
+   */
+  searcher?: () => Explorer;
 }
 
 /** Sensor-only planner (or any Explorer) that also takes shafts between floors. */
@@ -83,6 +100,13 @@ export class Climber {
   readonly stallSteps: number;
   readonly speed: number;
   readonly floorSteps: number;
+  private readonly makeSearcher: (() => Explorer) | null;
+  private searcher: Explorer | null = null;
+  /** Shaft voxels marked so far; the search tries to leave only when it grows. */
+  private marks = 0;
+  private marksTried = -1;
+  /** Steps flown by the shaft search (diagnostics). */
+  searchSteps = 0;
   private onFloor = 0;
   private columnZ = 0;
   private columnStuck = 0;
@@ -92,7 +116,7 @@ export class Climber {
   private done = new Set<number>();
   /** Floors swept at least once; one that is entered but not done was left early and is worth a second visit. */
   private entered = new Set<number>();
-  private phase: 'sweep' | 'route' | 'column' | 'done' = 'sweep';
+  private phase: 'sweep' | 'search' | 'route' | 'column' | 'done' = 'sweep';
   private route: [number, number][] = [];
   private target: { x: number; y: number; to: number } | null = null;
   private visitedLast = 0;
@@ -105,6 +129,7 @@ export class Climber {
     this.stallSteps = opts.stallSteps ?? Infinity;
     this.speed = opts.speed ?? 2;
     this.floorSteps = opts.floorSteps ?? Infinity;
+    this.makeSearcher = opts.searcher ?? null;
   }
 
   reset(): void {
@@ -120,6 +145,10 @@ export class Climber {
     this.sinceNew = 0;
     this.floorChanges = 0;
     this.onFloor = 0;
+    this.searcher = null;
+    this.marks = 0;
+    this.marksTried = -1;
+    this.searchSteps = 0;
   }
 
   get phaseName(): string {
@@ -150,8 +179,14 @@ export class Climber {
     const vy = Math.floor(f.pos[1] / VOXEL);
     if (this.phase !== 'column' && vx >= 0 && vy >= 0 && vx < f.vw && vy < f.vd) {
       const k = floor * f.vw * f.vd + vy * f.vw + vx;
-      if (floor < f.floors - 1 && ceil > f.floorHeight - zf + SHAFT_EXTRA) this.up[k] = 1;
-      if (floor > 0 && f.alt > zf + SHAFT_EXTRA) this.down[k] = 1;
+      if (floor < f.floors - 1 && ceil > f.floorHeight - zf + SHAFT_EXTRA && !this.up[k]) {
+        this.up[k] = 1;
+        this.marks += 1;
+      }
+      if (floor > 0 && f.alt > zf + SHAFT_EXTRA && !this.down[k]) {
+        this.down[k] = 1;
+        this.marks += 1;
+      }
     }
     let visited = 0;
     const base = floor * f.vw * f.vd;
@@ -162,6 +197,7 @@ export class Climber {
 
     if (this.phase === 'column') return this.column(f);
     if (this.phase === 'route') return this.follow(f, floor);
+    if (this.phase === 'search') return this.search(f, floor);
     if (this.phase === 'sweep') {
       this.entered.add(floor);
       const cmd = this.planner.act(f);
@@ -175,11 +211,37 @@ export class Climber {
         this.columnStuck = 0;
         return this.follow(f, floor);
       }
-      // Nowhere to go: if frontiers remain, keep sweeping; otherwise hover.
+      // Nowhere to go: if frontiers remain, keep sweeping; otherwise look for a shaft, or hover.
       if (cmd.exploring) return cmd;
+      if (this.makeSearcher && this.goals(floor, f, true).length > 0) {
+        this.searcher ??= this.makeSearcher();
+        this.marksTried = this.marks;
+        this.phase = 'search';
+        return this.search(f, floor);
+      }
       this.phase = 'done';
     }
     return { vx: 0, vy: 0, vz: 0, yawRate: 0.6, exploring: false };
+  }
+
+  /** Shaft search: sweep unflown voxels until a shaft toward a floor never entered turns up. */
+  private search(f: SensorFrame, floor: number): SensorCommand {
+    if (this.marks !== this.marksTried) {
+      this.marksTried = this.marks;
+      if (this.leave(f, floor, true)) {
+        this.columnStuck = 0;
+        this.searcher!.reset();
+        return this.follow(f, floor);
+      }
+    }
+    const cmd = this.searcher!.act(f);
+    this.searchSteps += 1;
+    if (!cmd.exploring) {
+      // The floor is flown out and no shaft turned up: nothing else to do from here.
+      this.phase = 'done';
+      return { vx: 0, vy: 0, vz: 0, yawRate: 0.6, exploring: false };
+    }
+    return cmd;
   }
 
   /**
@@ -264,7 +326,8 @@ export class Climber {
     }
     if (Math.abs(ez) < 0.08) {
       this.target = null;
-      this.planner.reset();
+      if (this.planner.floorChanged) this.planner.floorChanged();
+      else this.planner.reset();
       this.floorChanges += 1;
       this.phase = 'sweep';
       this.sinceNew = 0;
@@ -273,7 +336,7 @@ export class Climber {
     }
     const vx = Math.max(-0.3, Math.min(0.3, (t.x - f.pos[0]) * 2));
     const vy = Math.max(-0.3, Math.min(0.3, (t.y - f.pos[1]) * 2));
-    // Climb fast through the open column, slow over the last half metre.
-    return { vx, vy, vz: Math.max(-0.9, Math.min(0.9, ez * 1.5)), yawRate: 0, exploring: true };
+    // Climb at the vertical speed cap through the open column, slowing over the last third of a metre.
+    return { vx, vy, vz: Math.max(-CLIMB_SPEED, Math.min(CLIMB_SPEED, ez * CLIMB_GAIN)), yawRate: 0, exploring: true };
   }
 }
