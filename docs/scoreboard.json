@@ -6,56 +6,56 @@
       "short": "View-first planner",
       "house": true,
       "name": "Sensor-only planner, view first",
-      "meanRank": 1.1666666666666667
+      "meanRank": 2
     },
     {
       "id": "info-gain",
       "short": "Information gain",
       "cite": "Gonzalez-Banos & Latombe 2002",
       "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
-      "meanRank": 2.8333333333333335
-    },
-    {
-      "id": "nbvp",
-      "short": "NBVP",
-      "cite": "Bircher et al. 2016",
-      "name": "Next-best-view RRT (NBVP, Bircher et al. 2016)",
-      "meanRank": 3.8333333333333335
+      "meanRank": 2.875
     },
     {
       "id": "rapid-frontier",
       "short": "Rapid frontier",
       "cite": "Cieslewski et al. 2017",
       "name": "Rapid frontier (Cieslewski et al. 2017)",
-      "meanRank": 4.666666666666667
+      "meanRank": 4.25
     },
     {
       "id": "yamauchi",
       "short": "Nearest frontier",
       "cite": "Yamauchi 1997",
       "name": "Nearest frontier (Yamauchi 1997)",
-      "meanRank": 4.666666666666667
+      "meanRank": 4.25
+    },
+    {
+      "id": "nbvp",
+      "short": "NBVP",
+      "cite": "Bircher et al. 2016",
+      "name": "Next-best-view RRT (NBVP, Bircher et al. 2016)",
+      "meanRank": 4.375
     },
     {
       "id": "random-walk",
       "short": "Random walk",
       "floor": true,
       "name": "Random walk",
-      "meanRank": 5.833333333333333
+      "meanRank": 5.5
     },
     {
       "id": "boustrophedon",
       "short": "BA* coverage",
       "cite": "Viet et al. 2013",
       "name": "Boustrophedon coverage (BA*, Viet et al. 2013)",
-      "meanRank": 6.166666666666667
+      "meanRank": 5.625
     },
     {
       "id": "planner-tracker",
       "short": "Sensor-only planner",
       "house": true,
       "name": "Sensor-only planner + quad tracker",
-      "meanRank": 6.833333333333333
+      "meanRank": 7.125
     }
   ],
   "tracks": [
@@ -186,6 +186,45 @@
       "split": "test",
       "controlLabel": "same flights, healthy sensors",
       "run": "npm run bench:hard -- --track sensor --split test --only"
+    },
+    {
+      "id": "overwatch",
+      "label": "Overwatch",
+      "what": "Find a lost person walking through four rooms and keep them in camera view, never closer than 2 m",
+      "unit": "share of the flight the person was in camera view from 2 m or more",
+      "tasks": [
+        "watch-rooms",
+        "watch-quad",
+        "watch-large-quad"
+      ],
+      "seeds": {
+        "base": 151001,
+        "count": 30,
+        "last": 151030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:hard -- --track overwatch --split test --only"
+    },
+    {
+      "id": "integrity",
+      "label": "Integrity",
+      "what": "Fly on the estimate and say when it has gone bad: false confidence costs more than honest doubt",
+      "unit": "integrity score (availability, with false confidence penalized)",
+      "tasks": [
+        "pl-tof-large-quad",
+        "pl-tof-dark-quad",
+        "pl-failing-quad",
+        "pl-quad"
+      ],
+      "seeds": {
+        "base": 161001,
+        "count": 30,
+        "last": 161030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:hard -- --track integrity --split test --only"
     }
   ],
   "cells": {
@@ -832,6 +871,202 @@
         "file": "bench/results/hard-sensor/random-walk.json",
         "best": false
       }
+    },
+    "overwatch": {
+      "planner-view": {
+        "value": 0.5468240740740741,
+        "ci": [
+          0.49839814814814815,
+          0.5936388888888887
+        ],
+        "crashes": 3,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/planner-view.json",
+        "best": false
+      },
+      "planner-tracker": {
+        "value": 0.4076805555555556,
+        "ci": [
+          0.36065277777777777,
+          0.4558055555555556
+        ],
+        "crashes": 5,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.6178333333333333,
+        "ci": [
+          0.5652592592592592,
+          0.6673611111111111
+        ],
+        "crashes": 6,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/info-gain.json",
+        "best": true
+      },
+      "nbvp": {
+        "value": 0.4824259259259258,
+        "ci": [
+          0.4276249999999999,
+          0.5347037037037038
+        ],
+        "crashes": 13,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.5409351851851851,
+        "ci": [
+          0.48665277777777777,
+          0.5974814814814814
+        ],
+        "crashes": 9,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5572685185185186,
+        "ci": [
+          0.5069166666666667,
+          0.6094074074074074
+        ],
+        "crashes": 10,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.4578333333333333,
+        "ci": [
+          0.40797685185185184,
+          0.5107824074074074
+        ],
+        "crashes": 6,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.4715092592592593,
+        "ci": [
+          0.4178611111111112,
+          0.5232222222222223
+        ],
+        "crashes": 6,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/random-walk.json",
+        "best": false
+      }
+    },
+    "integrity": {
+      "planner-view": {
+        "value": 0.5574791666666666,
+        "ci": [
+          0.45159027777777777,
+          0.6516215277777777
+        ],
+        "crashes": 7,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/planner-view.json",
+        "best": false
+      },
+      "planner-tracker": {
+        "value": -0.07883333333333334,
+        "ci": [
+          -0.37188194444444433,
+          0.19518055555555558
+        ],
+        "crashes": 33,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.5694027777777778,
+        "ci": [
+          0.3728159722222222,
+          0.7191840277777778
+        ],
+        "crashes": 45,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.5274409722222222,
+        "ci": [
+          0.3606145833333334,
+          0.6766909722222223
+        ],
+        "crashes": 44,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.7226180555555556,
+        "ci": [
+          0.6301944444444444,
+          0.8054270833333332
+        ],
+        "crashes": 36,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5946909722222222,
+        "ci": [
+          0.45996180555555555,
+          0.7028055555555556
+        ],
+        "crashes": 41,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.8146875,
+        "ci": [
+          0.7039722222222222,
+          0.89690625
+        ],
+        "crashes": 28,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/boustrophedon.json",
+        "best": true
+      },
+      "random-walk": {
+        "value": 0.6618854166666668,
+        "ci": [
+          0.5279722222222222,
+          0.7805486111111111
+        ],
+        "crashes": 34,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/random-walk.json",
+        "best": false
+      }
     }
   },
   "replays": [
@@ -846,7 +1081,7 @@
         "maxSteps": 2400
       },
       "seed": 93101,
-      "commit": "28c6f50",
+      "commit": "1a8aa28",
       "flights": [
         {
           "id": "planner-view",
@@ -856,11 +1091,58 @@
           "result": "bench/results/hard/planner-view.json"
         },
         {
-          "id": "yamauchi",
-          "name": "Nearest frontier (Yamauchi 1997)",
-          "camera": 0.6073667711598746,
+          "id": "info-gain",
+          "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
+          "camera": 0.8311128526645768,
           "crashed": false,
-          "result": "bench/results/hard/yamauchi.json"
+          "result": "bench/results/hard/info-gain.json"
+        },
+        {
+          "id": "random-walk",
+          "name": "Random walk",
+          "camera": 0.3683385579937304,
+          "crashed": false,
+          "result": "bench/results/hard/random-walk.json"
+        }
+      ]
+    },
+    {
+      "file": "docs/replay/overwatch-watch-rooms-151001.json",
+      "track": "overwatch",
+      "task": {
+        "id": "watch-rooms",
+        "label": "Find a lost person and keep them in view, rooms, 120 s",
+        "dynamics": "kinematic",
+        "lighting": "day",
+        "maxSteps": 2400,
+        "person": true
+      },
+      "seed": 151001,
+      "commit": "1a8aa28",
+      "flights": [
+        {
+          "id": "info-gain",
+          "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
+          "camera": 0.7291666666666666,
+          "watch": 0.8370833333333333,
+          "crashed": false,
+          "result": "bench/results/hard-overwatch/info-gain.json"
+        },
+        {
+          "id": "planner-view",
+          "name": "Sensor-only planner, view first",
+          "camera": 0.9599358974358975,
+          "watch": 0.61,
+          "crashed": false,
+          "result": "bench/results/hard-overwatch/planner-view.json"
+        },
+        {
+          "id": "random-walk",
+          "name": "Random walk",
+          "camera": 0.9951923076923077,
+          "watch": 0.40125,
+          "crashed": false,
+          "result": "bench/results/hard-overwatch/random-walk.json"
         }
       ]
     }

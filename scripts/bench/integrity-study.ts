@@ -42,6 +42,8 @@ const variants: Array<{ id: string; label: string; monitor: IntegrityMonitor }> 
 const env = await createEnv();
 const pilot = BASELINES[pilotId]!();
 const flights: Array<{ task: string; seed: number; meanErr: number; maxErr: number; monitors: Record<string, IntegrityStats> }> = [];
+// How the estimator's own health reads while the pose is bad (true error over the alert limit) and while it is good.
+const calib = new Map<string, { bad: number[]; good: number[]; badTracking: number }>();
 const t0 = Date.now();
 for (const [ti, task] of INTEGRITY_TASKS.entries()) {
   for (const run of trackRuns('integrity', split, ti)) {
@@ -61,6 +63,14 @@ for (const [ti, task] of INTEGRITY_TASKS.entries()) {
       if (rec.record(s)) break;
     }
     rec.finish();
+    if (!calib.has(task.id)) calib.set(task.id, { bad: [], good: [], badTracking: 0 });
+    const c = calib.get(task.id)!;
+    for (const st of log) {
+      if (st.err > INTEGRITY.alertLimit) {
+        c.bad.push(st.health.sigmaM);
+        if (st.health.state === 'tracking' && st.health.ok) c.badTracking += 1;
+      } else c.good.push(st.health.sigmaM);
+    }
     if (dump) for (const [i, st] of log.entries()) dumped.push(`${task.id},${run.seed},${i},${st.err.toFixed(4)},${st.health.sigmaM.toFixed(4)},${st.health.sigmaMapM.toFixed(4)},${st.health.sigmaYawRad.toFixed(5)},${st.health.state},${st.health.ok ? 1 : 0}`);
     const monitors: Record<string, IntegrityStats> = {};
     for (const v of variants) {
@@ -91,8 +101,18 @@ const rows = variants.map((v) => {
 for (const r of rows) console.log(`${r.id.padEnd(16)} score ${(r.score * 100).toFixed(1)}%  available ${(r.availability * 100).toFixed(1)}%  HMI ${(r.hmiRate * 100).toFixed(2)}%  caught ${r.caught === null ? 'n/a' : `${(r.caught * 100).toFixed(1)}%`}`);
 const bad = mean(flights.map((f) => f.monitors.always!.badShare));
 console.log(`bad-pose share ${(bad * 100).toFixed(1)}% of steps; flights with an error over ${INTEGRITY.alertLimit} m: ${flights.filter((f) => f.maxErr > INTEGRITY.alertLimit).length}/${flights.length}`);
+const median = (xs: number[]) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)]!;
+};
+const calibration = INTEGRITY_TASKS.map((t) => {
+  const c = calib.get(t.id) ?? { bad: [], good: [], badTracking: 0 };
+  return { task: t.id, badSteps: c.bad.length, sigmaOnBad: median(c.bad), sigmaOnGood: median(c.good), trackingOnBad: c.bad.length ? c.badTracking / c.bad.length : null };
+});
+for (const c of calibration) console.log(`${c.task.padEnd(18)} bad steps ${c.badSteps}  median 1σ bad ${c.sigmaOnBad?.toFixed(2) ?? 'n/a'} m, good ${c.sigmaOnGood?.toFixed(2) ?? 'n/a'} m  tracking while bad ${c.trackingOnBad === null ? 'n/a' : `${(c.trackingOnBad * 100).toFixed(1)}%`}`);
 if (dump) writeFileSync(dump, `task,seed,step,err,sigma,sigmaMap,sigmaYaw,state,ok\n${dumped.join('\n')}\n`);
 if (out) {
   const { base, count } = INTEGRITY_SEEDS[split];
-  writeFileSync(out, `${JSON.stringify({ study: 'integrity', pilot: pilotId, split, seeds: { base, count, perTask: 100 }, commit, rules: INTEGRITY, ks: KS, rows, badShare: bad, flights }, null, 2)}\n`);
+  writeFileSync(out, `${JSON.stringify({ study: 'integrity', pilot: pilotId, split, seeds: { base, count, perTask: 100 }, commit, rules: INTEGRITY, ks: KS, rows, badShare: bad, calibration, flights }, null, 2)}\n`);
 }

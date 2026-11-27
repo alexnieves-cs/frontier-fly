@@ -44,6 +44,10 @@ body { background: var(--ff-bg); }
 .replay-head h2 { margin: 0 0 4px; font: 700 18px var(--film-font); letter-spacing: -0.01em; }
 .replay-head p { margin: 0 0 12px; max-width: 900px; font: 450 13px/1.5 var(--film-font); color: var(--film-muted); }
 .replay-head code { font: 500 12px var(--film-mono); }
+.replay-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.replay-tab { min-height: 40px; padding: 8px 14px; border-radius: 10px; border: 1px solid #2a3a46; background: #0a1218; color: var(--film-muted); font: 600 13.5px var(--film-font); cursor: pointer; }
+.replay-tab[aria-selected="true"] { border-color: var(--film-cyan); color: var(--film-ink); background: #0d1820; }
+.replay-tab:focus-visible { outline: 2px solid var(--film-cyan); outline-offset: 2px; }
 .replay-host { min-height: 280px; }
 .rp-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .rp-lane { margin: 0; padding: 10px; border-radius: 12px; background: var(--film-panel); border: 1px solid var(--film-line); }
@@ -214,6 +218,8 @@ button.btn { cursor: pointer; }
   .pitch { font-size: 15.5px; }
   .proof { flex-direction: column; gap: 4px; }
   .intro, .results, .about, .board, .replay { padding: 18px 16px 20px; }
+  /* The track names stay in view while the pilot columns scroll sideways under them. */
+  .sb-track, .sb-corner { position: sticky; left: 0; z-index: 1; background: linear-gradient(var(--film-panel), var(--film-panel)), var(--ff-bg, #05080b); min-width: 150px; max-width: 160px; box-shadow: 1px 0 0 var(--film-line); }
   .skills { grid-template-columns: minmax(0, 1fr); }
   .foot { padding: 14px 16px 20px; }
   .actions { grid-template-columns: minmax(0, 1fr); }

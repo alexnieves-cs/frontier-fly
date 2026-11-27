@@ -1,6 +1,6 @@
 # frontier-fly
 
-**A search-and-rescue drone autopilot that searches buildings from the treeline to the last room, entirely in your browser, and an honest measurement of how often it is wrong. A sensor-only planner maps and flies without ever reading the floor plan, a failure atlas hunts for its rare mistakes, and a learned policy is tested against the planner, where it wins on a simple airframe and loses on a quadrotor.**
+**FrontierBench: a benchmark for drones that explore buildings they have never seen, and the browser simulator it runs on. Five published exploration methods, a random walk and the house planners fly the same test seeds on eight tracks, and every number below is regenerated from the bench output on each build.**
 
 [![ci](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/ci.yml)
 [![pages](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml/badge.svg)](https://github.com/alexnieves-cs/frontier-fly/actions/workflows/pages.yml)
@@ -18,7 +18,27 @@ Built by **Alex Nieves** · [portfolio](https://alexnieves.me) · [GitHub](https
 
 The drone sweeps a geofenced patch of woods, finds the building, picks an opening it fits through, searches room by room for a missing person or confirms the place is clear, flies home and files a report. Physics, sensors, training and rendering all run in the tab, with no server, and a seed rebuilds the same world exactly. Civilian and defensive use only: it searches, inspects and confirms clear, and never pursues anyone.
 
-## Results
+## FrontierBench scoreboard
+
+<!-- generated:scoreboard:start -->
+| Track (test seeds) | View-first planner | Information gain | Rapid frontier | Nearest frontier | NBVP | Random walk | BA* coverage | Sensor-only planner |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **FrontierBench v3** (82001+, 30 per task × 7) | 67.4% | 13.8% | 9.7% | 8.8% | 27.1% | 47.1% | 65.4% | **68.0%** |
+| **Hard** (93001+, 30 per task × 5) | **86.0%** | 68.0% | 55.0% | 58.4% | 65.6% | 52.0% | 44.6% | 39.5% |
+| **Return** (97001+, 30 per task × 4) | **74.0%** | 62.0% | 50.6% | 53.1% | 49.7% | 37.8% | 32.3% | 26.0% |
+| **Drift** (99001+, 30 per task × 4) | **78.7%** | 63.1% | 55.6% | 51.0% | 55.9% | 44.9% | 41.5% | 36.2% |
+| **Hard drift** (111001+, 30 per task × 4) | **48.1%** | 35.4% | 32.9% | 34.0% | 31.4% | 27.5% | 23.1% | 15.0% |
+| **Degraded sensors** (141001+, 30 per task × 4) | **80.0%** | 50.0% | 48.4% | 47.0% | 53.0% | 42.2% | 46.0% | 30.7% |
+| **Overwatch** (151001+, 30 per task × 3) | 54.7% | **61.8%** | 54.1% | 55.7% | 48.2% | 47.2% | 45.8% | 40.8% |
+| **Integrity** (161001+, 30 per task × 4) | 55.7% | 56.9% | 72.3% | 59.5% | 52.7% | 66.2% | **81.5%** | −7.9% |
+
+Each cell is the mean over the track's tasks of the per-task mean on the test seeds, every pilot on the same flights; bold is the best in the row. V3 scores the share flown through; the frontier and next-best-view methods stop once their lidar has mapped every room, so they rank low there (judge them on the camera tracks). View-first planner: this repository; Information gain: Gonzalez-Banos & Latombe 2002; Rapid frontier: Cieslewski et al. 2017; Nearest frontier: Yamauchi 1997; NBVP: Bircher et al. 2016; Random walk: the floor, no map and no plan; BA* coverage: Viet et al. 2013; Sensor-only planner: this repository. Columns are ordered by mean rank. Intervals, crashes, the control runs and the commit of every cell are in [docs/scoreboard.json](docs/scoreboard.json) and [docs/LEADERBOARD.md](docs/LEADERBOARD.md).
+<!-- generated:scoreboard:end -->
+
+Score your own pilot on any track with `npm run bench:hard -- --pilot bench/entries/<you>/pilot.ts --track <track> --split dev`, then test once; [LEADERBOARD.md](docs/LEADERBOARD.md#submit-an-entry) has the rules, every track's full board and how to submit. The [live scoreboard](https://alexnieves-cs.github.io/frontier-fly/) shows the same numbers with intervals, and replays recorded bench flights in the browser.
+
+## Search-and-rescue results
+
 
 <!-- generated:headline:start -->
 | Question | Measured | On |
@@ -45,7 +65,7 @@ Everything runs in a browser tab, on desktop or phone. Pick the way that suits y
 | Terminal or Docker | The whole mission, FrontierBench and QGroundControl plan export with no browser: `docker run --rm ghcr.io/alexnieves-cs/frontier-fly mission`, see [CLI.md](docs/CLI.md) | Docker, or Node 22 |
 | Python | A Gymnasium env (`gym.make("FrontierFly-hard-v0")`) and the FrontierBench scorer, on the same simulator, install from a checkout (not on PyPI yet), see [python/](python/README.md#install) | Python 3.10+ and Node 22 |
 
-Also: [GitHub Codespaces](https://codespaces.new/alexnieves-cs/frontier-fly?quickstart=1), a real autopilot in the loop ([PX4.md](docs/PX4.md)), and a simulated Crazyflie that has not flown for real yet ([CRAZYFLIE.md](docs/CRAZYFLIE.md)).
+Also: [GitHub Codespaces](https://codespaces.new/alexnieves-cs/frontier-fly?quickstart=1), the PX4 autopilot in the loop in simulation ([PX4.md](docs/PX4.md)), and a simulated Crazyflie model ([CRAZYFLIE.md](docs/CRAZYFLIE.md)).
 
 ```bash
 npm ci && npm run dev   # Node 22, then open http://127.0.0.1:3000
@@ -55,7 +75,7 @@ The [project guide](docs/GUIDE.md) covers the pages, every benchmark table, the 
 
 ## Project status
 
-frontier-fly is at a stable stopping point as of [v1.2.0](CHANGELOG.md): the site, the CLI and Docker image, the Python package and FrontierBench are complete and tested in CI, and no new features or studies are planned. The limits above stay as measured: fewer than half of missions end as expected over a realistic mix of conditions, the false-clear rate is not zero, the learned policy loses to the planner on the quadrotor, and nothing has flown on real hardware. The built-in flight controller also stops the quadrotor in about a quarter of the distance PX4's default gains need on the same physics ([PHYSICS_VALIDATION.md](docs/PHYSICS_VALIDATION.md)), so crash and braking numbers are optimistic for a drone flown by PX4. Bug fixes and dependency updates still land, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send changes or a benchmark entry.
+frontier-fly is a simulation project, by design: every flight on this page is simulated, and flying on real hardware is not planned. The simulator is at a stable point as of [v1.2.0](CHANGELOG.md): the site, the CLI and Docker image and the Python package are complete and tested in CI. New work goes into FrontierBench, under one rule: no capability lands without a scored track and a number attached ([CONTRIBUTING.md](CONTRIBUTING.md#the-benchmark-rule)). The limits above stay as measured: fewer than half of missions end as expected over a realistic mix of conditions, the false-clear rate is not zero, and the learned policy loses to the planner on the quadrotor. The built-in flight controller also stops the quadrotor in about a quarter of the distance PX4's default gains need on the same physics ([PHYSICS_VALIDATION.md](docs/PHYSICS_VALIDATION.md)), so crash and braking numbers are optimistic next to a PX4-flown model. [CONTRIBUTING.md](CONTRIBUTING.md) explains how to send changes or a benchmark entry.
 
 ## About the project
 

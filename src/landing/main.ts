@@ -7,7 +7,7 @@ import { isWebglError } from '../ui/startError';
 import { atlasRates } from '../ui/tour/claims';
 import { pct, results, type PilotResult } from './results';
 import { mountBenchReplay } from './benchReplay';
-import { scoreboard, scoreboardTable } from './scoreboard';
+import { scoreboard, scoreboardTable, type ReplayEntry } from './scoreboard';
 
 const HERO_SCENARIO = 'cabin-day';
 
@@ -33,7 +33,21 @@ function markup(): string {
     )
     .join('');
   const replay = scoreboard.replays[0];
-  const lead = replay ? scoreboard.pilots.find((p) => p.id === replay.flights[0]?.id) : undefined;
+  // Who leads how many rows, from the cells themselves, so the pitch cannot overstate the house pilot.
+  const wins = scoreboard.pilots
+    .map((p) => ({ p, n: scoreboard.tracks.filter((t) => scoreboard.cells[t.id]?.[p.id]?.best).length }))
+    .filter((w) => w.n > 0)
+    .sort((a, b) => b.n - a.n);
+  const others = wins.slice(1).map((w) => w.p.short);
+  const leadLine = wins[0]
+    ? `${wins[0].p.short} leads ${wins[0].n} of ${scoreboard.tracks.length} rows today${others.length ? `; ${others.length === 1 ? others[0] : `${others.slice(0, -1).join(', ')} and ${others.at(-1)}`} ${others.length === 1 && wins[1]!.n === 1 ? 'leads' : 'lead'} the rest` : ''}. Beat it.`
+    : '';
+  const tabs =
+    scoreboard.replays.length > 1
+      ? `<div class="replay-tabs" role="tablist" aria-label="Recorded flights">${scoreboard.replays
+          .map((r, i) => `<button type="button" role="tab" class="replay-tab" data-replay="${i}" aria-selected="${i === 0}" aria-controls="bench-replay">${replayTabLabel(r)}</button>`)
+          .join('')}</div>`
+      : '';
   return `
   <div class="landing">
     ${siteHeader('home', { heading: false })}
@@ -42,9 +56,10 @@ function markup(): string {
         <p class="kicker">FRONTIERBENCH · AN OPEN BENCHMARK, IN SIMULATION</p>
         <h1 id="board-title">Can your planner search a building faster?</h1>
         <p class="board-pitch">
-          Exploration planners for indoor search drones, flown on the same seeded buildings in simulation and scored on how much
-          of each building their camera has in view. Every cell is a measured number read from the bench's result files at
-          build time; none is typed by hand. ${lead ? `${lead.short} leads today. Beat it.` : ''}
+          Exploration planners for indoor search drones, flown on the same seeded buildings in simulation and scored on what a
+          search needs: how much of each building their camera has in view, whether they keep a lost person in view once found,
+          and whether they know when their own position estimate has gone bad. Every cell is a measured number read from the
+          bench's result files at build time; none is typed by hand. ${leadLine}
         </p>
       </div>
       ${scoreboardTable(REPO)}
@@ -60,13 +75,10 @@ function markup(): string {
         ? `<section class="replay" aria-labelledby="replay-title">
       <div class="replay-head">
         <h2 id="replay-title">The same test building, flown by ${replay.flights.length === 1 ? 'one pilot' : `${replay.flights.length} pilots`}</h2>
-        <p>
-          ${replay.track === 'hard' ? 'Hard' : replay.track} track, task <code>${replay.task.id}</code> (${replay.task.label}), seed ${replay.seed}: the task's first
-          test seed, not a picked one. Top-down; lit floor is what each pilot's 90° camera has had in view within 3 m, and each
-          count ends on that flight's score in the result files.
-        </p>
+        <p id="replay-blurb">${replayBlurb(replay)}</p>
       </div>
-      <div class="replay-host" id="bench-replay"></div>
+      ${tabs}
+      <div class="replay-host" id="bench-replay" ${tabs ? 'role="tabpanel"' : ''}></div>
     </section>`
         : ''
     }
@@ -221,10 +233,38 @@ function whenSettledAndVisible(target: HTMLElement, fn: () => void): void {
   else window.addEventListener('load', idle, { once: true });
 }
 
+const TRACK_LABEL: Record<string, string> = { hard: 'Hard', overwatch: 'Overwatch', return: 'Return', drift: 'Drift', 'drift-hard': 'Hard drift', sensor: 'Degraded sensors', integrity: 'Integrity' };
+
+function replayTabLabel(r: ReplayEntry): string {
+  return r.task.person ? 'Keep a lost person in view' : 'Search a building';
+}
+
+function replayBlurb(r: ReplayEntry): string {
+  const where = `${TRACK_LABEL[r.track] ?? r.track} track, task <code>${r.task.id}</code> (${r.task.label}), seed ${r.seed}: the task's first test seed, not a picked one.`;
+  return r.task.person
+    ? `${where} Top-down; the orange dot is the lost person on their walk, and a line joins the drone to them while they are in its 90° camera view from 2 m or more. Each count ends on that flight's score in the result files.`
+    : `${where} Top-down; lit floor is what each pilot's 90° camera has had in view within 3 m, and each count ends on that flight's score in the result files.`;
+}
+
 function start(root: HTMLElement): void {
   root.innerHTML = markup();
   const replayHost = root.querySelector<HTMLElement>('#bench-replay');
-  if (replayHost && scoreboard.replays[0]) mountBenchReplay(replayHost, scoreboard.replays[0], REPO);
+  if (replayHost && scoreboard.replays[0]) {
+    let stop = mountBenchReplay(replayHost, scoreboard.replays[0], REPO);
+    const blurb = root.querySelector<HTMLElement>('#replay-blurb')!;
+    const heading = root.querySelector<HTMLElement>('#replay-title')!;
+    for (const tab of root.querySelectorAll<HTMLButtonElement>('.replay-tab'))
+      tab.addEventListener('click', () => {
+        const r = scoreboard.replays[Number(tab.dataset.replay)]!;
+        for (const t of root.querySelectorAll('.replay-tab')) t.setAttribute('aria-selected', String(t === tab));
+        stop();
+        delete replayHost.dataset.ready;
+        replayHost.innerHTML = '';
+        heading.textContent = `The same test building, flown by ${r.flights.length === 1 ? 'one pilot' : `${r.flights.length} pilots`}`;
+        blurb.innerHTML = replayBlurb(r);
+        stop = mountBenchReplay(replayHost, r, REPO);
+      });
+  }
   // The page is usable now; the hero shows the recorded flight while the live replay loads behind it.
   root.dataset.ready = '1';
   const hero = root.querySelector<HTMLElement>('.hero')!;

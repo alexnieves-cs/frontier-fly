@@ -292,6 +292,16 @@ export class Overwatch {
     this.inView = watched;
   }
 
+  /** Whether the last observed step counted: the person in view from the standoff or further. */
+  get watching(): boolean {
+    return this.inView;
+  }
+
+  /** Where the person stood at the last observed step. */
+  get person(): Vec3 {
+    return this.feet;
+  }
+
   /** The pilot's sighting for the frame it is about to act on, or null. */
   seen(): PersonSighting | null {
     return this.sighting;

@@ -41,6 +41,7 @@ export interface ReplayFlight {
   id: string;
   name: string;
   camera: number;
+  watch?: number;
   crashed: boolean;
   result: string;
 }
@@ -48,7 +49,7 @@ export interface ReplayFlight {
 export interface ReplayEntry {
   file: string;
   track: string;
-  task: { id: string; label: string; dynamics: string; lighting: string; maxSteps: number };
+  task: { id: string; label: string; dynamics: string; lighting: string; maxSteps: number; person?: boolean };
   seed: number;
   commit: string;
   flights: ReplayFlight[];
@@ -61,7 +62,8 @@ export const scoreboard = board as unknown as {
   replays: ReplayEntry[];
 };
 
-const pct = (v: number): string => `${(v * 100).toFixed(1)}%`;
+// A typographic minus for the integrity track, the one score that can go below zero.
+const pct = (v: number): string => `${(v * 100).toFixed(1)}%`.replace(/^-/, '−');
 
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 

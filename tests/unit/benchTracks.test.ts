@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { BASELINES } from '../../src/bench/baselines';
+import { BASELINES, watchLayer } from '../../src/bench/baselines';
 import { HARD_TRACKS, INTEGRITY_TASKS, OVERWATCH_TASKS, trackRuns, trackTasks } from '../../src/bench/hard';
 import { INTEGRITY, IntegrityMeter, MONITORS } from '../../src/bench/integrity';
 import { Overwatch, viewOfPerson, walkerRoute } from '../../src/bench/overwatch';
@@ -7,6 +7,8 @@ import { benchEpisodeSetup, runBenchEpisode } from '../../src/bench/run';
 import { CELL } from '../../src/shared/constants';
 import type { BuildingSpec } from '../../src/shared/types';
 import { createEnv } from '../../src/sim/env';
+import { InformationGainExplorer } from '../../src/sim/explorers/informationGain';
+import { WatchExplorer } from '../../src/sim/explorers/watch';
 import { initPhysics } from '../../src/sim/world';
 
 beforeAll(async () => {
@@ -98,19 +100,30 @@ describe('FrontierBench Hard tracks', () => {
     expect(w.stats(120)).toMatchObject({ score: 30 / 120, kept: 30 / 110 });
   });
 
-  it('flies an overwatch task: the view-first planner’s watch layer keeps the person in view far longer than an explorer', async () => {
+  it('gives every explorer pilot the same watch layer on overwatch tasks, and only there', () => {
+    const frame = { speedH: 2, maxSteps: 2400, dynamics: 'kinematic' as const };
+    const bare = new InformationGainExplorer({ speed: 2 });
+    expect(watchLayer(bare, frame)).toBe(bare);
+    const wrapped = watchLayer(bare, { ...frame, person: true });
+    expect(wrapped).toBeInstanceOf(WatchExplorer);
+    expect(watchLayer(wrapped, { ...frame, person: true })).toBe(wrapped);
+  });
+
+  it('flies an overwatch task: published explorers and the view-first planner all find and watch the person', async () => {
     const task = OVERWATCH_TASKS[0]!;
     const env = await createEnv();
     const run = { seed: 150001 };
-    const watch = runBenchEpisode(env, task, run, BASELINES['planner-view']!());
-    const view = runBenchEpisode(env, task, run, BASELINES['info-gain']!());
-    expect(watch.watch!.found).toBe(true);
-    expect(watch.watch!.score).toBeGreaterThan(view.watch!.score + 0.2);
-    expect(watch.collisions).toBe(0);
+    const house = runBenchEpisode(env, task, run, BASELINES['planner-view']!());
+    const published = runBenchEpisode(env, task, run, BASELINES['info-gain']!());
+    for (const ep of [house, published]) {
+      expect(ep.watch!.found).toBe(true);
+      // The person walks far from take-off: nothing is in view at the start.
+      expect(ep.watch!.findS).toBeGreaterThan(0);
+      expect(ep.watch!.score).toBeGreaterThan(0.4);
+    }
+    expect(house.collisions).toBe(0);
     // Deterministic.
-    expect(runBenchEpisode(env, task, run, BASELINES['planner-view']!()).watch).toEqual(watch.watch);
-    // The person walks far from take-off: nothing is in view at the start.
-    expect(watch.watch!.findS).toBeGreaterThan(0);
+    expect(runBenchEpisode(env, task, run, BASELINES['info-gain']!()).watch).toEqual(published.watch);
     expect(benchEpisodeSetup(task, run).cfg.maxSteps).toBe(2400);
     env.dispose();
   }, 120_000);

@@ -49,12 +49,21 @@ for (const id of pilots) {
   cam.reset(spec);
   const firstSeen = new Int32Array(vw * vd).fill(-1);
   const pose: number[] = [];
+  // Overwatch tasks: where the lost person stood, and whether that step counted (in view from 2 m or more).
+  const person: number[] = [];
+  const watched: number[] = [];
   const look = (step: number) => {
     const s = env.snapshot();
     cam.observe(env.world!, s.pos[0], s.pos[1], s.pos[2], s.yaw);
     const m = cam.seenMask();
     for (let k = 0; k < vw * vd; k++) if (m[k] && firstSeen[k] < 0) firstSeen[k] = step;
-    if (step % every === 0) pose.push(Math.round(s.pos[0] * 100) / 100, Math.round(s.pos[1] * 100) / 100, Math.round(s.yaw * 100) / 100);
+    if (step % every !== 0) return;
+    pose.push(Math.round(s.pos[0] * 100) / 100, Math.round(s.pos[1] * 100) / 100, Math.round(s.yaw * 100) / 100);
+    if (rec.overwatch) {
+      const p = rec.overwatch.person;
+      person.push(Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100);
+      watched.push(step > 0 && rec.overwatch.watching ? 1 : 0);
+    }
   };
   look(0);
   let obs = rec.obs;
@@ -62,12 +71,13 @@ for (const id of pilots) {
   let first = true;
   let step = 0;
   for (;;) {
-    const s = env.step(pilot.act(obs, drift ? drift.frame(obs, first) : sensorFrame(env, obs)));
+    const s = env.step(pilot.act(obs, rec.decorate(drift ? drift.frame(obs, first) : sensorFrame(env, obs))));
     first = false;
     obs = s.obs;
     step += 1;
+    const over = rec.record(s);
     look(step);
-    if (rec.record(s)) break;
+    if (over) break;
   }
   await pilot.close?.();
   const ep = rec.finish();
@@ -77,17 +87,31 @@ for (const id of pilots) {
   const file = `${dir}/${id}.json`;
   let matches: boolean | null = null;
   if (existsSync(file)) {
-    const r = JSON.parse(readFileSync(file, 'utf8')) as { episodes: { task: string; seed: number; camera: { footprint: number } }[] };
+    const r = JSON.parse(readFileSync(file, 'utf8')) as { episodes: { task: string; seed: number; camera: { footprint: number }; watch?: { score: number } }[] };
     const e = r.episodes.find((x) => x.task === task.id && x.seed === seed);
-    matches = e ? Math.abs(e.camera.footprint - ep.camera!.footprint) < 1e-9 : null;
+    matches = e ? Math.abs(e.camera.footprint - ep.camera!.footprint) < 1e-9 && (!ep.watch || Math.abs(e.watch!.score - ep.watch.score) < 1e-9) : null;
   }
-  console.log(`${id}: camera ${(ep.camera!.footprint * 100).toFixed(1)}%, ${ep.steps} steps, crashed ${ep.crashed}, matches ${file}: ${matches}`);
-  traces.push({ id, name: pilot.name, source, camera: ep.camera!.footprint, crashed: ep.crashed, collisions: ep.collisions, steps: ep.steps, ...(ep.returned === undefined ? {} : { returned: ep.returned }), matchesResult: matches, every, pose, firstSeen: Array.from(firstSeen) });
+  console.log(`${id}: camera ${(ep.camera!.footprint * 100).toFixed(1)}%${ep.watch ? `, person in view ${(ep.watch.score * 100).toFixed(1)}%` : ''}, ${ep.steps} steps, crashed ${ep.crashed}, matches ${file}: ${matches}`);
+  traces.push({
+    id,
+    name: pilot.name,
+    source,
+    camera: ep.camera!.footprint,
+    ...(ep.watch ? { watch: ep.watch.score, found: ep.watch.found, person, watched } : {}),
+    crashed: ep.crashed,
+    collisions: ep.collisions,
+    steps: ep.steps,
+    ...(ep.returned === undefined ? {} : { returned: ep.returned }),
+    matchesResult: matches,
+    every,
+    pose,
+    firstSeen: Array.from(firstSeen),
+  });
 }
 env.dispose();
 mkdirSync('docs/replay', { recursive: true });
 const name = `${track}-${task.id}-${seed}`;
-const out = { track, task: { id: task.id, label: task.label, dynamics: task.dynamics, lighting: task.lighting, maxSteps: task.maxSteps ?? 2400 }, seed, split: 'test', commit, voxel: 0.5, vw, vd, reachable: Array.from(reachable), traces };
+const out = { track, task: { id: task.id, label: task.label, dynamics: task.dynamics, lighting: task.lighting, maxSteps: task.maxSteps ?? 2400, ...(task.person ? { person: true } : {}) }, seed, split: 'test', commit, voxel: 0.5, vw, vd, reachable: Array.from(reachable), traces };
 writeFileSync(`docs/replay/${name}.json`, `${JSON.stringify(out)}\n`);
 const indexPath = 'docs/replay/index.json';
 const index = existsSync(indexPath) ? (JSON.parse(readFileSync(indexPath, 'utf8')) as { file: string }[]) : [];

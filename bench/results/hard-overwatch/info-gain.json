@@ -1,0 +1,2878 @@
+{
+  "hard": 1,
+  "track": "overwatch",
+  "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
+  "source": "baseline:info-gain",
+  "split": "test",
+  "commit": "1a8aa28",
+  "baseline": true,
+  "taskDefs": [
+    {
+      "id": "watch-rooms",
+      "label": "Find a lost person and keep them in view, rooms, 120 s",
+      "stage": 3,
+      "dynamics": "kinematic",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 0,
+      "maxSteps": 2400,
+      "camera": true,
+      "person": true
+    },
+    {
+      "id": "watch-quad",
+      "label": "Find a lost person and keep them in view, rooms, quadrotor, 120 s",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 1,
+      "maxSteps": 2400,
+      "camera": true,
+      "person": true
+    },
+    {
+      "id": "watch-large-quad",
+      "label": "Find a lost person and keep them in view, 40 x 40 m, quadrotor, 120 s",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 1,
+      "large": true,
+      "maxSteps": 2400,
+      "camera": true,
+      "person": true
+    }
+  ],
+  "score": 0.14250516396832896,
+  "footprintScore": 0.6882888888888888,
+  "cameraScore": 0.5957044883847987,
+  "watchScore": 0.6178333333333333,
+  "safeShare": 0.9333333333333333,
+  "crashShare": 0.06666666666666667,
+  "tasks": {
+    "watch-rooms": {
+      "episodes": 30,
+      "coverage": 0.1610374492315949,
+      "coverageCi": [
+        0.13813877485179243,
+        0.18336668949784818
+      ],
+      "collisionsPerEpisode": 0,
+      "safeFlights": 30,
+      "crashedFlights": 0,
+      "energyWh": 3.676822795976114,
+      "halfS": null,
+      "footprint": 0.7750133333333333,
+      "footprintCi": [
+        0.7009866666666665,
+        0.8449333333333333
+      ],
+      "area": {
+        "flown": 0.11023116666666666,
+        "footprint": 0.6543326666666667
+      },
+      "footprintHalfS": 19.978786998483955,
+      "camera": 0.664642266015366,
+      "cameraCi": [
+        0.5834824924790809,
+        0.7400089380461694
+      ],
+      "cameraArea": 0.5357919543303431,
+      "cameraHalfS": 35.21558079830888,
+      "watch": 0.7225555555555554,
+      "watchCi": [
+        0.6493749999999999,
+        0.7905694444444443
+      ],
+      "found": 30,
+      "findS": 6.786666666666668,
+      "kept": 0.7607802797592865,
+      "reacquireS": 2.484821428571429,
+      "breachS": 0.9383333333333334
+    },
+    "watch-quad": {
+      "episodes": 30,
+      "coverage": 0.18003667146704613,
+      "coverageCi": [
+        0.16067629526547608,
+        0.19913177609592508
+      ],
+      "collisionsPerEpisode": 0.06666666666666667,
+      "safeFlights": 28,
+      "crashedFlights": 2,
+      "energyWh": 3.526015803992392,
+      "halfS": null,
+      "footprint": 0.82148,
+      "footprintCi": [
+        0.7605433333333333,
+        0.8755299999999998
+      ],
+      "area": {
+        "flown": 0.124909,
+        "footprint": 0.7173156666666666
+      },
+      "footprintHalfS": 18.896644073896073,
+      "camera": 0.7121727768289429,
+      "cameraCi": [
+        0.6480213344339596,
+        0.7702735113857879
+      ],
+      "cameraArea": 0.5981922558021809,
+      "cameraHalfS": 28.388551205137542,
+      "watch": 0.7090138888888889,
+      "watchCi": [
+        0.6140277777777777,
+        0.7942083333333335
+      ],
+      "found": 29,
+      "findS": 7.081034482758621,
+      "kept": 0.7772137916853483,
+      "reacquireS": 3.0231481481481475,
+      "breachS": 1.2666666666666666
+    },
+    "watch-large-quad": {
+      "episodes": 30,
+      "coverage": 0.08644137120634582,
+      "coverageCi": [
+        0.07293915322378802,
+        0.09986448149660854
+      ],
+      "collisionsPerEpisode": 0.13333333333333333,
+      "safeFlights": 26,
+      "crashedFlights": 4,
+      "energyWh": 3.3398487723964516,
+      "halfS": null,
+      "footprint": 0.46837333333333336,
+      "footprintCi": [
+        0.3935366666666667,
+        0.5445666666666666
+      ],
+      "area": {
+        "flown": 0.05634433333333335,
+        "footprint": 0.3435948333333333
+      },
+      "footprintHalfS": 59.832149860645636,
+      "camera": 0.41029842231008745,
+      "cameraCi": [
+        0.3407953913392612,
+        0.48150414939487163
+      ],
+      "cameraArea": 0.29244077480211966,
+      "cameraHalfS": 66.81337195269664,
+      "watch": 0.4219305555555556,
+      "watchCi": [
+        0.3176388888888889,
+        0.526986111111111
+      ],
+      "found": 25,
+      "findS": 40.966,
+      "kept": 0.7642113354386553,
+      "reacquireS": 5.157499999999999,
+      "breachS": 0.9816666666666666
+    }
+  },
+  "episodes": [
+    {
+      "task": "watch-rooms",
+      "seed": 151001,
+      "coverage": 0.18108974358974358,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6779074817639925,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8173,
+      "area": {
+        "flown": 0.11506999999999998,
+        "footprint": 0.6140199999999999
+      },
+      "footprintHalfS": 45.17647058823529,
+      "camera": {
+        "footprint": 0.7291666666666666,
+        "area": 0.5334134615384614,
+        "halfS": 54.765957446808514
+      },
+      "watch": {
+        "score": 0.8370833333333333,
+        "found": true,
+        "findS": 2.45,
+        "kept": 0.8541666666666666,
+        "losses": 26,
+        "reacquireS": 0.1,
+        "breachS": 0.85
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151002,
+      "coverage": 0.23106060606060605,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.695095719822729,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9981,
+      "area": {
+        "flown": 0.15389000000000003,
+        "footprint": 0.8477250000000002
+      },
+      "footprintHalfS": 6.264011116257527,
+      "camera": {
+        "footprint": 0.8181818181818182,
+        "area": 0.6838068181818182,
+        "halfS": 10.745454545454546
+      },
+      "watch": {
+        "score": 0.5725,
+        "found": true,
+        "findS": 6.7,
+        "kept": 0.6060873400970446,
+        "losses": 15,
+        "reacquireS": 0.05,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151003,
+      "coverage": 0.2469879518072289,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6514171783512084,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9307,
+      "area": {
+        "flown": 0.19013500000000003,
+        "footprint": 0.8807050000000001
+      },
+      "footprintHalfS": 7.757128480375712,
+      "camera": {
+        "footprint": 0.8509036144578314,
+        "area": 0.7639307228915663,
+        "halfS": 11.25
+      },
+      "watch": {
+        "score": 0.42791666666666667,
+        "found": true,
+        "findS": 31.85,
+        "kept": 0.5821995464852607,
+        "losses": 3,
+        "reacquireS": 0.15,
+        "breachS": 1.55
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151004,
+      "coverage": 0.04807692307692308,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6700126249381184,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4107,
+      "area": {
+        "flown": 0.043335000000000005,
+        "footprint": 0.3983450000000001
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.28983516483516486,
+        "area": 0.27925824175824177,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9583333333333334,
+        "found": true,
+        "findS": 1.3,
+        "kept": 0.968421052631579,
+        "losses": 11,
+        "reacquireS": 0.2,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151005,
+      "coverage": 0.19387755102040816,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6688893801834546,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9324,
+      "area": {
+        "flown": 0.147075,
+        "footprint": 0.8229649999999997
+      },
+      "footprintHalfS": 8.610740885927086,
+      "camera": {
+        "footprint": 0.8354591836734694,
+        "area": 0.7231505102040817,
+        "halfS": 11.793103448275861
+      },
+      "watch": {
+        "score": 0.54625,
+        "found": true,
+        "findS": 20.95,
+        "kept": 0.6614530776992936,
+        "losses": 7,
+        "reacquireS": 0.075,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151006,
+      "coverage": 0.20833333333333334,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.705370992763778,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9489,
+      "area": {
+        "flown": 0.129735,
+        "footprint": 0.7220849999999999
+      },
+      "footprintHalfS": 26.354716981132075,
+      "camera": {
+        "footprint": 0.8181818181818182,
+        "area": 0.5993371212121212,
+        "halfS": 47.166666666666664
+      },
+      "watch": {
+        "score": 0.88125,
+        "found": true,
+        "findS": 1.65,
+        "kept": 0.8931587837837838,
+        "losses": 21,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151007,
+      "coverage": 0.23345588235294118,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6811252696290624,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9007,
+      "area": {
+        "flown": 0.137065,
+        "footprint": 0.56067
+      },
+      "footprintHalfS": 48.10131332082552,
+      "camera": {
+        "footprint": 0.7867647058823529,
+        "area": 0.4964154411764704,
+        "halfS": 50.125
+      },
+      "watch": {
+        "score": 0.6579166666666667,
+        "found": true,
+        "findS": 2.2,
+        "kept": 0.669919389053882,
+        "losses": 12,
+        "reacquireS": 0.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151008,
+      "coverage": 0.23106060606060605,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.627287798179471,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9053,
+      "area": {
+        "flown": 0.14622000000000002,
+        "footprint": 0.6596550000000001
+      },
+      "footprintHalfS": 5.76036866359447,
+      "camera": {
+        "footprint": 0.8200757575757576,
+        "area": 0.549810606060606,
+        "halfS": 55.875
+      },
+      "watch": {
+        "score": 0.5133333333333333,
+        "found": true,
+        "findS": 5.35,
+        "kept": 0.5370531822144725,
+        "losses": 8,
+        "reacquireS": 0.1,
+        "breachS": 2.6
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151009,
+      "coverage": 0.22321428571428573,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6705831964448277,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8714,
+      "area": {
+        "flown": 0.14275500000000002,
+        "footprint": 0.83339
+      },
+      "footprintHalfS": 6.45422943221321,
+      "camera": {
+        "footprint": 0.7910714285714285,
+        "area": 0.7148214285714286,
+        "halfS": 11.357142857142856
+      },
+      "watch": {
+        "score": 0.6791666666666667,
+        "found": true,
+        "findS": 8.95,
+        "kept": 0.7335733573357336,
+        "losses": 16,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151010,
+      "coverage": 0.1852409638554217,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7068978171815026,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8554,
+      "area": {
+        "flown": 0.12168499999999997,
+        "footprint": 0.7247799999999999
+      },
+      "footprintHalfS": 7.8318240620957305,
+      "camera": {
+        "footprint": 0.7108433734939759,
+        "area": 0.569051204819277,
+        "halfS": 43.71428571428571
+      },
+      "watch": {
+        "score": 0.8420833333333333,
+        "found": true,
+        "findS": 10.3,
+        "kept": 0.9207289293849659,
+        "losses": 30,
+        "reacquireS": 0.05,
+        "breachS": 2.7
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151011,
+      "coverage": 0.15357142857142858,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7225982982094186,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8804,
+      "area": {
+        "flown": 0.11723999999999998,
+        "footprint": 0.793515
+      },
+      "footprintHalfS": 11.15485564304462,
+      "camera": {
+        "footprint": 0.8017857142857143,
+        "area": 0.6740178571428572,
+        "halfS": 27.831932773109244
+      },
+      "watch": {
+        "score": 0.6825,
+        "found": true,
+        "findS": 3.95,
+        "kept": 0.7054263565891473,
+        "losses": 23,
+        "reacquireS": 0.175,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151012,
+      "coverage": 0.17838541666666666,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.748132621812081,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9466,
+      "area": {
+        "flown": 0.10260499999999999,
+        "footprint": 0.7052149999999999
+      },
+      "footprintHalfS": 25.90909090909091,
+      "camera": {
+        "footprint": 0.8138020833333334,
+        "area": 0.5577473958333334,
+        "halfS": 53.7
+      },
+      "watch": {
+        "score": 0.7275,
+        "found": true,
+        "findS": 7.05,
+        "kept": 0.772566371681416,
+        "losses": 19,
+        "reacquireS": 0.2,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151013,
+      "coverage": 0.1390625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.627709411461626,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8719,
+      "area": {
+        "flown": 0.09259500000000001,
+        "footprint": 0.6714249999999999
+      },
+      "footprintHalfS": 16.113345521023767,
+      "camera": {
+        "footprint": 0.7109375,
+        "area": 0.5057031249999999,
+        "halfS": 81.94736842105263
+      },
+      "watch": {
+        "score": 0.40791666666666665,
+        "found": true,
+        "findS": 1.85,
+        "kept": 0.41412859560067683,
+        "losses": 7,
+        "reacquireS": 0.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151014,
+      "coverage": 0.23035714285714284,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6725066868750758,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9054,
+      "area": {
+        "flown": 0.142865,
+        "footprint": 0.7282300000000002
+      },
+      "footprintHalfS": 5.9159929008085195,
+      "camera": {
+        "footprint": 0.8321428571428572,
+        "area": 0.6358035714285715,
+        "halfS": 41
+      },
+      "watch": {
+        "score": 0.82625,
+        "found": true,
+        "findS": 5.4,
+        "kept": 0.8648059310946359,
+        "losses": 3,
+        "reacquireS": 2.8,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151015,
+      "coverage": 0.05067567567567568,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6574260916863897,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3615,
+      "area": {
+        "flown": 0.044354999999999985,
+        "footprint": 0.35001500000000013
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.2195945945945946,
+        "area": 0.20793918918918922,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9995833333333334,
+        "found": true,
+        "findS": 0.1,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151016,
+      "coverage": 0.050824175824175824,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.682288322253017,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4093,
+      "area": {
+        "flown": 0.047339999999999986,
+        "footprint": 0.39943
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.28983516483516486,
+        "area": 0.2823489010989011,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9579166666666666,
+        "found": true,
+        "findS": 1.3,
+        "kept": 0.968,
+        "losses": 14,
+        "reacquireS": 0.175,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151017,
+      "coverage": 0.08783783783783784,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6921403306187863,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4679,
+      "area": {
+        "flown": 0.06807500000000002,
+        "footprint": 0.4356400000000001
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.2989864864864865,
+        "area": 0.2743243243243244,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9066666666666666,
+        "found": true,
+        "findS": 2.3,
+        "kept": 0.9239915074309979,
+        "losses": 5,
+        "reacquireS": 0.65,
+        "breachS": 3.45
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151018,
+      "coverage": 0.1722560975609756,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.666278018194577,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7957,
+      "area": {
+        "flown": 0.11226499999999999,
+        "footprint": 0.71218
+      },
+      "footprintHalfS": 7.091451292246521,
+      "camera": {
+        "footprint": 0.698170731707317,
+        "area": 0.6141006097560975,
+        "halfS": 9.894736842105262
+      },
+      "watch": {
+        "score": 0.8725,
+        "found": true,
+        "findS": 9.55,
+        "kept": 0.9475113122171945,
+        "losses": 7,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151019,
+      "coverage": 0.19886363636363635,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6688950943809395,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9129,
+      "area": {
+        "flown": 0.12737000000000004,
+        "footprint": 0.5920300000000001
+      },
+      "footprintHalfS": 73.25274725274726,
+      "camera": {
+        "footprint": 0.8181818181818182,
+        "area": 0.48522727272727273,
+        "halfS": 81.75
+      },
+      "watch": {
+        "score": 0.6508333333333334,
+        "found": true,
+        "findS": 6.8,
+        "kept": 0.6896247240618102,
+        "losses": 14,
+        "reacquireS": 0.1,
+        "breachS": 0.35
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151020,
+      "coverage": 0.16581632653061223,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.634941208815385,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.889,
+      "area": {
+        "flown": 0.122695,
+        "footprint": 0.8173899999999998
+      },
+      "footprintHalfS": 9.309090909090909,
+      "camera": {
+        "footprint": 0.8214285714285714,
+        "area": 0.7408163265306121,
+        "halfS": 13.25581395348837
+      },
+      "watch": {
+        "score": 0.3233333333333333,
+        "found": true,
+        "findS": 25.6,
+        "kept": 0.4107993647432504,
+        "losses": 2,
+        "reacquireS": 27.825,
+        "breachS": 3.1
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151021,
+      "coverage": 0.11148648648648649,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6668487215859242,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5709,
+      "area": {
+        "flown": 0.07423999999999999,
+        "footprint": 0.491875
+      },
+      "footprintHalfS": 48,
+      "camera": {
+        "footprint": 0.375,
+        "area": 0.31621621621621626,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.89625,
+        "found": true,
+        "findS": 2.3,
+        "kept": 0.913375796178344,
+        "losses": 2,
+        "reacquireS": 5.1,
+        "breachS": 6.75
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151022,
+      "coverage": 0.08928571428571429,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6838685814682766,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4588,
+      "area": {
+        "flown": 0.06380000000000001,
+        "footprint": 0.42019499999999993
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.26785714285714285,
+        "area": 0.24581043956043955,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9158333333333334,
+        "found": true,
+        "findS": 2.3,
+        "kept": 0.9333333333333333,
+        "losses": 6,
+        "reacquireS": 0.4,
+        "breachS": 1.5
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151023,
+      "coverage": 0.16428571428571428,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7001720806883847,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8393,
+      "area": {
+        "flown": 0.13187499999999996,
+        "footprint": 0.8108999999999998
+      },
+      "footprintHalfS": 5.8950677932796225,
+      "camera": {
+        "footprint": 0.7767857142857143,
+        "area": 0.7001785714285714,
+        "halfS": 14
+      },
+      "watch": {
+        "score": 0.6920833333333334,
+        "found": true,
+        "findS": 10,
+        "kept": 0.7546569741026806,
+        "losses": 10,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151024,
+      "coverage": 0.07601351351351351,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6716498721226736,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5355,
+      "area": {
+        "flown": 0.06619,
+        "footprint": 0.5137800000000001
+      },
+      "footprintHalfS": 36.30177514792899,
+      "camera": {
+        "footprint": 0.40540540540540543,
+        "area": 0.38673986486486484,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.89875,
+        "found": true,
+        "findS": 3.9,
+        "kept": 0.928540680154972,
+        "losses": 7,
+        "reacquireS": 0.7,
+        "breachS": 2.5
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151025,
+      "coverage": 0.21354166666666666,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.673425952075474,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9909,
+      "area": {
+        "flown": 0.123885,
+        "footprint": 0.69402
+      },
+      "footprintHalfS": 40.66666666666665,
+      "camera": {
+        "footprint": 0.9817708333333334,
+        "area": 0.6376302083333335,
+        "halfS": 61.46031746031746
+      },
+      "watch": {
+        "score": 0.3254166666666667,
+        "found": true,
+        "findS": 4.75,
+        "kept": 0.33868169991326974,
+        "losses": 13,
+        "reacquireS": 0.125,
+        "breachS": 2.55
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151026,
+      "coverage": 0.19444444444444445,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6733929680715307,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8222,
+      "area": {
+        "flown": 0.13283999999999996,
+        "footprint": 0.7486000000000002
+      },
+      "footprintHalfS": 19.194271024605214,
+      "camera": {
+        "footprint": 0.6875,
+        "area": 0.6087499999999999,
+        "halfS": 22.464285714285715
+      },
+      "watch": {
+        "score": 0.6370833333333333,
+        "found": true,
+        "findS": 2.85,
+        "kept": 0.6523037542662116,
+        "losses": 12,
+        "reacquireS": 0.1,
+        "breachS": 0.25
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151027,
+      "coverage": 0.04391891891891892,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.662651177739924,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3868,
+      "area": {
+        "flown": 0.03166,
+        "footprint": 0.3730699999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3125,
+        "area": 0.2974662162162163,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9958333333333333,
+        "found": true,
+        "findS": 0.55,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151028,
+      "coverage": 0.23106060606060605,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7064312685004275,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9318,
+      "area": {
+        "flown": 0.139005,
+        "footprint": 0.708905
+      },
+      "footprintHalfS": 5.462490895848506,
+      "camera": {
+        "footprint": 0.8484848484848485,
+        "area": 0.6073863636363634,
+        "halfS": 39.88235294117647
+      },
+      "watch": {
+        "score": 0.7891666666666667,
+        "found": true,
+        "findS": 4.9,
+        "kept": 0.822405557967868,
+        "losses": 26,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151029,
+      "coverage": 0.13392857142857142,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.61901569216007,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.875,
+      "area": {
+        "flown": 0.10813500000000002,
+        "footprint": 0.811515
+      },
+      "footprintHalfS": 5.853658536585367,
+      "camera": {
+        "footprint": 0.7892857142857143,
+        "area": 0.6964285714285715,
+        "halfS": 20
+      },
+      "watch": {
+        "score": 0.46166666666666667,
+        "found": true,
+        "findS": 5.55,
+        "kept": 0.48384279475982533,
+        "losses": 2,
+        "reacquireS": 29.55,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-rooms",
+      "seed": 151030,
+      "coverage": 0.16310975609756098,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7197240213053013,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8277,
+      "area": {
+        "flown": 0.13093500000000002,
+        "footprint": 0.78771
+      },
+      "footprintHalfS": 7.059579939991427,
+      "camera": {
+        "footprint": 0.739329268292683,
+        "area": 0.686128048780488,
+        "halfS": 10.763358778625955
+      },
+      "watch": {
+        "score": 0.79375,
+        "found": true,
+        "findS": 10.9,
+        "kept": 0.8726523133302795,
+        "losses": 23,
+        "reacquireS": 0.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151101,
+      "coverage": 0.17857142857142858,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.5985050815920303,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9143,
+      "area": {
+        "flown": 0.13859,
+        "footprint": 0.8170650000000004
+      },
+      "footprintHalfS": 6.532894736842106,
+      "camera": {
+        "footprint": 0.7875,
+        "area": 0.6866071428571427,
+        "halfS": 20.999999999999996
+      },
+      "watch": {
+        "score": 0.14666666666666667,
+        "found": true,
+        "findS": 3.5,
+        "kept": 0.15100815100815101,
+        "losses": 1,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151102,
+      "coverage": 0.2224025974025974,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6533456254653007,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9351,
+      "area": {
+        "flown": 0.10949,
+        "footprint": 0.613565
+      },
+      "footprintHalfS": 42.80082135523614,
+      "camera": {
+        "footprint": 0.8993506493506493,
+        "area": 0.56875,
+        "halfS": 44
+      },
+      "watch": {
+        "score": 0.5170833333333333,
+        "found": true,
+        "findS": 1.55,
+        "kept": 0.5236286919831223,
+        "losses": 3,
+        "reacquireS": 11.325,
+        "breachS": 2.35
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151103,
+      "coverage": 0.13175675675675674,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6854469505326164,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6723,
+      "area": {
+        "flown": 0.109725,
+        "footprint": 0.6352249999999999
+      },
+      "footprintHalfS": 7.148063781321187,
+      "camera": {
+        "footprint": 0.48986486486486486,
+        "area": 0.458108108108108,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.8579166666666667,
+        "found": true,
+        "findS": 11.2,
+        "kept": 0.9457969683050069,
+        "losses": 12,
+        "reacquireS": 0.3,
+        "breachS": 0.95
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151104,
+      "coverage": 0.2196969696969697,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7081488956141873,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9564,
+      "area": {
+        "flown": 0.130025,
+        "footprint": 0.7531100000000001
+      },
+      "footprintHalfS": 26.548812664907654,
+      "camera": {
+        "footprint": 0.8428030303030303,
+        "area": 0.6314393939393941,
+        "halfS": 37.714285714285715
+      },
+      "watch": {
+        "score": 0.9058333333333334,
+        "found": true,
+        "findS": 1.45,
+        "kept": 0.9165261382799326,
+        "losses": 4,
+        "reacquireS": 1.775,
+        "breachS": 4.5
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151105,
+      "coverage": 0.08952702702702703,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.701911099588386,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5608,
+      "area": {
+        "flown": 0.08182999999999997,
+        "footprint": 0.5512600000000003
+      },
+      "footprintHalfS": 13.4592,
+      "camera": {
+        "footprint": 0.43074324324324326,
+        "area": 0.4222128378378379,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9204166666666667,
+        "found": true,
+        "findS": 6.3,
+        "kept": 0.970989010989011,
+        "losses": 5,
+        "reacquireS": 0.85,
+        "breachS": 1.15
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151106,
+      "coverage": 0.17307692307692307,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7063878621651383,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9066,
+      "area": {
+        "flown": 0.11099499999999998,
+        "footprint": 0.6852399999999997
+      },
+      "footprintHalfS": 16.987951807228946,
+      "camera": {
+        "footprint": 0.7980769230769231,
+        "area": 0.5940247252747253,
+        "halfS": 50.73913043478261
+      },
+      "watch": {
+        "score": 0.8808333333333334,
+        "found": true,
+        "findS": 6.2,
+        "kept": 0.9284145805884936,
+        "losses": 7,
+        "reacquireS": 0.25,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151107,
+      "coverage": 0.1890625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.652536429705515,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9516,
+      "area": {
+        "flown": 0.13392999999999997,
+        "footprint": 0.7496149999999997
+      },
+      "footprintHalfS": 8.659420289855074,
+      "camera": {
+        "footprint": 0.834375,
+        "area": 0.6182031249999999,
+        "halfS": 50.25
+      },
+      "watch": {
+        "score": 0.48833333333333334,
+        "found": true,
+        "findS": 11.4,
+        "kept": 0.5393465255407272,
+        "losses": 10,
+        "reacquireS": 0.55,
+        "breachS": 1.45
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151108,
+      "coverage": 0.19886363636363635,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.717982473198248,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7367,
+      "area": {
+        "flown": 0.1285,
+        "footprint": 0.6498050000000001
+      },
+      "footprintHalfS": 5.932370970931382,
+      "camera": {
+        "footprint": 0.6590909090909091,
+        "area": 0.5407196969696969,
+        "halfS": 38.199999999999996
+      },
+      "watch": {
+        "score": 0.9354166666666667,
+        "found": true,
+        "findS": 4.4,
+        "kept": 0.9706009511456982,
+        "losses": 2,
+        "reacquireS": 1.7,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151109,
+      "coverage": 0.24242424242424243,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8618600013959923,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9129,
+      "area": {
+        "flown": 0.149525,
+        "footprint": 0.7446950000000002
+      },
+      "footprintHalfS": 5.781460782424359,
+      "camera": {
+        "footprint": 0.8295454545454546,
+        "area": 0.6548295454545456,
+        "halfS": 42.1875
+      },
+      "watch": {
+        "score": 0.8420833333333333,
+        "found": true,
+        "findS": 5.45,
+        "kept": 0.881762652705061,
+        "losses": 8,
+        "reacquireS": 0.45,
+        "breachS": 8.25
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151110,
+      "coverage": 0.14540816326530612,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6925402967429077,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7436,
+      "area": {
+        "flown": 0.11237,
+        "footprint": 0.7006900000000001
+      },
+      "footprintHalfS": 10.069660861594866,
+      "camera": {
+        "footprint": 0.6173469387755102,
+        "area": 0.5660076530612245,
+        "halfS": 19.200000000000003
+      },
+      "watch": {
+        "score": 0.7716666666666666,
+        "found": true,
+        "findS": 11.1,
+        "kept": 0.8499311610830657,
+        "losses": 7,
+        "reacquireS": 0.45,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151111,
+      "coverage": 0.1917808219178082,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7251060376745753,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9161,
+      "area": {
+        "flown": 0.112585,
+        "footprint": 0.657715
+      },
+      "footprintHalfS": 46.86098130841121,
+      "camera": {
+        "footprint": 0.8441780821917808,
+        "area": 0.5886130136986303,
+        "halfS": 49.4025974025974
+      },
+      "watch": {
+        "score": 0.675,
+        "found": true,
+        "findS": 0.95,
+        "kept": 0.6801007556675063,
+        "losses": 10,
+        "reacquireS": 0.225,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151112,
+      "coverage": 0.22128378378378377,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.68766463618525,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9645,
+      "area": {
+        "flown": 0.158605,
+        "footprint": 0.9203349999999997
+      },
+      "footprintHalfS": 7.328298887122417,
+      "camera": {
+        "footprint": 0.8513513513513513,
+        "area": 0.801351351351351,
+        "halfS": 10.057553956834532
+      },
+      "watch": {
+        "score": 0.8366666666666667,
+        "found": true,
+        "findS": 16.15,
+        "kept": 0.9663137632338787,
+        "losses": 1,
+        "reacquireS": 3.5,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151113,
+      "coverage": 0.05113636363636364,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.20354501339863623,
+      "halfS": null,
+      "steps": 127,
+      "footprint": 0.5114,
+      "area": {
+        "flown": 0.05091000000000001,
+        "footprint": 0.51102
+      },
+      "footprintHalfS": 5.954743946010321,
+      "camera": {
+        "footprint": 0.4090909090909091,
+        "area": 0.40880681818181824,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0,
+        "found": false,
+        "findS": null,
+        "kept": 0,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151114,
+      "coverage": 0.2517605633802817,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.904617802881006,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9542,
+      "area": {
+        "flown": 0.16513500000000003,
+        "footprint": 0.7744650000000001
+      },
+      "footprintHalfS": 6.838636363636364,
+      "camera": {
+        "footprint": 0.8450704225352113,
+        "area": 0.6243838028169015,
+        "halfS": 54.69230769230769
+      },
+      "watch": {
+        "score": 0.86,
+        "found": true,
+        "findS": 11,
+        "kept": 0.9463548830811555,
+        "losses": 13,
+        "reacquireS": 0.45,
+        "breachS": 0.6
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151115,
+      "coverage": 0.16544117647058823,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.711083906794998,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8621,
+      "area": {
+        "flown": 0.13732499999999997,
+        "footprint": 0.83141
+      },
+      "footprintHalfS": 7.8816,
+      "camera": {
+        "footprint": 0.7904411764705882,
+        "area": 0.7403492647058825,
+        "halfS": 10.059880239520957
+      },
+      "watch": {
+        "score": 0.7020833333333333,
+        "found": true,
+        "findS": 11.1,
+        "kept": 0.7732905002294631,
+        "losses": 8,
+        "reacquireS": 3.075,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151116,
+      "coverage": 0.2556818181818182,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7164960783173924,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9337,
+      "area": {
+        "flown": 0.16885500000000003,
+        "footprint": 0.8753800000000002
+      },
+      "footprintHalfS": 5.781460782424359,
+      "camera": {
+        "footprint": 0.7708333333333334,
+        "area": 0.6780303030303032,
+        "halfS": 13.961538461538463
+      },
+      "watch": {
+        "score": 0.5625,
+        "found": true,
+        "findS": 12.45,
+        "kept": 0.6273234200743495,
+        "losses": 18,
+        "reacquireS": 0.3,
+        "breachS": 3.95
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151117,
+      "coverage": 0.1951219512195122,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.735481197927268,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8994,
+      "area": {
+        "flown": 0.145885,
+        "footprint": 0.845735
+      },
+      "footprintHalfS": 7.482213438735178,
+      "camera": {
+        "footprint": 0.8064024390243902,
+        "area": 0.7212652439024392,
+        "halfS": 10.835820895522387
+      },
+      "watch": {
+        "score": 0.8720833333333333,
+        "found": true,
+        "findS": 9.05,
+        "kept": 0.9427927927927928,
+        "losses": 16,
+        "reacquireS": 0.25,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151118,
+      "coverage": 0.2481060606060606,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7364860977085432,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.964,
+      "area": {
+        "flown": 0.17631999999999998,
+        "footprint": 0.906705
+      },
+      "footprintHalfS": 5.739429883298259,
+      "camera": {
+        "footprint": 0.9053030303030303,
+        "area": 0.7993371212121214,
+        "halfS": 10.137931034482758
+      },
+      "watch": {
+        "score": 0.8716666666666667,
+        "found": true,
+        "findS": 8.8,
+        "kept": 0.9402247191011236,
+        "losses": 12,
+        "reacquireS": 0.15,
+        "breachS": 1.9
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151119,
+      "coverage": 0.2179054054054054,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7222896191397337,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9122,
+      "area": {
+        "flown": 0.14196000000000003,
+        "footprint": 0.78234
+      },
+      "footprintHalfS": 7.936038186157518,
+      "camera": {
+        "footprint": 0.7871621621621622,
+        "area": 0.6330236486486485,
+        "halfS": 13.953488372093021
+      },
+      "watch": {
+        "score": 0.87125,
+        "found": true,
+        "findS": 6.7,
+        "kept": 0.9223643581826202,
+        "losses": 18,
+        "reacquireS": 0.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151120,
+      "coverage": 0.16576086956521738,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6761099391447916,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8709,
+      "area": {
+        "flown": 0.13099,
+        "footprint": 0.817655
+      },
+      "footprintHalfS": 7.287318087318087,
+      "camera": {
+        "footprint": 0.7065217391304348,
+        "area": 0.6667119565217393,
+        "halfS": 11.20253164556962
+      },
+      "watch": {
+        "score": 0.3333333333333333,
+        "found": true,
+        "findS": 20.4,
+        "kept": 0.4014049172102358,
+        "losses": 5,
+        "reacquireS": 6.075,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151121,
+      "coverage": 0.16581632653061223,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6965666395606034,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.773,
+      "area": {
+        "flown": 0.12175499999999999,
+        "footprint": 0.689825
+      },
+      "footprintHalfS": 24.709647495361782,
+      "camera": {
+        "footprint": 0.6415816326530612,
+        "area": 0.542219387755102,
+        "halfS": 29.098039215686274
+      },
+      "watch": {
+        "score": 0.635,
+        "found": true,
+        "findS": 3.25,
+        "kept": 0.6523972602739726,
+        "losses": 13,
+        "reacquireS": 0.65,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151122,
+      "coverage": 0.16287878787878787,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6760803119944034,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.892,
+      "area": {
+        "flown": 0.12671000000000002,
+        "footprint": 0.7982199999999997
+      },
+      "footprintHalfS": 12.158333333333335,
+      "camera": {
+        "footprint": 0.7897727272727273,
+        "area": 0.6511363636363636,
+        "halfS": 31.043478260869563
+      },
+      "watch": {
+        "score": 0.8770833333333333,
+        "found": true,
+        "findS": 1.45,
+        "kept": 0.8874367622259697,
+        "losses": 8,
+        "reacquireS": 0.175,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151123,
+      "coverage": 0.08614864864864864,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6791424764564757,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4172,
+      "area": {
+        "flown": 0.06123000000000001,
+        "footprint": 0.38192000000000004
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.27871621621621623,
+        "area": 0.26554054054054055,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.99375,
+        "found": true,
+        "findS": 0.8,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151124,
+      "coverage": 0.2556818181818182,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.69333684232399,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9413,
+      "area": {
+        "flown": 0.179255,
+        "footprint": 0.889115
+      },
+      "footprintHalfS": 5.698005698005699,
+      "camera": {
+        "footprint": 0.8333333333333334,
+        "area": 0.7815340909090912,
+        "halfS": 9.08108108108108
+      },
+      "watch": {
+        "score": 0.74625,
+        "found": true,
+        "findS": 10.9,
+        "kept": 0.8204306000916171,
+        "losses": 10,
+        "reacquireS": 0.175,
+        "breachS": 1.4
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151125,
+      "coverage": 0.16964285714285715,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.9202498304265134,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.6935,
+      "area": {
+        "flown": 0.12127999999999999,
+        "footprint": 0.62351
+      },
+      "footprintHalfS": 20.681967213114753,
+      "camera": {
+        "footprint": 0.5252976190476191,
+        "area": 0.4626488095238095,
+        "halfS": 57.00000000000001
+      },
+      "watch": {
+        "score": 0.8125,
+        "found": true,
+        "findS": 0.9,
+        "kept": 0.8182962652119178,
+        "losses": 6,
+        "reacquireS": 0.475,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151126,
+      "coverage": 0.20535714285714285,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6489499106756202,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9554,
+      "area": {
+        "flown": 0.13115500000000002,
+        "footprint": 0.8776849999999999
+      },
+      "footprintHalfS": 5.7736720554272525,
+      "camera": {
+        "footprint": 0.8464285714285714,
+        "area": 0.7568750000000002,
+        "halfS": 10.258064516129032
+      },
+      "watch": {
+        "score": 0.5458333333333333,
+        "found": true,
+        "findS": 9.55,
+        "kept": 0.5927601809954751,
+        "losses": 1,
+        "reacquireS": 45,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151127,
+      "coverage": 0.23106060606060605,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7100270947093885,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9489,
+      "area": {
+        "flown": 0.13419,
+        "footprint": 0.72389
+      },
+      "footprintHalfS": 28.826254826254825,
+      "camera": {
+        "footprint": 0.8598484848484849,
+        "area": 0.6454545454545453,
+        "halfS": 45
+      },
+      "watch": {
+        "score": 0.9058333333333334,
+        "found": true,
+        "findS": 2.95,
+        "kept": 0.928266438941076,
+        "losses": 6,
+        "reacquireS": 0.975,
+        "breachS": 1.1
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151128,
+      "coverage": 0.11224489795918367,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6901746840457146,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5319,
+      "area": {
+        "flown": 0.06741000000000001,
+        "footprint": 0.4066850000000001
+      },
+      "footprintHalfS": 98.9027027027027,
+      "camera": {
+        "footprint": 0.4630102040816326,
+        "area": 0.35376275510204075,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.7445833333333334,
+        "found": true,
+        "findS": 1.25,
+        "kept": 0.752104377104377,
+        "losses": 9,
+        "reacquireS": 1.7,
+        "breachS": 10.4
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151129,
+      "coverage": 0.1375,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.522846605260433,
+      "halfS": null,
+      "steps": 941,
+      "footprint": 0.9036,
+      "area": {
+        "flown": 0.12651,
+        "footprint": 0.8666250000000003
+      },
+      "footprintHalfS": 7.520716685330347,
+      "camera": {
+        "footprint": 0.7821428571428571,
+        "area": 0.7266964285714284,
+        "halfS": 12.25
+      },
+      "watch": {
+        "score": 0.20208333333333334,
+        "found": true,
+        "findS": 11.55,
+        "kept": 0.22350230414746544,
+        "losses": 2,
+        "reacquireS": 0.5,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-quad",
+      "seed": 151130,
+      "coverage": 0.12,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.745554679146096,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5088,
+      "area": {
+        "flown": 0.08422500000000002,
+        "footprint": 0.43896500000000005
+      },
+      "footprintHalfS": 90.71999999999998,
+      "camera": {
+        "footprint": 0.44,
+        "area": 0.35712500000000014,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.9566666666666667,
+        "found": true,
+        "findS": 3.6,
+        "kept": 0.9858308286818377,
+        "losses": 10,
+        "reacquireS": 0.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151201,
+      "coverage": 0.12572254335260116,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7067363607781796,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7384,
+      "area": {
+        "flown": 0.07888500000000001,
+        "footprint": 0.48982000000000003
+      },
+      "footprintHalfS": 66.16438356164383,
+      "camera": {
+        "footprint": 0.6661849710982659,
+        "area": 0.43128612716763,
+        "halfS": 71.32544378698225
+      },
+      "watch": {
+        "score": 0.2733333333333333,
+        "found": true,
+        "findS": 87.25,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151202,
+      "coverage": 0.055327868852459015,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6929374683939153,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.2657,
+      "area": {
+        "flown": 0.035725,
+        "footprint": 0.19165
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.23155737704918034,
+        "area": 0.16200478142076505,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.6554166666666666,
+        "found": true,
+        "findS": 15.7,
+        "kept": 0.753713464302827,
+        "losses": 11,
+        "reacquireS": 0.175,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151203,
+      "coverage": 0.050314465408805034,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7079950193029076,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.294,
+      "area": {
+        "flown": 0.03141000000000001,
+        "footprint": 0.19871000000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.2134433962264151,
+        "area": 0.13767688679245282,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.7579166666666667,
+        "found": true,
+        "findS": 10.1,
+        "kept": 0.827194179172351,
+        "losses": 7,
+        "reacquireS": 1,
+        "breachS": 3.6
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151204,
+      "coverage": 0.09918276374442793,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.748110989098398,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.5442,
+      "area": {
+        "flown": 0.06755,
+        "footprint": 0.418635
+      },
+      "footprintHalfS": 75.14093959731544,
+      "camera": {
+        "footprint": 0.4814264487369985,
+        "area": 0.350650074294205,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.5841666666666666,
+        "found": true,
+        "findS": 43.15,
+        "kept": 0.9115734720416124,
+        "losses": 4,
+        "reacquireS": 1.575,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151205,
+      "coverage": 0.06341107871720117,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.738281059077146,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3681,
+      "area": {
+        "flown": 0.039095000000000005,
+        "footprint": 0.22548500000000002
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.30903790087463556,
+        "area": 0.1860969387755102,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.7716666666666666,
+        "found": true,
+        "findS": 14.7,
+        "kept": 0.8789748457522544,
+        "losses": 11,
+        "reacquireS": 0.625,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151206,
+      "coverage": 0.08020833333333334,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.729814480579741,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4618,
+      "area": {
+        "flown": 0.05688,
+        "footprint": 0.38005
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.41388888888888886,
+        "area": 0.33277777777777773,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.6020833333333333,
+        "found": true,
+        "findS": 40.6,
+        "kept": 0.9093769666456891,
+        "losses": 3,
+        "reacquireS": 2.25,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151207,
+      "coverage": 0.06720890410958905,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.705837557716231,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3241,
+      "area": {
+        "flown": 0.0521,
+        "footprint": 0.28256999999999993
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.2833904109589041,
+        "area": 0.2419520547945206,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.6795833333333333,
+        "found": true,
+        "findS": 25.5,
+        "kept": 0.8625066102591221,
+        "losses": 6,
+        "reacquireS": 0.65,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151208,
+      "coverage": 0.055678466076696166,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.686525308949841,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3127,
+      "area": {
+        "flown": 0.032784999999999995,
+        "footprint": 0.19663500000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.25,
+        "area": 0.15145648967551623,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.7983333333333333,
+        "found": true,
+        "findS": 8.45,
+        "kept": 0.8584229390681004,
+        "losses": 9,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151209,
+      "coverage": 0.12676553672316385,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6976481493077404,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7451,
+      "area": {
+        "flown": 0.079655,
+        "footprint": 0.5434100000000001
+      },
+      "footprintHalfS": 46.75955056179775,
+      "camera": {
+        "footprint": 0.6440677966101694,
+        "area": 0.45448446327683617,
+        "halfS": 58.53061224489796
+      },
+      "watch": {
+        "score": 0.30625,
+        "found": true,
+        "findS": 83.3,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151210,
+      "coverage": 0.0586890243902439,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.683748025003135,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.2755,
+      "area": {
+        "flown": 0.04045,
+        "footprint": 0.21805500000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.24657012195121952,
+        "area": 0.18527057926829268,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.8891666666666667,
+        "found": true,
+        "findS": 13.35,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151211,
+      "coverage": 0.02696917808219178,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.5303044140502388,
+      "halfS": null,
+      "steps": 329,
+      "footprint": 0.1986,
+      "area": {
+        "flown": 0.02575500000000001,
+        "footprint": 0.19294999999999993
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.14726027397260275,
+        "area": 0.1417380136986301,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0,
+        "found": false,
+        "findS": null,
+        "kept": 0,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151212,
+      "coverage": 0.05853474320241692,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7406043532709665,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.2481,
+      "area": {
+        "flown": 0.040305,
+        "footprint": 0.20360500000000004
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.19561933534743203,
+        "area": 0.1549848942598188,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.6433333333333333,
+        "found": true,
+        "findS": 17.15,
+        "kept": 0.750242954324587,
+        "losses": 8,
+        "reacquireS": 1.75,
+        "breachS": 6.05
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151213,
+      "coverage": 0.09687034277198212,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7691240221480298,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4788,
+      "area": {
+        "flown": 0.06737,
+        "footprint": 0.40570499999999987
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.4217585692995529,
+        "area": 0.351322652757079,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.42625,
+        "found": true,
+        "findS": 59.2,
+        "kept": 0.8405916187345933,
+        "losses": 5,
+        "reacquireS": 1.2,
+        "breachS": 1.5
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151214,
+      "coverage": 0.16170360110803325,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6991734054813135,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8885,
+      "area": {
+        "flown": 0.08389,
+        "footprint": 0.5187649999999999
+      },
+      "footprintHalfS": 56.859950859950864,
+      "camera": {
+        "footprint": 0.8199445983379502,
+        "area": 0.47565789473684206,
+        "halfS": 60.59210526315789
+      },
+      "watch": {
+        "score": 0,
+        "found": false,
+        "findS": null,
+        "kept": 0,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151215,
+      "coverage": 0.035,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.696478842192308,
+      "halfS": null,
+      "steps": 441,
+      "footprint": 0.2727,
+      "area": {
+        "flown": 0.03269000000000002,
+        "footprint": 0.25845000000000007
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.21,
+        "area": 0.1975384615384615,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0,
+        "found": false,
+        "findS": null,
+        "kept": 0,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151216,
+      "coverage": 0.09837962962962964,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7254248473696223,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4927,
+      "area": {
+        "flown": 0.06743000000000002,
+        "footprint": 0.41019999999999995
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.4201388888888889,
+        "area": 0.3360918209876544,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.6558333333333334,
+        "found": true,
+        "findS": 40.2,
+        "kept": 0.9855979962429555,
+        "losses": 1,
+        "reacquireS": 1.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151217,
+      "coverage": 0.08556782334384858,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.720894965732384,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4724,
+      "area": {
+        "flown": 0.061134999999999995,
+        "footprint": 0.37699999999999995
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.4160094637223975,
+        "area": 0.3208793375394322,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.49083333333333334,
+        "found": true,
+        "findS": 42,
+        "kept": 0.7546444586803331,
+        "losses": 10,
+        "reacquireS": 0.15,
+        "breachS": 4.25
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151218,
+      "coverage": 0.06268115942028986,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.87578170182286,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.2949,
+      "area": {
+        "flown": 0.031875,
+        "footprint": 0.15714
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.2688405797101449,
+        "area": 0.13766304347826086,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.5770833333333333,
+        "found": true,
+        "findS": 11.9,
+        "kept": 0.6403143781784558,
+        "losses": 8,
+        "reacquireS": 0.7,
+        "breachS": 0.75
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151219,
+      "coverage": 0.07912844036697247,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7267034215340926,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3295,
+      "area": {
+        "flown": 0.05830500000000001,
+        "footprint": 0.28961000000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.2996941896024465,
+        "area": 0.25659403669724773,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.635,
+        "found": true,
+        "findS": 40.95,
+        "kept": 0.9633375474083439,
+        "losses": 10,
+        "reacquireS": 0.2,
+        "breachS": 4
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151220,
+      "coverage": 0.07174744897959184,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7256708167817494,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3823,
+      "area": {
+        "flown": 0.046904999999999995,
+        "footprint": 0.2904049999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3380102040816326,
+        "area": 0.2536989795918367,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.5879166666666666,
+        "found": true,
+        "findS": 29,
+        "kept": 0.7748489840746843,
+        "losses": 8,
+        "reacquireS": 0.15,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151221,
+      "coverage": 0.07578875171467764,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.6953973060044794,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3416,
+      "area": {
+        "flown": 0.05652,
+        "footprint": 0.29944999999999994
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3069272976680384,
+        "area": 0.2618141289437586,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.5191666666666667,
+        "found": true,
+        "findS": 42.15,
+        "kept": 0.7997432605905006,
+        "losses": 3,
+        "reacquireS": 3.325,
+        "breachS": 0.45
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151222,
+      "coverage": 0.010646687697160883,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.2242945301518204,
+      "halfS": null,
+      "steps": 142,
+      "footprint": 0.1049,
+      "area": {
+        "flown": 0.010544999999999999,
+        "footprint": 0.10473999999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.07176656151419558,
+        "area": 0.07160883280757098,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0,
+        "found": false,
+        "findS": null,
+        "kept": 0,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151223,
+      "coverage": 0.09,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.78397298602095,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4393,
+      "area": {
+        "flown": 0.06409000000000001,
+        "footprint": 0.3565650000000001
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.38571428571428573,
+        "area": 0.3075714285714286,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.4075,
+        "found": true,
+        "findS": 52.5,
+        "kept": 0.7239082161361954,
+        "losses": 9,
+        "reacquireS": 0.65,
+        "breachS": 8.85
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151224,
+      "coverage": 0.08142857142857143,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7683763685109306,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.4086,
+      "area": {
+        "flown": 0.059019999999999996,
+        "footprint": 0.34865
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.365,
+        "area": 0.2970357142857143,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0.6208333333333333,
+        "found": true,
+        "findS": 45.55,
+        "kept": 1,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151225,
+      "coverage": 0.07307171853856563,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.64728620383414,
+      "halfS": null,
+      "steps": 1055,
+      "footprint": 0.4794,
+      "area": {
+        "flown": 0.05870999999999997,
+        "footprint": 0.38928
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.4316644113667118,
+        "area": 0.3488836265223275,
+        "halfS": null
+      },
+      "watch": {
+        "score": 0,
+        "found": false,
+        "findS": null,
+        "kept": 0,
+        "losses": 0,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151226,
+      "coverage": 0.12171052631578948,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.667382665109615,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7299,
+      "area": {
+        "flown": 0.081155,
+        "footprint": 0.5482500000000001
+      },
+      "footprintHalfS": 41.27490039840637,
+      "camera": {
+        "footprint": 0.6542397660818714,
+        "area": 0.474451754385965,
+        "halfS": 54.8421052631579
+      },
+      "watch": {
+        "score": 0.33,
+        "found": true,
+        "findS": 62.1,
+        "kept": 0.6833477135461605,
+        "losses": 2,
+        "reacquireS": 18.25,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151227,
+      "coverage": 0.15119760479041916,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.724708535596758,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8118,
+      "area": {
+        "flown": 0.08170000000000001,
+        "footprint": 0.44911
+      },
+      "footprintHalfS": 78.80571428571429,
+      "camera": {
+        "footprint": 0.7533682634730539,
+        "area": 0.4150261976047904,
+        "halfS": 81.7005988023952
+      },
+      "watch": {
+        "score": 0.0020833333333333333,
+        "found": true,
+        "findS": 62.45,
+        "kept": 0.004340277777777778,
+        "losses": 1,
+        "reacquireS": null,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151228,
+      "coverage": 0.1548202614379085,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7552899709093293,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7553,
+      "area": {
+        "flown": 0.08413000000000001,
+        "footprint": 0.49126000000000003
+      },
+      "footprintHalfS": 61.00000000000002,
+      "camera": {
+        "footprint": 0.6658496732026143,
+        "area": 0.4192197712418301,
+        "halfS": 79.66956521739131
+      },
+      "watch": {
+        "score": 0.00125,
+        "found": true,
+        "findS": 59.45,
+        "kept": 0.0024752475247524753,
+        "losses": 2,
+        "reacquireS": 0.05,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151229,
+      "coverage": 0.14827327327327328,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.894072696166007,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.8641,
+      "area": {
+        "flown": 0.07966,
+        "footprint": 0.534905
+      },
+      "footprintHalfS": 61.99698795180723,
+      "camera": {
+        "footprint": 0.7548798798798799,
+        "area": 0.4528528528528529,
+        "halfS": 69.90789473684211
+      },
+      "watch": {
+        "score": 0.13583333333333333,
+        "found": true,
+        "findS": 34.65,
+        "kept": 0.19086651053864168,
+        "losses": 1,
+        "reacquireS": 69.1,
+        "breachS": 0
+      }
+    },
+    {
+      "task": "watch-large-quad",
+      "seed": 151230,
+      "coverage": 0.12721238938053098,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.726886700998712,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.7282,
+      "area": {
+        "flown": 0.08460500000000001,
+        "footprint": 0.5367849999999998
+      },
+      "footprintHalfS": 50.48692152917505,
+      "camera": {
+        "footprint": 0.6426991150442478,
+        "area": 0.464933628318584,
+        "halfS": 57.93865030674847
+      },
+      "watch": {
+        "score": 0.3070833333333333,
+        "found": true,
+        "findS": 82.8,
+        "kept": 0.9892617449664429,
+        "losses": 4,
+        "reacquireS": 0.1,
+        "breachS": 0
+      }
+    }
+  ]
+}

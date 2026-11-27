@@ -3,7 +3,8 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const pct = (v) => `${(v * 100).toFixed(1)}%`;
+// A typographic minus for the integrity track, the one score that can go below zero.
+const pct = (v) => `${(v * 100).toFixed(1)}%`.replace(/^-/, '−');
 /** An entry's name is its author's text: keep it from adding links, HTML or table cells. */
 const plain = (name) => String(name).replace(/[|[\]<>`\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
 
@@ -92,6 +93,13 @@ const gapCell = (g) => {
   const tied = g.ci[0] <= 0 && g.ci[1] >= 0;
   return `${pts(g.gap)} (${pts(g.ci[0])} to ${pts(g.ci[1])})${tied ? ', tied' : ''}`;
 };
+
+/** A paired gap for prose: "+4.9 points (95% interval −9.5 to +21.5)". */
+export function gapPoints(g) {
+  if (!g) return '—';
+  const pts = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v * 100).toFixed(1)}`;
+  return `${pts(g.gap)} points (95% interval ${pts(g.ci[0])} to ${pts(g.ci[1])})`;
+}
 
 function readTeam(root) {
   const out = [];
@@ -201,6 +209,7 @@ function currentBy(root, dir, field) {
   return rows.filter((r) => (r.hard ?? 0) === v).sort((a, b) => b[field] - a[field]);
 }
 
+const ordinal = (n) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : (['th', 'st', 'nd', 'rd'][n % 10] ?? 'th')}`;
 const pilotCell = (r) => (r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`);
 const seconds = (v) => (v === null || v === undefined ? '—' : `${v.toFixed(1)} s`);
 const meanOf = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -208,14 +217,33 @@ const meanOf = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 
 /** The overwatch track's board (bench/overwatch.ts): the share of the flight the lost person was in camera view from 2 m or more. */
 function watchBoard(root) {
   const cur = currentBy(root, 'bench/results/hard-overwatch', 'watchScore');
-  if (!cur.length) return { BENCH_OVERWATCH: '_Run `npm run bench:hard -- --track overwatch --only planner-view,nbvp --split test`._', BENCH_OVERWATCH_TASKS: '' };
+  if (!cur.length) {
+    const none = Object.fromEntries(['OW_LEAD', 'OW_LEAD_FIND', 'OW_LEAD_FOUND', 'OW_HOUSE', 'OW_HOUSE_RANK', 'OW_HOUSE_FIND', 'OW_HOUSE_FOUND', 'OW_HOUSE_GAP', 'OW_KEPT_RANGE'].map((k) => [k, '—']));
+    return { ...none, BENCH_OVERWATCH: '_Run `npm run bench:hard -- --track overwatch --only planner-view,nbvp --split test`._', BENCH_OVERWATCH_TASKS: '' };
+  }
   const tasks = cur[0].taskDefs;
   const eps = (r) => r.episodes ?? [];
   const found = (r) => `${eps(r).filter((e) => e.watch.found).length} of ${eps(r).length}`;
   const findS = (r) => meanOf(eps(r).filter((e) => e.watch.found).map((e) => e.watch.findS));
   const kept = (r) => meanOf(eps(r).filter((e) => e.watch.found).map((e) => e.watch.kept));
   const breach = (r) => meanOf(eps(r).map((e) => e.watch.breachS));
+  // Inline numbers for the results prose (scripts/docs/LEADERBOARD.template.md).
+  const house = cur.find((r) => r.source === 'baseline:planner-view');
+  const lead = cur[0];
+  const keptAll = cur.map(kept).filter((v) => v !== null);
+  const prose = {
+    OW_LEAD: `${lead.name}, at ${pct(lead.watchScore)}`,
+    OW_LEAD_FIND: seconds(findS(lead)),
+    OW_LEAD_FOUND: found(lead),
+    OW_HOUSE: house ? pct(house.watchScore) : '—',
+    OW_HOUSE_RANK: house ? `${ordinal(cur.indexOf(house) + 1)} of ${cur.length}` : '—',
+    OW_HOUSE_FIND: house ? seconds(findS(house)) : '—',
+    OW_HOUSE_FOUND: house ? found(house) : '—',
+    OW_HOUSE_GAP: house && house !== lead ? gapPoints(pairedScoreGap(house, lead, 4000, (e) => e.watch.score)) : '—',
+    OW_KEPT_RANGE: keptAll.length ? `${pct(Math.min(...keptAll))} to ${pct(Math.max(...keptAll))}` : '—',
+  };
   return {
+    ...prose,
     BENCH_OVERWATCH: table(
       ['#', 'Pilot', 'In view', ...tasks.map((t) => t.id), 'Found', 'Time to find', 'Kept in view after the find', 'Inside 2 m', 'Flights ended by a crash', 'In view vs the row above (95% CI)', 'Commit'],
       cur.map((r, i) => [
@@ -246,9 +274,10 @@ function integrityBoard(root) {
   const tasks = cur[0].taskDefs;
   const eps = (r) => r.episodes ?? [];
   const col = (r, f) => meanOf(eps(r).map((e) => e.integrity[f]));
-  const caught = (r) => meanOf(eps(r).filter((e) => e.integrity.caught !== null).map((e) => e.integrity.caught));
-  // A pilot that reports nothing claims a level of 0: always available, and its true error is over 0 on every step.
-  const reports = (r) => (col(r, 'availability') === 1 && col(r, 'misleadShare') > 0.99 ? 'Nothing (claims 0)' : 'A protection level');
+  // Bad pose flagged: the mean over tasks of each task's share, as the score is (a task with no bad step has none).
+  const caught = (r) => meanOf(Object.values(r.tasks).filter((t) => t.caught !== null && t.caught !== undefined).map((t) => t.caught));
+  // A pilot that reports nothing claims a level of 0, under its true error on every step it flies.
+  const reports = (r) => (col(r, 'misleadShare') > 0.99 ? 'Nothing (claims 0)' : 'A protection level');
   return {
     BENCH_INTEGRITY: table(
       ['#', 'Pilot', 'Integrity score', ...tasks.map((t) => t.id), 'Reports', 'Available', 'Hazardously misleading', 'Bad-pose steps', 'Bad pose flagged', 'Camera', 'Integrity vs the row above (95% CI)', 'Commit'],

@@ -33,7 +33,7 @@ export const HOME_RETURN = { speed: 0.9, reserve: 5, every: 10 } as const;
  * (sim/explorers/watch.ts, on the pilot's own airframe options). An explorer that already watches
  * (the view-first planner) is not wrapped twice.
  */
-function watchLayer(e: Explorer, c: BenchContext): Explorer {
+export function watchLayer(e: Explorer, c: BenchContext): Explorer {
   return c.person && !(e instanceof WatchExplorer) ? new WatchExplorer(e, airframe(c)) : e;
 }
 

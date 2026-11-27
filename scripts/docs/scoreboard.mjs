@@ -231,13 +231,15 @@ function replays(root) {
       const e = r?.episodes.find((x) => x.task === rec.task.id && x.seed === rec.seed);
       if (!e) throw new Error(`${entry.file}: ${t.id} has no ${rec.task.id} seed ${rec.seed} flight in ${dir}/${t.id}.json`);
       if (Math.abs(e.camera.footprint - t.camera) > 1e-9) throw new Error(`${entry.file}: ${t.id} replay scores ${t.camera}, the board's flight ${e.camera.footprint}; re-record it with npm run bench:replay`);
-      return { id: t.id, name: t.name, camera: t.camera, crashed: t.crashed, result: `${dir}/${t.id}.json` };
+      if (t.watch !== undefined && Math.abs(e.watch.score - t.watch) > 1e-9) throw new Error(`${entry.file}: ${t.id} replay keeps the person in view ${t.watch}, the board's flight ${e.watch.score}; re-record it with npm run bench:replay`);
+      return { id: t.id, name: t.name, camera: t.camera, ...(t.watch === undefined ? {} : { watch: t.watch }), crashed: t.crashed, result: `${dir}/${t.id}.json` };
     });
     return { file: entry.file, track: rec.track, task: rec.task, seed: rec.seed, commit: rec.commit, flights };
   });
 }
 
-const pct = (v) => `${(v * 100).toFixed(1)}%`;
+// A typographic minus for the integrity track, the one score that can go below zero.
+const pct = (v) => `${(v * 100).toFixed(1)}%`.replace(/^-/, '−');
 
 /** The README's scoreboard block: the same cells as docs/scoreboard.json, best of each row in bold. */
 export function scoreboardMarkdown(board) {

@@ -16,6 +16,7 @@ import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchPair, benchSection } from './bench.mjs';
+import { integritySection } from './integrity.mjs';
 import { scoreboard, scoreboardMarkdown } from './scoreboard.mjs';
 import { visionSection } from './vision.mjs';
 import { floorsBudgetNote, hazardsSection } from './hazards.mjs';
@@ -1385,6 +1386,13 @@ function faultBench(bench, first) {
 
 // ---------------------------------------------------------------------------------------------
 
+/** HOUSE_MONITOR from src/bench/integrity.ts (the docs build imports no TypeScript), so INTEGRITY.md marks the pilot's real pick. */
+function houseMonitor() {
+  const m = /HOUSE_MONITOR = \{ id: '([\w-]+)', k: (\d+) \}/.exec(read('src/bench/integrity.ts'));
+  if (!m) throw new Error('HOUSE_MONITOR not found in src/bench/integrity.ts');
+  return { id: m[1], k: Number(m[2]) };
+}
+
 function fill(template, values) {
   return template.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_, key) => {
     if (!(key in values)) throw new Error(`template key ${key} has no value`);
@@ -1416,6 +1424,7 @@ const values = {
   ...speed.values,
   ...footprint.values,
   ...benchSection(ROOT),
+  ...integritySection(ROOT, readJson('docs/integrity-dev.json'), readJson('docs/integrity.json'), houseMonitor()),
   ...visionSection(readJson('docs/vision-detector.json'), readJson('docs/vision-bench.json')).values,
   ...localizationTables(readJson('docs/localization.json')),
   ...rl.values,
@@ -1436,6 +1445,7 @@ const outputs = {
   'docs/REPORT.md': header + fill(read('scripts/docs/REPORT.template.md'), values),
   'docs/SAFETY_CASE.md': header + fill(read('scripts/docs/SAFETY_CASE.template.md'), values),
   'docs/LEADERBOARD.md': header + fill(read('scripts/docs/LEADERBOARD.template.md'), values),
+  'docs/INTEGRITY.md': header + fill(read('scripts/docs/INTEGRITY.template.md'), values),
   ...ablations.files,
   ...sar.files,
   ...team.files,
