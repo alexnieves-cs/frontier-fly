@@ -52,6 +52,8 @@ export function clearanceFeatures(obs: Float32Array, out: Float32Array, at: numb
 }
 /** Input width of the quad student. */
 export const STUDENT_DIM = OBS_DIM + STUDENT_EXT;
+/** Output gain the shipped checkpoint (public/checkpoints/quad-student.bin) was fine-tuned and picked with. */
+export const QUAD_STUDENT_GAIN = 1.15;
 /** Default hidden layers of the quad student (wider than the kinematic policy's 256, 128). */
 export const STUDENT_HIDDEN = [512, 256] as const;
 
