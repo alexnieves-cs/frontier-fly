@@ -121,7 +121,7 @@ export class BenchEpisodeRecorder {
     private readonly run: BenchRun,
   ) {
     const { spec, envSeed, cfg } = benchEpisodeSetup(task, run);
-    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics, ...(task.home ? { home: true } : {}) };
+    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics, ...(task.home ? { home: true } : {}), ...(task.person ? { person: true } : {}) };
     this.obs = env.reset(spec, envSeed, cfg);
     const p0 = env.snapshot().pos;
     this.start = [p0[0], p0[1], p0[2]];

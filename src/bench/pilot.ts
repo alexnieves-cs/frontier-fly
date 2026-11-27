@@ -18,6 +18,11 @@ export interface BenchContext {
    * within HOME_RADIUS of where it took off when time runs out.
    */
   home?: boolean;
+  /**
+   * An overwatch task (bench/overwatch.ts): the frame carries the camera's sighting of a lost person
+   * (SensorFrame.person), and the score is the time they are in view from a standoff.
+   */
+  person?: boolean;
 }
 
 export interface BenchPilot {

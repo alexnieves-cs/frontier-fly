@@ -26,6 +26,18 @@ import type { BenchContext, BenchPilot } from './pilot';
 export const HOME_RETURN = { speed: 0.9, reserve: 5, every: 10 } as const;
 
 /**
+ * The watch layer every explorer pilot shares on overwatch tasks (BenchContext.person), as it shares
+ * the return supervisor on return tasks, so the track compares finding and holding the lost person,
+ * not who wrote watch code: once the camera sights the person it holds a standoff with the camera on
+ * them, looks where they were heading when they leave the view, and explores again after 10 s
+ * (sim/explorers/watch.ts, on the pilot's own airframe options). An explorer that already watches
+ * (the view-first planner) is not wrapped twice.
+ */
+function watchLayer(e: Explorer, c: BenchContext): Explorer {
+  return c.person && !(e instanceof WatchExplorer) ? new WatchExplorer(e, airframe(c)) : e;
+}
+
+/**
  * A pilot over any exploration strategy on the sensor frame, with its own
  * lidar occupancy map. On buildings with more than one floor it takes shafts
  * (sim/climber.ts) between floors.
@@ -43,7 +55,7 @@ export function explorerPilot(name: string, make: (ctx: BenchContext) => Explore
     name,
     reset(c) {
       ctx = c;
-      explorer = make(c);
+      explorer = watchLayer(make(c), c);
       climber = null;
       occ = null;
       steps = 0;
