@@ -12,14 +12,44 @@
  * Input layout: the OBS_DIM observation (src/sim/OBS_LAYOUT.md), then STUDENT_EXT values:
  *   +0..3  the command executed last step, [vx, vy, vz, yawRate] in action units
  *   +4..7  the command executed the step before
+ *   +8..15 braking clearance in 8 body-frame sectors (forward, then every 45 degrees to the left):
+ *          the nearest horizontal lidar return within 22.5 degrees of the sector, minus the distance
+ *          the drone needs to stop at its measured velocity toward it, divided by 2 m and clipped to
+ *          [-1, 1]. The same quantity the planner's braking filter thresholds; the policy only sees it.
  */
-import { ACT_DIM, OBS_DIM } from '../shared/constants';
+import { ACT_DIM, LIDAR_H, LIDAR_MAX, OBS, OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import { InferPolicy } from './infer';
 import type { Checkpoint } from './checkpoint';
 
+/** Body-frame sectors of the braking-clearance features. */
+export const SECTORS = 8;
 /** Extra input values after the observation. */
-export const STUDENT_EXT = 2 * ACT_DIM;
+export const STUDENT_EXT = 2 * ACT_DIM + SECTORS;
+/** Stopping model of the clearance features: reaction time (s) and deceleration (m/s²). */
+const CLEAR_REACTION = 0.25;
+const CLEAR_DECEL = 4;
+/** Meters of clearance that read as 1 (the margin matters within a couple of meters). */
+const CLEAR_SCALE = 2;
+
+/** Write the SECTORS braking-clearance features of `obs` into out[at..]. */
+export function clearanceFeatures(obs: Float32Array, out: Float32Array, at: number): void {
+  const vf = obs[OBS.vel]! * 2;
+  const vl = obs[OBS.vel + 1]! * 2;
+  const per = LIDAR_H / SECTORS;
+  for (let k = 0; k < SECTORS; k++) {
+    const c = k * per;
+    let r = Infinity;
+    for (let d = -per / 2; d <= per / 2; d++) {
+      const j = (((c + d) % LIDAR_H) + LIDAR_H) % LIDAR_H;
+      r = Math.min(r, obs[OBS.lidar + j]! * LIDAR_MAX);
+    }
+    const th = (k * 2 * Math.PI) / SECTORS;
+    const v = Math.max(0, vf * Math.cos(th) + vl * Math.sin(th));
+    const stop = v * CLEAR_REACTION + (v * v) / (2 * CLEAR_DECEL);
+    out[at + k] = Math.max(-1, Math.min(1, (r - stop) / CLEAR_SCALE));
+  }
+}
 /** Input width of the quad student. */
 export const STUDENT_DIM = OBS_DIM + STUDENT_EXT;
 /** Default hidden layers of the quad student (wider than the kinematic policy's 256, 128). */
@@ -41,6 +71,7 @@ export class StudentInput {
     this.row.set(obs.subarray(0, OBS_DIM), 0);
     this.row.set(this.prev, OBS_DIM);
     this.row.set(this.prev2, OBS_DIM + ACT_DIM);
+    clearanceFeatures(obs, this.row, OBS_DIM + 2 * ACT_DIM);
     return this.row;
   }
 
