@@ -3,7 +3,8 @@ name: crazyflie
 # The Crazyflie flight stack, in software: the safety guard's rules, the
 # flight script flying the simulated Crazyflie through every ladder mode and
 # injected fault, the mock radio and link check, the sim-versus-real report
-# on sim flights, and the cflib link against a stand-in Crazyflie. No radio.
+# on sim flights, the cflib link against a stand-in Crazyflie, and the AR
+# replay on a synthetic video of a sim flight. No radio.
 # Informational, like ci.yml.
 on:
   # Pull requests only: see ci.yml for why there is no push trigger.
@@ -32,5 +33,6 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       - run: pip install -r scripts/crazyflie/requirements.txt
+      - run: pip install -r scripts/crazyflie/requirements-ar.txt
       - run: npm run crazyflie:arena -- scripts/crazyflie/arenas/example-room.json
       - run: python -m pytest -v scripts/crazyflie/tests

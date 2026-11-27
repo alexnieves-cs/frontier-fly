@@ -160,6 +160,8 @@ python scripts/crazyflie/compare.py flights/<the log>.jsonl --landed X,Y
 
 The real track is the drone's own flow estimate, so nothing in the log says where it really was. Mark the landing spot and measure it from the arena's corner; `--landed X,Y` turns that one true point into the flow deck's real drift. If the drone answers its commands slower than the sim assumes, the report says so and gives the `--sim-set tau=...,latency=...` to rerun the sim with, to see whether the other differences close up.
 
+If you filmed the flight from a tripod, [CRAZYFLIE_AR_REPLAY.md](CRAZYFLIE_AR_REPLAY.md) turns the video into the true track: it draws the log into the room, measures the flow deck's drift and jumps frame by frame, and gives the `--landed` point from the video.
+
 Send the `flights/*.jsonl` logs and the report folders.
 
 ## Files
@@ -180,7 +182,8 @@ Send the `flights/*.jsonl` logs and the report folders.
 | `scripts/crazyflie/analysis.py` | the measures for one log, including a port of the sim's coverage |
 | `scripts/crazyflie/compare.py` | the sim-versus-real report |
 | `scripts/crazyflie/replay.ts` | one arena in `src/crazyflie/sim`, for `compare.py` |
-| `scripts/crazyflie/tests/` | 78 pytest tests: guard rules, end-to-end sim flights, faults, failures inside the flight script, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie |
+| `scripts/crazyflie/ar_replay.py` | the AR flight replay: a phone video and its log, drawn together ([CRAZYFLIE_AR_REPLAY.md](CRAZYFLIE_AR_REPLAY.md)) |
+| `scripts/crazyflie/tests/` | 80 pytest tests: guard rules, end-to-end sim flights, faults, failures inside the flight script, the mock radio, the link check, the log format, the report, the cflib link on a stand-in Crazyflie, the AR replay |
 | `docs/CRAZYFLIE_FIRST_FLIGHT.md` | the kit list and the first-flight checklist |
 
 ## Not done yet
