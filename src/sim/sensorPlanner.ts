@@ -5,6 +5,8 @@ import { approachSpeed, CommandShaper, cornerSpeed, profileSpeed, uTurnSpeed, re
 import { MAX_CANDIDATES, PICK_DIM, type GoalPicker, type PickCandidates } from './picker';
 import { BRAKING_MARGIN, brakingFilter, descentClear, filterVelocity, SAFETY_HORIZON, SAFETY_MARGIN, type BrakingModel } from './lidarSafety';
 import { voxelLayout } from '../shared/voxels';
+import type { PersonSighting } from '../bench/overwatch';
+import type { PoseHealth } from '../loc/types';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -42,6 +44,13 @@ export interface SensorFrame {
   vel?: readonly [number, number];
   /** Fraction of the step budget left, when the pilot knows it (a feature for SensorPlannerOptions.picker). */
   timeLeft?: number;
+  /**
+   * Overwatch tasks only (bench/overwatch.ts): the camera's sighting of the person this step, or null
+   * when they are not in view. Absent on every other task.
+   */
+  person?: PersonSighting | null;
+  /** Drift tasks only: the pose estimator's own health (loc/types.ts). It never reads the truth. */
+  health?: PoseHealth;
 }
 
 /** World-frame command. */
@@ -117,8 +126,9 @@ export interface SensorPlannerOptions {
    * drone's own lidar ring has had it in line of sight within `radius` meters, not only once the
    * drone has flown through it. The drone then visits rooms to look into them instead of sweeping
    * lanes, which is what sensor-footprint coverage scores. When nothing known is left unviewed it flies
-   * to the edge of unknown space (unflown voxels next to unmapped ones), and with `sweep`, when that
-   * is gone too, to unflown voxels for the rest of the budget. Each replan starts again at the top.
+   * to the edge of unknown space (unflown voxels next to unmapped ones), or with `frontiers` it weighs
+   * both kinds of goal by path cost from the start; when both are gone, with `sweep`, it flies to
+   * unflown voxels for the rest of the budget. Each replan starts again at the top.
    */
   view?: ViewOptions;
   /**
@@ -157,6 +167,14 @@ export interface ViewOptions {
   lookMin?: number;
   /** Yaw-rate cap while aiming the camera, rad/s (default: the tracker's cap, or the airframe's). */
   lookYawRate?: number;
+  /**
+   * The view phase also takes unflown voxels on the edge of unknown space as goals, not only once
+   * nothing known is left unviewed (default false: v3's rule, which on a 40 m building spends the
+   * whole flight on corners of the mapped part and never opens the unmapped rooms). The baseline
+   * turns it on for the kinematic airframe only: on the quadrotor flying on its own pose estimate it
+   * cost 11 points (docs/VIEW_FIRST.md, version 4).
+   */
+  frontiers?: boolean;
 }
 
 /** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
@@ -276,7 +294,7 @@ export class SensorPlanner {
     this.picker = opts.picker ?? null;
     this.lanes = opts.lanes ?? false;
     this.view = opts.view
-      ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0 }
+      ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0, frontiers: opts.view.frontiers ?? false }
       : null;
   }
 
@@ -322,7 +340,7 @@ export class SensorPlanner {
       return (y > 0 && f.visited[k - f.vw] === 1) || (y < f.vd - 1 && f.visited[k + f.vw] === 1);
     }
     if (!this.view || this.phase === 2) return f.visited[k] === 1;
-    if (this.phase === 0) return this.viewed[k] === 1;
+    if (this.phase === 0) return this.viewed[k] === 1 && (!this.view.frontiers || f.visited[k] === 1 || !this.bordersUnknown(f, k));
     return f.visited[k] === 1 || !this.bordersUnknown(f, k);
   }
 

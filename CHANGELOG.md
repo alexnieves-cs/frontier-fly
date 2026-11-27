@@ -5,6 +5,46 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### FrontierBench: the scoreboard, published baselines, overwatch and integrity (2026-11-27)
+
+- The homepage and the README open on a generated scoreboard: 8 tracks by 8 pilots, every cell from
+  `bench/results` with its test seed block (`docs/scoreboard.json`). Below it, two test flights replayed in the
+  browser, recorded from the bench's own episodes (`npm run bench:replay`) and checked against the result files
+  when the docs are generated.
+- Baselines on every track and the same seeds: random walk, greedy information gain (Gonzalez-Banos & Latombe
+  2002) and rapid frontier (Cieslewski et al. 2017).
+- `npm run bench:hard -- --track overwatch` (dev 150001+, test 151001+): find a lost person who never reacts to
+  the drone and keep them in view from 2 m or more, with one watch layer shared by every explorer pilot.
+  Information gain leads at 61.8%; the view-first planner is 2nd at 56.3% (v4).
+- `npm run bench:hard -- --track integrity` (dev 160001+, test 161001+): the pilot reports a protection level,
+  scored as availability minus 10 x the hazardously misleading rate (alert limit 1.5 m, time to alert 2 s). BA*
+  coverage leads at 81.5% by reporting nothing; the view-first planner, reporting its estimator's 1 sigma, is 6th
+  at 55.7%. Draft writeup: `docs/INTEGRITY.md`.
+- CONTRIBUTING: no capability lands without a scored track and a number attached.
+
+### Fix the planner's known weak spots (2026-11-27)
+
+- View-first planner v4 (`ViewOptions.frontiers`, kinematic airframe): the edge of unmapped space competes with
+  unviewed voxels by path cost from the start. The kinematic 40 m tie with nearest frontier is now a lead: fresh
+  block 153001+ 84.5% vs 73.4% (+11.1, +6.6 to +16.1); hard 87.0% vs v3's 84.7%. Hard test 87.8% (v3 86.0%), return
+  test 75.5% (74.0%). Off on the quadrotor, where it cost 11 points flying on the pose estimate.
+- Quadrotor mission touches at stairwells: the shaft-centring probe now centres on the stretch it saw open and
+  settles between probes, and indoors the up and down range finders veto a climb or descent into a slab. Practice
+  compound sweeps: touched flights 8 to 0 (estimate) and 4 to 0 (true pose) of 152; fresh 79401+: 8 to 4 of 240,
+  the four left on one seed with a different cause.
+
+### FrontierBench Hard: the hard drift track (2026-11-27)
+
+- `npm run bench:hard -- --track drift-hard`: four return tasks on the drift estimate with a short-range
+  ranging ring (24 beams to 4 m, `TOF_RING` in `src/bench/hard.ts`) instead of 90 beams to 8 m: the 40 m
+  building and back in 120 s and 240 s, in wind, and dark rooms. `DriftProfile` in `src/bench/drift.ts` sets
+  the sensor suite and estimator per task.
+- Test 111001+: view-first 48.1% on its estimate vs 77.1% on the true pose (−29.0, CI −35.5 to −22.7; 77 vs
+  118 of 120 flights home); still +14.2 over nearest frontier and +16.7 over NBVP.
+- Loop closure in flight (`--loop`, `LoopCloser` with multi-sweep keyframes, `accumulate`): 47.8%, a tie
+  (−0.3, −8.4 to +8.1). More flights home (90 of 120) but less seen. Looked +10 on tuning seeds, −3.7 on
+  held-out dev, so not the default.
+
 ### FrontierBench Hard: the degraded-sensor track (2026-11-27)
 
 - `npm run bench:hard -- --track sensor`: four quadrotor tasks on the drift estimate with sensor faults that hit

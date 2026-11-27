@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 test('the homepage scrolls to its results and footer once the hero film has loaded its styles', async ({ page }) => {
   await page.goto('/index.html');
   await expect(page.locator('#app[data-ready="1"]')).toBeVisible();
+  // The scoreboard comes first; the live film waits until the hero is on screen.
+  await page.evaluate(() => document.querySelector('.hero')!.scrollIntoView({ block: 'center' }));
   // The hero imports the film page's stylesheet, which used to lock html and body to the window.
   await expect(page.locator('#hero-film canvas')).toBeAttached({ timeout: 120_000 });
   const overflow = await page.evaluate(() => [getComputedStyle(document.documentElement).overflowY, getComputedStyle(document.body).overflowY]);
@@ -23,7 +25,8 @@ test('the homepage hero shows the recorded flight at once, then hands over to th
   await expect.poll(() => page.evaluate(() => (document.querySelector('.hero-still') as HTMLImageElement | null)?.naturalWidth ?? 0), { timeout: 5_000 }).toBeGreaterThan(0);
   await expect.poll(() => page.evaluate(() => document.querySelector<HTMLVideoElement>('.hero-loop')?.currentTime ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
   await expect(page.locator('#poster-status')).toContainText('Recorded flight');
-  // The live replay builds behind it and fades in over it.
+  // The live replay starts once the hero, under the scoreboard, is on screen; it builds behind the loop and fades in over it.
+  await page.evaluate(() => document.querySelector('.hero')!.scrollIntoView({ block: 'center' }));
   await expect(page.locator('#hero-poster')).toHaveClass(/hidden/, { timeout: 150_000 });
   await expect(page.locator('#poster-status')).toContainText('Live');
 });

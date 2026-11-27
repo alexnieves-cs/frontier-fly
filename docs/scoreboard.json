@@ -1,0 +1,1150 @@
+{
+  "source": "bench/results (scripts/docs/scoreboard.mjs); regenerate with npm run docs",
+  "pilots": [
+    {
+      "id": "planner-view",
+      "short": "View-first planner",
+      "house": true,
+      "name": "Sensor-only planner, view first",
+      "meanRank": 1.875
+    },
+    {
+      "id": "info-gain",
+      "short": "Information gain",
+      "cite": "Gonzalez-Banos & Latombe 2002",
+      "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
+      "meanRank": 2.875
+    },
+    {
+      "id": "rapid-frontier",
+      "short": "Rapid frontier",
+      "cite": "Cieslewski et al. 2017",
+      "name": "Rapid frontier (Cieslewski et al. 2017)",
+      "meanRank": 4.25
+    },
+    {
+      "id": "nbvp",
+      "short": "NBVP",
+      "cite": "Bircher et al. 2016",
+      "name": "Next-best-view RRT (NBVP, Bircher et al. 2016)",
+      "meanRank": 4.375
+    },
+    {
+      "id": "yamauchi",
+      "short": "Nearest frontier",
+      "cite": "Yamauchi 1997",
+      "name": "Nearest frontier (Yamauchi 1997)",
+      "meanRank": 4.375
+    },
+    {
+      "id": "random-walk",
+      "short": "Random walk",
+      "floor": true,
+      "name": "Random walk",
+      "meanRank": 5.5
+    },
+    {
+      "id": "boustrophedon",
+      "short": "BA* coverage",
+      "cite": "Viet et al. 2013",
+      "name": "Boustrophedon coverage (BA*, Viet et al. 2013)",
+      "meanRank": 5.625
+    },
+    {
+      "id": "planner-tracker",
+      "short": "Sensor-only planner",
+      "house": true,
+      "name": "Sensor-only planner + quad tracker",
+      "meanRank": 7.125
+    }
+  ],
+  "tracks": [
+    {
+      "id": "v3",
+      "label": "FrontierBench v3",
+      "what": "Seven indoor tasks: one room, hard buildings, lights off, fast, multi-floor, quadrotor, apartments",
+      "unit": "share of the building flown through",
+      "note": "v3 scores the share flown through; the frontier and next-best-view methods stop once their lidar has mapped every room, so they rank low there (judge them on the camera tracks).",
+      "tasks": [
+        "room",
+        "hard",
+        "dark",
+        "fast",
+        "floors",
+        "quad",
+        "apartments"
+      ],
+      "seeds": {
+        "base": 82001,
+        "count": 30,
+        "last": 82030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:board -- --only"
+    },
+    {
+      "id": "hard",
+      "label": "Hard",
+      "what": "Large buildings, a sprint, lights off, multi-floor, on the randomized quadrotor; scored by a 90° forward camera",
+      "unit": "share of the building in camera view within 3 m",
+      "tasks": [
+        "large",
+        "large-quad",
+        "sprint",
+        "quad-dark",
+        "floors-quad"
+      ],
+      "seeds": {
+        "base": 93001,
+        "count": 30,
+        "last": 93030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:hard -- --split test --only"
+    },
+    {
+      "id": "return",
+      "label": "Return",
+      "what": "Hard buildings where the camera counts only if the drone lands back within 1.5 m of take-off",
+      "unit": "camera footprint, zero unless it came home",
+      "tasks": [
+        "return-large-quad",
+        "return-wind-quad",
+        "return-dark-quad",
+        "return-sprint"
+      ],
+      "seeds": {
+        "base": 97001,
+        "count": 30,
+        "last": 97030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:hard -- --track return --split test --only"
+    },
+    {
+      "id": "drift",
+      "label": "Drift",
+      "what": "Every pilot flies on its own pose estimate (lidar odometry), not the true pose",
+      "unit": "camera footprint on the estimated pose",
+      "tasks": [
+        "drift-large-quad",
+        "drift-wind-quad",
+        "drift-dark-quad",
+        "drift-quad"
+      ],
+      "seeds": {
+        "base": 99001,
+        "count": 30,
+        "last": 99030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "controlLabel": "same flights, true pose",
+      "run": "npm run bench:hard -- --track drift --split test --only"
+    },
+    {
+      "id": "drift-hard",
+      "label": "Hard drift",
+      "what": "Pose estimate from a 24-beam, 4 m time-of-flight ring: drift grows to meters",
+      "unit": "camera footprint on the estimated pose",
+      "tasks": [
+        "tof-large-quad",
+        "tof-long-quad",
+        "tof-wind-quad",
+        "tof-dark-quad"
+      ],
+      "seeds": {
+        "base": 111001,
+        "count": 30,
+        "last": 111030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "controlLabel": "same flights, true pose",
+      "run": "npm run bench:hard -- --track drift-hard --split test --only"
+    },
+    {
+      "id": "sensor",
+      "label": "Degraded sensors",
+      "what": "A dead lidar sector, no optical flow in the dark, a sparse lidar, a sensor that fails mid-flight",
+      "unit": "camera footprint with the faults",
+      "tasks": [
+        "sector-large-quad",
+        "flowless-dark-quad",
+        "sparse-quad",
+        "failing-quad"
+      ],
+      "seeds": {
+        "base": 141001,
+        "count": 30,
+        "last": 141030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "controlLabel": "same flights, healthy sensors",
+      "run": "npm run bench:hard -- --track sensor --split test --only"
+    },
+    {
+      "id": "overwatch",
+      "label": "Overwatch",
+      "what": "Find a lost person walking through four rooms and keep them in camera view, never closer than 2 m",
+      "unit": "share of the flight the person was in camera view from 2 m or more",
+      "tasks": [
+        "watch-rooms",
+        "watch-quad",
+        "watch-large-quad"
+      ],
+      "seeds": {
+        "base": 151001,
+        "count": 30,
+        "last": 151030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:hard -- --track overwatch --split test --only"
+    },
+    {
+      "id": "integrity",
+      "label": "Integrity",
+      "what": "Fly on the estimate and say when it has gone bad: false confidence costs more than honest doubt",
+      "unit": "integrity score (availability, with false confidence penalized)",
+      "tasks": [
+        "pl-tof-large-quad",
+        "pl-tof-dark-quad",
+        "pl-failing-quad",
+        "pl-quad"
+      ],
+      "seeds": {
+        "base": 161001,
+        "count": 30,
+        "last": 161030,
+        "perTaskOffset": 100
+      },
+      "split": "test",
+      "run": "npm run bench:hard -- --track integrity --split test --only"
+    }
+  ],
+  "cells": {
+    "v3": {
+      "planner-view": {
+        "value": 0.676035115120894,
+        "ci": [
+          0.6646259325979005,
+          0.6870341047806964
+        ],
+        "crashes": 0,
+        "flights": 240,
+        "commit": "d65e8a5",
+        "file": "bench/results/planner-view.json",
+        "best": false
+      },
+      "planner-tracker": {
+        "value": 0.6800909576728468,
+        "ci": [
+          0.6679781595702927,
+          0.6917952499623186
+        ],
+        "crashes": 1,
+        "flights": 240,
+        "commit": "160ae15",
+        "file": "bench/results/planner-tracker.json",
+        "best": true
+      },
+      "info-gain": {
+        "value": 0.1376294305560249,
+        "ci": [
+          0.1329286227139031,
+          0.14222079967536802
+        ],
+        "crashes": 2,
+        "flights": 240,
+        "commit": "28c6f50",
+        "file": "bench/results/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.2705216001131324,
+        "ci": [
+          0.26176445894081907,
+          0.27936756127757023
+        ],
+        "crashes": 5,
+        "flights": 240,
+        "commit": "160ae15",
+        "file": "bench/results/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.096615556342338,
+        "ci": [
+          0.0922680271079824,
+          0.10103444768482225
+        ],
+        "crashes": 2,
+        "flights": 240,
+        "commit": "28c6f50",
+        "file": "bench/results/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.08769233309897927,
+        "ci": [
+          0.08384858412552572,
+          0.09147101967015803
+        ],
+        "crashes": 2,
+        "flights": 240,
+        "commit": "160ae15",
+        "file": "bench/results/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.6538864891038693,
+        "ci": [
+          0.6401352974428587,
+          0.6666906697154478
+        ],
+        "crashes": 9,
+        "flights": 240,
+        "commit": "160ae15",
+        "file": "bench/results/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.4705050291671468,
+        "ci": [
+          0.45873285811340087,
+          0.48162497123230186
+        ],
+        "crashes": 3,
+        "flights": 240,
+        "commit": "28c6f50",
+        "file": "bench/results/random-walk.json",
+        "best": false
+      }
+    },
+    "hard": {
+      "planner-view": {
+        "value": 0.8776852959483605,
+        "ci": [
+          0.8616458082137773,
+          0.8924969980195107
+        ],
+        "crashes": 3,
+        "flights": 150,
+        "commit": "d65e8a5",
+        "file": "bench/results/hard/planner-view.json",
+        "best": true
+      },
+      "planner-tracker": {
+        "value": 0.3954119565477966,
+        "ci": [
+          0.37948146169495567,
+          0.4105021271568921
+        ],
+        "crashes": 3,
+        "flights": 150,
+        "commit": "3e69af9",
+        "file": "bench/results/hard/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.6795642223023642,
+        "ci": [
+          0.6499393655494672,
+          0.7065093480089135
+        ],
+        "crashes": 14,
+        "flights": 150,
+        "commit": "28c6f50",
+        "file": "bench/results/hard/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.6560475670032637,
+        "ci": [
+          0.6284105010332548,
+          0.6839607913047844
+        ],
+        "crashes": 25,
+        "flights": 150,
+        "commit": "3e69af9",
+        "file": "bench/results/hard/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.5499962789384467,
+        "ci": [
+          0.5249400916240381,
+          0.5750199911074091
+        ],
+        "crashes": 9,
+        "flights": 150,
+        "commit": "28c6f50",
+        "file": "bench/results/hard/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5844253655911181,
+        "ci": [
+          0.5559086943001152,
+          0.613742072788873
+        ],
+        "crashes": 15,
+        "flights": 150,
+        "commit": "3e69af9",
+        "file": "bench/results/hard/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.44597021141496035,
+        "ci": [
+          0.4233411069776887,
+          0.46760371904636777
+        ],
+        "crashes": 11,
+        "flights": 150,
+        "commit": "3e69af9",
+        "file": "bench/results/hard/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.5204242766753744,
+        "ci": [
+          0.49315301669517864,
+          0.5450999940641148
+        ],
+        "crashes": 11,
+        "flights": 150,
+        "commit": "28c6f50",
+        "file": "bench/results/hard/random-walk.json",
+        "best": false
+      }
+    },
+    "return": {
+      "planner-view": {
+        "value": 0.7548737771501997,
+        "ci": [
+          0.7410445095403372,
+          0.7683488147019107
+        ],
+        "crashes": 0,
+        "flights": 120,
+        "cameHome": 120,
+        "commit": "d65e8a5",
+        "file": "bench/results/hard-return/planner-view.json",
+        "best": true
+      },
+      "planner-tracker": {
+        "value": 0.25988930466725585,
+        "ci": [
+          0.24438323330938816,
+          0.273988356332017
+        ],
+        "crashes": 4,
+        "flights": 120,
+        "cameHome": 116,
+        "commit": "b3f30bb",
+        "file": "bench/results/hard-return/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.6202284511550156,
+        "ci": [
+          0.5737922592168394,
+          0.6596464592531679
+        ],
+        "crashes": 17,
+        "flights": 120,
+        "cameHome": 103,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-return/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.49663519256219163,
+        "ci": [
+          0.4559095609997047,
+          0.5324865906811441
+        ],
+        "crashes": 22,
+        "flights": 120,
+        "cameHome": 98,
+        "commit": "b3f30bb",
+        "file": "bench/results/hard-return/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.5059259985480418,
+        "ci": [
+          0.47440707088038625,
+          0.5370499986552996
+        ],
+        "crashes": 5,
+        "flights": 120,
+        "cameHome": 115,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-return/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5314638591880809,
+        "ci": [
+          0.4855903642489495,
+          0.5758175387803514
+        ],
+        "crashes": 17,
+        "flights": 120,
+        "cameHome": 103,
+        "commit": "b3f30bb",
+        "file": "bench/results/hard-return/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.32279327250808915,
+        "ci": [
+          0.30532016924617045,
+          0.33991798174764465
+        ],
+        "crashes": 8,
+        "flights": 120,
+        "cameHome": 112,
+        "commit": "b3f30bb",
+        "file": "bench/results/hard-return/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.37786691392360805,
+        "ci": [
+          0.3538593657037197,
+          0.4024770453168569
+        ],
+        "crashes": 5,
+        "flights": 120,
+        "cameHome": 115,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-return/random-walk.json",
+        "best": false
+      }
+    },
+    "drift": {
+      "planner-view": {
+        "value": 0.7870280995990707,
+        "ci": [
+          0.7709441699525611,
+          0.8010822961780453
+        ],
+        "crashes": 0,
+        "flights": 120,
+        "cameHome": 89,
+        "control": 0.7852599522882439,
+        "commit": "f08db77",
+        "file": "bench/results/hard-drift/planner-view.json",
+        "best": true
+      },
+      "planner-tracker": {
+        "value": 0.36190703106887817,
+        "ci": [
+          0.34735652266826567,
+          0.3759135844632444
+        ],
+        "crashes": 3,
+        "flights": 120,
+        "cameHome": 88,
+        "control": 0.3281234941911648,
+        "commit": "f08db77",
+        "file": "bench/results/hard-drift/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.6305172018804467,
+        "ci": [
+          0.592545552205882,
+          0.6668133160607225
+        ],
+        "crashes": 18,
+        "flights": 120,
+        "cameHome": 73,
+        "control": 0.6441997135232734,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-drift/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.5590066354170642,
+        "ci": [
+          0.5229403338982167,
+          0.5931016557587836
+        ],
+        "crashes": 20,
+        "flights": 120,
+        "cameHome": 73,
+        "control": 0.5453262443544145,
+        "commit": "f08db77",
+        "file": "bench/results/hard-drift/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.5559417843326144,
+        "ci": [
+          0.5273440700977359,
+          0.57894351618608
+        ],
+        "crashes": 8,
+        "flights": 120,
+        "cameHome": 83,
+        "control": 0.5215173475231452,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-drift/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5097866429255973,
+        "ci": [
+          0.4639754601485593,
+          0.5513975419673769
+        ],
+        "crashes": 28,
+        "flights": 120,
+        "cameHome": 65,
+        "control": 0.5044807355781495,
+        "commit": "f08db77",
+        "file": "bench/results/hard-drift/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.41478216353133546,
+        "ci": [
+          0.386558992353623,
+          0.4403644488633304
+        ],
+        "crashes": 13,
+        "flights": 120,
+        "cameHome": 82,
+        "control": 0.41198595507564284,
+        "commit": "f08db77",
+        "file": "bench/results/hard-drift/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.44940780675895475,
+        "ci": [
+          0.424795233243577,
+          0.47438247345474566
+        ],
+        "crashes": 6,
+        "flights": 120,
+        "cameHome": 86,
+        "control": 0.45331297614909394,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-drift/random-walk.json",
+        "best": false
+      }
+    },
+    "drift-hard": {
+      "planner-view": {
+        "value": 0.48119754418496874,
+        "ci": [
+          0.4189469627625966,
+          0.5453921596717413
+        ],
+        "crashes": 3,
+        "flights": 120,
+        "cameHome": 77,
+        "control": 0.7707835147457581,
+        "commit": "4d6a2cc",
+        "file": "bench/results/hard-drift-hard/planner-view.json",
+        "best": true
+      },
+      "planner-tracker": {
+        "value": 0.1502918306533688,
+        "ci": [
+          0.12806187276140232,
+          0.173680384751154
+        ],
+        "crashes": 6,
+        "flights": 120,
+        "cameHome": 73,
+        "control": 0.22405660926291535,
+        "commit": "4d6a2cc",
+        "file": "bench/results/hard-drift-hard/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.35448524071567356,
+        "ci": [
+          0.2980310093149357,
+          0.4145678188243944
+        ],
+        "crashes": 34,
+        "flights": 120,
+        "cameHome": 61,
+        "control": 0.621569975296009,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-drift-hard/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.3143788810031893,
+        "ci": [
+          0.268727518543314,
+          0.3596328687568761
+        ],
+        "crashes": 23,
+        "flights": 120,
+        "cameHome": 68,
+        "control": 0.47388556816878336,
+        "commit": "4d6a2cc",
+        "file": "bench/results/hard-drift-hard/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.32870568574547804,
+        "ci": [
+          0.28627072920405705,
+          0.3744329353051109
+        ],
+        "crashes": 19,
+        "flights": 120,
+        "cameHome": 79,
+        "control": 0.4952426903003029,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-drift-hard/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.3396848613476102,
+        "ci": [
+          0.28470178398833385,
+          0.3992744166369325
+        ],
+        "crashes": 29,
+        "flights": 120,
+        "cameHome": 65,
+        "control": 0.46255293661110913,
+        "commit": "4d6a2cc",
+        "file": "bench/results/hard-drift-hard/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.23095227281691308,
+        "ci": [
+          0.20381750288782532,
+          0.2581804936704756
+        ],
+        "crashes": 15,
+        "flights": 120,
+        "cameHome": 83,
+        "control": 0.2895843278966317,
+        "commit": "4d6a2cc",
+        "file": "bench/results/hard-drift-hard/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.2745962185506052,
+        "ci": [
+          0.24505294450884163,
+          0.30330105344858826
+        ],
+        "crashes": 10,
+        "flights": 120,
+        "cameHome": 95,
+        "control": 0.32642105875354704,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-drift-hard/random-walk.json",
+        "best": false
+      }
+    },
+    "sensor": {
+      "planner-view": {
+        "value": 0.8004954026938186,
+        "ci": [
+          0.7745436395596299,
+          0.821245244560351
+        ],
+        "crashes": 3,
+        "flights": 120,
+        "cameHome": 88,
+        "control": 0.8723592634753413,
+        "commit": "f630eb7",
+        "file": "bench/results/hard-sensor/planner-view.json",
+        "best": true
+      },
+      "planner-tracker": {
+        "value": 0.30695714266648455,
+        "ci": [
+          0.28020414136573274,
+          0.33364409574825105
+        ],
+        "crashes": 42,
+        "flights": 120,
+        "cameHome": 64,
+        "control": 0.4084863844344949,
+        "commit": "f630eb7",
+        "file": "bench/results/hard-sensor/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.4998695835391114,
+        "ci": [
+          0.44816571468590854,
+          0.5502155062984666
+        ],
+        "crashes": 61,
+        "flights": 120,
+        "cameHome": 47,
+        "control": 0.6955553549566444,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-sensor/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.5301711660655885,
+        "ci": [
+          0.4860039346046531,
+          0.5707613530405848
+        ],
+        "crashes": 52,
+        "flights": 120,
+        "cameHome": 56,
+        "control": 0.6488306883715904,
+        "commit": "f630eb7",
+        "file": "bench/results/hard-sensor/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.4839625205207381,
+        "ci": [
+          0.4474980665704081,
+          0.5198043704517366
+        ],
+        "crashes": 47,
+        "flights": 120,
+        "cameHome": 55,
+        "control": 0.6194880712947863,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-sensor/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.470263811569654,
+        "ci": [
+          0.4221526536885056,
+          0.5142981002660504
+        ],
+        "crashes": 61,
+        "flights": 120,
+        "cameHome": 44,
+        "control": 0.5754834828935856,
+        "commit": "f630eb7",
+        "file": "bench/results/hard-sensor/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.4598516861593729,
+        "ci": [
+          0.4347248148242733,
+          0.48407589610265533
+        ],
+        "crashes": 24,
+        "flights": 120,
+        "cameHome": 76,
+        "control": 0.5053087426963828,
+        "commit": "f630eb7",
+        "file": "bench/results/hard-sensor/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.42195411780472236,
+        "ci": [
+          0.3859179093193196,
+          0.45786594435874883
+        ],
+        "crashes": 49,
+        "flights": 120,
+        "cameHome": 60,
+        "control": 0.5300733798544706,
+        "commit": "28c6f50",
+        "file": "bench/results/hard-sensor/random-walk.json",
+        "best": false
+      }
+    },
+    "overwatch": {
+      "planner-view": {
+        "value": 0.5634398148148149,
+        "ci": [
+          0.515875,
+          0.6096805555555556
+        ],
+        "crashes": 3,
+        "flights": 90,
+        "commit": "170e91a",
+        "file": "bench/results/hard-overwatch/planner-view.json",
+        "best": false
+      },
+      "planner-tracker": {
+        "value": 0.4076805555555556,
+        "ci": [
+          0.36065277777777777,
+          0.4558055555555556
+        ],
+        "crashes": 5,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.6178333333333333,
+        "ci": [
+          0.5652592592592592,
+          0.6673611111111111
+        ],
+        "crashes": 6,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/info-gain.json",
+        "best": true
+      },
+      "nbvp": {
+        "value": 0.4824259259259258,
+        "ci": [
+          0.4276249999999999,
+          0.5347037037037038
+        ],
+        "crashes": 13,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.5409351851851851,
+        "ci": [
+          0.48665277777777777,
+          0.5974814814814814
+        ],
+        "crashes": 9,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5572685185185186,
+        "ci": [
+          0.5069166666666667,
+          0.6094074074074074
+        ],
+        "crashes": 10,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.4578333333333333,
+        "ci": [
+          0.40797685185185184,
+          0.5107824074074074
+        ],
+        "crashes": 6,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/boustrophedon.json",
+        "best": false
+      },
+      "random-walk": {
+        "value": 0.4715092592592593,
+        "ci": [
+          0.4178611111111112,
+          0.5232222222222223
+        ],
+        "crashes": 6,
+        "flights": 90,
+        "commit": "1a8aa28",
+        "file": "bench/results/hard-overwatch/random-walk.json",
+        "best": false
+      }
+    },
+    "integrity": {
+      "planner-view": {
+        "value": 0.5574791666666666,
+        "ci": [
+          0.45159027777777777,
+          0.6516215277777777
+        ],
+        "crashes": 7,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/planner-view.json",
+        "best": false
+      },
+      "planner-tracker": {
+        "value": -0.07883333333333334,
+        "ci": [
+          -0.37188194444444433,
+          0.19518055555555558
+        ],
+        "crashes": 33,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/planner-tracker.json",
+        "best": false
+      },
+      "info-gain": {
+        "value": 0.5694027777777778,
+        "ci": [
+          0.3728159722222222,
+          0.7191840277777778
+        ],
+        "crashes": 45,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/info-gain.json",
+        "best": false
+      },
+      "nbvp": {
+        "value": 0.5274409722222222,
+        "ci": [
+          0.3606145833333334,
+          0.6766909722222223
+        ],
+        "crashes": 44,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/nbvp.json",
+        "best": false
+      },
+      "rapid-frontier": {
+        "value": 0.7226180555555556,
+        "ci": [
+          0.6301944444444444,
+          0.8054270833333332
+        ],
+        "crashes": 36,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/rapid-frontier.json",
+        "best": false
+      },
+      "yamauchi": {
+        "value": 0.5946909722222222,
+        "ci": [
+          0.45996180555555555,
+          0.7028055555555556
+        ],
+        "crashes": 41,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/yamauchi.json",
+        "best": false
+      },
+      "boustrophedon": {
+        "value": 0.8146875,
+        "ci": [
+          0.7039722222222222,
+          0.89690625
+        ],
+        "crashes": 28,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/boustrophedon.json",
+        "best": true
+      },
+      "random-walk": {
+        "value": 0.6618854166666668,
+        "ci": [
+          0.5279722222222222,
+          0.7805486111111111
+        ],
+        "crashes": 34,
+        "flights": 120,
+        "commit": "de30789",
+        "file": "bench/results/hard-integrity/random-walk.json",
+        "best": false
+      }
+    }
+  },
+  "replays": [
+    {
+      "file": "docs/replay/hard-large-quad-93101.json",
+      "track": "hard",
+      "task": {
+        "id": "large-quad",
+        "label": "40 x 40 m building, quadrotor, 120 s",
+        "dynamics": "quad",
+        "lighting": "day",
+        "maxSteps": 2400
+      },
+      "seed": 93101,
+      "commit": "1a8aa28",
+      "flights": [
+        {
+          "id": "planner-view",
+          "name": "Sensor-only planner, view first",
+          "camera": 0.7331504702194357,
+          "crashed": false,
+          "result": "bench/results/hard/planner-view.json"
+        },
+        {
+          "id": "info-gain",
+          "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
+          "camera": 0.8311128526645768,
+          "crashed": false,
+          "result": "bench/results/hard/info-gain.json"
+        },
+        {
+          "id": "random-walk",
+          "name": "Random walk",
+          "camera": 0.3683385579937304,
+          "crashed": false,
+          "result": "bench/results/hard/random-walk.json"
+        }
+      ]
+    },
+    {
+      "file": "docs/replay/overwatch-watch-rooms-151001.json",
+      "track": "overwatch",
+      "task": {
+        "id": "watch-rooms",
+        "label": "Find a lost person and keep them in view, rooms, 120 s",
+        "dynamics": "kinematic",
+        "lighting": "day",
+        "maxSteps": 2400,
+        "person": true
+      },
+      "seed": 151001,
+      "commit": "170e91a",
+      "flights": [
+        {
+          "id": "info-gain",
+          "name": "Greedy information gain (Gonzalez-Banos & Latombe 2002)",
+          "camera": 0.7291666666666666,
+          "watch": 0.8370833333333333,
+          "crashed": false,
+          "result": "bench/results/hard-overwatch/info-gain.json"
+        },
+        {
+          "id": "planner-view",
+          "name": "Sensor-only planner, view first",
+          "camera": 0.6858974358974359,
+          "watch": 0.9041666666666667,
+          "crashed": false,
+          "result": "bench/results/hard-overwatch/planner-view.json"
+        },
+        {
+          "id": "random-walk",
+          "name": "Random walk",
+          "camera": 0.9951923076923077,
+          "watch": 0.40125,
+          "crashed": false,
+          "result": "bench/results/hard-overwatch/random-walk.json"
+        }
+      ]
+    }
+  ]
+}

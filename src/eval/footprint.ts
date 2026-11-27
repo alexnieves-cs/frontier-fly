@@ -90,6 +90,11 @@ export class FootprintCoverage {
     return this.total > 0 ? this.counts[r]! / this.total : 0;
   }
 
+  /** The voxels seen so far at radius index `r`, 1 where seen (env visited-grid layout). Read it, do not write it. */
+  seenMask(r = this.radii.indexOf(FOOTPRINT_RADIUS)): Uint8Array {
+    return this.seen[r]!;
+  }
+
   /** Coverage at every radius, in `radii` order. */
   all(): number[] {
     return this.counts.map((c) => (this.total > 0 ? c / this.total : 0));

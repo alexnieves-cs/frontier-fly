@@ -4,8 +4,10 @@ import { CoverageCurve, curveArea, EpisodeFootprint, FOOTPRINT_RADIUS, Footprint
 import { generateLargeBuilding } from '../team/largeBuilding';
 import { defaultEpisodeConfig, policyEpisodeLimits } from '../sim/env';
 import { lightingPreset } from '../sim/lighting';
-import { sensorFrame } from '../sim/sensorPlanner';
+import { sensorFrame, type SensorFrame } from '../sim/sensorPlanner';
 import { DriftFrames, type DriftStats } from './drift';
+import { IntegrityMeter, type IntegrityStats } from './integrity';
+import { Overwatch, type WatchStats } from './overwatch';
 import { RNG } from '../shared/rng';
 import { defaultDynParams, sampleDynParams, sampleNoise } from '../sim/dynamics/dr';
 import type { ExplorerEnv } from '../sim/env';
@@ -42,6 +44,10 @@ export interface BenchEpisode {
   returned?: boolean;
   /** Drift tasks only: how far the pilot's pose estimate was from the truth, horizontal metres. */
   drift?: DriftStats;
+  /** Overwatch tasks only: keeping the lost person in view (bench/overwatch.ts). */
+  watch?: WatchStats;
+  /** Integrity tasks only: the pilot's protection levels against its true pose error (bench/integrity.ts). */
+  integrity?: IntegrityStats;
 }
 
 /** How close to the take-off point a return task's flight has to end, m (horizontal). */
@@ -63,8 +69,10 @@ export function benchEpisodeSetup(task: BenchTask, run: BenchRun): { spec: Build
   // v3 flies under the crash rule (shared/constants.ts CRASH_SPEED: a contact faster than 0.5 m/s ends
   // the flight, coverage counts what was flown until then) and prices energy on the current airframe
   // (shared/airframe.ts), the same as every study in the report. v2 did neither (bench/results/v2/).
-  // A return flight crosses air it has already flown, so the no-new-voxels stall cut is off.
-  if (task.home) cfg.stallSteps = cfg.maxSteps + 1;
+  // A return flight crosses air it has already flown, so the no-new-voxels stall cut is off. So is a watcher
+  // holding on a lost person (overwatch) and a pilot that keeps flying on its estimate after it has seen
+  // everything (integrity): both are scored on every step of the budget.
+  if (task.home || task.person || task.integrity) cfg.stallSteps = cfg.maxSteps + 1;
   if (task.wind) {
     const a = new RNG(seed, 'bench-wind').next() * Math.PI * 2;
     cfg.wind = [Math.cos(a) * task.wind, Math.sin(a) * task.wind];
@@ -104,6 +112,8 @@ export class BenchEpisodeRecorder {
   private steps = 0;
   private over = false;
   private start: [number, number, number] = [0, 0, 0];
+  /** Overwatch tasks: the lost person and the scoring of the drone's view of them. */
+  readonly overwatch: Overwatch | null;
 
   constructor(
     private readonly env: ExplorerEnv,
@@ -111,10 +121,12 @@ export class BenchEpisodeRecorder {
     private readonly run: BenchRun,
   ) {
     const { spec, envSeed, cfg } = benchEpisodeSetup(task, run);
-    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics, ...(task.home ? { home: true } : {}) };
+    this.ctx = { speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics, ...(task.home ? { home: true } : {}), ...(task.person ? { person: true } : {}) };
     this.obs = env.reset(spec, envSeed, cfg);
     const p0 = env.snapshot().pos;
     this.start = [p0[0], p0[1], p0[2]];
+    this.overwatch = task.person ? new Overwatch(spec, run.seed, this.start) : null;
+    if (this.overwatch) this.overwatch.observe(0, p0, env.snapshot().yaw);
     this.fp.start(env, spec, cfg.maxSteps);
     this.cam = task.camera ? { fp: new FootprintCoverage([FOOTPRINT_RADIUS], CAMERA_FOV), curve: new CoverageCurve(cfg.maxSteps) } : null;
     if (this.cam) {
@@ -140,6 +152,10 @@ export class BenchEpisodeRecorder {
     if (this.cam) {
       this.observeCamera();
       this.cam.curve.step(this.steps, [this.cam.fp.coverage(0)]);
+    }
+    if (this.overwatch) {
+      const snap = this.env.snapshot();
+      this.overwatch.observe(this.steps, snap.pos, snap.yaw);
     }
     this.over = s.done || this.steps >= this.ctx.maxSteps;
     return this.over;
@@ -174,7 +190,13 @@ export class BenchEpisodeRecorder {
       footprintHalfS: timeTo(rec.curve.footprint, 0.5, this.ctx.maxSteps / 20),
       ...(camera ? { camera } : {}),
       ...(returned === undefined ? {} : { returned }),
+      ...(this.overwatch ? { watch: this.overwatch.stats(this.ctx.maxSteps) } : {}),
     };
+  }
+
+  /** The pilot's frame with what this task adds: the person sighting on overwatch tasks. */
+  decorate(frame: SensorFrame): SensorFrame {
+    return this.overwatch ? { ...frame, person: this.overwatch.seen() } : frame;
   }
 }
 
@@ -182,14 +204,17 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
   const rec = new BenchEpisodeRecorder(env, task, run);
   pilot.reset(rec.ctx);
   let obs = rec.obs;
-  const drift = task.drift ? new DriftFrames(env, run.seed, task.lighting !== 'day', task.faults ?? null) : null;
+  const drift = task.drift ? new DriftFrames(env, run.seed, task.lighting !== 'day', task.faults ?? null, task.driftProfile) : null;
+  const meter = task.integrity && drift ? new IntegrityMeter() : null;
   let first = true;
   for (;;) {
-    const s = env.step(pilot.act(obs, drift ? drift.frame(obs, first) : sensorFrame(env, obs)));
+    const action = pilot.act(obs, rec.decorate(drift ? drift.frame(obs, first) : sensorFrame(env, obs)));
+    if (meter) meter.step(drift!.error(), pilot.protectionLevel?.() ?? 0);
+    const s = env.step(action);
     first = false;
     obs = s.obs;
     if (rec.record(s)) break;
   }
   const ep = rec.finish();
-  return drift ? { ...ep, drift: drift.stats() } : ep;
+  return drift ? { ...ep, drift: drift.stats(), ...(meter ? { integrity: meter.stats(rec.ctx.maxSteps) } : {}) } : ep;
 }
