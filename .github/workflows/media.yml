@@ -124,6 +124,7 @@ jobs:
             docs/media/media.json
             docs/missions.json
             !docs/media/film-*
+            !docs/media/story*
           retention-days: 7
 
   stills:
@@ -197,6 +198,8 @@ jobs:
           name: story-master
           path: test-results/film/story-master.mp4
           retention-days: 30
+      # The clips job checks out the source commit, so its artifact must not carry docs/media/story*:
+      # unpacking it here would overwrite the story video cut above (it did in media runs 43119630563 and 45930723163).
       - if: needs.clips.result == 'success' || needs.clips.result == 'failure'
         continue-on-error: true
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
