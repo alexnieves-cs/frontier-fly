@@ -26,7 +26,10 @@ import { SearchPhase } from './phases/search';
 import { centerDist, DETECT_PERIOD, fmt, RANK, TRACK_PERIOD, type Waypoint } from './phases/shared';
 import { DEFAULT_BATTERY } from './battery';
 import type { HealthInput } from './failsafe';
-import { CRASH_SPEED } from '../../shared/constants';
+import { CRASH_SPEED, DRONE_RADIUS } from '../../shared/constants';
+
+/** Free air the up range finder must see above the airframe's centre before an indoor climb, m. */
+const HEADROOM_M = DRONE_RADIUS + 0.2;
 
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
 /**
@@ -239,6 +242,7 @@ class Runner implements MissionRunner {
     let cmd = this.c.believed(() => this.climbClear(this.c.job.tick()));
     if (this.c.finished) return;
     if (this.c.loc) cmd = this.flyOnEstimate(cmd);
+    cmd = this.headroom(cmd);
     this.c.lastCmd = cmd;
     const wind: V3 = this.c.faults && !this.c.inside ? this.c.faults.wind() : (this.c.options.wind?.(this.c.t) ?? [0, 0, 0]);
     const step = this.c.vehicle.step(cmd, this.c.dt, this.c.limits(), { wind });
@@ -516,6 +520,21 @@ class Runner implements MissionRunner {
    * dead-reckoning guess, so climb to cruise height (height comes from the barometer and range
    * finder, which still work) and back away from the nearest building, instead of flying the plan.
    */
+  /**
+   * Indoors, the up and down range finders veto a climb into a ceiling, or a descent onto a floor,
+   * that they see within HEADROOM_M (a landing is the one descent that means to touch). Climbs and
+   * descents are planned on the drone's own pose and maps, and a shaft or trail point placed from a
+   * drifted estimate can put a slab over or under the airframe; the range finders read the real
+   * building, whatever the estimate says.
+   */
+  private headroom(cmd: VehicleCommand): VehicleCommand {
+    const vz = cmd.vel[2];
+    if (!this.c.inside || vz === 0 || (vz < 0 && this.c.phase === 'land')) return cmd;
+    const p = this.c.vehicle.pos;
+    if (!this.c.physics.cast(p[0], p[1], p[2], 0, 0, vz > 0 ? 1 : -1, HEADROOM_M)) return cmd;
+    return { ...cmd, vel: [cmd.vel[0], cmd.vel[1], 0] };
+  }
+
   private climbClear(cmd: VehicleCommand): VehicleCommand {
     const flags = this.c.health?.flags;
     // Without a fix, hold position by climbing rather than hovering where drift can carry the drone into a wall.

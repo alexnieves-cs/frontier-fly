@@ -23,9 +23,9 @@ The drone sweeps a geofenced patch of woods, finds the building, picks an openin
 <!-- generated:scoreboard:start -->
 | Track (test seeds) | View-first planner | Information gain | Rapid frontier | Nearest frontier | NBVP | Random walk | BA* coverage | Sensor-only planner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **FrontierBench v3** (82001+, 30 per task × 7) | 67.4% | 13.8% | 9.7% | 8.8% | 27.1% | 47.1% | 65.4% | **68.0%** |
-| **Hard** (93001+, 30 per task × 5) | **86.0%** | 68.0% | 55.0% | 58.4% | 65.6% | 52.0% | 44.6% | 39.5% |
-| **Return** (97001+, 30 per task × 4) | **74.0%** | 62.0% | 50.6% | 53.1% | 49.7% | 37.8% | 32.3% | 26.0% |
+| **FrontierBench v3** (82001+, 30 per task × 7) | 67.6% | 13.8% | 9.7% | 8.8% | 27.1% | 47.1% | 65.4% | **68.0%** |
+| **Hard** (93001+, 30 per task × 5) | **87.8%** | 68.0% | 55.0% | 58.4% | 65.6% | 52.0% | 44.6% | 39.5% |
+| **Return** (97001+, 30 per task × 4) | **75.5%** | 62.0% | 50.6% | 53.1% | 49.7% | 37.8% | 32.3% | 26.0% |
 | **Drift** (99001+, 30 per task × 4) | **78.7%** | 63.1% | 55.6% | 51.0% | 55.9% | 44.9% | 41.5% | 36.2% |
 | **Hard drift** (111001+, 30 per task × 4) | **48.1%** | 35.4% | 32.9% | 34.0% | 31.4% | 27.5% | 23.1% | 15.0% |
 | **Degraded sensors** (141001+, 30 per task × 4) | **80.0%** | 50.0% | 48.4% | 47.0% | 53.0% | 42.2% | 46.0% | 30.7% |
