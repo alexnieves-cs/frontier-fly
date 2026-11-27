@@ -129,7 +129,10 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898237+github-actions[bot]@users.noreply.github.com'
           b="train/${{ github.run_id }}-${{ matrix.k }}"
-          git checkout -b "$b"
+          # Results go on a branch off main: a branch that changes workflow files (a training branch
+          # often does) cannot be pushed with this token.
+          git fetch --depth 1 origin main
+          git checkout -f -b "$b" FETCH_HEAD
           git add -f train-out
           git commit -m "train:ppo run ${{ github.run_id }} #${{ matrix.k }}: $(cat train-out/args.txt) $NOTE"
           git push origin "$b"

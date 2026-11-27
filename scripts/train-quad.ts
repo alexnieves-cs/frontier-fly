@@ -286,8 +286,8 @@ async function main() {
     console.log(`expert on practice: ${pct(s.coverage)} crashes ${s.crashes}/${s.n}`);
   }
 
-  if (num('rl', 0) > 0) {
-    if (!init) throw new Error('--rl needs --init (a distilled student)');
+  if (num('rl', 0) > 0 && iters === 0) {
+    if (!init) throw new Error('--rl with --iters 0 needs --init (a distilled student)');
     await reinforce(pool, workers, policy, trainer, outDir, hidden, rng, val);
     console.log(`done in ${((Date.now() - started) / 60000).toFixed(1)} min`);
     await pool.close();
@@ -308,6 +308,7 @@ async function main() {
       crashBoost: num('crash-boost', 3),
       crashLookback: num('crash-lookback', 30),
       divergeBoost: num('diverge-boost', 1.5),
+      brakeBoost: num('brake-boost', 1),
       vzNoise: num('vz-noise', 0.3),
       seed: seed * 100000 + it * 100 + w,
     });
@@ -357,7 +358,16 @@ async function main() {
     }
     writeFileSync(join(outDir, 'log.json'), JSON.stringify({ args, log }, null, 1));
   }
-  console.log(`done in ${((Date.now() - started) / 60000).toFixed(1)} min; best practice score ${pct(best)}`);
+  console.log(`dagger done in ${((Date.now() - started) / 60000).toFixed(1)} min; best practice score ${pct(best)}`);
+  if (num('rl', 0) > 0) {
+    // Then PPO from the best DAgger student, in its own directory.
+    policy.setWeights(paddedWeights(parseCheckpoint(readFileSync(join(outDir, 'best.bin')))));
+    trainer.pushWeights();
+    const rlDir = join(outDir, 'rl');
+    mkdirSync(rlDir, { recursive: true });
+    await reinforce(pool, workers, policy, trainer, rlDir, hidden, rng, practiceEpisodes(num('rl-val', num('val', 16))));
+  }
+  console.log(`done in ${((Date.now() - started) / 60000).toFixed(1)} min`);
   await pool.close();
 }
 

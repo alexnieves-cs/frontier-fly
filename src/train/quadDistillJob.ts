@@ -48,6 +48,8 @@ export interface DaggerPayload {
   crashLookback: number;
   /** Weight multiplier where student and expert commands differ by more than 0.3 (L2). */
   divergeBoost: number;
+  /** Weight multiplier where the expert's own braking filter cut its command (safety-critical states). */
+  brakeBoost?: number;
   /** Std of a slow random vertical command (Ornstein-Uhlenbeck, action units) added to executed commands, so off-height states get labeled. */
   vzNoise: number;
   /** Planner options layered over the default quad pilot's (plain numbers only), e.g. a wider braking margin. */
@@ -158,6 +160,7 @@ const quadDagger: JobFn = (_ctx, raw) => {
       for (let i = 0; i < MAPS; i++) maps[t * MAPS + i] = Math.round(Math.max(0, Math.min(1, row[HEAD + i]!)) * 255);
       for (let i = 0; i < ACT_DIM; i++) labels.push(label[i]!);
       let w = 1;
+      if (expert.planner.lastSafetyCut > 0.05) w *= p.brakeBoost ?? 1;
       const useExpert = !student || rng.next() < p.beta;
       if (useExpert) {
         exec.set(label);
