@@ -335,6 +335,8 @@ export class TfTrainer {
       weights?: Float32Array;
       /** Per-action-dimension loss weights [actDim], e.g. to stop a small-magnitude vz label from being ignored. */
       actionWeights?: number[];
+      /** Compare tanh(mean) with the actions themselves instead of pre-tanh means with atanh targets. */
+      actionSpace?: boolean;
     },
   ): Promise<number> {
     await this.ready();
@@ -343,7 +345,8 @@ export class TfTrainer {
     const minibatch = opts?.minibatch ?? 256;
     const weights = opts?.weights;
     if (weights && weights.length < n) throw new Error('imitate: weights shorter than n');
-    const targets = atanhTargets(actions, n * this.policy.actDim);
+    const targets = opts?.actionSpace ? actions : atanhTargets(actions, n * this.policy.actDim);
+    this.squashLoss = opts?.actionSpace ?? false;
     this.actionWeights = opts?.actionWeights ? tf.keep(tf.tensor1d(opts.actionWeights)) : null;
     let last = 0;
     for (let epoch = 0; epoch < epochs; epoch++) {
@@ -367,6 +370,7 @@ export class TfTrainer {
     }
     this.actionWeights?.dispose();
     this.actionWeights = null;
+    this.squashLoss = false;
     this.pullWeights();
     return last;
   }
@@ -413,6 +417,8 @@ export class TfTrainer {
 
   /** Weighted (or plain) mean squared error between mean rows and targets. */
   private actionWeights: tf.Tensor1D | null = null;
+  /** imitate() with actionSpace: the loss compares squashed actions. */
+  private squashLoss = false;
 
   private static weightedMse(mean: tf.Tensor, tgt: tf.Tensor, w: tf.Tensor | null, dims: tf.Tensor | null = null): tf.Tensor {
     const sq = tf.square(tf.sub(mean, tgt));
@@ -429,7 +435,8 @@ export class TfTrainer {
     let before = Number.NaN;
     const cost = this.optimizerFor('policy').minimize(
       () => {
-        const loss = TfTrainer.weightedMse(this.policyMean(obsT), tgt, wT, this.actionWeights) as tf.Scalar;
+        const mean = this.policyMean(obsT);
+        const loss = TfTrainer.weightedMse(this.squashLoss ? tf.tanh(mean) : mean, tgt, wT, this.actionWeights) as tf.Scalar;
         before = loss.dataSync()[0] ?? Number.NaN;
         return loss;
       },
