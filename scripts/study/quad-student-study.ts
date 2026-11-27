@@ -69,7 +69,9 @@ function summarize(rows: Row[]) {
 
 const merge = args.indexOf('--merge');
 if (merge >= 0) {
-  const files = args.slice(merge + 1).filter((a) => !a.startsWith('--') && a !== out);
+  // The files run from --merge to the next flag (study.yml appends its args after them).
+  const end = args.findIndex((a, i) => i > merge && a.startsWith('--'));
+  const files = args.slice(merge + 1, end < 0 ? undefined : end);
   const rows: Row[] = files.flatMap((f) =>
     readFileSync(f, 'utf8')
       .split('\n')

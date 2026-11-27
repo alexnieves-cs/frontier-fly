@@ -26,6 +26,10 @@ on:
         description: Extra arguments for every shard and the merge (e.g. --base 79301)
         required: false
         default: ''
+      from_run:
+        description: Merge the shards of an earlier run (its run id) instead of flying them again
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -44,6 +48,7 @@ jobs:
           STUDY: ${{ inputs.study }}
           OUT: ${{ inputs.out }}
           SHARDS: ${{ inputs.shards }}
+          FROM_RUN: ${{ inputs.from_run }}
         run: |
           python3 - <<'EOF' >> "$GITHUB_OUTPUT"
           import json, os, re
@@ -51,11 +56,13 @@ jobs:
           assert re.fullmatch(r'docs/[A-Za-z0-9_./-]+\.json', os.environ['OUT']) and '..' not in os.environ['OUT'], 'out: a .json path under docs/'
           n = int(os.environ['SHARDS'])
           assert 1 <= n <= 16, 'shards: 1 to 16'
+          assert re.fullmatch(r'[0-9]*', os.environ['FROM_RUN']), 'from_run: a run id'
           print('shards=' + json.dumps(list(range(n))))
           EOF
 
   shard:
     needs: plan
+    if: inputs.from_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 300
     strategy:
@@ -97,11 +104,13 @@ jobs:
           retention-days: 7
 
   merge:
-    needs: shard
+    needs: [plan, shard]
+    if: always() && needs.plan.result == 'success' && (needs.shard.result == 'success' || (needs.shard.result == 'skipped' && inputs.from_run != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
       contents: write
+      actions: read
     env:
       STUDY_ENTRY: ${{ inputs.study }}
       STUDY: ${{ inputs.study }}
@@ -121,6 +130,9 @@ jobs:
           pattern: shard-*
           path: shards
           merge-multiple: true
+          # From this run's shards, or from an earlier run's when from_run is set.
+          run-id: ${{ inputs.from_run || github.run_id }}
+          github-token: ${{ github.token }}
       - run: npx vite-node "scripts/study/$STUDY.ts" -- --merge shards/*.jsonl --out "$OUT" $STUDY_ARGS
       # Also push the result to its own branch: some clients (the cloud container's proxy) can fetch
       # git but not artifact or log downloads, which are served from blob storage.
