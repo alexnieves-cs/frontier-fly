@@ -101,8 +101,10 @@ export class QuadStudentPilot {
     this.input.reset();
   }
 
-  act(obs: Float32Array): Float32Array {
+  /** The next command; `filter` (a safety shield, say) may change it in place before it is recorded as executed. */
+  act(obs: Float32Array, filter?: (a: Float32Array) => void): Float32Array {
     const a = this.policy.actWith(this.input.build(obs), 1, this.rng, true).action;
+    filter?.(a);
     this.input.executed(a);
     return a;
   }
