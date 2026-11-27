@@ -6,6 +6,8 @@ import { AUTHOR, prefersReducedMotion, REPO_URL as REPO, siteHeader } from '../u
 import { isWebglError } from '../ui/startError';
 import { atlasRates } from '../ui/tour/claims';
 import { pct, results, type PilotResult } from './results';
+import { mountBenchReplay } from './benchReplay';
+import { scoreboard, scoreboardTable } from './scoreboard';
 
 const HERO_SCENARIO = 'cabin-day';
 
@@ -30,9 +32,45 @@ function markup(): string {
         </li>`,
     )
     .join('');
+  const replay = scoreboard.replays[0];
+  const lead = replay ? scoreboard.pilots.find((p) => p.id === replay.flights[0]?.id) : undefined;
   return `
   <div class="landing">
     ${siteHeader('home', { heading: false })}
+    <section class="board" id="scoreboard" aria-labelledby="board-title">
+      <div class="board-head">
+        <p class="kicker">FRONTIERBENCH · AN OPEN BENCHMARK, IN SIMULATION</p>
+        <h1 id="board-title">Can your planner search a building faster?</h1>
+        <p class="board-pitch">
+          Exploration planners for indoor search drones, flown on the same seeded buildings in simulation and scored on how much
+          of each building their camera has in view. Every cell is a measured number read from the bench's result files at
+          build time; none is typed by hand. ${lead ? `${lead.short} leads today. Beat it.` : ''}
+        </p>
+      </div>
+      ${scoreboardTable(REPO)}
+      <p class="board-foot">
+        Hover or focus a cell for its 95% interval, crashes, control run and commit. Higher is better; the best in each row is highlighted.
+        <a href="${REPO}/blob/main/docs/LEADERBOARD.md" rel="noopener">Full leaderboard</a>
+        <a href="${REPO}/blob/main/docs/LEADERBOARD.md#submit-an-entry" rel="noopener">Submit a pilot</a>
+      </p>
+    </section>
+
+    ${
+      replay
+        ? `<section class="replay" aria-labelledby="replay-title">
+      <div class="replay-head">
+        <h2 id="replay-title">The same test building, flown by ${replay.flights.length === 1 ? 'one pilot' : `${replay.flights.length} pilots`}</h2>
+        <p>
+          ${replay.track === 'hard' ? 'Hard' : replay.track} track, task <code>${replay.task.id}</code> (${replay.task.label}), seed ${replay.seed}: the task's first
+          test seed, not a picked one. Top-down; lit floor is what each pilot's 90° camera has had in view within 3 m, and each
+          count ends on that flight's score in the result files.
+        </p>
+      </div>
+      <div class="replay-host" id="bench-replay"></div>
+    </section>`
+        : ''
+    }
+
     <section class="hero" data-tour="hero" aria-label="Mission replay">
       <div class="hero-film" id="hero-film"></div>
       <div class="hero-poster" id="hero-poster">
@@ -50,8 +88,8 @@ function markup(): string {
 
     <section class="intro">
       <div class="intro-copy">
-        <p class="kicker">AUTONOMOUS SEARCH AND RESCUE · RUNS IN YOUR TAB</p>
-        <h1>frontier-fly</h1>
+        <p class="kicker">THE SIMULATOR BEHIND IT · RUNS IN YOUR TAB</p>
+        <h2 class="intro-title">frontier-fly</h2>
         <p class="pitch">
           A rescue drone that sweeps the woods, finds the building, flies in through an opening it fits, and searches
           room by room, in buildings it has never seen, on its own sensors and without the floor plan. The physics,
@@ -185,6 +223,8 @@ function whenSettledAndVisible(target: HTMLElement, fn: () => void): void {
 
 function start(root: HTMLElement): void {
   root.innerHTML = markup();
+  const replayHost = root.querySelector<HTMLElement>('#bench-replay');
+  if (replayHost && scoreboard.replays[0]) mountBenchReplay(replayHost, scoreboard.replays[0], REPO);
   // The page is usable now; the hero shows the recorded flight while the live replay loads behind it.
   root.dataset.ready = '1';
   const hero = root.querySelector<HTMLElement>('.hero')!;

@@ -381,21 +381,27 @@ The speed study scored the same way, flown / footprint at each speed cap:
 
 ### Against published exploration methods
 
-The planner above was designed in this repository, so it needs comparison against methods others published. FrontierBench now carries three of them as baselines ([LEADERBOARD.md](LEADERBOARD.md), `src/sim/explorers`), each written from its paper:
+The planner above was designed in this repository, so it needs comparison against methods others published. FrontierBench now carries five of them as baselines ([LEADERBOARD.md](LEADERBOARD.md), `src/sim/explorers`), each written from its paper, and a random walk as the floor:
 
 - **Nearest frontier** (B. Yamauchi, *A frontier-based approach for autonomous exploration*, IEEE CIRA 1997). Frontier cells are known-free cells next to unknown space. Regions smaller than three voxels are dropped. The drone flies to the nearest region by path length and keeps that goal until it arrives or makes no progress. Reached and inaccessible destinations are skipped after that.
+- **Greedy information gain** (H. H. Gonzalez-Banos and J.-C. Latombe, *Navigation strategies for exploring indoor environments*, IJRR 2002). Candidate viewpoints are sampled in known free space next to unknown space and scored by the unknown area their sensor would see, times exp(−λ · path length). The drone flies the whole path to the best one, then chooses again. λ = 0.1 per metre was picked on the hard track's dev split; the paper leaves it free.
+- **Rapid frontier** (T. Cieslewski, E. Kaufmann and D. Scaramuzza, *Rapid exploration with multi-rotors: a frontier selection method for high speed flight*, IEEE/RSJ IROS 2017). While a frontier lies in the forward camera's view, the drone flies straight at the one that needs the smallest change of velocity, so it keeps its speed. With none in view it falls back to nearest frontier.
 - **Receding-horizon next-best-view, NBVP** (A. Bircher et al., *Receding horizon "next-best-view" planner for 3D exploration*, IEEE ICRA 2016). An RRT grows through known free space. Each node's gain is the unknown voxels its sensor would see, discounted by exp(−0.5 · path length) and summed along the branch. The drone flies only the first edge of the best branch, then regrows the tree from the rest of that branch.
 - **Online boustrophedon coverage, BA\*** (H. H. Viet et al., *BA\*: an online complete coverage algorithm for cleaning robots*, Applied Intelligence 2013; after H. Choset and P. Pignon, *Coverage path planning: the boustrophedon cellular decomposition*, FSR 1997). It steps north, south, east or west, in that priority, into known-free cells it has not flown. At a dead end it backtracks along the shortest known path to the nearest uncovered cell next to a covered one. Its cell is the bench's 0.5 m voxel, so its lanes are one voxel apart.
+- **Random walk** (no paper). A uniformly random heading, flown straight until the lidar shows a wall ahead or the leg times out, then a new one. It never plans, so it is the floor every planner should beat.
 
-All three run on the same inputs as the planner. They use its lidar occupancy map, its path cost near unknown space, its pure pursuit, its altitude hold and its safety filter (the braking filter on the quadrotor), and they take shafts through the same climber. So the comparison isolates *where each method chooses to go*. Parameters are the papers' own where a paper gives one (NBVP's λ = 0.5) and were not tuned on any split. The papers' 360° sweep and NBVP's yaw sampling are dropped, because the lidar ring already sees 360° on every step. Every pilot flies the same 240 test flights:
+All five, and the random walk, run on the same inputs as the planner. They use its lidar occupancy map, its path cost near unknown space, its pure pursuit, its altitude hold and its safety filter (the braking filter on the quadrotor), and they take shafts through the same climber. So the comparison isolates *where each method chooses to go*. Parameters are the papers' own where a paper gives one (NBVP's λ = 0.5) and were not tuned on any split, apart from information gain's free λ. The papers' 360° sweep and NBVP's yaw sampling are dropped, because the lidar ring already sees 360° on every step. Every pilot flies the same 240 test flights:
 
 | Pilot | Score (flown) | Footprint score | Footprint curve area | Half seen, s | Flights ended by a crash | Flights that touched nothing |
 | --- | --- | --- | --- | --- | --- | --- |
 | Sensor-only planner (this repository) | 66.2% | 85.2% | 0.65 | 39.0 | 12 of 240 | 94% |
 | Sensor-only planner, view first (this repository) | 67.4% | 99.1% | 0.91 | 11.8 | 0 of 240 | 100% |
-| Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 2 of 240 | 99% |
+| Greedy information gain (Gonzalez-Banos & Latombe 2002) | 13.8% | 83.5% | 0.80 | 8.0 | 2 of 240 | 99% |
 | Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.1% | 89.7% | 0.84 | 10.5 | 5 of 240 | 98% |
+| Rapid frontier (Cieslewski et al. 2017) | 9.7% | 74.3% | 0.71 | 10.6 | 2 of 240 | 99% |
+| Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 2 of 240 | 99% |
 | Boustrophedon coverage (BA*, Viet et al. 2013) | 65.4% | 87.4% | 0.67 | 35.0 | 9 of 240 | 95% |
+| Random walk | 47.1% | 85.3% | 0.70 | 31.2 | 3 of 240 | 98% |
 
 *Footprint curve area* is the normalized area under the footprint-over-time curve: 1 means the whole building was in view at once. *Half seen* is the mean time until half the building was inside the 3 m footprint.
 

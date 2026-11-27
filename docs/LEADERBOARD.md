@@ -15,25 +15,31 @@ FrontierBench is this repository's indoor exploration benchmark, frozen so that 
 | 5 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **65.4%** | 87.4% | 95.1% | 60.8% | 60.3% | 79.6% | 41.2% | 35.1% | 85.6% | 9 of 240 | 95% | −0.6 (−1.8 to +0.5), tied | `160ae15` |
 | 6 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **62.7%** | 80.0% | 95.1% | 73.1% | 74.1% | 66.4% | 38.7% | 25.8% | 65.5% | 51 of 240 | 67% | −2.7 (−4.8 to −0.8) | `160ae15` |
 | 7 | [Example: planner cruising at 1.6 m/s](../bench/entries/example) | **59.5%** | 83.1% | 93.2% | 54.6% | 54.5% | 56.7% | 36.9% | 39.7% | 80.6% | 5 of 240 | 96% | −3.2 (−5.0 to −1.2) | `160ae15` |
-| 8 | Shipped policy (DAgger + PPO) (baseline) | **46.4%** | 65.3% | 95.1% | 69.8% | 73.9% | 6.0% | 35.9% | 9.2% | 35.0% | 152 of 240 | 28% | −13.0 (−14.8 to −11.3) | `160ae15` |
-| 9 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **27.1%** | 89.7% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 22.8% | 31.1% | 5 of 240 | 98% | −19.4 (−21.4 to −17.3) | `160ae15` |
-| 10 | Frontier waypoint follower (baseline) | **19.1%** | 49.9% | 52.8% | 20.4% | 15.7% | 6.6% | 12.0% | 3.6% | 22.5% | 239 of 240 | 0% | −8.0 (−9.3 to −6.6) | `160ae15` |
-| 11 | Lidar wall-follower (baseline) | **16.8%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 17.5% | 10.1% | 1 of 240 | 97% | −2.2 (−3.4 to −1.1) | `160ae15` |
-| 12 | Nearest frontier (Yamauchi 1997) (baseline) | **8.8%** | 73.5% | 3.3% | 10.0% | 11.6% | 10.3% | 4.6% | 9.7% | 11.9% | 2 of 240 | 99% | −8.1 (−8.9 to −7.3) | `160ae15` |
+| 8 | Random walk (baseline) | **47.1%** | 85.3% | 71.7% | 44.5% | 42.3% | 51.9% | 31.9% | 36.8% | 50.3% | 3 of 240 | 98% | −12.4 (−13.4 to −11.5) | `28c6f50` |
+| 9 | Shipped policy (DAgger + PPO) (baseline) | **46.4%** | 65.3% | 95.1% | 69.8% | 73.9% | 6.0% | 35.9% | 9.2% | 35.0% | 152 of 240 | 28% | −0.6 (−2.6 to +1.2), tied | `160ae15` |
+| 10 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **27.1%** | 89.7% | 46.0% | 18.0% | 38.4% | 21.1% | 12.0% | 22.8% | 31.1% | 5 of 240 | 98% | −19.4 (−21.4 to −17.3) | `160ae15` |
+| 11 | Frontier waypoint follower (baseline) | **19.1%** | 49.9% | 52.8% | 20.4% | 15.7% | 6.6% | 12.0% | 3.6% | 22.5% | 239 of 240 | 0% | −8.0 (−9.3 to −6.6) | `160ae15` |
+| 12 | Lidar wall-follower (baseline) | **16.8%** | 61.1% | 29.1% | 15.0% | 19.8% | 17.5% | 8.9% | 17.5% | 10.1% | 1 of 240 | 97% | −2.2 (−3.4 to −1.1) | `160ae15` |
+| 13 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **13.8%** | 83.5% | 11.9% | 12.2% | 18.1% | 13.2% | 7.5% | 13.0% | 20.5% | 2 of 240 | 99% | −3.1 (−3.9 to −2.3) | `28c6f50` |
+| 14 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **9.7%** | 74.3% | 4.8% | 10.6% | 12.2% | 11.5% | 5.8% | 9.7% | 13.0% | 2 of 240 | 99% | −4.1 (−4.6 to −3.6) | `28c6f50` |
+| 15 | Nearest frontier (Yamauchi 1997) (baseline) | **8.8%** | 73.5% | 3.3% | 10.0% | 11.6% | 10.3% | 4.6% | 9.7% | 11.9% | 2 of 240 | 99% | −0.9 (−1.2 to −0.6) | `160ae15` |
 
-The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. *Flights ended by a crash* counts the test flights the crash rule ended, and *flights that touched nothing* the share with no contact at all, slow ones included. *Score vs the row above* is the score gap in points with a paired 95% bootstrap interval (both pilots fly the same buildings; flights are resampled within each task): where it says *tied* the interval includes zero and the two ranks should be read as one. The quad-aware planner leads the plain planner only through the `quad` task, the one task where they fly differently. The `room` task is one empty room that almost every pilot covers equally, so it is a sanity check and does not separate pilots. The planner and its variants were tuned on the dev split; the three published methods use their papers' parameters and were not tuned, which favors the planner. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
+The **footprint score** is reported beside the score and does not rank: the mean share of the reachable building that came within 3 m of the drone's sensor, by ground-truth rays at its altitude, the way exploration papers count coverage ([REPORT.md](REPORT.md#coverage-the-way-exploration-papers-measure-it), `src/eval/footprint.ts`). The score counts only voxels the drone flew through, which rewards tight sweep lanes. *Flights ended by a crash* counts the test flights the crash rule ended, and *flights that touched nothing* the share with no contact at all, slow ones included. *Score vs the row above* is the score gap in points with a paired 95% bootstrap interval (both pilots fly the same buildings; flights are resampled within each task): where it says *tied* the interval includes zero and the two ranks should be read as one. The quad-aware planner leads the plain planner only through the `quad` task, the one task where they fly differently. The `room` task is one empty room that almost every pilot covers equally, so it is a sanity check and does not separate pilots. The planner and its variants were tuned on the dev split; the published methods use their papers' parameters and were not tuned, apart from information gain's path-length discount λ, which its paper leaves free and which was picked on the hard track's dev split. That favors the planner. Baselines are re-scored by `npm run bench:board`; submitted entries are re-scored from their code by CI (`npm run bench:verify`) on every pull request that touches them.
 
 ### Published methods
 
-Three baselines reimplement published exploration methods on the same sensor maps, flight layer and safety filter as the planner (`src/sim/explorers`): nearest frontier (Yamauchi 1997), receding-horizon next-best-view (NBVP, Bircher et al. 2016) and online boustrophedon coverage (BA\*, Viet et al. 2013). The two mapping methods stop once nothing in lidar range is unknown, so they rank low on flown coverage. Judge them on the footprint. NBVP leads the sweeping planner there; the view-first planner (`planner-view`, [VIEW_FIRST.md](VIEW_FIRST.md)), which picks goals by what its own lidar has not yet had within 3 m, leads NBVP on the same test flights and on a fresh report-only block:
+Five baselines reimplement published exploration methods on the same sensor maps, flight layer and safety filter as the planner (`src/sim/explorers`): nearest frontier (Yamauchi 1997), greedy information gain (Gonzalez-Banos & Latombe 2002), rapid frontier (Cieslewski et al. 2017), receding-horizon next-best-view (NBVP, Bircher et al. 2016) and online boustrophedon coverage (BA\*, Viet et al. 2013). A random walk with no map and no plan (`src/sim/explorers/randomWalk.ts`) is the floor. The four mapping methods stop once nothing in lidar range is unknown, so they rank low on flown coverage, below the random walk. Judge them on the footprint and on the camera tracks below. NBVP leads the sweeping planner there; the view-first planner (`planner-view`, [VIEW_FIRST.md](VIEW_FIRST.md)), which picks goals by what its own lidar has not yet had within 3 m, leads NBVP on the same test flights and on a fresh report-only block:
 
 | Pilot | Score (flown) | Footprint score | Footprint curve area | Half seen, s | Flights ended by a crash | Flights that touched nothing |
 | --- | --- | --- | --- | --- | --- | --- |
 | Sensor-only planner (this repository) | 66.2% | 85.2% | 0.65 | 39.0 | 12 of 240 | 94% |
 | Sensor-only planner, view first (this repository) | 67.4% | 99.1% | 0.91 | 11.8 | 0 of 240 | 100% |
-| Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 2 of 240 | 99% |
+| Greedy information gain (Gonzalez-Banos & Latombe 2002) | 13.8% | 83.5% | 0.80 | 8.0 | 2 of 240 | 99% |
 | Next-best-view RRT (NBVP, Bircher et al. 2016) | 27.1% | 89.7% | 0.84 | 10.5 | 5 of 240 | 98% |
+| Rapid frontier (Cieslewski et al. 2017) | 9.7% | 74.3% | 0.71 | 10.6 | 2 of 240 | 99% |
+| Nearest frontier (Yamauchi 1997) | 8.8% | 73.5% | 0.71 | 8.9 | 2 of 240 | 99% |
 | Boustrophedon coverage (BA*, Viet et al. 2013) | 65.4% | 87.4% | 0.67 | 35.0 | 9 of 240 | 95% |
+| Random walk | 47.1% | 85.3% | 0.70 | 31.2 | 3 of 240 | 98% |
 
 [REPORT.md](REPORT.md#against-published-exploration-methods) describes each method and its adaptations.
 
@@ -77,11 +83,14 @@ v3's footprint column saturates: the view-first planner sees 99% of the test bui
 | # | Pilot | Camera score | large | large-quad | sprint | quad-dark | floors-quad | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner, view first (baseline) | **86.0%** | 75.6% | 75.6% | 94.2% | 97.7% | 86.8% | 90.6% | 26.2% | 3 of 150 | — | `a79fd86` |
-| 2 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **65.6%** | 58.9% | 45.1% | 76.4% | 85.0% | 62.5% | 70.6% | 17.8% | 25 of 150 | −20.4 (−23.3 to −17.4) | `3e69af9` |
-| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **58.4%** | 73.3% | 46.1% | 61.0% | 73.0% | 38.8% | 66.9% | 10.3% | 15 of 150 | −7.2 (−10.5 to −3.9) | `3e69af9` |
-| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **44.6%** | 27.0% | 23.6% | 43.0% | 69.5% | 60.0% | 49.0% | 23.2% | 11 of 150 | −13.8 (−17.4 to −10.4) | `3e69af9` |
-| 5 | Sensor-only planner + quad tracker (baseline) | **39.5%** | 23.3% | 16.8% | 44.5% | 60.1% | 53.1% | 43.0% | 24.2% | 3 of 150 | −5.1 (−7.2 to −2.9) | `3e69af9` |
-| 6 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **38.6%** | 27.3% | 21.0% | 50.0% | 60.0% | 34.8% | 42.4% | 19.4% | 46 of 150 | −0.9 (−3.3 to +1.5), tied | `3e69af9` |
+| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **68.0%** | 78.0% | 67.6% | 69.1% | 80.2% | 44.9% | 76.5% | 13.7% | 14 of 150 | −18.0 (−21.3 to −15.1) | `28c6f50` |
+| 3 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **65.6%** | 58.9% | 45.1% | 76.4% | 85.0% | 62.5% | 70.6% | 17.8% | 25 of 150 | −2.4 (−6.2 to +1.6), tied | `3e69af9` |
+| 4 | Nearest frontier (Yamauchi 1997) (baseline) | **58.4%** | 73.3% | 46.1% | 61.0% | 73.0% | 38.8% | 66.9% | 10.3% | 15 of 150 | −7.2 (−10.5 to −3.9) | `3e69af9` |
+| 5 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **55.0%** | 67.7% | 43.3% | 55.7% | 72.3% | 36.0% | 64.3% | 10.4% | 9 of 150 | −3.4 (−6.7 to −0.3) | `28c6f50` |
+| 6 | Random walk (baseline) | **52.0%** | 27.5% | 26.1% | 56.3% | 75.2% | 75.1% | 54.8% | 21.9% | 11 of 150 | −3.0 (−6.2 to +0.3), tied | `28c6f50` |
+| 7 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **44.6%** | 27.0% | 23.6% | 43.0% | 69.5% | 60.0% | 49.0% | 23.2% | 11 of 150 | −7.4 (−10.6 to −4.3) | `3e69af9` |
+| 8 | Sensor-only planner + quad tracker (baseline) | **39.5%** | 23.3% | 16.8% | 44.5% | 60.1% | 53.1% | 43.0% | 24.2% | 3 of 150 | −5.1 (−7.2 to −2.9) | `3e69af9` |
+| 9 | Shipped policy (DAgger + PPO) under the lidar guard (baseline) | **38.6%** | 27.3% | 21.0% | 50.0% | 60.0% | 34.8% | 42.4% | 19.4% | 46 of 150 | −0.9 (−3.3 to +1.5), tied | `3e69af9` |
 
 | Task | What | Airframe | Lighting | Budget |
 | --- | --- | --- | --- | --- |
@@ -100,10 +109,13 @@ A search drone that does not come back loses what it saw, and no pilot on the ha
 | # | Pilot | Camera score | return-large-quad | return-wind-quad | return-dark-quad | return-sprint | Came home | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner, view first (baseline) | **74.0%** | 64.5% | 67.2% | 89.8% | 74.3% | 120 of 120 | 79.7% | 15.3% | 0 of 120 | — | `b3f30bb` |
-| 2 | Nearest frontier (Yamauchi 1997) (baseline) | **53.1%** | 40.3% | 40.0% | 64.0% | 68.3% | 103 of 120 | 63.8% | 10.6% | 17 of 120 | −20.8 (−25.7 to −15.9) | `b3f30bb` |
-| 3 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **49.7%** | 31.4% | 34.3% | 65.8% | 67.1% | 98 of 120 | 59.5% | 12.6% | 22 of 120 | −3.5 (−8.6 to +1.6), tied | `b3f30bb` |
-| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **32.3%** | 21.5% | 21.9% | 42.2% | 43.5% | 112 of 120 | 36.4% | 12.2% | 8 of 120 | −17.4 (−21.3 to −13.2) | `b3f30bb` |
-| 5 | Sensor-only planner + quad tracker (baseline) | **26.0%** | 16.2% | 14.3% | 31.5% | 41.9% | 116 of 120 | 29.1% | 12.1% | 4 of 120 | −6.3 (−8.1 to −4.4) | `b3f30bb` |
+| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **62.0%** | 56.8% | 47.7% | 73.9% | 69.6% | 103 of 120 | 73.9% | 13.3% | 17 of 120 | −11.9 (−16.6 to −7.4) | `28c6f50` |
+| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **53.1%** | 40.3% | 40.0% | 64.0% | 68.3% | 103 of 120 | 63.8% | 10.6% | 17 of 120 | −8.9 (−14.4 to −3.3) | `b3f30bb` |
+| 4 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **50.6%** | 37.1% | 36.9% | 69.6% | 58.7% | 115 of 120 | 58.5% | 10.4% | 5 of 120 | −2.6 (−7.2 to +2.2), tied | `28c6f50` |
+| 5 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **49.7%** | 31.4% | 34.3% | 65.8% | 67.1% | 98 of 120 | 59.5% | 12.6% | 22 of 120 | −0.9 (−5.6 to +3.8), tied | `b3f30bb` |
+| 6 | Random walk (baseline) | **37.8%** | 26.1% | 24.1% | 51.5% | 49.5% | 115 of 120 | 40.7% | 12.7% | 5 of 120 | −11.9 (−15.7 to −7.9) | `28c6f50` |
+| 7 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **32.3%** | 21.5% | 21.9% | 42.2% | 43.5% | 112 of 120 | 36.4% | 12.2% | 8 of 120 | −5.5 (−7.9 to −3.1) | `b3f30bb` |
+| 8 | Sensor-only planner + quad tracker (baseline) | **26.0%** | 16.2% | 14.3% | 31.5% | 41.9% | 116 of 120 | 29.1% | 12.1% | 4 of 120 | −6.3 (−8.1 to −4.4) | `b3f30bb` |
 
 | Task | What | Airframe | Lighting | Budget |
 | --- | --- | --- | --- | --- |
@@ -121,10 +133,13 @@ Every other board hands the pilot its true position. A real drone indoors has no
 | # | Pilot | Camera score | drift-large-quad | drift-wind-quad | drift-dark-quad | drift-quad | Came home | Same flights on the true pose | Mean pose error | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner, view first (baseline) | **78.7%** | 66.2% | 63.3% | 87.3% | 97.9% | 89 of 90 | 78.5% | 0.18 m | 84.3% | 23.0% | 0 of 120 | — | `f08db77` |
-| 2 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **55.9%** | 30.8% | 34.8% | 67.8% | 90.2% | 73 of 90 | 54.5% | 0.16 m | 62.9% | 17.0% | 20 of 120 | −22.8 (−26.5 to −19.2) | `f08db77` |
-| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **51.0%** | 35.0% | 32.6% | 64.9% | 71.4% | 65 of 90 | 50.4% | 0.17 m | 63.7% | 13.0% | 28 of 120 | −4.9 (−9.6 to −0.2) | `f08db77` |
-| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **41.5%** | 23.5% | 22.3% | 42.8% | 77.3% | 82 of 90 | 41.2% | 0.15 m | 45.5% | 19.8% | 13 of 120 | −9.5 (−14.1 to −4.6) | `f08db77` |
-| 5 | Sensor-only planner + quad tracker (baseline) | **36.2%** | 19.0% | 17.6% | 30.3% | 77.8% | 88 of 90 | 32.8% | 0.14 m | 40.4% | 20.3% | 3 of 120 | −5.3 (−8.2 to −2.2) | `f08db77` |
+| 2 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **63.1%** | 44.5% | 44.1% | 76.9% | 86.7% | 73 of 90 | 64.4% | 0.18 m | 72.8% | 15.4% | 18 of 120 | −15.7 (−19.5 to −11.8) | `28c6f50` |
+| 3 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **55.9%** | 30.8% | 34.8% | 67.8% | 90.2% | 73 of 90 | 54.5% | 0.16 m | 62.9% | 17.0% | 20 of 120 | −7.2 (−11.6 to −2.8) | `f08db77` |
+| 4 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **55.6%** | 40.8% | 37.6% | 65.9% | 78.0% | 83 of 90 | 52.2% | 0.18 m | 63.6% | 13.9% | 8 of 120 | −0.3 (−4.4 to +4.0), tied | `28c6f50` |
+| 5 | Nearest frontier (Yamauchi 1997) (baseline) | **51.0%** | 35.0% | 32.6% | 64.9% | 71.4% | 65 of 90 | 50.4% | 0.17 m | 63.7% | 13.0% | 28 of 120 | −4.6 (−9.1 to −0.4) | `f08db77` |
+| 6 | Random walk (baseline) | **44.9%** | 25.0% | 25.0% | 47.9% | 81.8% | 86 of 90 | 45.3% | 0.15 m | 47.8% | 19.8% | 6 of 120 | −6.0 (−10.5 to −1.2) | `28c6f50` |
+| 7 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **41.5%** | 23.5% | 22.3% | 42.8% | 77.3% | 82 of 90 | 41.2% | 0.15 m | 45.5% | 19.8% | 13 of 120 | −3.5 (−6.3 to −0.6) | `f08db77` |
+| 8 | Sensor-only planner + quad tracker (baseline) | **36.2%** | 19.0% | 17.6% | 30.3% | 77.8% | 88 of 90 | 32.8% | 0.14 m | 40.4% | 20.3% | 3 of 120 | −5.3 (−8.2 to −2.2) | `f08db77` |
 
 | Task | What | Airframe | Lighting | Budget |
 | --- | --- | --- | --- | --- |
@@ -143,10 +158,13 @@ The drift track's estimator holds the pose to about 0.2 m, so flying on it costs
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner, view first (baseline) | **48.1%** | 40.9% | 45.8% | 30.8% | 75.0% | 77 of 120 | 77.1% | 0.79 m | 77.6% | 16.2% | 3 of 120 | — | `4d6a2cc` |
 | 2 | Sensor-only planner, view first + loop closure (baseline) | **47.8%** | 35.5% | 54.0% | 36.2% | 65.4% | 90 of 120 | 77.1% | 1.06 m | 69.3% | 14.6% | 1 of 120 | −0.3 (−8.4 to +8.1), tied | `4d6a2cc` |
-| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **34.0%** | 24.9% | 29.8% | 24.0% | 57.2% | 65 of 120 | 46.3% | 0.72 m | 55.5% | 13.1% | 29 of 120 | −13.8 (−21.7 to −5.7) | `4d6a2cc` |
-| 4 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **31.4%** | 29.6% | 16.4% | 18.0% | 61.8% | 68 of 120 | 47.4% | 0.75 m | 50.4% | 12.4% | 23 of 120 | −2.5 (−8.8 to +3.7), tied | `4d6a2cc` |
-| 5 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **23.1%** | 17.6% | 18.8% | 16.8% | 39.2% | 83 of 120 | 29.0% | 0.62 m | 34.1% | 12.7% | 15 of 120 | −8.3 (−13.2 to −3.7) | `4d6a2cc` |
-| 6 | Sensor-only planner + quad tracker (baseline) | **15.0%** | 15.4% | 15.2% | 8.0% | 21.4% | 73 of 120 | 22.4% | 0.76 m | 27.2% | 12.3% | 6 of 120 | −8.1 (−11.2 to −4.8) | `4d6a2cc` |
+| 3 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **35.4%** | 31.6% | 25.5% | 21.2% | 63.5% | 61 of 120 | 62.2% | 0.73 m | 64.7% | 14.2% | 34 of 120 | −12.3 (−19.8 to −4.9) | `28c6f50` |
+| 4 | Nearest frontier (Yamauchi 1997) (baseline) | **34.0%** | 24.9% | 29.8% | 24.0% | 57.2% | 65 of 120 | 46.3% | 0.72 m | 55.5% | 13.1% | 29 of 120 | −1.5 (−8.5 to +5.3), tied | `4d6a2cc` |
+| 5 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **32.9%** | 24.1% | 27.9% | 26.3% | 53.2% | 79 of 120 | 49.5% | 0.70 m | 47.5% | 11.6% | 19 of 120 | −1.1 (−7.3 to +5.1), tied | `28c6f50` |
+| 6 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **31.4%** | 29.6% | 16.4% | 18.0% | 61.8% | 68 of 120 | 47.4% | 0.75 m | 50.4% | 12.4% | 23 of 120 | −1.4 (−7.0 to +3.9), tied | `4d6a2cc` |
+| 7 | Random walk (baseline) | **27.5%** | 22.5% | 23.9% | 21.3% | 42.1% | 95 of 120 | 32.6% | 0.58 m | 35.8% | 13.8% | 10 of 120 | −4.0 (−9.7 to +1.7), tied | `28c6f50` |
+| 8 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **23.1%** | 17.6% | 18.8% | 16.8% | 39.2% | 83 of 120 | 29.0% | 0.62 m | 34.1% | 12.7% | 15 of 120 | −4.4 (−8.2 to −0.6) | `4d6a2cc` |
+| 9 | Sensor-only planner + quad tracker (baseline) | **15.0%** | 15.4% | 15.2% | 8.0% | 21.4% | 73 of 120 | 22.4% | 0.76 m | 27.2% | 12.3% | 6 of 120 | −8.1 (−11.2 to −4.8) | `4d6a2cc` |
 
 | Task | What | Airframe | Lighting | Budget |
 | --- | --- | --- | --- | --- |
@@ -167,9 +185,12 @@ The drift track's sensors all work. On the degraded-sensor track (`SENSOR_TASKS`
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Sensor-only planner, view first (baseline) | **80.0%** | 47.1% | 89.0% | 86.8% | 97.3% | 88 of 90 | 87.2% | 0.37 m | 86.3% | 20.1% | 3 of 120 | — | `f630eb7` |
 | 2 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **53.0%** | 9.1% | 69.5% | 45.9% | 87.5% | 56 of 90 | 64.9% | 0.16 m | 62.5% | 17.1% | 52 of 120 | −27.0 (−32.2 to −21.6) | `f630eb7` |
-| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **47.0%** | 5.4% | 68.2% | 32.1% | 82.4% | 44 of 90 | 57.5% | 0.16 m | 60.4% | 14.1% | 61 of 120 | −6.0 (−11.4 to −0.6) | `f630eb7` |
-| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **46.0%** | 16.3% | 43.2% | 45.4% | 79.1% | 76 of 90 | 50.5% | 0.19 m | 51.6% | 21.9% | 24 of 120 | −1.0 (−6.0 to +3.9), tied | `f630eb7` |
-| 5 | Sensor-only planner + quad tracker (baseline) | **30.7%** | 6.3% | 30.1% | 31.6% | 54.7% | 64 of 90 | 40.8% | 0.61 m | 39.9% | 17.9% | 42 of 120 | −15.3 (−18.6 to −12.0) | `f630eb7` |
+| 3 | Greedy information gain (Gonzalez-Banos & Latombe 2002) (baseline) | **50.0%** | 12.3% | 66.2% | 34.2% | 87.2% | 47 of 90 | 69.6% | 0.17 m | 65.5% | 16.5% | 61 of 120 | −3.0 (−9.3 to +2.6), tied | `28c6f50` |
+| 4 | Rapid frontier (Cieslewski et al. 2017) (baseline) | **48.4%** | 9.7% | 69.0% | 30.5% | 84.3% | 55 of 90 | 61.9% | 0.18 m | 61.9% | 15.1% | 47 of 120 | −1.6 (−6.7 to +3.9), tied | `28c6f50` |
+| 5 | Nearest frontier (Yamauchi 1997) (baseline) | **47.0%** | 5.4% | 68.2% | 32.1% | 82.4% | 44 of 90 | 57.5% | 0.16 m | 60.4% | 14.1% | 61 of 120 | −1.4 (−6.7 to +3.7), tied | `f630eb7` |
+| 6 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **46.0%** | 16.3% | 43.2% | 45.4% | 79.1% | 76 of 90 | 50.5% | 0.19 m | 51.6% | 21.9% | 24 of 120 | −1.0 (−6.0 to +3.9), tied | `f630eb7` |
+| 7 | Random walk (baseline) | **42.2%** | 7.9% | 52.7% | 39.5% | 68.6% | 60 of 90 | 53.0% | 0.20 m | 51.5% | 18.3% | 49 of 120 | −3.8 (−7.9 to +0.0), tied | `28c6f50` |
+| 8 | Sensor-only planner + quad tracker (baseline) | **30.7%** | 6.3% | 30.1% | 31.6% | 54.7% | 64 of 90 | 40.8% | 0.61 m | 39.9% | 17.9% | 42 of 120 | −11.5 (−15.3 to −7.5) | `f630eb7` |
 
 | Task | What | Airframe | Lighting | Budget |
 | --- | --- | --- | --- | --- |

@@ -12,7 +12,7 @@ function table(head, rows) {
   return [line(head), line(head.map(() => '---')), ...rows.map(line)].join('\n');
 }
 
-function readResults(root, dir = 'bench/results') {
+export function readResults(root, dir = 'bench/results') {
   const out = [];
   const results = join(root, dir);
   if (existsSync(results)) for (const f of readdirSync(results).sort()) if (f.endsWith('.json')) out.push({ ...JSON.parse(readFileSync(join(results, f), 'utf8')), path: `${dir}/${f}` });
@@ -41,7 +41,7 @@ const crashes = (r) => {
 };
 
 /** Small deterministic generator, so the board's intervals do not change between runs of the docs. */
-function mulberry32(seed) {
+export function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -129,7 +129,7 @@ function teamBoard(root) {
 }
 
 /** Baselines that reimplement published exploration methods (src/sim/explorers), beside the house planner. */
-const PUBLISHED = ['planner', 'planner-view', 'yamauchi', 'nbvp', 'boustrophedon'];
+const PUBLISHED = ['planner', 'planner-view', 'info-gain', 'nbvp', 'rapid-frontier', 'yamauchi', 'boustrophedon', 'random-walk'];
 
 function publishedTable(rows) {
   rows = current(rows);

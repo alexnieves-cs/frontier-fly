@@ -16,6 +16,7 @@ import { teamSection } from './team.mjs';
 import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchPair, benchSection } from './bench.mjs';
+import { scoreboard, scoreboardMarkdown } from './scoreboard.mjs';
 import { visionSection } from './vision.mjs';
 import { floorsBudgetNote, hazardsSection } from './hazards.mjs';
 
@@ -1446,7 +1447,11 @@ const outputs = {
 // the study's per-episode rows (docs/study.json is ~700 KB).
 const headline = studyHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'));
 if (headline) outputs['docs/headline.json'] = `${JSON.stringify(headline, null, 2)}\n`;
+// The FrontierBench scoreboard (homepage and README): every track by every baseline, from bench/results.
+const board = scoreboard(ROOT);
+outputs['docs/scoreboard.json'] = `${JSON.stringify(board, null, 2)}\n`;
 let readme = read('README.md');
+readme = replaceBlock(readme, 'scoreboard', scoreboardMarkdown(board));
 readme = replaceBlock(readme, 'headline', readmeHeadline(readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/atlas.json'), readJson('docs/fault-bench.json'), trackingRuns(), readJson('docs/atlas/mc.json')));
 outputs['README.md'] = readme;
 // The full tables live in the project guide, one directory down, so their links drop the docs/ prefix.
