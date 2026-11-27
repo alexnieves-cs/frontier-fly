@@ -101,6 +101,7 @@ export default defineConfig({
         px4: resolve(root, 'px4.html'),
         atlas: resolve(root, 'atlas.html'),
         how: resolve(root, 'how.html'),
+        joint: resolve(root, 'joint.html'),
       },
     },
   },
