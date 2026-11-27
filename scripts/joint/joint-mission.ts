@@ -4,7 +4,7 @@
 // The ingress is the Denied Signal Stack's footage lab: frames rendered from Spain's PNOA 2013 orthophotos, matched
 // against the 2009 flight of the same tile, with GPS never fused (vision only). Its estimate at the end of the leg,
 // minus the true position, is the handoff error; its protection level there says whether DSS vouches for it.
-// scratch handoff.py writes those per pair into a dss-handoff@1 file.
+// DSS's tools/footage/handoff.py writes those per pair into a dss-handoff@1 file.
 //
 // frontier-fly then flies each bench scenario with that error added to everything it believes outdoors
 // (RunnerOptions.outdoorPoseError), held constant after the handoff, and indoors on its own pose estimate
@@ -12,7 +12,14 @@
 //
 // Arms, paired on the same worlds:
 //   control   the same flight with no outdoor error (what GNSS would give)
-//   dss       the handoff error applied, whatever DSS's protection level says
+//   dss       the handoff error applied, whatever DSS's protection level says, held constant
+//   anchor    the handoff error plus visual-inertial drift (VIO_DRIFT of the distance flown), until the drone
+//             is within ANCHOR_RANGE_M of a building: from then on it flies on its measured offset to that
+//             building's facade, a residual of ANCHOR_SIGMA_M per axis that wanders with ANCHOR_TAU_S. Away
+//             from every building it drifts again from the last residual. This step is modelled, not
+//             simulated from lidar rays: frontier-fly's building inspection flies about a metre off the
+//             walls, which no absolute navigator without RTK can hold, so a GNSS-denied drone has to
+//             reference the facade it is looking at. ANCHOR_SIGMA_M is an assumption, not a measurement.
 // The scored "alert limit enforced" result is dss with every flight whose handoff protection level is over 10 m
 // counted as held at the treeline instead of flown: DSS raised the alert, so the drone does not commit.
 //
@@ -22,6 +29,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { dirname } from 'node:path';
 import { BENCH_SCENARIOS, flyMission, type MissionFlight, type MissionMode, wilson } from '../../src/eval/missions';
 import type { V3 } from '../../src/mission/autonomy/contracts';
+import { buildMissionWorld } from '../../src/mission/autonomy/world';
+import { ANCHOR_RANGE_M, ANCHOR_SIGMA_M, ANCHOR_TAU_S, anchoredError, VIO_DRIFT } from './anchor';
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -32,6 +41,8 @@ function arg(name: string, fallback: string): string {
 export const ALERT_LIMIT_M = 10;
 export const JOINT_SEED_BASE = 47100; // a block no other study used
 export const JOINT_MODE: MissionMode = 'sensorQuadLoc';
+type Arm = 'control' | 'dss' | 'anchor';
+const ARMS: readonly Arm[] = ['control', 'dss', 'anchor'];
 
 interface Handoff {
   pair: string;
@@ -46,7 +57,7 @@ interface Handoff {
 }
 
 interface Row extends MissionFlight {
-  arm: 'control' | 'dss';
+  arm: Arm;
   pair: string;
   handoffErrM: number;
   handoffHplM: number;
@@ -65,8 +76,9 @@ async function fly(): Promise<void> {
     const r = JSON.parse(l) as Row;
     return `${r.arm}:${r.scenario}:${r.seed}`;
   }) : []);
+  const arms = arg('arms', ARMS.join(',')).split(',') as Arm[];
   const jobs = BENCH_SCENARIOS.flatMap((s, si) => Array.from({ length: seeds }, (_, i) => ({ scenario: s.id, seed: JOINT_SEED_BASE + i, h: H[(i + si * 7) % H.length]! })))
-    .flatMap((j) => (['control', 'dss'] as const).map((arm) => ({ ...j, arm })))
+    .flatMap((j) => arms.map((arm) => ({ ...j, arm })))
     .filter((_, k) => k % of === part);
   const t0 = Date.now();
   let flown = 0;
@@ -74,7 +86,13 @@ async function fly(): Promise<void> {
     if (done.has(`${j.arm}:${j.scenario}:${j.seed}`)) continue;
     // DSS gives east and north; frontier-fly's world is x and y across the ground, z up.
     const e: V3 = [j.h.errEnd[0], j.h.errEnd[1], 0];
-    const runner = j.arm === 'dss' ? { outdoorPoseError: () => e } : {};
+    const scenario = BENCH_SCENARIOS.find((sc) => sc.id === j.scenario)!;
+    const runner =
+      j.arm === 'dss'
+        ? { outdoorPoseError: () => e }
+        : j.arm === 'anchor'
+          ? { outdoorPoseError: anchoredError(buildMissionWorld({ ...scenario.world, seed: j.seed }), e, j.seed) }
+          : {};
     const f = await flyMission({ scenario: j.scenario, seed: j.seed, indoor: JOINT_MODE }, undefined, undefined, { runner });
     const row: Row = { arm: j.arm, pair: j.h.pair, handoffErrM: j.h.errEndM, handoffHplM: j.h.hplEnd, ...f };
     appendFileSync(out, JSON.stringify(row) + '\n');
@@ -107,19 +125,33 @@ function summary(files: string[]): void {
   const rows = files.flatMap((f) => readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as Row));
   const control = rows.filter((r) => r.arm === 'control');
   const dss = rows.filter((r) => r.arm === 'dss');
+  const anchor = rows.filter((r) => r.arm === 'anchor');
   const flies = (r: Row) => r.handoffHplM <= ALERT_LIMIT_M;
   const table: Record<string, ReturnType<typeof score>> = {
     'control (true outdoor pose)': score(control),
     'DSS handoff, alert ignored': score(dss),
     'DSS handoff, alert limit enforced': score(dss.filter(flies), dss.filter((r) => !flies(r)).length),
+    ...(anchor.length
+      ? {
+          'DSS handoff + facade re-anchor, alert ignored': score(anchor),
+          'DSS handoff + facade re-anchor, alert limit enforced': score(anchor.filter(flies), anchor.filter((r) => !flies(r)).length),
+        }
+      : {}),
   };
   const byScenario: Record<string, unknown> = {};
   for (const s of BENCH_SCENARIOS) {
     const c = control.filter((r) => r.scenario === s.id), d = dss.filter((r) => r.scenario === s.id);
+    const a = anchor.filter((r) => r.scenario === s.id);
     byScenario[s.id] = {
       control: `${c.filter((r) => r.expected).length}/${c.length}`,
       dssIgnored: `${d.filter((r) => r.expected).length}/${d.length}`,
       dssEnforced: `${d.filter((r) => flies(r) && r.expected).length}/${d.length} (${d.filter((r) => !flies(r)).length} held)`,
+      ...(a.length
+        ? {
+            anchorIgnored: `${a.filter((r) => r.expected).length}/${a.length}`,
+            anchorEnforced: `${a.filter((r) => flies(r) && r.expected).length}/${a.length} (${a.filter((r) => !flies(r)).length} held)`,
+          }
+        : {}),
     };
   }
   // Where the alert mattered: flights it held, and how they went when flown anyway.
@@ -139,6 +171,7 @@ function summary(files: string[]): void {
       mode: JOINT_MODE,
       alertLimitM: ALERT_LIMIT_M,
       seedBase: JOINT_SEED_BASE,
+      anchor: { rangeM: ANCHOR_RANGE_M, sigmaM: ANCHOR_SIGMA_M, tauS: ANCHOR_TAU_S, vioDrift: VIO_DRIFT, modelled: true },
       handoffs: handoffs(),
       table,
       byScenario,
