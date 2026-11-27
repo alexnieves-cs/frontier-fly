@@ -1,0 +1,25 @@
+
+> frontier-fly@1.2.0 train:quad
+> vite-node scripts/train-quad.ts -- --out-dir train-out --init init.bin --iters 0 --val 40 --seed 14 --rl 120 --rl-episodes 48 --rl-lr 4e-5 --log-std -2.5 --crash-penalty -200 --bc 0.3:0.3 --critic-warmup 4 --val-every 10
+
+Platform node has already been set. Overwriting the platform with node.
+2026-11-27 06:13:10.804670: I tensorflow/core/util/util.cc:169] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+2026-11-27 06:13:10.825532: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
+backend tensorflow, 4 workers, hidden 512,256, 80 practice flights, init init.bin
+rl start: alone 45.7% crashes 36/80 score 34.4%
+rl 1 steps 97473 rollout 46.5% crash 19/48 pi -0.000 v 0.587 kl 0.0001 bc 0.000x0.30 (critic warm-up) 24s
+(node:2351) [DEP0051] DeprecationWarning: The `util.isNullOrUndefined` API is deprecated. Please use `arg === null || arg === undefined` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+rl 2 steps 84828 rollout 41.5% crash 27/48 pi -0.000 v 0.770 kl 0.0001 bc 0.000x0.30 (critic warm-up) 19s
+rl 3 steps 94015 rollout 44.8% crash 27/48 pi -0.000 v 0.509 kl 0.0001 bc 0.000x0.30 (critic warm-up) 21s
+rl 4 steps 94557 rollout 45.6% crash 20/48 pi 0.000 v 0.479 kl 0.0001 bc 0.000x0.30 (critic warm-up) 22s
+rl 5 steps 87811 rollout 40.9% crash 25/48 pi 0.001 v 1.404 kl 0.0104 bc 0.014x0.30 25s
+rl 6 steps 92424 rollout 43.9% crash 24/48 pi 0.001 v 1.156 kl 0.0114 bc 0.015x0.30 27s
+rl 7 steps 95429 rollout 44.9% crash 28/48 pi 0.001 v 1.120 kl 0.0099 bc 0.015x0.30 28s
+rl 8 steps 95952 rollout 45.2% crash 20/48 pi 0.002 v 1.021 kl 0.0110 bc 0.015x0.30 27s
+rl 9 steps 101230 rollout 46.7% crash 22/48 pi 0.001 v 0.939 kl 0.0103 bc 0.015x0.30 28s
+rl 10 steps 97456 rollout 46.2% crash 23/48 pi 0.001 v 0.995 kl 0.0108 bc 0.014x0.30 | alone 45.0% crashes 33/80 score 34.7% 43s
+rl 11 steps 85050 rollout 40.1% crash 27/48 pi 0.001 v 1.373 kl 0.0123 bc 0.014x0.30 23s
+rl 12 steps 100893 rollout 46.6% crash 21/48 pi 0.001 v 0.871 kl 0.0098 bc 0.015x0.30 28s
+rl 13 steps 97024 rollout 44.0% crash 24/48 pi 0.005 v 1.039 kl 0.0206 bc 0.015x0.30 27s
