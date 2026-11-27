@@ -101,17 +101,19 @@ function split<T>(xs: T[], k: number): T[][] {
   return out;
 }
 
-export async function evalEpisodes(pool: NodeRolloutPool, workers: number, eps: PickerEpisode[], student: StudentWeights | null): Promise<EvalEpisode[]> {
-  const parts = await Promise.all(split(eps, workers).map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student }, w) : Promise.resolve([]))));
+export async function evalEpisodes(pool: NodeRolloutPool, workers: number, eps: PickerEpisode[], student: StudentWeights | null, shield = false): Promise<EvalEpisode[]> {
+  const parts = await Promise.all(split(eps, workers).map((list, w) => (list.length ? pool.runJob<EvalEpisode[]>('quadEval', { episodes: list, student, shield }, w) : Promise.resolve([]))));
   return parts.flat();
 }
 
-export function summary(rs: EvalEpisode[]): { coverage: number; crashes: number; n: number; score: number } {
+export function summary(rs: EvalEpisode[]): { coverage: number; crashes: number; n: number; score: number; interventionRate: number } {
   const n = rs.length;
+  const steps = rs.reduce((a, r) => a + r.steps, 0);
+  const interventionRate = rs.reduce((a, r) => a + r.interventions, 0) / Math.max(1, steps);
   const coverage = rs.reduce((a, r) => a + r.coverage, 0) / Math.max(1, n);
   const crashes = rs.filter((r) => r.crashed).length;
   // Selection score: a crash costs a quarter of a building.
-  return { coverage, crashes, n, score: coverage - (0.25 * crashes) / Math.max(1, n) };
+  return { coverage, crashes, n, score: coverage - (0.25 * crashes) / Math.max(1, n), interventionRate };
 }
 
 function toCheckpoint(policy: InferPolicy): Checkpoint {
@@ -153,6 +155,8 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
   const [bc0, bc1] = (arg('bc') ?? '1:0.1').split(':').map(Number);
   const warmup = num('critic-warmup', 8);
   const valEvery = num('val-every', 5);
+  // --shield: train behind the braking shield (with a penalty for every correction it makes).
+  const shield = args.includes('--shield');
   // Exploration noise: a fixed state-independent log std (trained by PPO afterwards).
   const w = policy.getWeights();
   new Float32Array(w[6]!).fill(num('log-std', -2));
@@ -170,7 +174,7 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
     const student = { hidden, weights: policy.getWeights() };
     const chunks = await Promise.all(
       split(eps, workers).map((list, k) =>
-        pool.runJob<RolloutChunk>('quadRollout', { episodes: list, student, crashPenalty: num('crash-penalty', -40), rewardScale: num('reward-scale', 0.1), labels: true, seed: u * 1000 + k } satisfies RolloutPayload, k),
+        pool.runJob<RolloutChunk>('quadRollout', { episodes: list, student, crashPenalty: num('crash-penalty', -40), rewardScale: num('reward-scale', 0.1), labels: true, shield, shieldPenalty: num('shield-penalty', 2), seed: u * 1000 + k } satisfies RolloutPayload, k),
       ),
     );
     const n = chunks.reduce((a, c) => a + c.n, 0);
@@ -223,10 +227,18 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
       const s = summary(await evalEpisodes(pool, workers, val, { hidden, weights: policy.getWeights() }));
       entry.val = s;
       line += ` | alone ${pct(s.coverage)} crashes ${s.crashes}/${s.n} score ${pct(s.score)}`;
+      // Shielded runs are picked on the shielded score.
+      let pick = s.score;
+      if (shield) {
+        const g = summary(await evalEpisodes(pool, workers, val, { hidden, weights: policy.getWeights() }, true));
+        entry.valShield = g;
+        line += ` | shielded ${pct(g.coverage)} crashes ${g.crashes}/${g.n} interventions ${pct(g.interventionRate)}`;
+        pick = g.score;
+      }
       const ck = toCheckpoint(policy);
       writeFileSync(join(outDir, 'last.bin'), serializeCheckpointFor('x.bin', ck));
-      if (s.score > best) {
-        best = s.score;
+      if (pick > best) {
+        best = pick;
         writeFileSync(join(outDir, 'best.bin'), serializeCheckpointFor('x.bin', ck));
       }
     }

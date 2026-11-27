@@ -104,6 +104,12 @@ jobs:
             rm -f train-out/*.r[0-9]*.json train-out/*.swa*.json "train-out/$name.json" "train-out/$name.ppo.json"
           elif [ "$SCRIPT" = "train:quad" ]; then
             # Quad student (docs/QUAD_STUDENT.md): best.bin, last.bin and log.json per run.
+            # A line may start with init=<train branch>:<path> to start from a checkpoint another run pushed.
+            if [[ "$line" =~ ^init=(train/[0-9]+-[0-9]+):([A-Za-z0-9_./-]+)(\ |$)(.*)$ ]]; then
+              git fetch --depth 1 origin "${BASH_REMATCH[1]}"
+              git show "FETCH_HEAD:${BASH_REMATCH[2]}" > init.bin
+              line="--init init.bin ${BASH_REMATCH[4]}"
+            fi
             # shellcheck disable=SC2086
             npm run train:quad -- --out-dir train-out $line 2>&1 | grep --line-buffered -v "already registered" | tee train-out/train.log
           elif [ "$SCRIPT" = "train:picker" ]; then

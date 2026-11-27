@@ -13,7 +13,7 @@
  */
 import { ACT_DIM, MAX_SPEED_H, OBS, OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
-import { quadPilot } from '../eval/pilots';
+import { guardedAction, quadPilot } from '../eval/pilots';
 import { InferPolicy } from '../rl/infer';
 import { StudentInput, STUDENT_DIM } from '../rl/quadStudent';
 import { ExplorerEnv } from '../sim/env';
@@ -81,6 +81,8 @@ export interface EvalPayload {
   /** null = fly the expert itself. */
   student: StudentWeights | null;
   expert?: ExpertKnobs;
+  /** Fly the student behind the braking shield. */
+  shield?: boolean;
 }
 
 export interface EvalEpisode extends PickerEpisode {
@@ -88,9 +90,23 @@ export interface EvalEpisode extends PickerEpisode {
   crashed: boolean;
   collisions: number;
   steps: number;
+  /** Steps where the shield changed the command by more than 0.02. */
+  interventions: number;
 }
 
 let env: ExplorerEnv | null = null;
+
+/**
+ * The braking shield: the default quad pilot's braking filter applied to the horizontal command
+ * only (vertical and yaw pass through). Returns how far it moved the command (L2, action units).
+ */
+function shieldInPlace(a: Float32Array, obs: Float32Array, e: ExplorerEnv): number {
+  const g = guardedAction(a, obs, e, QUAD_PICKER_BRAKING);
+  const d = Math.hypot(g[0]! - a[0]!, g[1]! - a[1]!);
+  a[0] = g[0]!;
+  a[1] = g[1]!;
+  return d;
+}
 
 function makeStudent(w: StudentWeights | null): InferPolicy | null {
   if (!w) return null;
@@ -216,10 +232,12 @@ const quadEval: JobFn = (_ctx, raw) => {
     let crashed = false;
     let collisions = 0;
     let steps = 0;
+    let interventions = 0;
     for (let t = 0; t < setup.cfg.maxSteps; t++) {
       let a: Float32Array;
       if (student) {
         a = student.actWith(input.build(obs), 1, rng, true).action;
+        if (p.shield && shieldInPlace(a, obs, env) > 0.02) interventions++;
         input.executed(a);
       } else a = expert!.act(obs, env);
       const step = env.step(a);
@@ -232,7 +250,7 @@ const quadEval: JobFn = (_ctx, raw) => {
         break;
       }
     }
-    out.push({ ...e, coverage, crashed, collisions, steps });
+    out.push({ ...e, coverage, crashed, collisions, steps, interventions });
   }
   return out;
 };
@@ -247,6 +265,10 @@ export interface RolloutPayload {
   /** Label every state with the expert's command (for the imitation anchor). */
   labels: boolean;
   expert?: ExpertKnobs;
+  /** Execute through the braking shield; the policy's own sample is what PPO trains on. */
+  shield?: boolean;
+  /** Reward (before scaling) subtracted per unit of shield correction (L2, action units). */
+  shieldPenalty?: number;
   seed: number;
 }
 
@@ -288,6 +310,7 @@ const quadRollout: JobFn = (_ctx, raw) => {
     let coverage = 0;
     let crashed = false;
     let steps = 0;
+    let lastExec = new Float32Array(ACT_DIM);
     for (let t = 0; t < setup.cfg.maxSteps && n < total; t++) {
       const row = input.build(obs);
       head.set(row.subarray(0, HEAD), n * HEAD_ROW);
@@ -297,8 +320,7 @@ const quadRollout: JobFn = (_ctx, raw) => {
       const a = out.action;
       if (expert) {
         if (t > 0) {
-          const prev = actions.subarray((n - 1) * ACT_DIM, n * ACT_DIM);
-          const c = worldCommand(prev, env.snapshot().yaw, speedH);
+          const c = worldCommand(lastExec, env.snapshot().yaw, speedH);
           expert.planner.holdCommand(c[0], c[1]);
         }
         labels.set(expert.act(obs, env).subarray(0, ACT_DIM), n * ACT_DIM);
@@ -306,9 +328,12 @@ const quadRollout: JobFn = (_ctx, raw) => {
       actions.set(a, n * ACT_DIM);
       logp[n] = out.logp[0]!;
       values[n] = out.value[0]!;
-      input.executed(a);
-      const step = env.step(a);
-      let r = step.reward;
+      const exec = a.slice();
+      lastExec = exec;
+      const corr = p.shield ? shieldInPlace(exec, obs, env) : 0;
+      input.executed(exec);
+      const step = env.step(exec);
+      let r = step.reward - corr * (p.shieldPenalty ?? 0);
       if (step.done && step.info.crashed) r += p.crashPenalty;
       rewards[n] = r * p.rewardScale;
       obs = step.obs;
