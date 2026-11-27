@@ -162,7 +162,7 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
   new Float32Array(w[6]!).fill(num('log-std', -2));
   policy.setWeights(w);
   trainer.pushWeights();
-  trainer.setLearningRate(num('lr', 1e-4));
+  trainer.setLearningRate(num('rl-lr', 1e-4));
   const log: unknown[] = [];
   const s0 = summary(await evalEpisodes(pool, workers, val, { hidden, weights: policy.getWeights() }));
   console.log(`rl start: alone ${pct(s0.coverage)} crashes ${s0.crashes}/${s0.n} score ${pct(s0.score)}`);
