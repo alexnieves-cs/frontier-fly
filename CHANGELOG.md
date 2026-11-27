@@ -5,6 +5,16 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### Multi-floor round 2: real multi-storey homes, shaft search, battery budget (2026-11-27)
+
+- New page `docs/MULTI_FLOOR.md`: five sensor-only pilots fly 30 fresh generated multi-floor buildings, 60 real
+  two- and three-storey homes from Swiss Dwellings (CC BY 4.0) and 12 held-out homes, under 120 s, 120 s per floor
+  and the airframe's own battery (`scripts/study/storeys-study.ts`, `docs/storeys-study.json`). On the battery the
+  planner flies 95.0% of the generated buildings and 94.8% of the real homes, reaching every floor of every one.
+- The climber gains a shaft search, faster climbs and a fix for L- and U-shaped stairwells, all opt-in
+  (`STAIR_CLIMB`, flown by `STAIR_BASELINES`). FrontierBench and FrontierBench Hard fly the climber as before, so
+  their flights are the same as on main.
+
 ### FrontierBench: the scoreboard, published baselines, overwatch and integrity (2026-11-27)
 
 - The homepage and the README open on a generated scoreboard: 8 tracks by 8 pilots, every cell from

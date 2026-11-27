@@ -50,6 +50,20 @@ export class WatchExplorer implements Explorer {
 
   reset(): void {
     this.inner.reset();
+    this.clearWatch();
+  }
+
+  /**
+   * The drone changed floors (sim/climber.ts, with `keepViews`): the inner explorer keeps what it has
+   * had in view if it can, and the watch starts afresh, as after reset().
+   */
+  floorChanged(): void {
+    if (this.inner.floorChanged) this.inner.floorChanged();
+    else this.inner.reset();
+    this.clearWatch();
+  }
+
+  private clearWatch(): void {
     this.step = 0;
     this.last = null;
     this.vel = [0, 0];

@@ -68,6 +68,13 @@ export interface SensorPlannerOptions {
   speed?: number;
   /** Flight height above the floor, meters. */
   flyHeight?: number;
+  /**
+   * Shaft-search lanes (sim/climber.ts `searcher`): a voxel counts as covered once it or the voxel
+   * beside it across the lane (y ± 1) is flown, so the sweep flies lanes 1 m apart, half the
+   * distance of a full sweep, and still passes under every opening at least 1 m across, which is all
+   * the up and down range finders need to find a shaft.
+   */
+  lanes?: boolean;
   /** Replan every this many steps even when the goal is still valid. */
   replanEvery?: number;
   /** Turn to face the direction of travel (the camera looks forward). */
@@ -225,6 +232,7 @@ export class SensorPlanner {
   readonly tracker: ResolvedTracker | null;
   readonly picker: GoalPicker | null;
   readonly view: Required<ViewOptions> | null;
+  private readonly lanes: boolean;
   /** Own-map line-of-sight view mask (SeenMap layout), when `view` is set. */
   private viewed = new Uint8Array(0);
   /** Camera view mask (view.look), same layout. */
@@ -284,6 +292,7 @@ export class SensorPlanner {
     this.penalty = opts.penalty ?? null;
     this.tracker = opts.tracker ? resolveTracker(opts.tracker) : null;
     this.picker = opts.picker ?? null;
+    this.lanes = opts.lanes ?? false;
     this.view = opts.view
       ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0, frontiers: opts.view.frontiers ?? false }
       : null;
@@ -325,6 +334,11 @@ export class SensorPlanner {
   }
 
   private covered(f: SensorFrame, k: number): boolean {
+    if (this.lanes) {
+      if (f.visited[k] === 1) return true;
+      const y = Math.floor((k % this.plane) / f.vw);
+      return (y > 0 && f.visited[k - f.vw] === 1) || (y < f.vd - 1 && f.visited[k + f.vw] === 1);
+    }
     if (!this.view || this.phase === 2) return f.visited[k] === 1;
     if (this.phase === 0) return this.viewed[k] === 1 && (!this.view.frontiers || f.visited[k] === 1 || !this.bordersUnknown(f, k));
     return f.visited[k] === 1 || !this.bordersUnknown(f, k);
@@ -378,7 +392,20 @@ export class SensorPlanner {
     }
   }
 
+  /**
+   * The drone has changed floors (sim/climber.ts): forget goals and paths like reset(), but keep what
+   * the drone has already had in view on every floor, so a floor it comes back to is not looked at again.
+   */
+  floorChanged(): void {
+    const carry = { viewed: this.viewed.slice(), cam: this.camViewed.slice() };
+    this.reset();
+    this.carry = carry;
+  }
+
+  private carry: { viewed: Uint8Array; cam: Uint8Array } | null = null;
+
   reset(): void {
+    this.carry = null;
     this.contradicted = 0;
     this.sensorFault = false;
     this.n = 0;
@@ -441,6 +468,11 @@ export class SensorPlanner {
     this.banned = new Uint8Array(n);
     this.viewed = new Uint8Array(this.view ? n : 0);
     this.camViewed = new Uint8Array(this.view?.look ? n : 0);
+    if (this.carry) {
+      if (this.carry.viewed.length === this.viewed.length) this.viewed.set(this.carry.viewed);
+      if (this.carry.cam.length === this.camViewed.length) this.camViewed.set(this.carry.cam);
+      this.carry = null;
+    }
     this.candScore = new Float64Array(this.plane);
     this.candOrder = new Int32Array(this.plane);
     this.candLabel = new Int32Array(this.plane);

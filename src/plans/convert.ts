@@ -239,7 +239,7 @@ export function planSeed(id: string): number {
  */
 export interface ConvertedPlan {
   spec: BuildingSpec;
-  /** Room type per spec room id (floor 0). */
+  /** Room type per spec room, storey by storey (storey 0's rooms first). */
   roomTypes: string[];
   /** Index into plan.areas per spec room id. */
   roomAreas: number[];
@@ -257,12 +257,42 @@ export interface ConvertedPlan {
 }
 
 export function planToBuilding(plan: PlanRecord, opts: { furniture?: boolean } = {}): ConvertedPlan | null {
-  const wallBoxes = plan.walls.map(ringBox);
-  const doorBoxes = plan.doors.map(ringBox);
-  const windowBoxes = plan.windows.map(ringBox);
-  const areaBoxes = plan.areas.map((a) => ringBox(a.poly));
-  const all: Box[] = [...wallBoxes, ...areaBoxes];
-  if (areaBoxes.length === 0) return null;
+  return floorsToBuilding([plan], planSeed(plan.id), opts);
+}
+
+/** One storey of a real home: its plan, plus where its staircase is (feature polygons). */
+export interface PlanStorey {
+  areas: PlanRecord['areas'];
+  walls: number[][];
+  doors: number[][];
+  windows: number[][];
+  /** Staircase polygons on this storey. Where a stair on one storey overlaps one on the next, the sim opens a shaft. */
+  stairs?: number[][];
+}
+
+/** A shaft opens only where at least this many cells hold a stair on both storeys. */
+const MIN_SHAFT_CELLS = 1;
+
+/**
+ * Convert one or more storeys that share a plan frame (storey 0 lowest). Every storey is cut on the
+ * same axis cuts (the union of all storeys' walls and doors), so cells stack; a cell whose centre
+ * lies in a staircase on two consecutive storeys becomes a shaft on both (the stair flight itself is
+ * not modelled: the sim flies an open column where the real staircase is). The drone starts at the
+ * entrance on the lowest storey that has one. A single storey converts exactly as before.
+ */
+export function floorsToBuilding(storeys: PlanStorey[], seed: number, opts: { furniture?: boolean } = {}): ConvertedPlan | null {
+  const nf = storeys.length;
+  if (nf === 0) return null;
+  const per = storeys.map((plan) => ({
+    plan,
+    wallBoxes: plan.walls.map(ringBox),
+    doorBoxes: plan.doors.map(ringBox),
+    windowBoxes: plan.windows.map(ringBox),
+    areaBoxes: plan.areas.map((a) => ringBox(a.poly)),
+    stairBoxes: (plan.stairs ?? []).map(ringBox),
+  }));
+  const all: Box[] = per.flatMap((p) => [...p.wallBoxes, ...p.areaBoxes]);
+  if (per.some((p) => p.areaBoxes.length === 0)) return null;
   const x0 = Math.min(...all.map((b) => b.x0));
   const x1 = Math.max(...all.map((b) => b.x1));
   const y0 = Math.min(...all.map((b) => b.y0));
@@ -270,18 +300,20 @@ export function planToBuilding(plan: PlanRecord, opts: { furniture?: boolean } =
 
   const xWalls: Band[] = [];
   const yWalls: Band[] = [];
-  for (const b of wallBoxes) {
-    const bw = b.x1 - b.x0;
-    const bh = b.y1 - b.y0;
-    if (bw <= WALL_MAX_THICKNESS && bh >= WALL_MIN_LENGTH) xWalls.push({ a: b.x0, b: b.x1, c0: b.y0, c1: b.y1 });
-    else if (bh <= WALL_MAX_THICKNESS && bw >= WALL_MIN_LENGTH) yWalls.push({ a: b.y0, b: b.y1, c0: b.x0, c1: b.x1 });
-  }
-  // A door's width (its long side) should hold a cell centre; its thin side sits in a wall band.
   const xDoors: { a: number; b: number }[] = [];
   const yDoors: { a: number; b: number }[] = [];
-  for (const b of doorBoxes) {
-    if (b.x1 - b.x0 >= b.y1 - b.y0) xDoors.push({ a: b.x0, b: b.x1 });
-    else yDoors.push({ a: b.y0, b: b.y1 });
+  for (const p of per) {
+    for (const b of p.wallBoxes) {
+      const bw = b.x1 - b.x0;
+      const bh = b.y1 - b.y0;
+      if (bw <= WALL_MAX_THICKNESS && bh >= WALL_MIN_LENGTH) xWalls.push({ a: b.x0, b: b.x1, c0: b.y0, c1: b.y1 });
+      else if (bh <= WALL_MAX_THICKNESS && bw >= WALL_MIN_LENGTH) yWalls.push({ a: b.y0, b: b.y1, c0: b.x0, c1: b.x1 });
+    }
+    // A door's width (its long side) should hold a cell centre; its thin side sits in a wall band.
+    for (const b of p.doorBoxes) {
+      if (b.x1 - b.x0 >= b.y1 - b.y0) xDoors.push({ a: b.x0, b: b.x1 });
+      else yDoors.push({ a: b.y0, b: b.y1 });
+    }
   }
   const ax = cutAxis(x0, x1, xWalls, xDoors);
   const ay = cutAxis(y0, y1, yWalls, yDoors);
@@ -291,165 +323,233 @@ export function planToBuilding(plan: PlanRecord, opts: { furniture?: boolean } =
   const OUT = -1;
   const WALL = -2;
   const DOOR = -3;
-  // label: area index, or OUT / WALL / DOOR.
-  const label = new Int32Array(w * d).fill(OUT);
-  const glass = new Uint8Array(w * d);
+  // label: area index, or OUT / WALL / DOOR, per storey.
+  const labels = per.map(() => new Int32Array(w * d).fill(OUT));
+  const glasses = per.map(() => new Uint8Array(w * d));
+  const stairAt = per.map(() => new Uint8Array(w * d));
   const px: number[] = [];
   const py: number[] = [];
-  const inWall = (x: number, y: number) => {
-    for (let k = 0; k < plan.walls.length; k++) if (inBox(wallBoxes[k]!, x, y) && inRing(plan.walls[k]!, x, y)) return true;
-    return false;
-  };
-  const inDoor = (x: number, y: number) => doorBoxes.some((b) => inBox(b, x, y, OPENING_PAD));
-  const areaAt = (x: number, y: number) => {
-    for (let k = 0; k < plan.areas.length; k++) if (inBox(areaBoxes[k]!, x, y) && inRing(plan.areas[k]!.poly, x, y)) return k;
-    return OUT;
-  };
-  for (let gz = 1; gz < d - 1; gz++) {
-    for (let gx = 1; gx < w - 1; gx++) {
-      const i = gz * w + gx;
-      const cx = ax.centers[gx - 1]!;
-      const cy = ay.centers[gz - 1]!;
-      const wxs = ax.walls[gx - 1]!;
-      const wys = ay.walls[gz - 1]!;
-      // Centre first, then the wall centre lines this cell holds.
-      px.length = 0;
-      py.length = 0;
-      px.push(cx);
-      py.push(cy);
-      for (const wx of wxs) {
-        px.push(wx);
-        py.push(cy);
-      }
-      for (const wy of wys) {
+  for (let f = 0; f < nf; f++) {
+    const { plan, wallBoxes, doorBoxes, windowBoxes, areaBoxes, stairBoxes } = per[f]!;
+    const label = labels[f]!;
+    const glass = glasses[f]!;
+    const inWall = (x: number, y: number) => {
+      for (let k = 0; k < plan.walls.length; k++) if (inBox(wallBoxes[k]!, x, y) && inRing(plan.walls[k]!, x, y)) return true;
+      return false;
+    };
+    const inDoor = (x: number, y: number) => doorBoxes.some((b) => inBox(b, x, y, OPENING_PAD));
+    const areaAt = (x: number, y: number) => {
+      for (let k = 0; k < plan.areas.length; k++) if (inBox(areaBoxes[k]!, x, y) && inRing(plan.areas[k]!.poly, x, y)) return k;
+      return OUT;
+    };
+    const stairs = plan.stairs ?? [];
+    for (let gz = 1; gz < d - 1; gz++) {
+      for (let gx = 1; gx < w - 1; gx++) {
+        const i = gz * w + gx;
+        const cx = ax.centers[gx - 1]!;
+        const cy = ay.centers[gz - 1]!;
+        const wxs = ax.walls[gx - 1]!;
+        const wys = ay.walls[gz - 1]!;
+        // Centre first, then the wall centre lines this cell holds.
+        px.length = 0;
+        py.length = 0;
         px.push(cx);
-        py.push(wy);
+        py.push(cy);
         for (const wx of wxs) {
           px.push(wx);
-          py.push(wy);
+          py.push(cy);
         }
+        for (const wy of wys) {
+          px.push(cx);
+          py.push(wy);
+          for (const wx of wxs) {
+            px.push(wx);
+            py.push(wy);
+          }
+        }
+        let l = OUT;
+        for (let k = 1; k < px.length && l === OUT; k++) if (inDoor(px[k]!, py[k]!)) l = DOOR;
+        for (let k = 0; k < px.length && l === OUT; k++) if (inWall(px[k]!, py[k]!)) l = WALL;
+        for (let k = 0; k < px.length && l === OUT; k++) l = areaAt(px[k]!, py[k]!);
+        label[i] = l;
+        if (l === WALL || l === OUT) {
+          for (let k = 0; k < px.length; k++) if (windowBoxes.some((b) => inBox(b, px[k]!, py[k]!, OPENING_PAD))) glass[i] = 1;
+        }
+        for (let k = 0; k < stairs.length; k++) if (inBox(stairBoxes[k]!, cx, cy) && inRing(stairs[k]!, cx, cy)) stairAt[f]![i] = 1;
       }
-      let l = OUT;
-      for (let k = 1; k < px.length && l === OUT; k++) if (inDoor(px[k]!, py[k]!)) l = DOOR;
-      for (let k = 0; k < px.length && l === OUT; k++) if (inWall(px[k]!, py[k]!)) l = WALL;
-      for (let k = 0; k < px.length && l === OUT; k++) l = areaAt(px[k]!, py[k]!);
-      label[i] = l;
-      if (l === WALL || l === OUT) {
-        for (let k = 0; k < px.length; k++) if (windowBoxes.some((b) => inBox(b, px[k]!, py[k]!, OPENING_PAD))) glass[i] = 1;
+    }
+  }
+
+  // Shafts: a stair cell on two consecutive storeys that is not a wall on either.
+  const shaft = per.map(() => new Uint8Array(w * d));
+  for (let f = 0; f + 1 < nf; f++) {
+    let n = 0;
+    const pair = new Uint8Array(w * d);
+    for (let i = 0; i < w * d; i++) {
+      if (stairAt[f]![i] && stairAt[f + 1]![i] && labels[f]![i] !== WALL && labels[f + 1]![i] !== WALL && labels[f]![i] !== DOOR && labels[f + 1]![i] !== DOOR) {
+        pair[i] = 1;
+        n += 1;
       }
+    }
+    if (n < MIN_SHAFT_CELLS) continue;
+    for (let i = 0; i < w * d; i++) {
+      if (!pair[i]) continue;
+      shaft[f]![i] = 1;
+      shaft[f + 1]![i] = 1;
     }
   }
 
   // A door cell is kept when it joins indoor cells on two opposite sides (or
   // joins another door cell that does, for doors two cells deep). One that
   // leads outside on one side is the entrance; the drone starts next to it.
-  const indoor = (i: number) => label[i]! >= 0;
   let entranceCell = -1;
+  let entranceFloor = -1;
   let doors = 0;
-  const keep = new Uint8Array(w * d);
-  for (let gz = 1; gz < d - 1; gz++) {
-    for (let gx = 1; gx < w - 1; gx++) {
-      const i = gz * w + gx;
-      if (label[i] !== DOOR) continue;
-      const pass = (a: number, b: number) =>
-        (indoor(a) || label[a] === DOOR) && (indoor(b) || label[b] === DOOR) && (indoor(a) || indoor(b));
-      if (pass(i - 1, i + 1) || pass(i - w, i + w)) {
-        keep[i] = 1;
-        doors += 1;
-      } else if (entranceCell < 0) {
-        for (const n of [i - 1, i + 1, i - w, i + w]) if (indoor(n)) entranceCell = n;
-      }
-    }
-  }
-
-  const cells = new Uint8Array(w * d).fill(CELL.WALL);
-  for (let i = 0; i < w * d; i++) {
-    if (indoor(i) || keep[i]) cells[i] = label[i] === DOOR ? CELL.DOOR : CELL.EMPTY;
-  }
-
-  // Keep the component the drone starts in; unreachable pockets (shafts
-  // misread as rooms, closets behind a missing door) become solid.
-  let start = entranceCell;
-  if (start < 0) {
-    let bestCount = -1;
-    for (let k = 0; k < plan.areas.length; k++) {
-      let count = 0;
-      let first = -1;
-      for (let i = 0; i < w * d; i++) {
-        if (label[i] === k) {
-          count += 1;
-          if (first < 0) first = i;
+  const cellsPer: Uint8Array[] = [];
+  for (let f = 0; f < nf; f++) {
+    const label = labels[f]!;
+    const indoor = (i: number) => label[i]! >= 0 || shaft[f]![i] === 1;
+    const keep = new Uint8Array(w * d);
+    for (let gz = 1; gz < d - 1; gz++) {
+      for (let gx = 1; gx < w - 1; gx++) {
+        const i = gz * w + gx;
+        if (label[i] !== DOOR) continue;
+        const pass = (a: number, b: number) =>
+          (indoor(a) || label[a] === DOOR) && (indoor(b) || label[b] === DOOR) && (indoor(a) || indoor(b));
+        if (pass(i - 1, i + 1) || pass(i - w, i + w)) {
+          keep[i] = 1;
+          doors += 1;
+        } else if (entranceFloor < 0 || entranceFloor === f) {
+          if (entranceCell < 0) {
+            for (const n of [i - 1, i + 1, i - w, i + w]) if (indoor(n)) entranceCell = n;
+            if (entranceCell >= 0) entranceFloor = f;
+          }
         }
       }
-      if (count > bestCount) {
-        bestCount = count;
-        start = first;
+    }
+    const cells = new Uint8Array(w * d).fill(CELL.WALL);
+    for (let i = 0; i < w * d; i++) {
+      if (shaft[f]![i]) cells[i] = CELL.SHAFT;
+      else if (indoor(i) || keep[i]) cells[i] = label[i] === DOOR ? CELL.DOOR : CELL.EMPTY;
+    }
+    cellsPer.push(cells);
+  }
+
+  // Keep the component the drone starts in (across shafts); unreachable pockets (shafts
+  // misread as rooms, closets behind a missing door, storeys with no stair) become solid.
+  let start = entranceCell;
+  let startFloor = entranceFloor;
+  if (start < 0) {
+    let bestCount = -1;
+    for (let f = 0; f < nf; f++) {
+      const label = labels[f]!;
+      for (let k = 0; k < per[f]!.plan.areas.length; k++) {
+        let count = 0;
+        let first = -1;
+        for (let i = 0; i < w * d; i++) {
+          if (label[i] === k) {
+            count += 1;
+            if (first < 0) first = i;
+          }
+        }
+        if (count > bestCount) {
+          bestCount = count;
+          start = first;
+          startFloor = f;
+        }
       }
+      // Without an entrance the start is on the lowest storey, as on a single-storey plan.
+      if (start >= 0) break;
     }
   }
   if (start < 0) return null;
-  const seen = new Uint8Array(w * d);
-  const queue = [start];
-  seen[start] = 1;
-  for (let h = 0; h < queue.length; h++) {
-    const i = queue[h]!;
+  const seen = per.map(() => new Uint8Array(w * d));
+  const queue = [startFloor, start];
+  seen[startFloor]![start] = 1;
+  for (let h = 0; h < queue.length; h += 2) {
+    const f = queue[h]!;
+    const i = queue[h + 1]!;
+    const cells = cellsPer[f]!;
     for (const n of [i - 1, i + 1, i - w, i + w]) {
-      if (n < 0 || n >= w * d || seen[n] || cells[n] === CELL.WALL) continue;
-      seen[n] = 1;
-      queue.push(n);
+      if (n < 0 || n >= w * d || seen[f]![n] || cells[n] === CELL.WALL) continue;
+      seen[f]![n] = 1;
+      queue.push(f, n);
+    }
+    if (cells[i] === CELL.SHAFT) {
+      for (const g of [f - 1, f + 1]) {
+        if (g < 0 || g >= nf || seen[g]![i] || cellsPer[g]![i] !== CELL.SHAFT) continue;
+        seen[g]![i] = 1;
+        queue.push(g, i);
+      }
     }
   }
-  for (let i = 0; i < w * d; i++) if (!seen[i]) cells[i] = CELL.WALL;
+  for (let f = 0; f < nf; f++) for (let i = 0; i < w * d; i++) if (!seen[f]![i]) cellsPer[f]![i] = CELL.WALL;
 
-  const rooms: Room[] = [];
+  const rooms: Room[][] = [];
   const roomTypes: string[] = [];
   const roomAreas: number[] = [];
   let droppedAreas = 0;
   const mask = new Uint8Array(w * d);
-  for (let k = 0; k < plan.areas.length; k++) {
-    mask.fill(0);
-    for (let i = 0; i < w * d; i++) if (label[i] === k && cells[i] === CELL.EMPTY) mask[i] = 1;
-    const rect = largestRect(mask, w, d);
-    if (!rect || rect.w * rect.d < MIN_ROOM_CELLS) {
-      droppedAreas += 1;
-      continue;
+  for (let f = 0; f < nf; f++) {
+    const label = labels[f]!;
+    const cells = cellsPer[f]!;
+    const list: Room[] = [];
+    for (let k = 0; k < per[f]!.plan.areas.length; k++) {
+      mask.fill(0);
+      for (let i = 0; i < w * d; i++) if (label[i] === k && cells[i] === CELL.EMPTY) mask[i] = 1;
+      const rect = largestRect(mask, w, d);
+      if (!rect || rect.w * rect.d < MIN_ROOM_CELLS) {
+        droppedAreas += 1;
+        continue;
+      }
+      rect.id = list.length;
+      list.push(rect);
+      roomTypes.push(per[f]!.plan.areas[k]!.type);
+      roomAreas.push(k);
     }
-    rect.id = rooms.length;
-    rooms.push(rect);
-    roomTypes.push(plan.areas[k]!.type);
-    roomAreas.push(k);
+    rooms.push(list);
   }
-  if (rooms.length === 0) return null;
+  if (rooms.some((list) => list.length === 0)) return null;
 
-  const surfaces = new Uint8Array(w * d);
+  const surfacesPer: Uint8Array[] = [];
   let walkableCells = 0;
-  for (let i = 0; i < w * d; i++) {
-    if (cells[i] !== CELL.WALL) {
-      surfaces[i] = SURFACE.WOOD;
-      walkableCells += 1;
-    } else if (glass[i]) surfaces[i] = SURFACE.GLASS;
-    else surfaces[i] = label[i] === WALL ? SURFACE.DRYWALL : SURFACE.CONCRETE;
+  for (let f = 0; f < nf; f++) {
+    const cells = cellsPer[f]!;
+    const label = labels[f]!;
+    const surfaces = new Uint8Array(w * d);
+    for (let i = 0; i < w * d; i++) {
+      if (cells[i] !== CELL.WALL) {
+        surfaces[i] = cells[i] === CELL.SHAFT ? SURFACE.METAL : SURFACE.WOOD;
+        walkableCells += 1;
+      } else if (glasses[f]![i]) surfaces[i] = SURFACE.GLASS;
+      else surfaces[i] = label[i] === WALL ? SURFACE.DRYWALL : SURFACE.CONCRETE;
+    }
+    surfacesPer.push(surfaces);
   }
-  let spawnCell = entranceCell >= 0 && cells[entranceCell] === CELL.EMPTY ? entranceCell : -1;
+  let spawnCell = entranceCell >= 0 && cellsPer[entranceFloor]![entranceCell] === CELL.EMPTY ? entranceCell : -1;
+  let spawnFloor = entranceFloor;
   if (spawnCell < 0) {
-    let best = rooms[0]!;
-    for (const room of rooms) if (room.w * room.d > best.w * best.d) best = room;
+    spawnFloor = startFloor;
+    let best = rooms[spawnFloor]![0]!;
+    for (const room of rooms[spawnFloor]!) if (room.w * room.d > best.w * best.d) best = room;
     spawnCell = (best.z + Math.floor(best.d / 2)) * w + best.x + Math.floor(best.w / 2);
   }
 
-  // Crop to the walkable cells plus a one-cell wall border.
+  // Crop to the walkable cells of every storey plus a one-cell wall border.
   let minX = w;
   let minZ = d;
   let maxX = 0;
   let maxZ = 0;
-  for (let i = 0; i < w * d; i++) {
-    if (cells[i] === CELL.WALL) continue;
-    const x = i % w;
-    const z = Math.floor(i / w);
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minZ = Math.min(minZ, z);
-    maxZ = Math.max(maxZ, z);
+  for (const cells of cellsPer) {
+    for (let i = 0; i < w * d; i++) {
+      if (cells[i] === CELL.WALL) continue;
+      const x = i % w;
+      const z = Math.floor(i / w);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+    }
   }
   const ox = minX - 1;
   const oz = minZ - 1;
@@ -460,19 +560,22 @@ export function planToBuilding(plan: PlanRecord, opts: { furniture?: boolean } =
     for (let z = 0; z < cd; z++) for (let x = 0; x < cw; x++) out[z * cw + x] = src[(z + oz) * w + x + ox]!;
     return out;
   };
-  for (const room of rooms) {
-    room.x -= ox;
-    room.z -= oz;
+  const floors: FloorGrid[] = [];
+  for (let f = 0; f < nf; f++) {
+    for (const room of rooms[f]!) {
+      room.x -= ox;
+      room.z -= oz;
+    }
+    floors.push({ w: cw, d: cd, cells: crop(cellsPer[f]!), rooms: rooms[f]!, surfaces: crop(surfacesPer[f]!) });
   }
-  const floor: FloorGrid = { w: cw, d: cd, cells: crop(cells), rooms, surfaces: crop(surfaces) };
   const sx = (spawnCell % w) - ox;
   const sz = Math.floor(spawnCell / w) - oz;
   const spec: BuildingSpec = {
-    seed: planSeed(plan.id),
+    seed,
     cellSize: CELL_SIZE,
     floorHeight: FLOOR_HEIGHT,
-    floors: [floor],
-    spawn: [(sx + 0.5) * CELL_SIZE, (sz + 0.5) * CELL_SIZE, 1],
+    floors,
+    spawn: [(sx + 0.5) * CELL_SIZE, (sz + 0.5) * CELL_SIZE, spawnFloor * FLOOR_HEIGHT + 1],
     reachableVoxels: 0,
   };
   const empty = computeFlightMap(spec);
@@ -484,7 +587,7 @@ export function planToBuilding(plan: PlanRecord, opts: { furniture?: boolean } =
     furnish(spec);
   }
 
-  const planArea = plan.areas.reduce((sum, a) => sum + ringArea(a.poly), 0);
+  const planArea = storeys.reduce((sum, plan) => sum + plan.areas.reduce((t, a) => t + ringArea(a.poly), 0), 0);
   return {
     spec,
     roomTypes,

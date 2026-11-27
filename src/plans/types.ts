@@ -39,3 +39,29 @@ export interface PlanSet {
   dataset: { name: string; version: string; license: string; url: string; doi: string; attribution: string; changes: string };
   plans: PlanRecord[];
 }
+
+/**
+ * A real home of two or more storeys (a maisonette), as stored in public/plans/swiss-homes.json.
+ * Every storey shares one plan frame (same rotation and origin), storey 0 lowest.
+ */
+export interface HomeRecord {
+  id: string;
+  split: 'dev' | 'eval';
+  source: Omit<PlanSource, 'floor'> & { floors: number[]; elevations: number[] };
+  rotation: number;
+  storeys: HomeStorey[];
+}
+
+export interface HomeStorey {
+  areas: PlanArea[];
+  walls: number[][];
+  doors: number[][];
+  windows: number[][];
+  /** Staircase polygons (Swiss Dwellings STAIRS features and STAIRCASE areas). */
+  stairs: number[][];
+}
+
+export interface HomeSet {
+  dataset: PlanSet['dataset'];
+  homes: HomeRecord[];
+}

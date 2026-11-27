@@ -20,6 +20,7 @@ import { integritySection } from './integrity.mjs';
 import { scoreboard, scoreboardMarkdown } from './scoreboard.mjs';
 import { visionSection } from './vision.mjs';
 import { floorsBudgetNote, hazardsSection } from './hazards.mjs';
+import { storeysControlTable, storeysFirstRunTable, storeysLimit, storeysNote, storeysTables } from './storeys.mjs';
 
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const CHECK = process.argv.includes('--check');
@@ -1037,7 +1038,7 @@ function benchLimit() {
   return `Across all of FrontierBench v${p.version}, under the same crash rule, ${lead}: the guarded policy scores ${pc(p.a.score)} with ${crashed(p.a)} of its flights ended by a crash, the planner ${pc(p.b.score)} with ${crashed(p.b)}, and on the quadrotor task they cover ${quad(p.a)} and ${quad(p.b)} ([LEADERBOARD.md](LEADERBOARD.md)).`;
 }
 
-function guideLimits(v, study, mb, plans) {
+function guideLimits(v, study, mb, plans, storeys) {
   if (!study || !mb) return '_Not measured yet._';
   const quad = (pilot) => study.cells.find((c) => c.condition === 'quad' && c.lighting === 'day' && c.pilot === pilot);
   const crashes = (c) => `${c.crashes} of ${c.episodes}`;
@@ -1050,6 +1051,7 @@ function guideLimits(v, study, mb, plans) {
     `- On quadrotor dynamics with sensor noise every pilot covers less than on the kinematic airframe, because the quad cannot change speed instantly. Under the crash rule only the quad-aware planner (braking safety filter plus command tracker) survives: ${v.R_Q_BRAKE_TRACK} with ${v.R_Q_BRAKE_TRACK_CRASHES} crashes in 30 flights. The plain planner crashes in ${crashes(quad('classical'))} and covers ${v.R_PLANNER_QUAD}; the policy crashes in ${crashes(quad('policy'))} and covers ${v.R_POLICY_QUAD}, and the guard does not save it (${crashes(quad('guarded'))}). Whole missions on the quad, which slow to 1 m/s indoors behind the braking filter, reach the expected outcome ${v.R_MQ_SENSOR} of the time with the planner and ${v.R_MQ_POLICY} with the policy.${loc && truth ? ` Flown on the pose estimate instead of the true pose they reach it ${pct(loc.expectedOutcome)} of the time, and ${loc.flightsWithCollision} of ${loc.flights} flights touch something against ${truth.flightsWithCollision} on the true pose. The touches replayed so far (seeds 79206, 79221, 79303 and 79317) are slow, at most 0.35 m/s and below the crash limit, and all in the compound's larger second building, on its upper floor, while exploring or leaving. In two of them the estimate had drifted 0.7 to 1.2 m from the building by then; in the others it was within 15 cm, so drift is part of the cause but not all of it. Two causes are fixed. A way out that ended short of the opening let the fly-through line up through a wall (src/mission/autonomy/phases/indoor.ts, reachedExit). The rest were vertical touches at a stairwell hole: the range-finder probe that centres the drone before a climb averaged a real edge with a reach-limit stop and began its second axis before settling on the first, so it climbed into the slab's rim. It now centres on the stretch it saw open and settles first (src/mission/autonomy/planner/indoor/explorers.ts), and indoors the up and down range finders veto a climb or descent into a slab within 0.35 m (runner.ts, headroom). On the fresh block 79401–79460 flights with a touch fell from 3 to 2 on the estimate and from 5 to 2 on the true pose, out of 120 each; the four left are one seed, 79438, touching a wall while confirming a contact in a single-floor building, as on main. Seeds 79201+ and 79301+ were used to diagnose this and are no longer held-out for the quadrotor arms.` : ''}`,
     '- FrontierBench freezes seven exploration tasks (the last on real apartment plans) and a drone-team track, with public dev and test seeds so other pilots can be scored the same way; CI re-scores every submitted entry from its code. The seeds are public, so the board relies on entrants not tuning on the test split. [LEADERBOARD.md](LEADERBOARD.md) has the board and how to enter.',
     `- On multi-floor buildings only the sensor-only planner takes shafts; it reaches another floor in ${v.R_CLIMB_REACHED} fresh buildings and covers ${v.R_CLIMB_FLOORS} of them against ${v.R_PLANNER_FLOORS} without climbing. The policy and the teacher stay on the ground floor. A learned predictor of what lies behind each frontier is accurate but does not raise coverage, and neither does the true answer: coverage here is limited by flight time. [REPORT.md](REPORT.md) has both.`,
+    ...(storeys ? [storeysLimit(storeys)] : []),
     '- Mission clips show the 2D mission map. Clips in `docs/media/` were recorded in a cloud container with software WebGL, which renders at a few frames per second. FPV and training clips play one captured frame per 50 ms sim step, so flight runs at true speed and the training charts run faster than real time. On a laptop GPU the page runs in real time.',
   ];
   if (plans) {
@@ -1435,6 +1437,7 @@ const values = {
   ...atlasValues(readJson('docs/atlas.json')),
   ...hazardsSection(readJson('docs/hazard-coverage.json'), readJson('docs/hazard-missions.json'), readJson('docs/hazard-thermal.json')).values,
   FLOORS_BUDGET_NOTE: floorsBudgetNote(readJson('docs/floors-study.json')),
+  STOREYS_NOTE: storeysNote(readJson('docs/storeys-study.json')),
   ...trackingValues(readJson('docs/atlas/mc-tracking.json'), readJson('docs/atlas/mc-tracking-control.json')),
   ...faultBench(readJson('docs/fault-bench.json'), [readJson('results/archive/fault-bench/fault-bench-run1.json'), readJson('results/archive/fault-bench/fault-bench-run2.json'), readJson('results/archive/fault-bench/fault-bench-run3.json'), readJson('results/archive/fault-bench/fault-bench-run4.json'), readJson('results/archive/fault-bench/fault-bench-run5.json'), readJson('results/archive/fault-bench/fault-bench-run6.json'), readJson('results/archive/fault-bench/fault-bench-run7.json')]),
 };
@@ -1469,8 +1472,14 @@ const fromDocs = (text) => text.replaceAll('](docs/', '](');
 let guide = read('docs/GUIDE.md');
 guide = replaceBlock(guide, 'benchmarks', fromDocs(values.README_SUMMARY));
 guide = replaceBlock(guide, 'missions', fromDocs(values.README_MISSIONS));
-guide = replaceBlock(guide, 'limits', guideLimits(values, readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/plans-bench.json')));
+guide = replaceBlock(guide, 'limits', guideLimits(values, readJson('docs/study.json'), readJson('docs/mission-bench.json'), readJson('docs/plans-bench.json'), readJson('docs/storeys-study.json')));
 outputs['docs/GUIDE.md'] = guide;
+const storeys = readJson('docs/storeys-study.json');
+let multiFloor = read('docs/MULTI_FLOOR.md');
+multiFloor = replaceBlock(multiFloor, 'storeys', storeysTables(storeys));
+multiFloor = replaceBlock(multiFloor, 'storeys-control', storeysControlTable(storeys));
+multiFloor = replaceBlock(multiFloor, 'storeys-first', storeysFirstRunTable(storeys));
+outputs['docs/MULTI_FLOOR.md'] = multiFloor;
 
 let stale = false;
 for (const [path, text] of Object.entries(outputs)) {
