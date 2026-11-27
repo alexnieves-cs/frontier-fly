@@ -5,6 +5,7 @@
 //   vite-node scripts/study/storeys-study.ts -- --pilots planner,nbvp --out /tmp/a.json     # a shard
 //   vite-node scripts/study/storeys-study.ts -- --merge /tmp/a.json /tmp/b.json --out docs/storeys-study.json [--control main.json]
 //   vite-node scripts/study/storeys-study.ts -- --split dev ...                             # dev seeds (tune freely)
+//   vite-node scripts/study/storeys-study.ts -- --plain --pilots planner-view --out /tmp/c.json # paired control: BASELINES, no stair search
 //
 // Budgets:
 //   bench      120 s, whatever the number of floors (FrontierBench's `floors` task).
@@ -23,7 +24,7 @@
 // 88801+), report only; dev = FrontierBench dev 81401-81420 and the 20 dev homes (88601+).
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { STAIR_BASELINES } from '../../src/bench/baselines';
+import { BASELINES, STAIR_BASELINES } from '../../src/bench/baselines';
 import { benchEpisodeSetup } from '../../src/bench/run';
 import { BENCH_TASKS } from '../../src/bench/tasks';
 import { EpisodeFootprint, FOOTPRINT_RADIUS } from '../../src/eval/footprint';
@@ -47,6 +48,9 @@ export const PILOTS = ['planner', 'planner-view', 'boustrophedon', 'nbvp', 'yama
 export const BATTERY_EXPLORE_SHARE = 0.7;
 const BATTERY_CAP_STEPS = 20 * 60 * 20;
 const USABLE_WH = DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
+
+/** --plain flies `BASELINES` (the climber without the stair search, as the leaderboard flies it): the paired control. */
+const PLAIN = process.argv.includes('--plain');
 
 function arg(name: string, fallback: string): string {
   const i = process.argv.indexOf(`--${name}`);
@@ -121,7 +125,7 @@ async function fly(split: 'dev' | 'test', pilots: string[]): Promise<{ pilot: st
         const floors = spec.floors.length;
         if (budget.id === 'per-floor') cfg.maxSteps *= floors;
         if (budget.id === 'battery') cfg.maxSteps = BATTERY_CAP_STEPS;
-        const pilot = STAIR_BASELINES[pilotId]!();
+        const pilot = (PLAIN ? BASELINES : STAIR_BASELINES)[pilotId]!();
         pilot.reset({ speedH: task.speedH, maxSteps: cfg.maxSteps, dynamics: task.dynamics });
         let obs = env.reset(spec, envSeed, cfg);
         const fp = new EpisodeFootprint();
