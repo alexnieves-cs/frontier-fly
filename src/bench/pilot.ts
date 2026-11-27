@@ -18,6 +18,11 @@ export interface BenchContext {
    * within HOME_RADIUS of where it took off when time runs out.
    */
   home?: boolean;
+  /**
+   * An overwatch task (bench/overwatch.ts): the frame carries the camera's sighting of a lost person
+   * (SensorFrame.person), and the score is the time they are in view from a standoff.
+   */
+  person?: boolean;
 }
 
 export interface BenchPilot {
@@ -25,6 +30,12 @@ export interface BenchPilot {
   readonly name: string;
   reset(ctx: BenchContext): void;
   act(obs: Float32Array, frame: SensorFrame): Float32Array;
+  /**
+   * Integrity tasks (bench/integrity.ts): after each act, the horizontal radius, metres, the pilot
+   * claims holds its true position; Infinity when it does not trust its pose. A pilot without it
+   * claims 0 on every step (it flies as if its pose were exact).
+   */
+  protectionLevel?(): number;
 }
 
 /** A pilot module default-exports one of these. */

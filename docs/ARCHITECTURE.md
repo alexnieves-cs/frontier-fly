@@ -4,7 +4,7 @@
 
 frontier-fly is a static site. Physics, sensors, training, and rendering all run in the browser tab, and the same simulator code runs headless in Node for tests, pretraining, and benchmarks. There is no server.
 
-The tables and the module graph below are generated from the import graph under `src/` (321 files, 64,219 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
+The tables and the module graph below are generated from the import graph under `src/` (330 files, 66,686 lines) by `npm run docs`. The prose is the template in `scripts/docs/ARCHITECTURE.template.md`.
 
 ## Runtime data flow
 
@@ -106,9 +106,12 @@ flowchart LR
   app -->|1| ui
   bench -->|2| app
   bench -->|2| eval
-  bench -->|3| loc
-  bench -->|6| shared
-  bench -->|20| sim
+  bench -->|1| gen
+  bench -->|5| loc
+  bench -->|1| perception
+  bench -->|9| shared
+  bench -->|24| sim
+  bench -->|2| targets
   bench -->|4| team
   crazyflie -->|3| shared
   crazyflie -->|2| sim
@@ -129,7 +132,7 @@ flowchart LR
   film -->|6| viz
   gen -->|19| shared
   landing -->|2| film
-  landing -->|5| ui
+  landing -->|6| ui
   loc -->|3| shared
   mission -->|4| gen
   mission -->|6| loc
@@ -144,8 +147,8 @@ flowchart LR
   perception -->|1| sim
   perception -->|6| targets
   plans -->|2| gen
-  plans -->|3| shared
-  plans -->|2| sim
+  plans -->|4| shared
+  plans -->|4| sim
   px4 -->|11| mission
   px4 -->|2| shared
   px4 -->|5| sim
@@ -158,11 +161,13 @@ flowchart LR
   rl -->|8| sim
   rl -->|1| workers
   shared -->|1| mission
+  sim -->|1| bench
   sim -->|1| eval
   sim -->|8| gen
+  sim -->|1| loc
   sim -->|1| mission
   sim -->|1| rl
-  sim -->|50| shared
+  sim -->|55| shared
   targets -->|2| gen
   targets -->|6| shared
   team -->|1| eval
@@ -220,20 +225,20 @@ flowchart LR
 | Module | Files | Lines | Imports from | Libraries | Workers |
 | --- | --- | --- | --- | --- | --- |
 | `src/` | 1 | 7 | `ui` | — | — |
-| `src/bench` | 7 | 816 | `app`, `eval`, `loc`, `shared`, `sim`, `team` | — | — |
+| `src/bench` | 9 | 1,571 | `app`, `eval`, `gen`, `loc`, `perception`, `shared`, `sim`, `targets`, `team` | — | — |
 | `src/crazyflie` | 4 | 752 | `shared`, `sim` | — | — |
-| `src/eval` | 18 | 2,974 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
+| `src/eval` | 18 | 2,979 | `gen`, `loc`, `mission`, `rl`, `shared`, `sim`, `targets`, `train`, `vision`, `world/outdoor` | — | — |
 | `src/film` | 6 | 1,876 | `mission`, `rl`, `targets`, `ui`, `viz` | Three.js | — |
 | `src/gen` | 8 | 1,680 | `shared` | — | — |
-| `src/landing` | 2 | 332 | `film`, `ui` | — | — |
-| `src/loc` | 10 | 2,813 | `shared` | — | — |
-| `src/mission` | 63 | 15,179 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
+| `src/landing` | 4 | 887 | `film`, `ui` | — | — |
+| `src/loc` | 10 | 2,861 | `shared` | — | — |
+| `src/mission` | 63 | 15,234 | `gen`, `loc`, `perception`, `rl`, `shared`, `sim`, `targets`, `world/outdoor` | — | — |
 | `src/perception` | 8 | 865 | `gen`, `shared`, `sim`, `targets` | — | — |
-| `src/plans` | 4 | 731 | `gen`, `shared`, `sim` | — | — |
+| `src/plans` | 5 | 925 | `gen`, `shared`, `sim` | — | — |
 | `src/px4` | 8 | 1,618 | `mission`, `shared`, `sim`, `ui`, `world/outdoor/viz`, `world/outdoor` | — | `src/px4/bridge.worker.ts` |
 | `src/rl` | 15 | 3,763 | `eval`, `gen`, `shared`, `sim`, `workers` | TF.js | — |
 | `src/shared` | 7 | 766 | `mission` | — | — |
-| `src/sim` | 34 | 7,399 | `eval`, `gen`, `mission`, `rl`, `shared` | Rapier | — |
+| `src/sim` | 38 | 8,254 | `bench`, `eval`, `gen`, `loc`, `mission`, `rl`, `shared` | Rapier | — |
 | `src/targets` | 10 | 1,321 | `gen`, `shared` | Three.js | — |
 | `src/team` | 6 | 1,123 | `eval`, `gen`, `mission`, `shared`, `sim` | — | — |
 | `src/train` | 9 | 2,468 | `eval`, `gen`, `rl`, `shared`, `sim`, `workers` | — | — |

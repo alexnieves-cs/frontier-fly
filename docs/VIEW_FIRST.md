@@ -124,6 +124,82 @@ Every result above hands the planner its true position. Round 3's goal was to ta
 
 The lead is +22.8 points over NBVP (+19.4 to +26.6) and +27.7 over nearest frontier (+23.5 to +32.1). The estimate costs the view-first planner +0.2 points (−1.4 to +1.5), that is, nothing measurable, because the estimator keeps the error at 0.12 to 0.22 m on average (worst 0.80 m). The honest reading: the planner does not depend on ground truth, but this level of drift is not hard for any pilot. A harsher sensor model (lidar sector loss, glass, flow failure) is the next stressor. The quad tracker's +3.4 points on its estimate is unexplained.
 
+## Round 4: broken sensors
+
+Goal: with sensor faults, on its own pose estimate, lead every baseline by 15 points or more, crash in under 5% of flights, and lose under 15 points against the same flights with healthy sensors. The degraded-sensor track (`SENSOR_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts)) kills a 90° lidar sector, the flow sensor, three lidar rays in four, or 120° of lidar plus flow mid-flight. A fault hits the pilot and the estimator alike.
+
+On dev (140001+) the v3 planner already led by 27 points but crashed in 18 of 80 flights, 17 of them on the mid-flight failure. Diagnosis: the crashes came with pose errors under 0.3 m. The blind side was flying into walls the safety filter could no longer see, not getting lost. Three attempts, on dev only:
+
+1. Map-backed safety filter (`mapFill`): a no-return ray reads, for the braking filter only, the distance to the first wall voxel on the drone's own map. Crashes 18 to 12 on the failing task. Also counting unknown voxels as walls: 18 to 7 of 80.
+2. Fault declaration: two or more rays reading nothing where the map has a wall within 4 m, 10 steps in a row, and the drone flies at 0.6× for the rest of the flight. 7 to 0 of 80; the healthy tracks' dev splits unchanged (hard 86.9% vs 86.6%, return 72.1% vs 72.5%, drift 78.8% vs 79.1%). Shipped.
+3. Slow down only toward rays declared dead (cumulative count per ray): false alarms on healthy flights cost 13 points on the drift and return dev splits and brought crashes back. Dropped.
+
+Test (141001-141430, flown once per pilot, with a healthy-sensor control on the same seeds):
+
+| Pilot | With faults | Healthy sensors | Crashes (faults) |
+| --- | --- | --- | --- |
+| View-first planner | **80.0%** | 87.2% | 3/120 |
+| NBVP | 53.0% | 64.9% | 52/120 |
+| Nearest frontier | 47.0% | 57.5% | 61/120 |
+| BA* | 46.0% | 50.5% | 24/120 |
+| Planner + quad tracker | 30.7% | 40.8% | 42/120 |
+
+Every part of the goal holds: +27.0 points over NBVP (+21.7 to +32.2), 2.5% of flights crash, and the faults cost 7.2 points (−9.9 to −5.2). The price is the blanket slow-down: on the 40 m task with a sector dead from take-off the planner scores 47.1% against 65.3% with healthy sensors. The baselines fly the shared safety filter without `mapFill`, so part of the lead is this safety change, not exploration.
+
+## Version 4: unmapped rooms compete from the start (the 40 m tie)
+
+Round 1 left one task where nearest frontier kept up: the kinematic 40 m building, a tie on fresh seeds (+0.6, −3.4
+to +5.2). The cause was the order of the phases. The planner chose among mapped voxels it had not yet viewed, and
+only when none were left did it fly to the edge of unknown space. A 20 m building runs out of unviewed voxels in
+time; a 40 m building in 120 s never does, so the drone spent its flight on corners of the part the lidar ring had
+mapped while the rooms behind the first doorways stayed unmapped. On 20 practice flights it flew 224 m per flight
+to nearest frontier's 186 m and saw about the same.
+
+Version 4 (`ViewOptions.frontiers`) lets both kinds of goal compete by path cost from the start: an unflown voxel
+on the edge of unknown space is a goal even while unviewed voxels are left. Everything else is v3. Tuned on a new
+practice block (150001-150200) and the dev splits only:
+
+- Kinematic `large`, practice 150001-150060: 75.9% to 85.6% (nearest frontier 75.7% on 150001-150100). A path-cost
+  bonus for frontier goals (0.5 to 10 m) did worse than none; aiming the camera on the kinematic airframe, a 2.2 m
+  view radius and no edge bonus were all worse than v3 and were dropped.
+- `large-quad`, practice 150101-150140: 79.3% to 79.7%, no real change.
+
+**The rule is on for the kinematic airframe only.** The first version turned it on for both airframes, and a
+report-only block (152001-152430) and the test splits were flown with it. Rescoring the drift track's test split
+showed the cost: on the quadrotor flying on its own pose estimate the camera score fell from 78.7% to 67.5%, against
+77.5% for the same flights on the true pose (drift dev: 79.1% to 67.6%). The estimate-painted maps leave many small
+unseen gaps beside walls, and the rule sends the drone after them. Two repairs tried on drift dev did not close
+the gap: counting voxels the drone's own lidar had hit as walls (76.0%), and asking for 2 to 5 unknown voxels in a
+row (60 to 61% on the two 40 m drift tasks against v3's 65.2%). The quadrotor had gained nothing from the rule on the
+true pose either (`large-quad` +0.4 and +0.5; `floors-quad` −4.5 on block 152001, −10.6 to +1.0), so the shipped
+baseline keeps v3's rule on the quadrotor, bit for bit (its quadrotor flights below are identical to main's), and
+uses v4's on the kinematic airframe, where the gain is. No pilot here flies the kinematic airframe on its own
+estimate, so whether the rule survives drift there is not measured.
+
+Because that choice was made after block 152001 had been flown, the final code was confirmed on one more fresh
+report-only block, **153001-153430** (30 flights per task), flown once by v4, by v3 from main (`848a9da`) as a
+paired control, and by NBVP and nearest frontier. Results: `bench/results/hard-153001/` (v3 in `control/`).
+
+| Pilot | Camera score | large | large-quad | sprint | quad-dark | floors-quad | Crashes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| View-first planner v4 | **87.0%** | **84.5** | **75.4** | **95.0** | **97.9** | **82.2** | 3 of 150 |
+| View-first planner v3 (main) | 84.7% | 74.0 | 75.4 | 93.8 | 97.9 | 82.2 | 3 of 150 |
+| Next-best-view RRT (NBVP) | 65.2% | 59.6 | 42.3 | 78.9 | 84.3 | 60.7 | 28 of 150 |
+| Nearest frontier (Yamauchi) | 58.2% | 73.4 | 41.8 | 62.2 | 72.9 | 40.5 | 17 of 150 |
+
+On the kinematic 40 m task v4 is **+11.1 points over nearest frontier** (95% interval +6.6 to +16.1) and +10.5 over
+v3 (+7.2 to +13.6). The tie is gone. Overall v4 is +2.3 over v3 (+1.6 to +3.1), +21.9 over NBVP (+18.9 to +24.8) and
++28.9 over nearest frontier (+25.6 to +32.1). The same on the other fresh flights: 90 more 40 m buildings
+(151001-151090, `bench/results/hard-151001-large/`) give 84.7% against nearest frontier's 75.3% (+9.4, +6.8 to
++12.4) and v3's 76.3%; block 152001 with the final code gives 88.9% against v3's 86.9% (`large` 86.3 against
+nearest frontier's 75.2).
+
+The test splits, rescored once for v4: hard 87.8% (v3 86.0%, paired +1.8, +1.0 to +2.6; `large` 83.3% against nearest
+frontier's 73.3%, +9.9, +6.0 to +14.0), 3 crashes in 150 as before; return 75.5% (v3 74.0%, +1.5, +0.7 to +2.4), 120 of
+120 home, no crash, and the 30 s sprint's lead over nearest frontier is now +12.1 (+6.4 to +18.2) where it was within
+noise; FrontierBench v3 99.7% footprint and 67.6% flown (v3 99.1%, 67.4%), no crash in 240. The drift track is all
+quadrotor, and v4 leaves the quadrotor unchanged, so the drift, degraded-sensor and hard drift results stand as published.
+
 ## Results of version 1
 
 Seed blocks are in the project's seed ledger. Tuning used the FrontierBench dev split and a practice block

@@ -27,6 +27,8 @@ export function summarize(episodes: BenchEpisode[], taskList: readonly BenchTask
   const covs: number[] = [];
   const fps: number[] = [];
   const cams: number[] = [];
+  const watches: number[] = [];
+  const integrities: number[] = [];
   for (const t of taskList) {
     const rs = episodes.filter((e) => e.task === t.id);
     if (!rs.length) continue;
@@ -44,11 +46,15 @@ export function summarize(episodes: BenchEpisode[], taskList: readonly BenchTask
       halfS: half.length ? mean(half) : null,
       ...footprintStats(rs, mean),
       ...cameraStats(rs, mean),
+      ...watchStats(rs, mean),
+      ...integrityStats(rs, mean),
     };
+    if (rs.every((r) => r.watch)) watches.push(mean(rs.map((r) => r.watch!.score)));
+    if (rs.every((r) => r.integrity)) integrities.push(mean(rs.map((r) => r.integrity!.score)));
     if (rs.every((r) => r.camera)) cams.push(mean(rs.map((r) => r.camera!.footprint)));
     if (rs.every((r) => r.footprint !== undefined)) fps.push(mean(rs.map((r) => r.footprint)));
   }
-  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), ...(cams.length && cams.length === covs.length ? { cameraScore: mean(cams) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), crashShare: episodes.filter((e) => e.crashed).length / Math.max(1, episodes.length), tasks };
+  return { score: mean(covs), ...(fps.length === covs.length ? { footprintScore: mean(fps) } : {}), ...(cams.length && cams.length === covs.length ? { cameraScore: mean(cams) } : {}), ...(watches.length && watches.length === covs.length ? { watchScore: mean(watches) } : {}), ...(integrities.length && integrities.length === covs.length ? { integrityScore: mean(integrities) } : {}), safeShare: episodes.filter((e) => e.collisions <= SAFE_COLLISIONS).length / Math.max(1, episodes.length), crashShare: episodes.filter((e) => e.crashed).length / Math.max(1, episodes.length), tasks };
 }
 
 /** Camera-footprint columns of a FrontierBench Hard task (absent elsewhere). */
@@ -57,6 +63,38 @@ function cameraStats(rs: BenchEpisode[], mean: (xs: number[]) => number) {
   const c = rs.map((r) => r.camera!.footprint);
   const half = rs.filter((r) => r.camera!.halfS !== null).map((r) => r.camera!.halfS!);
   return { camera: mean(c), cameraCi: bootstrapCi(c), cameraArea: mean(rs.map((r) => r.camera!.area)), cameraHalfS: half.length ? mean(half) : null };
+}
+
+/** Overwatch columns of a task (bench/overwatch.ts; absent elsewhere). */
+function watchStats(rs: BenchEpisode[], mean: (xs: number[]) => number) {
+  if (!rs.length || !rs.every((r) => r.watch)) return {};
+  const w = rs.map((r) => r.watch!);
+  const found = w.filter((x) => x.found);
+  const re = w.filter((x) => x.reacquireS !== null).map((x) => x.reacquireS!);
+  return {
+    watch: mean(w.map((x) => x.score)),
+    watchCi: bootstrapCi(w.map((x) => x.score)),
+    found: found.length,
+    findS: found.length ? mean(found.map((x) => x.findS!)) : null,
+    kept: found.length ? mean(found.map((x) => x.kept)) : null,
+    reacquireS: re.length ? mean(re) : null,
+    breachS: mean(w.map((x) => x.breachS)),
+  };
+}
+
+/** Integrity columns of a task (bench/integrity.ts; absent elsewhere). */
+function integrityStats(rs: BenchEpisode[], mean: (xs: number[]) => number) {
+  if (!rs.length || !rs.every((r) => r.integrity)) return {};
+  const g = rs.map((r) => r.integrity!);
+  return {
+    integrity: mean(g.map((x) => x.score)),
+    integrityCi: bootstrapCi(g.map((x) => x.score)),
+    availability: mean(g.map((x) => x.availability)),
+    hmiRate: mean(g.map((x) => x.hmiRate)),
+    badShare: mean(g.map((x) => x.badShare)),
+    // Null on a flight with no bad-pose step: the mean is over the flights that had one.
+    caught: ((k) => (k.length ? mean(k) : null))(g.map((x) => x.caught).filter((x): x is number => x !== null)),
+  };
 }
 
 /** Footprint columns of a task (absent on results written before the footprint metric existed). */

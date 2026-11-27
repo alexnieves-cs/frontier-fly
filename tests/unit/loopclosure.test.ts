@@ -97,4 +97,40 @@ describe('loop closer', () => {
     expect(err).toBeLessThan(0.05);
     expect(lc.stats.loopAccepted).toBeGreaterThan(0);
   });
+
+  it('accumulates the sweeps since the last keyframe, so a sparse ring still closes the loop', () => {
+    const log = parseFlaser(syntheticLog());
+    // Every fourth beam of the ring, to 4 m: too few returns in one sweep to pass the match thresholds.
+    const sparse = (i: number): Float64Array => {
+      const full = ringScan(log, i, 4).ranges;
+      return Float64Array.from({ length: Math.floor(full.length / 4) }, (_, k) => full[k * 4]!);
+    };
+    const run = (accumulate: number): { err: number; loops: number; pts: number } => {
+      const lc = new LoopCloser({ loopMinGap: 8, maxRange: 4, accumulate, keyDist: 0.6, keyYaw: 0.5, seqMinPts: 20, loopMinPts: 40, loopHalfWindow: 4 });
+      let odo: Pose2 = [log.odom[0]!, log.odom[1]!, log.odom[2]!];
+      let prev: Pose2 | null = null;
+      let last: Pose2 = odo;
+      for (let lap = 0; lap < 2; lap++) {
+        for (let i = 0; i < log.n; i++) {
+          const t: Pose2 = [log.odom[i * 3]!, log.odom[i * 3 + 1]!, log.odom[i * 3 + 2]!];
+          if (prev) {
+            const z = between(prev, t);
+            z[2] += (0.4 * Math.PI) / 180;
+            odo = compose(odo, z);
+          }
+          prev = t;
+          last = t;
+          lc.add(odo, sparse(i));
+        }
+      }
+      const now = lc.current();
+      return { err: Math.hypot(now[0] - last[0], now[1] - last[1]), loops: lc.stats.loopAccepted, pts: lc.stats.seqMatched };
+    };
+    const single = run(1);
+    const merged = run(6);
+    expect(single.pts).toBe(0);
+    expect(merged.pts).toBeGreaterThan(0);
+    expect(merged.loops).toBeGreaterThan(0);
+    expect(merged.err).toBeLessThan(single.err);
+  });
 });

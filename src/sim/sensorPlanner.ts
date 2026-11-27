@@ -5,6 +5,8 @@ import { approachSpeed, CommandShaper, cornerSpeed, profileSpeed, uTurnSpeed, re
 import { MAX_CANDIDATES, PICK_DIM, type GoalPicker, type PickCandidates } from './picker';
 import { BRAKING_MARGIN, brakingFilter, descentClear, filterVelocity, SAFETY_HORIZON, SAFETY_MARGIN, type BrakingModel } from './lidarSafety';
 import { voxelLayout } from '../shared/voxels';
+import type { PersonSighting } from '../bench/overwatch';
+import type { PoseHealth } from '../loc/types';
 
 // Module-local copies (imported bindings are getter calls under vite-node).
 const LIDAR_H = C.LIDAR_H;
@@ -42,6 +44,13 @@ export interface SensorFrame {
   vel?: readonly [number, number];
   /** Fraction of the step budget left, when the pilot knows it (a feature for SensorPlannerOptions.picker). */
   timeLeft?: number;
+  /**
+   * Overwatch tasks only (bench/overwatch.ts): the camera's sighting of the person this step, or null
+   * when they are not in view. Absent on every other task.
+   */
+  person?: PersonSighting | null;
+  /** Drift tasks only: the pose estimator's own health (loc/types.ts). It never reads the truth. */
+  health?: PoseHealth;
 }
 
 /** World-frame command. */
@@ -59,6 +68,13 @@ export interface SensorPlannerOptions {
   speed?: number;
   /** Flight height above the floor, meters. */
   flyHeight?: number;
+  /**
+   * Shaft-search lanes (sim/climber.ts `searcher`): a voxel counts as covered once it or the voxel
+   * beside it across the lane (y ± 1) is flown, so the sweep flies lanes 1 m apart, half the
+   * distance of a full sweep, and still passes under every opening at least 1 m across, which is all
+   * the up and down range finders need to find a shaft.
+   */
+  lanes?: boolean;
   /** Replan every this many steps even when the goal is still valid. */
   replanEvery?: number;
   /** Turn to face the direction of travel (the camera looks forward). */
@@ -110,11 +126,28 @@ export interface SensorPlannerOptions {
    * drone's own lidar ring has had it in line of sight within `radius` meters, not only once the
    * drone has flown through it. The drone then visits rooms to look into them instead of sweeping
    * lanes, which is what sensor-footprint coverage scores. When nothing known is left unviewed it flies
-   * to the edge of unknown space (unflown voxels next to unmapped ones), and with `sweep`, when that
-   * is gone too, to unflown voxels for the rest of the budget. Each replan starts again at the top.
+   * to the edge of unknown space (unflown voxels next to unmapped ones), or with `frontiers` it weighs
+   * both kinds of goal by path cost from the start; when both are gone, with `sweep`, it flies to
+   * unflown voxels for the rest of the budget. Each replan starts again at the top.
    */
   view?: ViewOptions;
+  /**
+   * Map-backed safety: a lidar ray with no return is filled, for the safety filter only, with the
+   * distance along it to the nearest wall voxel of the drone's own occupancy map (`occupied`). A dead
+   * or blocked lidar sector then still brakes for walls the drone mapped earlier. Off by default.
+   */
+  mapFill?: boolean;
 }
+
+/**
+ * Lidar fault rule of mapFill: when FAULT_RAYS or more rays read no return where the drone's map has a
+ * wall within FAULT_RANGE m, FAULT_STEPS steps in a row, the lidar is declared faulty and the drone
+ * flies at FAULT_SPEED of its speed for the rest of the flight.
+ */
+const FAULT_RAYS = 2;
+const FAULT_RANGE = 4;
+const FAULT_STEPS = 10;
+const FAULT_SPEED = 0.6;
 
 export interface ViewOptions {
   /** Line-of-sight radius that counts a voxel as viewed, meters (default 3, the footprint metric's headline). */
@@ -134,6 +167,14 @@ export interface ViewOptions {
   lookMin?: number;
   /** Yaw-rate cap while aiming the camera, rad/s (default: the tracker's cap, or the airframe's). */
   lookYawRate?: number;
+  /**
+   * The view phase also takes unflown voxels on the edge of unknown space as goals, not only once
+   * nothing known is left unviewed (default false: v3's rule, which on a 40 m building spends the
+   * whole flight on corners of the mapped part and never opens the unmapped rooms). The baseline
+   * turns it on for the kinematic airframe only: on the quadrotor flying on its own pose estimate it
+   * cost 11 points (docs/VIEW_FIRST.md, version 4).
+   */
+  frontiers?: boolean;
 }
 
 /** Non-negative extra cost of a frontier candidate, for coordinating with other drones. */
@@ -177,6 +218,12 @@ export class SensorPlanner {
   readonly horizon: number;
   readonly braking: BrakingModel | null;
   readonly brakingMargin: number;
+  private readonly mapFill: boolean;
+  private readonly filled = new Float64Array(LIDAR_H);
+  /** Steps in a row with lidar rays the map contradicts (no return where a mapped wall is near). */
+  private contradicted = 0;
+  /** A lidar fault was declared: fly slower for the rest of the flight. */
+  sensorFault = false;
   readonly momentum: number;
   readonly gain: GainSource | null;
   readonly gainWeight: number;
@@ -185,6 +232,7 @@ export class SensorPlanner {
   readonly tracker: ResolvedTracker | null;
   readonly picker: GoalPicker | null;
   readonly view: Required<ViewOptions> | null;
+  private readonly lanes: boolean;
   /** Own-map line-of-sight view mask (SeenMap layout), when `view` is set. */
   private viewed = new Uint8Array(0);
   /** Camera view mask (view.look), same layout. */
@@ -237,14 +285,16 @@ export class SensorPlanner {
     this.horizon = opts.horizon ?? SAFETY_HORIZON;
     this.braking = opts.braking ?? null;
     this.brakingMargin = opts.brakingMargin ?? BRAKING_MARGIN;
+    this.mapFill = opts.mapFill ?? false;
     this.momentum = opts.momentum ?? 0;
     this.gain = opts.gain ?? null;
     this.gainWeight = opts.gain ? (opts.gainWeight ?? 0.05) : 0;
     this.penalty = opts.penalty ?? null;
     this.tracker = opts.tracker ? resolveTracker(opts.tracker) : null;
     this.picker = opts.picker ?? null;
+    this.lanes = opts.lanes ?? false;
     this.view = opts.view
-      ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0 }
+      ? { radius: opts.view.radius ?? 3, rays: opts.view.rays ?? 72, sweep: opts.view.sweep ?? true, look: opts.view.look ?? 0, lookMin: opts.view.lookMin ?? 4, lookYawRate: opts.view.lookYawRate ?? 0, frontiers: opts.view.frontiers ?? false }
       : null;
   }
 
@@ -252,9 +302,45 @@ export class SensorPlanner {
    * A voxel (SeenMap index) no longer needs a visit: flown, or in view mode viewed and not on the
    * edge of unknown space (a viewed doorway into unmapped rooms is still worth flying to).
    */
+  /** The lidar with each no-return ray replaced by the distance to the first mapped wall voxel along it. */
+  private fillFromMap(f: SensorFrame, floor: number): ArrayLike<number> {
+    const occ = f.occupied!;
+    const out = this.filled;
+    const base = floor * f.vw * f.vd;
+    let bad = 0;
+    for (let i = 0; i < LIDAR_H; i++) {
+      const r = f.lidar[i]!;
+      out[i] = r;
+      if (r < LIDAR_MAX - 1e-3) continue;
+      const a = f.yaw + (i / LIDAR_H) * Math.PI * 2;
+      const dx = Math.cos(a);
+      const dy = Math.sin(a);
+      // Start past the drone's own voxel: a drifted map can put a wall voxel under it.
+      for (let t = 0.3; t < LIDAR_MAX; t += 0.1) {
+        const vx = Math.floor((f.pos[0] + dx * t) / VOXEL);
+        const vy = Math.floor((f.pos[1] + dy * t) / VOXEL);
+        if (vx < 0 || vy < 0 || vx >= f.vw || vy >= f.vd) break;
+        const k = base + vy * f.vw + vx;
+        if (occ[k] === 1 || (f.seen[k] !== 1 && f.visited[k] !== 1)) {
+          out[i] = t;
+          if (occ[k] === 1 && t < FAULT_RANGE) bad += 1;
+          break;
+        }
+      }
+    }
+    this.contradicted = bad >= FAULT_RAYS ? this.contradicted + 1 : 0;
+    if (this.contradicted >= FAULT_STEPS) this.sensorFault = true;
+    return out;
+  }
+
   private covered(f: SensorFrame, k: number): boolean {
+    if (this.lanes) {
+      if (f.visited[k] === 1) return true;
+      const y = Math.floor((k % this.plane) / f.vw);
+      return (y > 0 && f.visited[k - f.vw] === 1) || (y < f.vd - 1 && f.visited[k + f.vw] === 1);
+    }
     if (!this.view || this.phase === 2) return f.visited[k] === 1;
-    if (this.phase === 0) return this.viewed[k] === 1;
+    if (this.phase === 0) return this.viewed[k] === 1 && (!this.view.frontiers || f.visited[k] === 1 || !this.bordersUnknown(f, k));
     return f.visited[k] === 1 || !this.bordersUnknown(f, k);
   }
 
@@ -306,7 +392,22 @@ export class SensorPlanner {
     }
   }
 
+  /**
+   * The drone has changed floors (sim/climber.ts): forget goals and paths like reset(), but keep what
+   * the drone has already had in view on every floor, so a floor it comes back to is not looked at again.
+   */
+  floorChanged(): void {
+    const carry = { viewed: this.viewed.slice(), cam: this.camViewed.slice() };
+    this.reset();
+    this.carry = carry;
+  }
+
+  private carry: { viewed: Uint8Array; cam: Uint8Array } | null = null;
+
   reset(): void {
+    this.carry = null;
+    this.contradicted = 0;
+    this.sensorFault = false;
     this.n = 0;
     this.path = [];
     this.goal = -1;
@@ -370,6 +471,11 @@ export class SensorPlanner {
     this.banned = new Uint8Array(n);
     this.viewed = new Uint8Array(this.view ? n : 0);
     this.camViewed = new Uint8Array(this.view?.look ? n : 0);
+    if (this.carry) {
+      if (this.carry.viewed.length === this.viewed.length) this.viewed.set(this.carry.viewed);
+      if (this.carry.cam.length === this.camViewed.length) this.camViewed.set(this.carry.cam);
+      this.carry = null;
+    }
     this.candScore = new Float64Array(this.plane);
     this.candOrder = new Int32Array(this.plane);
     this.candLabel = new Int32Array(this.plane);
@@ -906,12 +1012,17 @@ export class SensorPlanner {
     if (tr) [vx, vy] = this.shaper.shape(vx, vy, tr.accel, POLICY_DT, f.vel);
     const sx = vx;
     const sy = vy;
+    const lidar = this.mapFill && f.occupied ? this.fillFromMap(f, floor) : f.lidar;
     [vx, vy] = this.braking
-      ? brakingFilter(vx, vy, f.yaw, f.lidar, f.vel, this.braking, this.brakingMargin)
-      : filterVelocity(vx, vy, f.yaw, f.lidar, SAFETY_MARGIN, this.horizon);
+      ? brakingFilter(vx, vy, f.yaw, lidar, f.vel, this.braking, this.brakingMargin)
+      : filterVelocity(vx, vy, f.yaw, lidar, SAFETY_MARGIN, this.horizon);
     this.lastSafetyCut = Math.hypot(sx - vx, sy - vy);
     // A cut by the safety filter is where the next ramp starts from.
     if (tr && (vx !== sx || vy !== sy)) this.shaper.hold(vx, vy);
+    if (this.sensorFault) {
+      vx *= FAULT_SPEED;
+      vy *= FAULT_SPEED;
+    }
     let yawRate = 0;
     const aim = this.view?.look && !homing ? this.lookHeading() : null;
     if (aim !== null) {

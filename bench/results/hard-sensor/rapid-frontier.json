@@ -1,0 +1,3628 @@
+{
+  "hard": 1,
+  "track": "sensor",
+  "name": "Rapid frontier (Cieslewski et al. 2017)",
+  "source": "baseline:rapid-frontier",
+  "split": "test",
+  "commit": "28c6f50",
+  "baseline": true,
+  "taskDefs": [
+    {
+      "id": "sector-large-quad",
+      "label": "40 x 40 m and back, quadrotor, a 90° lidar sector dead, 120 s",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 1,
+      "large": true,
+      "maxSteps": 2400,
+      "camera": true,
+      "home": true,
+      "drift": true,
+      "faults": {
+        "lidarSector": 1.5707963267948966
+      }
+    },
+    {
+      "id": "flowless-dark-quad",
+      "label": "Rooms and back, quadrotor, lights off, flow sensor dead, 40 s",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "night-dark",
+      "speedH": 2,
+      "dr": 1,
+      "maxSteps": 800,
+      "camera": true,
+      "home": true,
+      "drift": true,
+      "faults": {
+        "flowDead": true
+      }
+    },
+    {
+      "id": "sparse-quad",
+      "label": "Rooms and back, quadrotor, 1 lidar ray in 4, 60 s",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 1,
+      "maxSteps": 1200,
+      "camera": true,
+      "home": true,
+      "drift": true,
+      "faults": {
+        "lidarKeep": 4
+      }
+    },
+    {
+      "id": "failing-quad",
+      "label": "Rooms, quadrotor, 120° of lidar and the flow sensor fail at 20-60 s, 120 s",
+      "stage": 3,
+      "dynamics": "quad",
+      "lighting": "day",
+      "speedH": 2,
+      "dr": 1,
+      "camera": true,
+      "drift": true,
+      "faults": {
+        "lidarSector": 2.0943951023931953,
+        "flowDead": true,
+        "failAt": [
+          20,
+          60
+        ]
+      }
+    }
+  ],
+  "score": 0.15144856417599648,
+  "footprintScore": 0.6192425000000001,
+  "cameraScore": 0.4839625205207381,
+  "safeShare": 0.575,
+  "crashShare": 0.39166666666666666,
+  "tasks": {
+    "sector-large-quad": {
+      "episodes": 30,
+      "coverage": 0.04966555818988665,
+      "coverageCi": [
+        0.03655860459680864,
+        0.06354485525093462
+      ],
+      "collisionsPerEpisode": 0.8333333333333334,
+      "safeFlights": 9,
+      "crashedFlights": 21,
+      "energyWh": 1.7089046596941408,
+      "halfS": null,
+      "footprint": 0.19746666666666668,
+      "footprintCi": [
+        0.15828333333333336,
+        0.23802666666666672
+      ],
+      "area": {
+        "flown": 0.03379466666666665,
+        "footprint": 0.15973816666666668
+      },
+      "footprintHalfS": null,
+      "camera": 0.09721619531660244,
+      "cameraCi": [
+        0.04432315090608901,
+        0.15271036514394615
+      ],
+      "cameraArea": 0.13121992946504574,
+      "cameraHalfS": null
+    },
+    "flowless-dark-quad": {
+      "episodes": 30,
+      "coverage": 0.1664255298130179,
+      "coverageCi": [
+        0.15801465086016597,
+        0.17528106912934158
+      ],
+      "collisionsPerEpisode": 0.03333333333333333,
+      "safeFlights": 29,
+      "crashedFlights": 0,
+      "energyWh": 1.2699581424797894,
+      "halfS": null,
+      "footprint": 0.7838066666666668,
+      "footprintCi": [
+        0.7440033333333335,
+        0.8264666666666666
+      ],
+      "area": {
+        "flown": 0.09849483333333332,
+        "footprint": 0.607598
+      },
+      "footprintHalfS": 13.317778461882115,
+      "camera": 0.6902488145983441,
+      "cameraCi": [
+        0.6514281469175388,
+        0.7334435148902061
+      ],
+      "cameraArea": 0.47897839198655745,
+      "cameraHalfS": 21.061729202921804
+    },
+    "sparse-quad": {
+      "episodes": 30,
+      "coverage": 0.15981963665531337,
+      "coverageCi": [
+        0.13869473308949445,
+        0.18029656948933465
+      ],
+      "collisionsPerEpisode": 0.5333333333333333,
+      "safeFlights": 14,
+      "crashedFlights": 14,
+      "energyWh": 1.3879495975771994,
+      "halfS": null,
+      "footprint": 0.5818733333333335,
+      "footprintCi": [
+        0.5159133333333333,
+        0.6515000000000001
+      ],
+      "area": {
+        "flown": 0.1116983333333333,
+        "footprint": 0.4992161666666666
+      },
+      "footprintHalfS": 18.81600787825901,
+      "camera": 0.3050725968717585,
+      "cameraCi": [
+        0.19586775185212688,
+        0.41856127465959775
+      ],
+      "cameraArea": 0.39829346468684734,
+      "cameraHalfS": 28.336030276269362
+    },
+    "failing-quad": {
+      "episodes": 30,
+      "coverage": 0.22988353204576795,
+      "coverageCi": [
+        0.2007995397340562,
+        0.25682242486654283
+      ],
+      "collisionsPerEpisode": 0.5,
+      "safeFlights": 17,
+      "crashedFlights": 12,
+      "energyWh": 2.4627389548934007,
+      "halfS": null,
+      "footprint": 0.9138233333333334,
+      "footprintCi": [
+        0.8523866666666667,
+        0.9592066666666668
+      ],
+      "area": {
+        "flown": 0.17415683333333332,
+        "footprint": 0.8100353333333336
+      },
+      "footprintHalfS": 13.952738160546664,
+      "camera": 0.8433124752962475,
+      "cameraCi": [
+        0.7745390958883339,
+        0.8994471962973296
+      ],
+      "cameraArea": 0.7102629623256562,
+      "cameraHalfS": 21.54910018494454
+    }
+  },
+  "episodes": [
+    {
+      "task": "sector-large-quad",
+      "seed": 141001,
+      "coverage": 0.007681564245810056,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.15076692951268833,
+      "halfS": null,
+      "steps": 94,
+      "footprint": 0.0747,
+      "area": {
+        "flown": 0.007700000000000001,
+        "footprint": 0.0747
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.037011173184357544,
+        "halfS": null,
+        "seen": 0.037011173184357544
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.12522197136846236,
+        "max": 0.22724439255659876,
+        "final": 0.18433299694686772,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141002,
+      "coverage": 0.06155015197568389,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.9761062296483842,
+      "halfS": null,
+      "steps": 1249,
+      "footprint": 0.1619,
+      "area": {
+        "flown": 0.046939999999999996,
+        "footprint": 0.14957500000000004
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.13294072948328264,
+        "halfS": null,
+        "seen": 0.15767477203647418
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.2774431183432758,
+        "max": 0.32974294437859525,
+        "final": 0.2433270272257967,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141003,
+      "coverage": 0.008285302593659942,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.19239996297993373,
+      "halfS": null,
+      "steps": 117,
+      "footprint": 0.0944,
+      "area": {
+        "flown": 0.0083,
+        "footprint": 0.09440000000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.051873198847262256,
+        "halfS": null,
+        "seen": 0.05187319884726225
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.21418989103209932,
+        "max": 0.33184689990945593,
+        "final": 0.32394586657818203,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141004,
+      "coverage": 0.10802023121387283,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.866310107101735,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3696,
+      "area": {
+        "flown": 0.061005,
+        "footprint": 0.25124
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3388728323699422,
+        "area": 0.22586705202312135,
+        "halfS": null,
+        "seen": 0.3388728323699422
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.3191515987696935,
+        "max": 0.45566023523350574,
+        "final": 0.14799647104887123,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141005,
+      "coverage": 0.040680473372781065,
+      "collisions": 2,
+      "crashed": true,
+      "energyWh": 1.0983756554412611,
+      "halfS": null,
+      "steps": 695,
+      "footprint": 0.155,
+      "area": {
+        "flown": 0.03660999999999999,
+        "footprint": 0.14506499999999994
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.13531804733727815,
+        "halfS": null,
+        "seen": 0.14792899408284024
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.08632006138435667,
+        "max": 0.15923746254030732,
+        "final": 0.07010865981414238,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141006,
+      "coverage": 0.011645962732919254,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.23321362157980974,
+      "halfS": null,
+      "steps": 147,
+      "footprint": 0.1083,
+      "area": {
+        "flown": 0.011545,
+        "footprint": 0.108105
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.06473214285714284,
+        "halfS": null,
+        "seen": 0.06482919254658386
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.26756331576346615,
+        "max": 0.364446218769777,
+        "final": 0.31242485225516037,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141007,
+      "coverage": 0.02572964669738863,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.6941833124294078,
+      "halfS": null,
+      "steps": 437,
+      "footprint": 0.1352,
+      "area": {
+        "flown": 0.024225,
+        "footprint": 0.13061000000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.09193548387096771,
+        "halfS": null,
+        "seen": 0.0967741935483871
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.3114250561978191,
+        "max": 0.4068530334001955,
+        "final": 0.3186274553184026,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141008,
+      "coverage": 0.04239766081871345,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.6771479626545953,
+      "halfS": null,
+      "steps": 1032,
+      "footprint": 0.2222,
+      "area": {
+        "flown": 0.03516,
+        "footprint": 0.19398999999999997
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.15986842105263158,
+        "halfS": null,
+        "seen": 0.18603801169590642
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.14105129163874483,
+        "max": 0.22460340381719518,
+        "final": 0.19112084913390914,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141009,
+      "coverage": 0.00641025641025641,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.14898379680358104,
+      "halfS": null,
+      "steps": 89,
+      "footprint": 0.0527,
+      "area": {
+        "flown": 0.006400000000000001,
+        "footprint": 0.05269999999999998
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.03133903133903134,
+        "halfS": null,
+        "seen": 0.03133903133903134
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.12581816896395107,
+        "max": 0.1640723901782431,
+        "final": 0.11939123660861851,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141010,
+      "coverage": 0.10185185185185185,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.839839459741842,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3528,
+      "area": {
+        "flown": 0.052725,
+        "footprint": 0.20907500000000004
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3373015873015873,
+        "area": 0.1909887566137566,
+        "halfS": null,
+        "seen": 0.3373015873015873
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.1168996883337104,
+        "max": 0.3317192401077219,
+        "final": 0.041289344730672424,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141011,
+      "coverage": 0.009180790960451978,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.18762296338694728,
+      "halfS": null,
+      "steps": 116,
+      "footprint": 0.0657,
+      "area": {
+        "flown": 0.009199999999999996,
+        "footprint": 0.06570000000000001
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.037782485875706213,
+        "halfS": null,
+        "seen": 0.037782485875706213
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.1370175374014139,
+        "max": 0.17997717542839342,
+        "final": 0.11765874198410163,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141012,
+      "coverage": 0.007311977715877437,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.19171159983175762,
+      "halfS": null,
+      "steps": 114,
+      "footprint": 0.0487,
+      "area": {
+        "flown": 0.007299999999999999,
+        "footprint": 0.048699999999999986
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.02402506963788302,
+        "halfS": null,
+        "seen": 0.02402506963788301
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.10423626857665949,
+        "max": 0.1376284469542822,
+        "final": 0.10884977184209366,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141013,
+      "coverage": 0.06016597510373444,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.251341811081894,
+      "halfS": null,
+      "steps": 1385,
+      "footprint": 0.2701,
+      "area": {
+        "flown": 0.044700000000000004,
+        "footprint": 0.21219500000000008
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.19344744121715077,
+        "halfS": null,
+        "seen": 0.24861687413554634
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.3093916059624637,
+        "max": 0.4351335531497177,
+        "final": 0.2804779181220142,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141014,
+      "coverage": 0.09947447447447448,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8504903813334135,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3307,
+      "area": {
+        "flown": 0.05619,
+        "footprint": 0.22896
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3036786786786787,
+        "area": 0.19465090090090093,
+        "halfS": null,
+        "seen": 0.3036786786786787
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.13961826300793742,
+        "max": 0.3770909444714284,
+        "final": 0.10252259665762438,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141015,
+      "coverage": 0.10709117221418235,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.794956737059098,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3936,
+      "area": {
+        "flown": 0.061595,
+        "footprint": 0.27895499999999995
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3755426917510854,
+        "area": 0.2636939218523878,
+        "halfS": null,
+        "seen": 0.3755426917510854
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.18814768421720568,
+        "max": 0.3030920217833635,
+        "final": 0.07410825034935045,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141016,
+      "coverage": 0.09122562674094707,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.753114672806109,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.2893,
+      "area": {
+        "flown": 0.054935,
+        "footprint": 0.22737499999999997
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.28586350974930363,
+        "area": 0.21434540389972145,
+        "halfS": null,
+        "seen": 0.28586350974930363
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.19099017816089883,
+        "max": 0.5618239813875768,
+        "final": 0.15860572732854883,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141017,
+      "coverage": 0.015127388535031847,
+      "collisions": 3,
+      "crashed": true,
+      "energyWh": 0.4642375630244753,
+      "halfS": null,
+      "steps": 274,
+      "footprint": 0.092,
+      "area": {
+        "flown": 0.014544999999999999,
+        "footprint": 0.09106000000000002
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.08262340764331208,
+        "halfS": null,
+        "seen": 0.08519108280254777
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.14505024323138596,
+        "max": 0.19966256895017773,
+        "final": 0.12793456757180344,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141018,
+      "coverage": 0.0031960227272727275,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.06847172474026733,
+      "halfS": null,
+      "steps": 17,
+      "footprint": 0.0518,
+      "area": {
+        "flown": 0.0032000000000000006,
+        "footprint": 0.05179999999999998
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.01988636363636364,
+        "halfS": null,
+        "seen": 0.019886363636363636
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.12778735454957024,
+        "max": 0.13994869533359997,
+        "final": 0.13994869533359997,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141019,
+      "coverage": 0.10590778097982709,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8547794653538565,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3617,
+      "area": {
+        "flown": 0.05705499999999999,
+        "footprint": 0.24192
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.35482708933717577,
+        "area": 0.23161023054755042,
+        "halfS": null,
+        "seen": 0.35482708933717577
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.1693521088662286,
+        "max": 0.3369797845488798,
+        "final": 0.1417216010365912,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141020,
+      "coverage": 0.0997191011235955,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8603272620310745,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3223,
+      "area": {
+        "flown": 0.055720000000000006,
+        "footprint": 0.235065
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.29564606741573035,
+        "area": 0.1967696629213483,
+        "halfS": null,
+        "seen": 0.29564606741573035
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2580553819762177,
+        "max": 0.3811018980950978,
+        "final": 0.14590723973652833,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141021,
+      "coverage": 0.02217741935483871,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.4710544278334678,
+      "halfS": null,
+      "steps": 298,
+      "footprint": 0.1355,
+      "area": {
+        "flown": 0.02139,
+        "footprint": 0.13255499999999998
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.09703629032258068,
+        "halfS": null,
+        "seen": 0.1
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.0762003922097095,
+        "max": 0.1188402356062737,
+        "final": 0.09253902454947427,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141022,
+      "coverage": 0.0043859649122807015,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.08338969120988841,
+      "halfS": null,
+      "steps": 50,
+      "footprint": 0.0698,
+      "area": {
+        "flown": 0.0044,
+        "footprint": 0.0698
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.0263157894736842,
+        "halfS": null,
+        "seen": 0.02631578947368421
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.13419829179167386,
+        "max": 0.16373960925857178,
+        "final": 0.14125732415560524,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141023,
+      "coverage": 0.050833333333333335,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.232961399572458,
+      "halfS": null,
+      "steps": 765,
+      "footprint": 0.2342,
+      "area": {
+        "flown": 0.044389999999999985,
+        "footprint": 0.22288000000000002
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.17306250000000004,
+        "halfS": null,
+        "seen": 0.18791666666666668
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.18908189318695567,
+        "max": 0.28988563330041667,
+        "final": 0.16489384573788884,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141024,
+      "coverage": 0.04611280487804878,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.085493390610568,
+      "halfS": null,
+      "steps": 690,
+      "footprint": 0.2138,
+      "area": {
+        "flown": 0.040825000000000014,
+        "footprint": 0.2062
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.15544969512195123,
+        "halfS": null,
+        "seen": 0.16501524390243902
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.17574577903931995,
+        "max": 0.3180798866359334,
+        "final": 0.15600587167745683,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141025,
+      "coverage": 0.10315712187958884,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8169434313822532,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3686,
+      "area": {
+        "flown": 0.05864499999999999,
+        "footprint": 0.2585199999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.31497797356828194,
+        "area": 0.21455580029368576,
+        "halfS": null,
+        "seen": 0.31497797356828194
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.14228053230343,
+        "max": 0.21157010070259363,
+        "final": 0.11107908987600758,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141026,
+      "coverage": 0.031067251461988302,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.8470326313334956,
+      "halfS": null,
+      "steps": 520,
+      "footprint": 0.1758,
+      "area": {
+        "flown": 0.028535000000000005,
+        "footprint": 0.16624000000000005
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.12277046783625731,
+        "halfS": null,
+        "seen": 0.13157894736842105
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.13550255252082657,
+        "max": 0.22416348852426157,
+        "final": 0.1711697789241203,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141027,
+      "coverage": 0.09379128137384413,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.827865261566741,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.3184,
+      "area": {
+        "flown": 0.053855,
+        "footprint": 0.222065
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.309775429326288,
+        "area": 0.21027080581241747,
+        "halfS": null,
+        "seen": 0.309775429326288
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.23956144343819635,
+        "max": 0.4349020101297682,
+        "final": 0.15171159314615054,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141028,
+      "coverage": 0.03523738872403561,
+      "collisions": 2,
+      "crashed": true,
+      "energyWh": 1.3453430473829393,
+      "halfS": null,
+      "steps": 832,
+      "footprint": 0.1365,
+      "area": {
+        "flown": 0.030515000000000004,
+        "footprint": 0.12867499999999998
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.1144844213649852,
+        "halfS": null,
+        "seen": 0.12277448071216618
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.0943944260715554,
+        "max": 0.174226166855217,
+        "final": 0.1268297643203375,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141029,
+      "coverage": 0.020774647887323944,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.6947942841386161,
+      "halfS": null,
+      "steps": 431,
+      "footprint": 0.0993,
+      "area": {
+        "flown": 0.01982499999999999,
+        "footprint": 0.09922999999999996
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.07026408450704223,
+        "halfS": null,
+        "seen": 0.07183098591549296
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.1636119947178425,
+        "max": 0.19328826281331735,
+        "final": 0.1603304056287801,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sector-large-quad",
+      "seed": 141030,
+      "coverage": 0.06977611940298507,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.7078810072516595,
+      "halfS": null,
+      "steps": 1095,
+      "footprint": 0.2194,
+      "area": {
+        "flown": 0.056409999999999995,
+        "footprint": 0.1947899999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.17167910447761192,
+        "halfS": null,
+        "seen": 0.20223880597014926
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.1423432224018666,
+        "max": 0.302670682528946,
+        "final": 0.06325151836687859,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141101,
+      "coverage": 0.125,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2982341667837811,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.5513,
+      "area": {
+        "flown": 0.07101500000000001,
+        "footprint": 0.38272000000000006
+      },
+      "footprintHalfS": 27.76923076923077,
+      "camera": {
+        "footprint": 0.48875,
+        "area": 0.331875,
+        "halfS": null,
+        "seen": 0.48875
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2030290864327966,
+        "max": 0.3829328716434778,
+        "final": 0.17870378738167436,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141102,
+      "coverage": 0.12912087912087913,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2564764761013614,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7253,
+      "area": {
+        "flown": 0.07835500000000001,
+        "footprint": 0.578775
+      },
+      "footprintHalfS": 12.582010582010582,
+      "camera": {
+        "footprint": 0.5659340659340659,
+        "area": 0.38152472527472525,
+        "halfS": 31.548387096774196,
+        "seen": 0.5659340659340659
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.14749682160950908,
+        "max": 0.18007611022912817,
+        "final": 0.1304803585013177,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141103,
+      "coverage": 0.1875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.3052418555121539,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7708,
+      "area": {
+        "flown": 0.10521,
+        "footprint": 0.608675
+      },
+      "footprintHalfS": 10.943999999999999,
+      "camera": {
+        "footprint": 0.6961805555555556,
+        "area": 0.5282118055555556,
+        "halfS": 16.357142857142858,
+        "seen": 0.6961805555555556
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2493109002569237,
+        "max": 0.32904991385717935,
+        "final": 0.22126570024751194,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141104,
+      "coverage": 0.1328125,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2655271123959249,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.6328,
+      "area": {
+        "flown": 0.0808,
+        "footprint": 0.51264
+      },
+      "footprintHalfS": 14.293453724604968,
+      "camera": {
+        "footprint": 0.5716145833333334,
+        "area": 0.4131510416666666,
+        "halfS": 23.25,
+        "seen": 0.5716145833333334
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.14267634683471273,
+        "max": 0.18843760940951942,
+        "final": 0.10601338024511286,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141105,
+      "coverage": 0.15853658536585366,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2573334194251333,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.6387,
+      "area": {
+        "flown": 0.095415,
+        "footprint": 0.508295
+      },
+      "footprintHalfS": 19.152391546162402,
+      "camera": {
+        "footprint": 0.5792682926829268,
+        "area": 0.4080030487804878,
+        "halfS": 25.666666666666668,
+        "seen": 0.5792682926829268
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.08359230243513309,
+        "max": 0.11700758793775286,
+        "final": 0.07517629171003293,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141106,
+      "coverage": 0.17234848484848486,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2806052878546783,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7538,
+      "area": {
+        "flown": 0.09745,
+        "footprint": 0.582405
+      },
+      "footprintHalfS": 15.472222222222225,
+      "camera": {
+        "footprint": 0.7083333333333334,
+        "area": 0.4260416666666667,
+        "halfS": 23.724137931034484,
+        "seen": 0.7083333333333334
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.19060860777558922,
+        "max": 0.26229055779845445,
+        "final": 0.1673251043870269,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141107,
+      "coverage": 0.17613636363636365,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2565985361459886,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8807,
+      "area": {
+        "flown": 0.09800499999999998,
+        "footprint": 0.6762300000000001
+      },
+      "footprintHalfS": 14,
+      "camera": {
+        "footprint": 0.7821969696969697,
+        "area": 0.543465909090909,
+        "halfS": 16.642857142857142,
+        "seen": 0.7821969696969697
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.0845709376397379,
+        "max": 0.16364202086532909,
+        "final": 0.08873458161295068,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141108,
+      "coverage": 0.14527027027027026,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2560574531363946,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7399,
+      "area": {
+        "flown": 0.088945,
+        "footprint": 0.58328
+      },
+      "footprintHalfS": 11.2,
+      "camera": {
+        "footprint": 0.643581081081081,
+        "area": 0.4743243243243242,
+        "halfS": 20.76923076923077,
+        "seen": 0.643581081081081
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.1172205791116149,
+        "max": 0.1808865420622986,
+        "final": 0.09450044363095741,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141109,
+      "coverage": 0.16220238095238096,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2801007104059015,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7619,
+      "area": {
+        "flown": 0.10067000000000001,
+        "footprint": 0.5859300000000001
+      },
+      "footprintHalfS": 11.33254716981132,
+      "camera": {
+        "footprint": 0.6904761904761905,
+        "area": 0.4706845238095238,
+        "halfS": 17.92452830188679,
+        "seen": 0.6904761904761905
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.07135027967917072,
+        "max": 0.13711339507721232,
+        "final": 0.048382143406233036,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141110,
+      "coverage": 0.16287878787878787,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2719425977937835,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7197,
+      "area": {
+        "flown": 0.10029000000000002,
+        "footprint": 0.5698099999999998
+      },
+      "footprintHalfS": 16.350923482849602,
+      "camera": {
+        "footprint": 0.5928030303030303,
+        "area": 0.41505681818181817,
+        "halfS": 25.032258064516128,
+        "seen": 0.5928030303030303
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.17364700313533116,
+        "max": 0.23029913113183068,
+        "final": 0.1720704618794282,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141111,
+      "coverage": 0.18412162162162163,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2557490045304078,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8919,
+      "area": {
+        "flown": 0.10971500000000001,
+        "footprint": 0.6599649999999999
+      },
+      "footprintHalfS": 11.333333333333336,
+      "camera": {
+        "footprint": 0.7837837837837838,
+        "area": 0.5433277027027028,
+        "halfS": 18.697674418604652,
+        "seen": 0.7837837837837838
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.10965060274135198,
+        "max": 0.16323124010769754,
+        "final": 0.09974602671809647,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141112,
+      "coverage": 0.13625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2554909193882355,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7212,
+      "area": {
+        "flown": 0.08165,
+        "footprint": 0.50401
+      },
+      "footprintHalfS": 19.523809523809526,
+      "camera": {
+        "footprint": 0.585,
+        "area": 0.38318749999999996,
+        "halfS": 27.45945945945946,
+        "seen": 0.585
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.09093518326037614,
+        "max": 0.15915416130050902,
+        "final": 0.10853345489077147,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141113,
+      "coverage": 0.19886363636363635,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.285513515717269,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7102,
+      "area": {
+        "flown": 0.11771000000000001,
+        "footprint": 0.6037750000000002
+      },
+      "footprintHalfS": 11.398416886543536,
+      "camera": {
+        "footprint": 0.5909090909090909,
+        "area": 0.4174242424242425,
+        "halfS": 31.076923076923077,
+        "seen": 0.5909090909090909
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.10291543657749438,
+        "max": 0.14314568510360973,
+        "final": 0.1141157234658159,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141114,
+      "coverage": 0.12894736842105264,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2939982371764542,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.5789,
+      "area": {
+        "flown": 0.075785,
+        "footprint": 0.4444700000000001
+      },
+      "footprintHalfS": 30.077496274217584,
+      "camera": {
+        "footprint": 0.5197368421052632,
+        "area": 0.3475,
+        "halfS": 31.513513513513516,
+        "seen": 0.5197368421052632
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2395953523355611,
+        "max": 0.29940162968268225,
+        "final": 0.20520809570681298,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141115,
+      "coverage": 0.16047297297297297,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2720254694671136,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8361,
+      "area": {
+        "flown": 0.09206500000000002,
+        "footprint": 0.6405199999999999
+      },
+      "footprintHalfS": 9.333333333333337,
+      "camera": {
+        "footprint": 0.6486486486486487,
+        "area": 0.40625,
+        "halfS": 28.78048780487805,
+        "seen": 0.6486486486486487
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.15347248403960007,
+        "max": 0.18812463071558622,
+        "final": 0.1441464582152968,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141116,
+      "coverage": 0.1948529411764706,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.244289133118473,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.9044,
+      "area": {
+        "flown": 0.11737500000000001,
+        "footprint": 0.7650850000000001
+      },
+      "footprintHalfS": 5.843670348343245,
+      "camera": {
+        "footprint": 0.7591911764705882,
+        "area": 0.5867647058823529,
+        "halfS": 11.680000000000001,
+        "seen": 0.7591911764705882
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2796174366603875,
+        "max": 0.3906945936473718,
+        "final": 0.18999635013483884,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141117,
+      "coverage": 0.18074324324324326,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.3019384954305286,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8851,
+      "area": {
+        "flown": 0.10355,
+        "footprint": 0.6557449999999999
+      },
+      "footprintHalfS": 7.890204520990312,
+      "camera": {
+        "footprint": 0.8057432432432432,
+        "area": 0.505320945945946,
+        "halfS": 20.560000000000002,
+        "seen": 0.8057432432432432
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.13789312272642743,
+        "max": 0.18301324532630034,
+        "final": 0.11473986209109523,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141118,
+      "coverage": 0.20265151515151514,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.243086170575871,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.9489,
+      "area": {
+        "flown": 0.11838000000000001,
+        "footprint": 0.76534
+      },
+      "footprintHalfS": 6.6378896882494,
+      "camera": {
+        "footprint": 0.8939393939393939,
+        "area": 0.6062500000000001,
+        "halfS": 14.266666666666666,
+        "seen": 0.8939393939393939
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.08109483887113905,
+        "max": 0.1525793214118486,
+        "final": 0.13553336580778858,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141119,
+      "coverage": 0.20270270270270271,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2434800940859376,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.924,
+      "area": {
+        "flown": 0.12474500000000002,
+        "footprint": 0.7520249999999997
+      },
+      "footprintHalfS": 6.833881578947369,
+      "camera": {
+        "footprint": 0.8665540540540541,
+        "area": 0.6617398648648649,
+        "halfS": 9.169811320754716,
+        "seen": 0.8665540540540541
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.22720580525193376,
+        "max": 0.2821668800837881,
+        "final": 0.21787001290005478,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141120,
+      "coverage": 0.1475,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2553361105843774,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7988,
+      "area": {
+        "flown": 0.087575,
+        "footprint": 0.588165
+      },
+      "footprintHalfS": 14.036923076923076,
+      "camera": {
+        "footprint": 0.68,
+        "area": 0.44818749999999996,
+        "halfS": 21.807692307692307,
+        "seen": 0.68
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.11462434989272126,
+        "max": 0.2009036916095489,
+        "final": 0.11881141555856722,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141121,
+      "coverage": 0.1712962962962963,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.247642072021068,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8318,
+      "area": {
+        "flown": 0.09853999999999999,
+        "footprint": 0.6585649999999998
+      },
+      "footprintHalfS": 8.867605633802818,
+      "camera": {
+        "footprint": 0.7098765432098766,
+        "area": 0.4964506172839506,
+        "halfS": 17.72,
+        "seen": 0.7098765432098766
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.20020734974018342,
+        "max": 0.2939760563383752,
+        "final": 0.15893774195935312,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141122,
+      "coverage": 0.1590909090909091,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.31153973976584,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.6753,
+      "area": {
+        "flown": 0.10128999999999996,
+        "footprint": 0.5910749999999999
+      },
+      "footprintHalfS": 7.883847549909257,
+      "camera": {
+        "footprint": 0.5487012987012987,
+        "area": 0.4641233766233766,
+        "halfS": 18.538461538461537,
+        "seen": 0.5487012987012987
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.14863193541131314,
+        "max": 0.2510763504716189,
+        "final": 0.09583323376624756,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141123,
+      "coverage": 0.1778846153846154,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2666398917172716,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8734,
+      "area": {
+        "flown": 0.10177,
+        "footprint": 0.602005
+      },
+      "footprintHalfS": 14.714285714285715,
+      "camera": {
+        "footprint": 0.7467948717948718,
+        "area": 0.47524038461538465,
+        "halfS": 24.071428571428573,
+        "seen": 0.7467948717948718
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2782888758430367,
+        "max": 0.32019391779485235,
+        "final": 0.2663232344772269,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141124,
+      "coverage": 0.19128787878787878,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.27445409070447,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.9545,
+      "area": {
+        "flown": 0.11335500000000001,
+        "footprint": 0.7247149999999999
+      },
+      "footprintHalfS": 8.548654244306418,
+      "camera": {
+        "footprint": 0.8617424242424242,
+        "area": 0.5420454545454545,
+        "halfS": 18.193548387096776,
+        "seen": 0.8617424242424242
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.09201759652177388,
+        "max": 0.1370334052072694,
+        "final": 0.0895806225073426,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141125,
+      "coverage": 0.13671875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2653044644318008,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.6458,
+      "area": {
+        "flown": 0.079625,
+        "footprint": 0.4717949999999999
+      },
+      "footprintHalfS": 20.866666666666667,
+      "camera": {
+        "footprint": 0.5807291666666666,
+        "area": 0.3634114583333333,
+        "halfS": 32.310344827586206,
+        "seen": 0.5807291666666666
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.13699646878674168,
+        "max": 0.17975502978703262,
+        "final": 0.1334334397575501,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141126,
+      "coverage": 0.16544117647058823,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.276740523255263,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7022,
+      "area": {
+        "flown": 0.10091000000000001,
+        "footprint": 0.5397099999999998
+      },
+      "footprintHalfS": 18.528,
+      "camera": {
+        "footprint": 0.6746323529411765,
+        "area": 0.4922794117647058,
+        "halfS": 19.279999999999998,
+        "seen": 0.6746323529411765
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.12774023003347096,
+        "max": 0.21436410405452488,
+        "final": 0.10987271327614835,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141127,
+      "coverage": 0.16758241758241757,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2584323315905965,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.8036,
+      "area": {
+        "flown": 0.09609500000000001,
+        "footprint": 0.6212099999999998
+      },
+      "footprintHalfS": 10.348101265822786,
+      "camera": {
+        "footprint": 0.7211538461538461,
+        "area": 0.4988324175824177,
+        "halfS": 19.105263157894736,
+        "seen": 0.7211538461538461
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.2163641118345064,
+        "max": 0.33457081428875485,
+        "final": 0.17396248308327367,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141128,
+      "coverage": 0.21022727272727273,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2808453280615246,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.964,
+      "area": {
+        "flown": 0.122435,
+        "footprint": 0.76741
+      },
+      "footprintHalfS": 6.908799999999999,
+      "camera": {
+        "footprint": 0.8503787878787878,
+        "area": 0.5921401515151514,
+        "halfS": 14.95238095238095,
+        "seen": 0.8503787878787878
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.18562110873232018,
+        "max": 0.2908151678913159,
+        "final": 0.1087752864675281,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141129,
+      "coverage": 0.13851351351351351,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.2733609188240034,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.7838,
+      "area": {
+        "flown": 0.08446500000000001,
+        "footprint": 0.57583
+      },
+      "footprintHalfS": 18.037988826815642,
+      "camera": {
+        "footprint": 0.7010135135135135,
+        "area": 0.4793918918918919,
+        "halfS": 20.64,
+        "seen": 0.7010135135135135
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.18401623695316288,
+        "max": 0.2221409746518875,
+        "final": 0.19196170884415456,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "flowless-dark-quad",
+      "seed": 141130,
+      "coverage": 0.1858108108108108,
+      "collisions": 1,
+      "crashed": false,
+      "energyWh": 1.2647601483920745,
+      "halfS": null,
+      "steps": 800,
+      "footprint": 0.9054,
+      "area": {
+        "flown": 0.11165499999999999,
+        "footprint": 0.7077650000000001
+      },
+      "footprintHalfS": 8.823665893271462,
+      "camera": {
+        "footprint": 0.8597972972972973,
+        "area": 0.66714527027027,
+        "halfS": 10.051282051282051,
+        "seen": 0.8597972972972973
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.13188128197833493,
+        "max": 0.198738507548487,
+        "final": 0.12762305365778054,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141201,
+      "coverage": 0.16047297297297297,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8436542137774439,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.6047,
+      "area": {
+        "flown": 0.11976999999999997,
+        "footprint": 0.5538649999999998
+      },
+      "footprintHalfS": 14.49050279329609,
+      "camera": {
+        "footprint": 0.5743243243243243,
+        "area": 0.4569256756756757,
+        "halfS": 20.64705882352941,
+        "seen": 0.5743243243243243
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.15920372111701092,
+        "max": 0.3141322245205726,
+        "final": 0.12175645245839588,
+        "lostTicks": 9
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141202,
+      "coverage": 0.23648648648648649,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.865604049253378,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.826,
+      "area": {
+        "flown": 0.16249999999999998,
+        "footprint": 0.7084649999999998
+      },
+      "footprintHalfS": 12.916118421052632,
+      "camera": {
+        "footprint": 0.7888513513513513,
+        "area": 0.5848817567567566,
+        "halfS": 18,
+        "seen": 0.7888513513513513
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.11473279170055112,
+        "max": 0.21061996682608758,
+        "final": 0.08157783532605896,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141203,
+      "coverage": 0.09146341463414634,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.6924648080054028,
+      "halfS": null,
+      "steps": 425,
+      "footprint": 0.282,
+      "area": {
+        "flown": 0.07853499999999998,
+        "footprint": 0.27255
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.23292682926829272,
+        "halfS": null,
+        "seen": 0.25914634146341464
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.08960845219872979,
+        "max": 0.1342004835824043,
+        "final": 0.07770435925207717,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141204,
+      "coverage": 0.1558641975308642,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.0419092500188232,
+      "halfS": null,
+      "steps": 632,
+      "footprint": 0.5787,
+      "area": {
+        "flown": 0.12161499999999996,
+        "footprint": 0.5215999999999997
+      },
+      "footprintHalfS": 16.354150197628456,
+      "camera": {
+        "footprint": 0,
+        "area": 0.39089506172839505,
+        "halfS": null,
+        "seen": 0.44753086419753085
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.32579555952646316,
+        "max": 0.60492127067052,
+        "final": 0.34303450166753907,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141205,
+      "coverage": 0.18125,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.862513160403976,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.5125,
+      "area": {
+        "flown": 0.10126000000000002,
+        "footprint": 0.36498
+      },
+      "footprintHalfS": 49.152709359605915,
+      "camera": {
+        "footprint": 0.5046875,
+        "area": 0.3240625,
+        "halfS": 51.750000000000014,
+        "seen": 0.5046875
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.17630934207717366,
+        "max": 0.6305293294164611,
+        "final": 0.11128792605286404,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141206,
+      "coverage": 0.17530487804878048,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8991966520263424,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.4634,
+      "area": {
+        "flown": 0.11402000000000001,
+        "footprint": 0.41981999999999997
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.44664634146341464,
+        "area": 0.376295731707317,
+        "halfS": null,
+        "seen": 0.44664634146341464
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.3372054436596813,
+        "max": 0.40471450427159494,
+        "final": 0.3028540767891327,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141207,
+      "coverage": 0.14125,
+      "collisions": 1,
+      "crashed": false,
+      "energyWh": 1.9067709514047524,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.3813,
+      "area": {
+        "flown": 0.09039,
+        "footprint": 0.3335699999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.35875,
+        "area": 0.27824999999999994,
+        "halfS": null,
+        "seen": 0.35875
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.20187783921561317,
+        "max": 0.37118303456619706,
+        "final": 0.08142385446341875,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141208,
+      "coverage": 0.18818681318681318,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8394751481474891,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.6552,
+      "area": {
+        "flown": 0.11613500000000002,
+        "footprint": 0.5624450000000001
+      },
+      "footprintHalfS": 18.16935483870968,
+      "camera": {
+        "footprint": 0.5892857142857143,
+        "area": 0.4716346153846153,
+        "halfS": 22.515151515151516,
+        "seen": 0.5892857142857143
+      },
+      "returned": true,
+      "drift": {
+        "mean": 1.5338749906033087,
+        "max": 3.0563587052198167,
+        "final": 0.4999702831976212,
+        "lostTicks": 1156
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141209,
+      "coverage": 0.17736486486486486,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8597165095059296,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.701,
+      "area": {
+        "flown": 0.12905499999999998,
+        "footprint": 0.6274400000000001
+      },
+      "footprintHalfS": 13.37193575655114,
+      "camera": {
+        "footprint": 0.643581081081081,
+        "area": 0.4983108108108108,
+        "halfS": 19.5,
+        "seen": 0.643581081081081
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.14944513456069047,
+        "max": 0.22830795243091245,
+        "final": 0.1575513980009435,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141210,
+      "coverage": 0.07682291666666667,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.5145948393648078,
+      "halfS": null,
+      "steps": 316,
+      "footprint": 0.4479,
+      "area": {
+        "flown": 0.06885999999999999,
+        "footprint": 0.42452999999999996
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.2735026041666667,
+        "halfS": null,
+        "seen": 0.2955729166666667
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.15611189688876925,
+        "max": 0.26342060960861025,
+        "final": 0.11238234994258622,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141211,
+      "coverage": 0.1575,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.916195467639045,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.4125,
+      "area": {
+        "flown": 0.0837,
+        "footprint": 0.3329049999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3775,
+        "area": 0.2614375000000001,
+        "halfS": null,
+        "seen": 0.3775
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.3053474430774855,
+        "max": 0.5046158005614412,
+        "final": 0.1434127046372968,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141212,
+      "coverage": 0.125,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.6348737509363721,
+      "halfS": null,
+      "steps": 399,
+      "footprint": 0.5375,
+      "area": {
+        "flown": 0.10929,
+        "footprint": 0.5048249999999999
+      },
+      "footprintHalfS": 12,
+      "camera": {
+        "footprint": 0,
+        "area": 0.39857142857142874,
+        "halfS": null,
+        "seen": 0.43392857142857144
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.5686347525502327,
+        "max": 0.9264204499049469,
+        "final": 0.5523141978993253,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141213,
+      "coverage": 0.1171875,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.688973119264841,
+      "halfS": null,
+      "steps": 423,
+      "footprint": 0.6237,
+      "area": {
+        "flown": 0.099295,
+        "footprint": 0.55085
+      },
+      "footprintHalfS": 15.946091644204852,
+      "camera": {
+        "footprint": 0,
+        "area": 0.3970703125000001,
+        "halfS": null,
+        "seen": 0.4596354166666667
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.15931931106691666,
+        "max": 0.25369316414298837,
+        "final": 0.13816426364596204,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141214,
+      "coverage": 0.10037878787878787,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.4540936753930009,
+      "halfS": null,
+      "steps": 277,
+      "footprint": 0.4602,
+      "area": {
+        "flown": 0.09045000000000003,
+        "footprint": 0.44202000000000014
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.350189393939394,
+        "halfS": null,
+        "seen": 0.3806818181818182
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.06639303946350678,
+        "max": 0.1321253242479268,
+        "final": 0.07246184756395269,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141215,
+      "coverage": 0.16895604395604397,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.067124102599374,
+      "halfS": null,
+      "steps": 674,
+      "footprint": 0.7637,
+      "area": {
+        "flown": 0.12769500000000003,
+        "footprint": 0.628765
+      },
+      "footprintHalfS": 14.703504043126685,
+      "camera": {
+        "footprint": 0,
+        "area": 0.48118131868131864,
+        "halfS": 22.961538461538463,
+        "seen": 0.5961538461538461
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.3490502559051407,
+        "max": 0.4758096098334206,
+        "final": 0.23763632820048577,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141216,
+      "coverage": 0.2934027777777778,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8886857630821712,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 1,
+      "area": {
+        "flown": 0.18455,
+        "footprint": 0.793755
+      },
+      "footprintHalfS": 14.699308755760367,
+      "camera": {
+        "footprint": 0.9288194444444444,
+        "area": 0.6879340277777778,
+        "halfS": 18.406779661016948,
+        "seen": 0.9288194444444444
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.08481788557853027,
+        "max": 0.23645837610954792,
+        "final": 0.06646525507069201,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141217,
+      "coverage": 0.24375,
+      "collisions": 1,
+      "crashed": false,
+      "energyWh": 1.889445021490503,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.6984,
+      "area": {
+        "flown": 0.14414999999999997,
+        "footprint": 0.51444
+      },
+      "footprintHalfS": 27.63903462749213,
+      "camera": {
+        "footprint": 0.6734375,
+        "area": 0.46859375000000003,
+        "halfS": 28.57894736842105,
+        "seen": 0.6734375
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.15769025194331313,
+        "max": 0.4082617295985484,
+        "final": 0.14597352409080144,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141218,
+      "coverage": 0.15521978021978022,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8631509655861564,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.6484,
+      "area": {
+        "flown": 0.10948000000000002,
+        "footprint": 0.57833
+      },
+      "footprintHalfS": 14.950704225352114,
+      "camera": {
+        "footprint": 0.5645604395604396,
+        "area": 0.4396978021978023,
+        "halfS": 30,
+        "seen": 0.5645604395604396
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.37679113871340547,
+        "max": 0.6504158981438962,
+        "final": 0.14819942235839914,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141219,
+      "coverage": 0.17424242424242425,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.1097319040447742,
+      "halfS": null,
+      "steps": 686,
+      "footprint": 0.5966,
+      "area": {
+        "flown": 0.12724499999999997,
+        "footprint": 0.4513250000000002
+      },
+      "footprintHalfS": 31.828054298642535,
+      "camera": {
+        "footprint": 0,
+        "area": 0.3907196969696971,
+        "halfS": 32.35714285714286,
+        "seen": 0.5435606060606061
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.15487260470556252,
+        "max": 0.24437028943518144,
+        "final": 0.05100411773071772,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141220,
+      "coverage": 0.1173780487804878,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8876929259148385,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.3323,
+      "area": {
+        "flown": 0.07385,
+        "footprint": 0.28420500000000004
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3155487804878049,
+        "area": 0.22576219512195123,
+        "halfS": null,
+        "seen": 0.3155487804878049
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.13297038565893016,
+        "max": 0.22716600207546178,
+        "final": 0.1262997057404913,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141221,
+      "coverage": 0.13324175824175824,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.305809619556508,
+      "halfS": null,
+      "steps": 824,
+      "footprint": 0.6442,
+      "area": {
+        "flown": 0.10691500000000001,
+        "footprint": 0.5823349999999998
+      },
+      "footprintHalfS": 13.409040793825799,
+      "camera": {
+        "footprint": 0,
+        "area": 0.4271291208791209,
+        "halfS": 39,
+        "seen": 0.5054945054945055
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.15212661838342081,
+        "max": 0.2382285201715711,
+        "final": 0.2062233855194306,
+        "lostTicks": 224
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141222,
+      "coverage": 0.17398648648648649,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.9061943915854669,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.5135,
+      "area": {
+        "flown": 0.12575999999999998,
+        "footprint": 0.4874949999999999
+      },
+      "footprintHalfS": 14.588709677419356,
+      "camera": {
+        "footprint": 0.5,
+        "area": 0.4391891891891892,
+        "halfS": 54,
+        "seen": 0.5
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.15615158583737135,
+        "max": 0.30483273021990237,
+        "final": 0.10301547082873218,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141223,
+      "coverage": 0.16015625,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.90048141347446,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.3659,
+      "area": {
+        "flown": 0.09257,
+        "footprint": 0.31118999999999997
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.3528645833333333,
+        "area": 0.2738932291666666,
+        "halfS": null,
+        "seen": 0.3528645833333333
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.23626433455637155,
+        "max": 0.4117050529834539,
+        "final": 0.18455548535657487,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141224,
+      "coverage": 0.15934065934065933,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8809901333694103,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.6484,
+      "area": {
+        "flown": 0.10775000000000001,
+        "footprint": 0.5544250000000001
+      },
+      "footprintHalfS": 18.53446033810143,
+      "camera": {
+        "footprint": 0.592032967032967,
+        "area": 0.43489010989010995,
+        "halfS": 24.1875,
+        "seen": 0.592032967032967
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.14365470745354486,
+        "max": 0.2611960516796104,
+        "final": 0.10447606001888901,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141225,
+      "coverage": 0.06329113924050633,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.4762103194797657,
+      "halfS": null,
+      "steps": 295,
+      "footprint": 0.3972,
+      "area": {
+        "flown": 0.057125,
+        "footprint": 0.3762199999999999
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.2631329113924051,
+        "halfS": null,
+        "seen": 0.2848101265822785
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.06742477180407185,
+        "max": 0.11676060399564019,
+        "final": 0.08534609736182523,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141226,
+      "coverage": 0.21189024390243902,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.5571527881000962,
+      "halfS": null,
+      "steps": 979,
+      "footprint": 0.6479,
+      "area": {
+        "flown": 0.14832,
+        "footprint": 0.58987
+      },
+      "footprintHalfS": 9.052754982415006,
+      "camera": {
+        "footprint": 0,
+        "area": 0.5041920731707317,
+        "halfS": 27.804878048780488,
+        "seen": 0.6158536585365854
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.46511434008168323,
+        "max": 0.8153992787519937,
+        "final": 0.1308904272057263,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141227,
+      "coverage": 0.01893939393939394,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.08098256733896153,
+      "halfS": null,
+      "steps": 48,
+      "footprint": 0.2765,
+      "area": {
+        "flown": 0.018900000000000007,
+        "footprint": 0.2765000000000001
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0,
+        "area": 0.10037878787878787,
+        "halfS": null,
+        "seen": 0.10037878787878787
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.22898267124481855,
+        "max": 0.3175458241261094,
+        "final": 0.3175458241261094,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141228,
+      "coverage": 0.1570945945945946,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.0166911773014864,
+      "halfS": null,
+      "steps": 633,
+      "footprint": 0.5389,
+      "area": {
+        "flown": 0.12053499999999998,
+        "footprint": 0.4553400000000001
+      },
+      "footprintHalfS": 29.130360205831902,
+      "camera": {
+        "footprint": 0,
+        "area": 0.3608108108108107,
+        "halfS": null,
+        "seen": 0.4408783783783784
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.10723011090165721,
+        "max": 0.174709823291732,
+        "final": 0.15392684220515745,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141229,
+      "coverage": 0.2821969696969697,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.8970912367140769,
+      "halfS": null,
+      "steps": 1200,
+      "footprint": 0.9943,
+      "area": {
+        "flown": 0.168465,
+        "footprint": 0.740325
+      },
+      "footprintHalfS": 19.97865168539326,
+      "camera": {
+        "footprint": 0.9412878787878788,
+        "area": 0.6135416666666667,
+        "halfS": 22.810344827586206,
+        "seen": 0.9412878787878788
+      },
+      "returned": true,
+      "drift": {
+        "mean": 0.3233955183039617,
+        "max": 0.6068294818881993,
+        "final": 0.1076636510323324,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "sparse-quad",
+      "seed": 141230,
+      "coverage": 0.19696969696969696,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.8910180025363166,
+      "halfS": null,
+      "steps": 567,
+      "footprint": 0.9034,
+      "area": {
+        "flown": 0.15276500000000004,
+        "footprint": 0.7320999999999998
+      },
+      "footprintHalfS": 15.404710920770878,
+      "camera": {
+        "footprint": 0,
+        "area": 0.5428030303030302,
+        "halfS": 20.857142857142854,
+        "seen": 0.6856060606060606
+      },
+      "returned": false,
+      "drift": {
+        "mean": 0.304305751416239,
+        "max": 0.5222187628523964,
+        "final": 0.3135363398613283,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141301,
+      "coverage": 0.21323529411764705,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.2337446606980411,
+      "halfS": null,
+      "steps": 774,
+      "footprint": 0.8971,
+      "area": {
+        "flown": 0.18297500000000003,
+        "footprint": 0.79672
+      },
+      "footprintHalfS": 17.28156748911466,
+      "camera": {
+        "footprint": 0.7849264705882353,
+        "area": 0.686856617647059,
+        "halfS": 24.39344262295082
+      },
+      "drift": {
+        "mean": 0.0787439452530372,
+        "max": 0.12376337210223164,
+        "final": 0.10253802303360712,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141302,
+      "coverage": 0.25,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.6133055224000916,
+      "halfS": null,
+      "steps": 1676,
+      "footprint": 0.9231,
+      "area": {
+        "flown": 0.180915,
+        "footprint": 0.8065049999999999
+      },
+      "footprintHalfS": 17.543400713436384,
+      "camera": {
+        "footprint": 0.8589743589743589,
+        "area": 0.6951923076923079,
+        "halfS": 22.016528925619834
+      },
+      "drift": {
+        "mean": 0.12335716056690231,
+        "max": 0.3903706287428248,
+        "final": 0.07451995801210651,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141303,
+      "coverage": 0.14464285714285716,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.202766478528462,
+      "halfS": null,
+      "steps": 749,
+      "footprint": 0.9036,
+      "area": {
+        "flown": 0.13041500000000003,
+        "footprint": 0.8458250000000003
+      },
+      "footprintHalfS": 10.061180525635503,
+      "camera": {
+        "footprint": 0.8125,
+        "area": 0.7606249999999999,
+        "halfS": 11.32258064516129
+      },
+      "drift": {
+        "mean": 0.11940402373629576,
+        "max": 0.16836088236427985,
+        "final": 0.1468049427708701,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141304,
+      "coverage": 0.2680722891566265,
+      "collisions": 1,
+      "crashed": false,
+      "energyWh": 3.169025070455196,
+      "halfS": null,
+      "steps": 2028,
+      "footprint": 0.9955,
+      "area": {
+        "flown": 0.192635,
+        "footprint": 0.855865
+      },
+      "footprintHalfS": 17.77021276595745,
+      "camera": {
+        "footprint": 0.9051204819277109,
+        "area": 0.710918674698795,
+        "halfS": 29.064935064935064
+      },
+      "drift": {
+        "mean": 0.10023623335737701,
+        "max": 0.42109116028165705,
+        "final": 0.1347898240666048,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141305,
+      "coverage": 0.1268939393939394,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4065713705929306,
+      "halfS": null,
+      "steps": 923,
+      "footprint": 0.9129,
+      "area": {
+        "flown": 0.11790500000000001,
+        "footprint": 0.8676300000000003
+      },
+      "footprintHalfS": 8.478485370051636,
+      "camera": {
+        "footprint": 0.6837121212121212,
+        "area": 0.6439393939393938,
+        "halfS": 15.149999999999999
+      },
+      "drift": {
+        "mean": 0.07331172728755833,
+        "max": 0.11612539840389019,
+        "final": 0.07239891495961455,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141306,
+      "coverage": 0.13137755102040816,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.1930186350606153,
+      "halfS": null,
+      "steps": 734,
+      "footprint": 0.8635,
+      "area": {
+        "flown": 0.11577,
+        "footprint": 0.769115
+      },
+      "footprintHalfS": 17.577464788732396,
+      "camera": {
+        "footprint": 0.7040816326530612,
+        "area": 0.6202806122448978,
+        "halfS": 25.52112676056338
+      },
+      "drift": {
+        "mean": 0.1514515543883519,
+        "max": 0.20255204908939292,
+        "final": 0.15127651534535558,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141307,
+      "coverage": 0.26875,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.687729922130429,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9913,
+      "area": {
+        "flown": 0.18575999999999998,
+        "footprint": 0.8364750000000001
+      },
+      "footprintHalfS": 16.30028328611898,
+      "camera": {
+        "footprint": 0.94125,
+        "area": 0.7689374999999999,
+        "halfS": 19.673076923076923
+      },
+      "drift": {
+        "mean": 0.08955179737924178,
+        "max": 0.5289372263913195,
+        "final": 0.1794288885378774,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141308,
+      "coverage": 0.20512820512820512,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.919202415973044,
+      "halfS": null,
+      "steps": 1896,
+      "footprint": 0.9054,
+      "area": {
+        "flown": 0.16241999999999995,
+        "footprint": 0.814885
+      },
+      "footprintHalfS": 11.933425797503466,
+      "camera": {
+        "footprint": 0.8333333333333334,
+        "area": 0.7371794871794874,
+        "halfS": 18.681818181818183
+      },
+      "drift": {
+        "mean": 0.1326350106297983,
+        "max": 0.20078563900062799,
+        "final": 0.11311115682682256,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141309,
+      "coverage": 0.00875,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 0.04845025308800098,
+      "halfS": null,
+      "steps": 17,
+      "footprint": 0.1688,
+      "area": {
+        "flown": 0.0088,
+        "footprint": 0.16880000000000003
+      },
+      "footprintHalfS": null,
+      "camera": {
+        "footprint": 0.06,
+        "area": 0.06000000000000003,
+        "halfS": null
+      },
+      "drift": {
+        "mean": 0.17165280485266543,
+        "max": 0.1913688423764022,
+        "final": 0.15323802086731234,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141310,
+      "coverage": 0.2175,
+      "collisions": 2,
+      "crashed": true,
+      "energyWh": 1.9009608424808562,
+      "halfS": null,
+      "steps": 1173,
+      "footprint": 0.9213,
+      "area": {
+        "flown": 0.1668199999999999,
+        "footprint": 0.7928450000000002
+      },
+      "footprintHalfS": 20.594594594594593,
+      "camera": {
+        "footprint": 0.835,
+        "area": 0.6995000000000002,
+        "halfS": 26.360655737704917
+      },
+      "drift": {
+        "mean": 0.058707614972511056,
+        "max": 0.18252767657133423,
+        "final": 0.1439765104730058,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141311,
+      "coverage": 0.25675675675675674,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.949505921922691,
+      "halfS": null,
+      "steps": 1915,
+      "footprint": 0.9274,
+      "area": {
+        "flown": 0.20306500000000005,
+        "footprint": 0.852045
+      },
+      "footprintHalfS": 8.035940803382665,
+      "camera": {
+        "footprint": 0.8547297297297297,
+        "area": 0.7230574324324324,
+        "halfS": 25.551724137931032
+      },
+      "drift": {
+        "mean": 0.12606715249078007,
+        "max": 0.33327594356155965,
+        "final": 0.1385029893642494,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141312,
+      "coverage": 0.3241758241758242,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.741601025053156,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9973,
+      "area": {
+        "flown": 0.22759500000000005,
+        "footprint": 0.844165
+      },
+      "footprintHalfS": 16.26890756302521,
+      "camera": {
+        "footprint": 0.9739010989010989,
+        "area": 0.7773351648351648,
+        "halfS": 24.545454545454543
+      },
+      "drift": {
+        "mean": 0.11843488118183908,
+        "max": 0.2588493226452387,
+        "final": 0.1465666682835485,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141313,
+      "coverage": 0.24489795918367346,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.4278397161939314,
+      "halfS": null,
+      "steps": 2198,
+      "footprint": 0.9783,
+      "area": {
+        "flown": 0.17512499999999995,
+        "footprint": 0.8484700000000004
+      },
+      "footprintHalfS": 14.26906779661017,
+      "camera": {
+        "footprint": 0.9323979591836735,
+        "area": 0.7512755102040815,
+        "halfS": 27.918367346938773
+      },
+      "drift": {
+        "mean": 0.1517034457721617,
+        "max": 0.2210320354270715,
+        "final": 0.14189438712128466,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141314,
+      "coverage": 0.3560606060606061,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.8116500966788798,
+      "halfS": null,
+      "steps": 1768,
+      "footprint": 1,
+      "area": {
+        "flown": 0.250395,
+        "footprint": 0.8994349999999999
+      },
+      "footprintHalfS": 5.910165484633569,
+      "camera": {
+        "footprint": 0.9981060606060606,
+        "area": 0.793371212121212,
+        "halfS": 17.40740740740741
+      },
+      "drift": {
+        "mean": 0.10110287857293827,
+        "max": 0.1403510032669654,
+        "final": 0.09020699104910261,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141315,
+      "coverage": 0.24088541666666666,
+      "collisions": 2,
+      "crashed": true,
+      "energyWh": 2.007932864739061,
+      "halfS": null,
+      "steps": 1247,
+      "footprint": 0.9727,
+      "area": {
+        "flown": 0.18359999999999996,
+        "footprint": 0.82555
+      },
+      "footprintHalfS": 23.161290322580644,
+      "camera": {
+        "footprint": 0.8697916666666666,
+        "area": 0.7116536458333331,
+        "halfS": 27.88235294117647
+      },
+      "drift": {
+        "mean": 0.3127230745457258,
+        "max": 0.3714178310250264,
+        "final": 0.29265963603794254,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141316,
+      "coverage": 0.3158783783783784,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.7409799844002087,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 1,
+      "area": {
+        "flown": 0.20607999999999999,
+        "footprint": 0.8317650000000001
+      },
+      "footprintHalfS": 8.547337278106507,
+      "camera": {
+        "footprint": 1,
+        "area": 0.7843749999999999,
+        "halfS": 17.4
+      },
+      "drift": {
+        "mean": 0.10212756725526122,
+        "max": 0.3126676399021033,
+        "final": 0.12846062011926268,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141317,
+      "coverage": 0.25137362637362637,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.2183333837860153,
+      "halfS": null,
+      "steps": 2094,
+      "footprint": 1,
+      "area": {
+        "flown": 0.16964999999999997,
+        "footprint": 0.8015700000000001
+      },
+      "footprintHalfS": 12.849683544303799,
+      "camera": {
+        "footprint": 0.9945054945054945,
+        "area": 0.7368131868131867,
+        "halfS": 37.75609756097561
+      },
+      "drift": {
+        "mean": 0.14374870124908298,
+        "max": 0.5924334837762636,
+        "final": 0.16999209931711656,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141318,
+      "coverage": 0.3512658227848101,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8413863828978294,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.981,
+      "area": {
+        "flown": 0.22113500000000003,
+        "footprint": 0.8531550000000001
+      },
+      "footprintHalfS": 13.028880866425993,
+      "camera": {
+        "footprint": 0.9683544303797469,
+        "area": 0.7303797468354433,
+        "halfS": 26.676923076923078
+      },
+      "drift": {
+        "mean": 0.2961853040332538,
+        "max": 0.4186576325820729,
+        "final": 0.2965633838982014,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141319,
+      "coverage": 0.2975352112676056,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.5850493944801043,
+      "halfS": null,
+      "steps": 2276,
+      "footprint": 0.9718,
+      "area": {
+        "flown": 0.21407499999999996,
+        "footprint": 0.8899549999999998
+      },
+      "footprintHalfS": 8.880817253121455,
+      "camera": {
+        "footprint": 0.9154929577464789,
+        "area": 0.7663732394366194,
+        "halfS": 20.32941176470588
+      },
+      "drift": {
+        "mean": 0.17935341350993056,
+        "max": 0.9526623476895633,
+        "final": 0.9341786664121313,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141320,
+      "coverage": 0.1575,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.3446555367692996,
+      "halfS": null,
+      "steps": 833,
+      "footprint": 0.6738,
+      "area": {
+        "flown": 0.13619000000000003,
+        "footprint": 0.6303
+      },
+      "footprintHalfS": 16.17,
+      "camera": {
+        "footprint": 0.63625,
+        "area": 0.5821250000000002,
+        "halfS": 20.8125
+      },
+      "drift": {
+        "mean": 0.29657272435110155,
+        "max": 0.3412683161945451,
+        "final": 0.3034863309886548,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141321,
+      "coverage": 0.2876506024096386,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.8073257557800666,
+      "halfS": null,
+      "steps": 2400,
+      "footprint": 0.9955,
+      "area": {
+        "flown": 0.19970499999999997,
+        "footprint": 0.8685299999999998
+      },
+      "footprintHalfS": 17.719917012448136,
+      "camera": {
+        "footprint": 0.9909638554216867,
+        "area": 0.815286144578313,
+        "halfS": 21.56043956043956
+      },
+      "drift": {
+        "mean": 0.17505286655806956,
+        "max": 0.5238788125409991,
+        "final": 0.11437299975708894,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141322,
+      "coverage": 0.20052083333333334,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.9884608234563435,
+      "halfS": null,
+      "steps": 1255,
+      "footprint": 0.9818,
+      "area": {
+        "flown": 0.16229999999999994,
+        "footprint": 0.8409549999999999
+      },
+      "footprintHalfS": 19.708210277613706,
+      "camera": {
+        "footprint": 0.8763020833333334,
+        "area": 0.7166666666666669,
+        "halfS": 30
+      },
+      "drift": {
+        "mean": 0.13712741373340873,
+        "max": 0.22137023237084588,
+        "final": 0.14742491803387198,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141323,
+      "coverage": 0.2611111111111111,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.698874145330716,
+      "halfS": null,
+      "steps": 1745,
+      "footprint": 0.9778,
+      "area": {
+        "flown": 0.20256999999999997,
+        "footprint": 0.8510549999999999
+      },
+      "footprintHalfS": 18.076052512449074,
+      "camera": {
+        "footprint": 0.9597222222222223,
+        "area": 0.8169444444444445,
+        "halfS": 19.453125
+      },
+      "drift": {
+        "mean": 0.14448246524436567,
+        "max": 0.41181124283414355,
+        "final": 0.16569939503966233,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141324,
+      "coverage": 0.11580882352941177,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 1.4191644023241217,
+      "halfS": null,
+      "steps": 934,
+      "footprint": 0.9173,
+      "area": {
+        "flown": 0.10752999999999997,
+        "footprint": 0.8695050000000004
+      },
+      "footprintHalfS": 8.699673558215451,
+      "camera": {
+        "footprint": 0.7003676470588235,
+        "area": 0.6525735294117649,
+        "halfS": 16.5
+      },
+      "drift": {
+        "mean": 0.08421073176453941,
+        "max": 0.12289988459168395,
+        "final": 0.07389678774567396,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141325,
+      "coverage": 0.115,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 1.0570038769401222,
+      "halfS": null,
+      "steps": 644,
+      "footprint": 0.7663,
+      "area": {
+        "flown": 0.10269500000000001,
+        "footprint": 0.7006749999999998
+      },
+      "footprintHalfS": 17.496000000000002,
+      "camera": {
+        "footprint": 0.675,
+        "area": 0.6134375000000001,
+        "halfS": 21.962264150943394
+      },
+      "drift": {
+        "mean": 0.09680426492836583,
+        "max": 0.22627816263718958,
+        "final": 0.07565023099807248,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141326,
+      "coverage": 0.26121794871794873,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.1747702843389756,
+      "halfS": null,
+      "steps": 2028,
+      "footprint": 0.9263,
+      "area": {
+        "flown": 0.20632500000000004,
+        "footprint": 0.8357499999999998
+      },
+      "footprintHalfS": 14.373596766951055,
+      "camera": {
+        "footprint": 0.8733974358974359,
+        "area": 0.7692307692307694,
+        "halfS": 16.10958904109589
+      },
+      "drift": {
+        "mean": 0.32803167345334927,
+        "max": 1.9061765152431347,
+        "final": 0.9884548021923604,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141327,
+      "coverage": 0.2571428571428571,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.382515333010474,
+      "halfS": null,
+      "steps": 1547,
+      "footprint": 1,
+      "area": {
+        "flown": 0.21336999999999998,
+        "footprint": 0.87152
+      },
+      "footprintHalfS": 19.334370139968897,
+      "camera": {
+        "footprint": 0.9321428571428572,
+        "area": 0.8035714285714285,
+        "halfS": 19.783783783783786
+      },
+      "drift": {
+        "mean": 0.13448866422470981,
+        "max": 0.19747880369542986,
+        "final": 0.1277882410106801,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141328,
+      "coverage": 0.16895604395604397,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 2.039426535872109,
+      "halfS": null,
+      "steps": 1323,
+      "footprint": 0.8819,
+      "area": {
+        "flown": 0.14824500000000002,
+        "footprint": 0.8228899999999999
+      },
+      "footprintHalfS": 9.160194174757281,
+      "camera": {
+        "footprint": 0.7664835164835165,
+        "area": 0.7035714285714285,
+        "halfS": 14.237288135593221
+      },
+      "drift": {
+        "mean": 0.14421104071539437,
+        "max": 0.20399669383888275,
+        "final": 0.1894721001122948,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141329,
+      "coverage": 0.2897058823529412,
+      "collisions": 1,
+      "crashed": true,
+      "energyWh": 2.2505016243598073,
+      "halfS": null,
+      "steps": 1383,
+      "footprint": 1,
+      "area": {
+        "flown": 0.21683499999999994,
+        "footprint": 0.89735
+      },
+      "footprintHalfS": 9.700680272108844,
+      "camera": {
+        "footprint": 0.9852941176470589,
+        "area": 0.8325735294117644,
+        "halfS": 15.25301204819277
+      },
+      "drift": {
+        "mean": 0.0999189856298649,
+        "max": 0.1994636976041464,
+        "final": 0.11813935815645375,
+        "lostTicks": 0
+      }
+    },
+    {
+      "task": "failing-quad",
+      "seed": 141330,
+      "coverage": 0.3087121212121212,
+      "collisions": 0,
+      "crashed": false,
+      "energyWh": 3.0204163870604344,
+      "halfS": null,
+      "steps": 1948,
+      "footprint": 0.983,
+      "area": {
+        "flown": 0.23380499999999999,
+        "footprint": 0.9117550000000003
+      },
+      "footprintHalfS": 5.698005698005699,
+      "camera": {
+        "footprint": 0.9772727272727273,
+        "area": 0.8438446969696967,
+        "halfS": 11.6
+      },
+      "drift": {
+        "mean": 0.08733186047788018,
+        "max": 0.32399994472617755,
+        "final": 0.07380518732846762,
+        "lostTicks": 0
+      }
+    }
+  ]
+}
