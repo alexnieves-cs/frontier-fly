@@ -345,7 +345,8 @@ export class TfTrainer {
     const minibatch = opts?.minibatch ?? 256;
     const weights = opts?.weights;
     if (weights && weights.length < n) throw new Error('imitate: weights shorter than n');
-    const targets = opts?.actionSpace ? actions : atanhTargets(actions, n * this.policy.actDim);
+    // Action-space targets stop short of ±1, or a saturated label would drive the pre-tanh mean without bound.
+    const targets = opts?.actionSpace ? actions.map((v) => Math.max(-0.98, Math.min(0.98, v))) : atanhTargets(actions, n * this.policy.actDim);
     this.squashLoss = opts?.actionSpace ?? false;
     this.actionWeights = opts?.actionWeights ? tf.keep(tf.tensor1d(opts.actionWeights)) : null;
     let last = 0;

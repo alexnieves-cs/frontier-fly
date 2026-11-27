@@ -14,7 +14,7 @@
 import { ACT_DIM, MAX_SPEED_H, OBS, OBS_DIM } from '../shared/constants';
 import { RNG } from '../shared/rng';
 import { guardedAction, quadPilot } from '../eval/pilots';
-import { InferPolicy } from '../rl/infer';
+import { gaussianLogp, InferPolicy } from '../rl/infer';
 import { StudentInput, STUDENT_DIM } from '../rl/quadStudent';
 import { ExplorerEnv } from '../sim/env';
 import { QUAD_PICKER_BRAKING } from '../sim/quadPilot';
@@ -282,11 +282,15 @@ export interface RolloutChunk extends DaggerChunk {
   dones: Uint8Array;
 }
 
+/** Largest |action| a rollout samples. */
+const A_MAX = 0.995;
+
 /** On-policy episodes of the stochastic student, for PPO (scripts/train-quad.ts --rl). */
 const quadRollout: JobFn = (_ctx, raw) => {
   const p = raw as RolloutPayload;
   env ??= new ExplorerEnv();
   const student = makeStudent(p.student)!;
+  const logStd = student.logStd();
   const rng = new RNG(p.seed, 'quad-rollout');
   const input = new StudentInput();
   const total = p.episodes.length * 2400;
@@ -316,8 +320,21 @@ const quadRollout: JobFn = (_ctx, raw) => {
       head.set(row.subarray(0, HEAD), n * HEAD_ROW);
       head.set(row.subarray(OBS_DIM, STUDENT_DIM), n * HEAD_ROW + HEAD);
       for (let i = 0; i < MAPS; i++) maps[n * MAPS + i] = Math.round(Math.max(0, Math.min(1, row[HEAD + i]!)) * 255);
-      const out = student.actWith(row, 1, rng, false);
-      const a = out.action;
+      // Sample a squashed Gaussian action, kept within ±A_MAX, and score it exactly as the learner
+      // will (src/rl/model.ts squashedLogp on the stored float32 action). Without the bound, a
+      // saturated mean gives tanh(u) = ±1 in float32 and the learner's log-prob disagrees wildly.
+      const mv = student.meanAndValue(row, 1);
+      const a = new Float32Array(ACT_DIM);
+      let lp = 0;
+      for (let j = 0; j < ACT_DIM; j++) {
+        const m = mv.mean[j]!;
+        const ls = logStd[j]!;
+        const sd = Math.exp(ls);
+        a[j] = Math.max(-A_MAX, Math.min(A_MAX, Math.tanh(m + sd * rng.gaussian())));
+        const u = Math.atanh(a[j]!);
+        lp += gaussianLogp(u, m, sd, ls) - Math.log(1 - a[j]! * a[j]! + 1e-6);
+      }
+      const out = { logp: [lp], value: mv.value };
       if (expert) {
         if (t > 0) {
           const c = worldCommand(lastExec, env.snapshot().yaw, speedH);
