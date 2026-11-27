@@ -50,8 +50,6 @@ export interface DriftStats {
   final: number;
   /** Ticks the estimator called itself lost. */
   lostTicks: number;
-  /** Times the maps were repainted after a closure (DriftProfile.repaint). */
-  repaints?: number;
   /** Loop closure in flight: the graph's counts (keyframes, matches, closures tried and kept). */
   loop?: LoopClosureStats;
   /** With loop closure: the mean horizontal error of the pose the pilot did not fly on (estimator alone, or the shadow graph). */
@@ -72,13 +70,6 @@ export interface DriftProfile {
    * optimised pose composed with the estimator's motion since). Absent: the estimator alone.
    */
   loop?: Partial<LoopClosureOptions>;
-  /**
-   * With `loop`: after a closure moves the graph, repaint the pilot's seen and flown maps from every frame
-   * so far at its corrected pose, instead of leaving what was painted at the old poses where it was.
-   * At most once per `repaintEvery` policy steps (default 20, 1 s).
-   */
-  repaint?: boolean;
-  repaintEvery?: number;
   /** Dev diagnostics: run the loop closer but fly on the estimator, and report both errors. */
   loopShadow?: boolean;
 }
@@ -108,14 +99,6 @@ export class DriftFrames {
   private otherMax = 0;
   private otherLast = 0;
   private readonly shadow: boolean;
-  private readonly spec: NonNullable<ExplorerEnv['building']>;
-  /** Repaint log, one entry per frame: the sweep it follows, the estimator's motion since that sweep, z and the pilot's lidar ring. */
-  private readonly log: { sweep: number; rel: Pose2; z: number; ring: Float64Array }[] = [];
-  private readonly repaint: boolean;
-  private readonly repaintEvery: number;
-  private closuresPainted = 0;
-  private lastRepaint = -Infinity;
-  private repaints = 0;
   private readonly faults: SensorFaults | null;
   /** Body angle where the dead lidar sector starts, and the policy step the faults start. */
   private readonly sector0: number;
@@ -142,9 +125,6 @@ export class DriftFrames {
     this.est.reset([s.pos[0] + START_SIGMA_XY * rng.gaussian(), s.pos[1] + START_SIGMA_XY * rng.gaussian(), s.pos[2]], s.yaw + START_SIGMA_YAW * rng.gaussian(), START_SIGMA_XY, START_SIGMA_YAW);
     this.current = this.est.estimate();
     this.shadow = !!profile.loopShadow;
-    this.spec = spec;
-    this.repaint = !!profile.loop && !!profile.repaint;
-    this.repaintEvery = profile.repaintEvery ?? 20;
     this.closer = profile.loop ? new LoopCloser({ maxRange: profile.lidarRange ?? 8, ...profile.loop }) : null;
     this.seen.reset(spec);
     this.visited = new Uint8Array(this.seen.data.length);
@@ -218,15 +198,11 @@ export class DriftFrames {
     if (e.health.state === 'lost') this.lost += 1;
 
     for (let i = 0; i < C.LIDAR_H; i++) this.lidar[i] = this.dead(i, C.LIDAR_H) ? C.LIDAR_MAX : obs[C.OBS.lidar + i]! * C.LIDAR_MAX;
-    if (this.repaint && this.closer && this.frontAtSweep) {
-      this.log.push({ sweep: this.closer.sweeps - 1, rel: between(this.frontAtSweep, [this.current.pos[0], this.current.pos[1], this.current.yaw]), z: e.pos[2], ring: Float64Array.from(this.lidar) });
-      const closures = this.closer.stats.loopAccepted;
-      if (closures > this.closuresPainted && this.ticks - this.lastRepaint >= this.repaintEvery) {
-        this.closuresPainted = closures;
-        this.lastRepaint = this.ticks;
-        this.repaintAll();
-      } else this.paint(e.pos[0], e.pos[1], e.pos[2], e.yaw, this.lidar);
-    } else this.paint(e.pos[0], e.pos[1], e.pos[2], e.yaw, this.lidar);
+    const floor = Math.floor(e.pos[2] / this.floorHeight);
+    this.seen.markRing(e.pos[0], e.pos[1], floor, e.yaw, this.lidar);
+    const vx = Math.floor(e.pos[0] / C.VOXEL);
+    const vy = Math.floor(e.pos[1] / C.VOXEL);
+    if (floor >= 0 && floor < this.floors && vx >= 0 && vy >= 0 && vx < this.vw && vy < this.vd) this.visited[floor * this.vw * this.vd + vy * this.vw + vx] = 1;
     return {
       seen: this.seen.data,
       visited: this.visited,
@@ -243,32 +219,6 @@ export class DriftFrames {
     };
   }
 
-  private paint(x: number, y: number, z: number, yaw: number, ring: ArrayLike<number>): void {
-    const floor = Math.floor(z / this.floorHeight);
-    this.seen.markRing(x, y, floor, yaw, ring);
-    const vx = Math.floor(x / C.VOXEL);
-    const vy = Math.floor(y / C.VOXEL);
-    if (floor >= 0 && floor < this.floors && vx >= 0 && vy >= 0 && vx < this.vw && vy < this.vd) this.visited[floor * this.vw * this.vd + vy * this.vw + vx] = 1;
-  }
-
-  /** Clear both maps and paint every logged frame again at the graph's current pose for it. */
-  private repaintAll(): void {
-    const closer = this.closer!;
-    this.seen.reset(this.spec);
-    this.visited.fill(0);
-    let sweep = -1;
-    let at: Pose2 = [0, 0, 0];
-    for (const f of this.log) {
-      if (f.sweep !== sweep) {
-        sweep = f.sweep;
-        at = closer.sweepPose(sweep);
-      }
-      const p = compose(at, f.rel);
-      this.paint(p[0], p[1], f.z, p[2], f.ring);
-    }
-    this.repaints += 1;
-  }
-
   /** The pose the pilot flies on: the estimator's, or the graph's carried forward by the estimator's motion since its last sweep. */
   private flown(): PoseEstimate {
     const e = this.current;
@@ -278,6 +228,6 @@ export class DriftFrames {
   }
 
   stats(): DriftStats {
-    return { mean: this.errSum / Math.max(1, this.ticks), max: this.errMax, final: this.errLast, lostTicks: this.lost, ...(this.repaint ? { repaints: this.repaints } : {}), ...(this.closer ? { loop: { ...this.closer.stats }, other: { mean: this.otherSum / Math.max(1, this.ticks), max: this.otherMax, final: this.otherLast } } : {}) };
+    return { mean: this.errSum / Math.max(1, this.ticks), max: this.errMax, final: this.errLast, lostTicks: this.lost, ...(this.closer ? { loop: { ...this.closer.stats }, other: { mean: this.otherSum / Math.max(1, this.ticks), max: this.otherMax, final: this.otherLast } } : {}) };
   }
 }
