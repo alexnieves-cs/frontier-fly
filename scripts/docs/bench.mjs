@@ -187,6 +187,7 @@ function hardBoard(root) {
     ...trackBoard(root, 'bench/results/hard', 'BENCH_HARD', ''),
     ...trackBoard(root, 'bench/results/hard-return', 'BENCH_RETURN', ' --track return'),
     ...trackBoard(root, 'bench/results/hard-drift', 'BENCH_DRIFT', ' --track drift', 'bench/results/hard-drift-truth'),
+    ...trackBoard(root, 'bench/results/hard-drift-hard', 'BENCH_DRIFT_HARD', ' --track drift-hard', 'bench/results/hard-drift-hard-truth'),
     ...trackBoard(root, 'bench/results/hard-sensor', 'BENCH_SENSOR', ' --track sensor', 'bench/results/hard-sensor-healthy', 'Same flights, healthy sensors'),
   };
 }
@@ -205,7 +206,8 @@ function trackBoard(root, dir, key, flag, control, controlLabel = 'Same flights 
   const home = tasks.some((t) => t.home);
   const ctl = control ? readResults(root, control).filter((r) => r.split === 'test' && r.cameraScore !== undefined) : [];
   const onTruth = (r) => {
-    const c = ctl.find((x) => x.name === r.name && (x.hard ?? 0) === v);
+    // A loop-closure row (bench:hard --loop) shares its pilot's true-pose control.
+    const c = ctl.find((x) => x.name === r.name.replace(/ \+ loop closure$/, '') && (x.hard ?? 0) === v);
     return c ? pct(c.cameraScore) : '—';
   };
   const poseErr = (r) => {

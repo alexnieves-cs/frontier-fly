@@ -10,9 +10,9 @@
  *
  * The seed blocks 81001+ (dev) and 82001+ (test) are used nowhere else.
  */
-import type { SensorFaults } from './drift';
 import type { PlanRecord, PlanSet } from '../plans';
 import type { LightingPreset } from '../sim/lighting';
+import type { DriftProfile, SensorFaults } from './drift';
 
 /**
  * v2 added the real-apartments task. v3 flies under the crash rule (a contact faster than
@@ -48,6 +48,8 @@ export interface BenchTask {
   wind?: number;
   /** Drift task: the pilot flies on its own pose estimate, with maps painted from it (bench/drift.ts). */
   drift?: boolean;
+  /** Drift task: the sensor suite and estimator settings, when not round 3's defaults. */
+  driftProfile?: DriftProfile;
   /** Degraded-sensor task: faults on the drift task's sensors (bench/drift.ts SensorFaults). Needs `drift`. */
   faults?: SensorFaults;
 }

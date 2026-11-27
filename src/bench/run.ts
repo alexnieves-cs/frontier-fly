@@ -182,7 +182,7 @@ export function runBenchEpisode(env: ExplorerEnv, task: BenchTask, run: BenchRun
   const rec = new BenchEpisodeRecorder(env, task, run);
   pilot.reset(rec.ctx);
   let obs = rec.obs;
-  const drift = task.drift ? new DriftFrames(env, run.seed, task.lighting !== 'day', task.faults ?? null) : null;
+  const drift = task.drift ? new DriftFrames(env, run.seed, task.lighting !== 'day', task.faults ?? null, task.driftProfile) : null;
   let first = true;
   for (;;) {
     const s = env.step(pilot.act(obs, drift ? drift.frame(obs, first) : sensorFrame(env, obs)));
