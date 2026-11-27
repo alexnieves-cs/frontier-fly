@@ -217,12 +217,20 @@ async function reinforce(pool: NodeRolloutPool, workers: number, policy: InferPo
     const frac = (u - 1) / Math.max(1, updates - 1);
     const bcCoef = bc0! + (bc1! - bc0!) * frac;
     const valueOnly = u <= warmup;
+    // A rare minibatch can blow the policy far off (KL in the units, not hundredths): undo that update.
+    const before = policy.getWeights().map((b) => b.slice(0));
     const m = await trainer.update(
       { obs, actions, logp, advantages: adv, returns: ret, n },
       { epochs: num('ppo-epochs', 3), minibatch: num('minibatch', 1024), clipEps: num('clip', 0.1), entropyCoef: 0, valueOnly, anchor: valueOnly ? undefined : { bc: { obs, actions: labels, n }, bcCoef } },
     );
-    const entry: Record<string, unknown> = { update: u, steps: n, rolloutCoverage: cov / neps, crashes, episodes: neps, bcCoef, ...m, seconds: (Date.now() - t0) / 1000 };
-    let line = `rl ${u} steps ${n} rollout ${pct(cov / neps)} crash ${crashes}/${neps} pi ${m.policyLoss.toFixed(3)} v ${m.valueLoss.toFixed(3)} kl ${m.kl.toFixed(4)} bc ${(m.bcLoss ?? 0).toFixed(3)}x${bcCoef.toFixed(2)}${valueOnly ? ' (critic warm-up)' : ''}`;
+    let reverted = false;
+    if (!(m.kl <= num('max-kl', 0.1))) {
+      policy.setWeights(before);
+      trainer.pushWeights();
+      reverted = true;
+    }
+    const entry: Record<string, unknown> = { update: u, steps: n, reverted, rolloutCoverage: cov / neps, crashes, episodes: neps, bcCoef, ...m, seconds: (Date.now() - t0) / 1000 };
+    let line = `rl ${u} steps ${n} rollout ${pct(cov / neps)} crash ${crashes}/${neps} pi ${m.policyLoss.toFixed(3)} v ${m.valueLoss.toFixed(3)} kl ${m.kl.toFixed(4)} bc ${(m.bcLoss ?? 0).toFixed(3)}x${bcCoef.toFixed(2)}${valueOnly ? ' (critic warm-up)' : ''}${reverted ? ' REVERTED' : ''}`;
     if (u % valEvery === 0 || u === updates) {
       const s = summary(await evalEpisodes(pool, workers, val, { hidden, weights: policy.getWeights() }));
       entry.val = s;
