@@ -136,9 +136,12 @@ export const BASELINES: Record<string, () => BenchPilot> = {
   // practice block 90501-90600 (docs/VIEW_FIRST.md): view goals mean longer legs at cruise.
   // On the quadrotor it also aims a forward camera (VIEW_LOOK) at what it has not had in view, turning
   // at up to 0.8 rad/s (the tracker's own yaw cap is 0.3), picked on FrontierBench Hard dev 92001+.
+  // Its quadrotor safety filter is map-backed (mapFill): a lidar ray with no return brakes for the walls and
+  // unknown space its own map has along it, and a lidar the map keeps contradicting slows it to 0.6x
+  // (degraded-sensor track, round 4, chosen on dev 140001+; no change on the healthy tracks' dev splits).
   'planner-view': () =>
     explorerPilot('Sensor-only planner, view first', (c) =>
-      new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { view: VIEW_LOOK, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN } : { view: {} }) }),
+      new SensorPlanner({ speed: c.speedH, ...(c.dynamics === 'quad' ? { view: VIEW_LOOK, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN, mapFill: true } : { view: {} }) }),
     ),
   waypoint: () => statelessPilot('Frontier waypoint follower', waypointAction),
   heuristic: () => statelessPilot('Lidar wall-follower', heuristicAction),

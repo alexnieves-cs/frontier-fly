@@ -135,6 +135,27 @@ Every other board hands the pilot its true position. A real drone indoors has no
 
 On its own estimate the view-first planner scores 78.7%, with 89 of 90 return flights home and no crash in 120 flights. That is +22.8 points over NBVP (95% interval +19.4 to +26.6) and +27.7 over nearest frontier (+23.5 to +32.1). The estimate itself costs it nothing measurable: the same flights on the true pose score 78.5% (difference +0.2, −1.4 to +1.5). No pilot loses more than noise to the estimate, because the estimator holds the pose to 0.12 to 0.22 m on average (worst 0.80 m, in the wind). So this board shows the pilots do not depend on ground truth; it does not show that drift is hard for them. One oddity: the planner + quad tracker scores 3.4 points higher on its estimate than on the truth (+2.0 to +4.8); we have not found why. Nothing was tuned for this track: every pilot is the one on the boards above, and dev met the round's goal before any change.
 
+### Degraded-sensor track
+
+The drift track's sensors all work. On the degraded-sensor track (`SENSOR_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts), faults in [`src/bench/drift.ts`](../src/bench/drift.ts), `npm run bench:hard -- --track sensor`) they do not, and the pilot still flies on its own pose estimate. A fault hits what the pilot reads and what the estimator reads alike, so a dead lidar sector is blind to the safety filter, the map and the scan matcher at once. Four tasks: the 40 m building and back with a 90° lidar sector dead from take-off; dark rooms and back in 40 s with the optical-flow sensor dead (so the estimator has the gyro, accelerometer and lidar only); rooms and back in 60 s with only one lidar ray in four returning; and rooms for 120 s where 120° of lidar and the flow sensor fail together at a random time between 20 and 60 s. Each pilot also flies the same seeds with healthy sensors (`--healthy`), the paired control that prices the faults. Seeds: dev 140001+ (20 per task), test 141001+ (30 per task, scored once).
+
+| # | Pilot | Camera score | sector-large-quad | flowless-dark-quad | sparse-quad | failing-quad | Came home | Same flights, healthy sensors | Mean pose error | 360° footprint | Flown | Flights ended by a crash | Camera vs the row above (95% CI) | Commit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Sensor-only planner, view first (baseline) | **80.0%** | 47.1% | 89.0% | 86.8% | 97.3% | 88 of 90 | 87.2% | 0.37 m | 86.3% | 20.1% | 3 of 120 | — | `f630eb7` |
+| 2 | Next-best-view RRT (NBVP, Bircher et al. 2016) (baseline) | **53.0%** | 9.1% | 69.5% | 45.9% | 87.5% | 56 of 90 | 64.9% | 0.16 m | 62.5% | 17.1% | 52 of 120 | −27.0 (−32.2 to −21.6) | `f630eb7` |
+| 3 | Nearest frontier (Yamauchi 1997) (baseline) | **47.0%** | 5.4% | 68.2% | 32.1% | 82.4% | 44 of 90 | 57.5% | 0.16 m | 60.4% | 14.1% | 61 of 120 | −6.0 (−11.4 to −0.6) | `f630eb7` |
+| 4 | Boustrophedon coverage (BA*, Viet et al. 2013) (baseline) | **46.0%** | 16.3% | 43.2% | 45.4% | 79.1% | 76 of 90 | 50.5% | 0.19 m | 51.6% | 21.9% | 24 of 120 | −1.0 (−6.0 to +3.9), tied | `f630eb7` |
+| 5 | Sensor-only planner + quad tracker (baseline) | **30.7%** | 6.3% | 30.1% | 31.6% | 54.7% | 64 of 90 | 40.8% | 0.61 m | 39.9% | 17.9% | 42 of 120 | −15.3 (−18.6 to −12.0) | `f630eb7` |
+
+| Task | What | Airframe | Lighting | Budget |
+| --- | --- | --- | --- | --- |
+| `sector-large-quad` | 40 x 40 m and back, quadrotor, a 90° lidar sector dead, 120 s | Quadrotor, randomized | Day | 120 s |
+| `flowless-dark-quad` | Rooms and back, quadrotor, lights off, flow sensor dead, 40 s | Quadrotor, randomized | Lights off | 40 s |
+| `sparse-quad` | Rooms and back, quadrotor, 1 lidar ray in 4, 60 s | Quadrotor, randomized | Day | 60 s |
+| `failing-quad` | Rooms, quadrotor, 120° of lidar and the flow sensor fail at 20-60 s, 120 s | Quadrotor, randomized | Day | 120 s |
+
+With broken sensors the view-first planner scores 80.0%, with 88 of 90 return flights home and 3 crashes in 120 flights (all on the mid-flight failure task). Every baseline crashes in 20% to 51% of flights. The lead is +27.0 points over NBVP (95% interval +21.7 to +32.2) and +33.0 over nearest frontier (+27.2 to +38.2). The faults cost it 7.2 points against the same flights with healthy sensors (−9.9 to −5.2), less than NBVP (−11.9) or nearest frontier (−10.5). The view-first planner was changed for this track, on dev only. Its quadrotor safety filter is now map-backed: a lidar ray with no return brakes for the walls and unknown space the drone's own map has along it. When two or more rays keep reading nothing where the map has a wall within 4 m (10 steps in a row), it declares the lidar faulty and flies at 0.6× speed. On dev, that took its crashes from 18 of 80 to 0. The cost is speed: the slow-down holds for the whole flight, so the 40 m task with a dead sector from take-off drops 18 points against healthy sensors. A version that slowed only toward the dead rays false-alarmed on healthy flights (−13 points on the return track's dev split) and was dropped. The same change made no difference on the healthy tracks' dev splits (hard 86.9% vs 86.6%, return 72.1% vs 72.5%, drift 78.8% vs 79.1%). The baselines fly the shared safety filter without it.
+
 ## Team track
 
 | # | Team | Drones | Score | hard | hard: base knows | hard: 80% in | large | large: base knows | large: 80% in | Commit |

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { BASELINES, explorerPilot, VIEW_QUAD_MARGIN } from '../../src/bench/baselines';
-import { DRIFT_TASKS, HARD_SEEDS, HARD_TASKS, hardRuns, RETURN_TASKS, trackRuns } from '../../src/bench/hard';
+import { DRIFT_TASKS, HARD_SEEDS, HARD_TASKS, hardRuns, RETURN_TASKS, SENSOR_TASKS, trackRuns } from '../../src/bench/hard';
 import { benchEpisodeSetup, runBenchEpisode } from '../../src/bench/run';
 import { BENCH_SEEDS } from '../../src/bench/tasks';
 import { evalEpisodeSetup } from '../../src/eval/coverage';
@@ -117,6 +117,19 @@ describe('FrontierBench Hard', () => {
     expect(ep.drift!.mean).toBeGreaterThan(0);
     expect(ep.drift!.max).toBeLessThan(1);
     expect(ep.returned).toBe(true);
+    env.dispose();
+  });
+
+  it('a map-backed safety filter keeps a drone whose lidar fails mid-flight off the walls', async () => {
+    const env = await createEnv();
+    const ti = SENSOR_TASKS.findIndex((t) => t.id === 'failing-quad');
+    const task = { ...SENSOR_TASKS[ti]!, maxSteps: 900 };
+    // Dev 140314: 120° of lidar and the flow sensor die at 27 s; without the map the blind side hits a wall.
+    const run = trackRuns('sensor', 'dev', ti)[13]!;
+    expect(run.seed).toBe(140314);
+    const make = (mapFill: boolean) => explorerPilot('view', (c) => new SensorPlanner({ speed: c.speedH, view: { look: Math.PI / 2, lookYawRate: 0.8 }, braking: QUAD_BRAKING, tracker: {}, brakingMargin: VIEW_QUAD_MARGIN, mapFill }));
+    expect(runBenchEpisode(env, task, run, make(false)).crashed).toBe(true);
+    expect(runBenchEpisode(env, task, run, make(true)).crashed).toBe(false);
     env.dispose();
   });
 });

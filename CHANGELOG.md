@@ -5,6 +5,18 @@ Zenodo archives it under the concept DOI [10.5281/zenodo.23717793](https://doi.o
 
 ## Unreleased
 
+### FrontierBench Hard: the degraded-sensor track (2026-11-27)
+
+- `npm run bench:hard -- --track sensor`: four quadrotor tasks on the drift estimate with sensor faults that hit
+  the pilot and the estimator alike (`SensorFaults` in `src/bench/drift.ts`): a dead 90° lidar sector, a dead
+  flow sensor in the dark, one lidar ray in four, and 120° of lidar plus flow failing at 20-60 s. `--healthy`
+  flies the same seeds with working sensors.
+- `SensorPlannerOptions.mapFill` (on for the view-first planner on the quadrotor): a no-return lidar ray brakes
+  for the walls and unknown space on the drone's own map, and a lidar the map keeps contradicting slows the
+  drone to 0.6x. Dev crashes 18 -> 0 of 80; no change on the healthy tracks' dev splits.
+- Test 141001+: view-first 80.0% (3 crashes in 120) vs 87.2% with healthy sensors; NBVP 53.0% (52 crashes),
+  nearest frontier 47.0% (61), BA* 46.0% (24), quad-aware planner 30.7% (42).
+
 ### FrontierBench Hard: the drift track (2026-11-26)
 
 - `npm run bench:hard -- --track drift`: four quadrotor tasks flown with no ground truth in the pilot's loop. The
