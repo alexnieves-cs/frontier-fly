@@ -187,6 +187,8 @@ function hardBoard(root) {
     ...trackBoard(root, 'bench/results/hard', 'BENCH_HARD', ''),
     ...trackBoard(root, 'bench/results/hard-return', 'BENCH_RETURN', ' --track return'),
     ...trackBoard(root, 'bench/results/hard-drift', 'BENCH_DRIFT', ' --track drift', 'bench/results/hard-drift-truth'),
+    ...trackBoard(root, 'bench/results/hard-drift-hard', 'BENCH_DRIFT_HARD', ' --track drift-hard', 'bench/results/hard-drift-hard-truth'),
+    ...trackBoard(root, 'bench/results/hard-sensor', 'BENCH_SENSOR', ' --track sensor', 'bench/results/hard-sensor-healthy', 'Same flights, healthy sensors'),
   };
 }
 
@@ -194,7 +196,7 @@ function hardBoard(root) {
  * One FrontierBench Hard track's board and task table; return tasks add the share of flights that came home.
  * With `control` (the drift track), each pilot's same flights on the true pose and its mean pose error join the row.
  */
-function trackBoard(root, dir, key, flag, control) {
+function trackBoard(root, dir, key, flag, control, controlLabel = 'Same flights on the true pose') {
   const rows = readResults(root, dir).filter((r) => r.split === 'test' && r.cameraScore !== undefined);
   if (!rows.length) return { [key]: `_Run \`npm run bench:hard --${flag} --only planner-view,nbvp --split test\`._`, [`${key}_TASKS`]: '' };
   const v = Math.max(...rows.map((r) => r.hard ?? 0));
@@ -204,7 +206,8 @@ function trackBoard(root, dir, key, flag, control) {
   const home = tasks.some((t) => t.home);
   const ctl = control ? readResults(root, control).filter((r) => r.split === 'test' && r.cameraScore !== undefined) : [];
   const onTruth = (r) => {
-    const c = ctl.find((x) => x.name === r.name && (x.hard ?? 0) === v);
+    // A loop-closure row (bench:hard --loop) shares its pilot's true-pose control.
+    const c = ctl.find((x) => x.name === r.name.replace(/ \+ loop closure$/, '') && (x.hard ?? 0) === v);
     return c ? pct(c.cameraScore) : '—';
   };
   const poseErr = (r) => {
@@ -217,7 +220,7 @@ function trackBoard(root, dir, key, flag, control) {
   };
   return {
     [key]: table(
-      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), ...(home ? ['Came home'] : []), ...(control ? ['Same flights on the true pose', 'Mean pose error'] : []), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
+      ['#', 'Pilot', 'Camera score', ...tasks.map((t) => t.id), ...(home ? ['Came home'] : []), ...(control ? [controlLabel, 'Mean pose error'] : []), '360° footprint', 'Flown', 'Flights ended by a crash', 'Camera vs the row above (95% CI)', 'Commit'],
       cur.map((r, i) => [
         String(i + 1),
         r.baseline ? `${r.name} (baseline)` : `[${plain(r.name)}](../${r.path})`,

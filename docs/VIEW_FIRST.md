@@ -124,6 +124,28 @@ Every result above hands the planner its true position. Round 3's goal was to ta
 
 The lead is +22.8 points over NBVP (+19.4 to +26.6) and +27.7 over nearest frontier (+23.5 to +32.1). The estimate costs the view-first planner +0.2 points (−1.4 to +1.5), that is, nothing measurable, because the estimator keeps the error at 0.12 to 0.22 m on average (worst 0.80 m). The honest reading: the planner does not depend on ground truth, but this level of drift is not hard for any pilot. A harsher sensor model (lidar sector loss, glass, flow failure) is the next stressor. The quad tracker's +3.4 points on its estimate is unexplained.
 
+## Round 4: broken sensors
+
+Goal: with sensor faults, on its own pose estimate, lead every baseline by 15 points or more, crash in under 5% of flights, and lose under 15 points against the same flights with healthy sensors. The degraded-sensor track (`SENSOR_TASKS` in [`src/bench/hard.ts`](../src/bench/hard.ts)) kills a 90° lidar sector, the flow sensor, three lidar rays in four, or 120° of lidar plus flow mid-flight. A fault hits the pilot and the estimator alike.
+
+On dev (140001+) the v3 planner already led by 27 points but crashed in 18 of 80 flights, 17 of them on the mid-flight failure. Diagnosis: the crashes came with pose errors under 0.3 m. The blind side was flying into walls the safety filter could no longer see, not getting lost. Three attempts, on dev only:
+
+1. Map-backed safety filter (`mapFill`): a no-return ray reads, for the braking filter only, the distance to the first wall voxel on the drone's own map. Crashes 18 to 12 on the failing task. Also counting unknown voxels as walls: 18 to 7 of 80.
+2. Fault declaration: two or more rays reading nothing where the map has a wall within 4 m, 10 steps in a row, and the drone flies at 0.6× for the rest of the flight. 7 to 0 of 80; the healthy tracks' dev splits unchanged (hard 86.9% vs 86.6%, return 72.1% vs 72.5%, drift 78.8% vs 79.1%). Shipped.
+3. Slow down only toward rays declared dead (cumulative count per ray): false alarms on healthy flights cost 13 points on the drift and return dev splits and brought crashes back. Dropped.
+
+Test (141001-141430, flown once per pilot, with a healthy-sensor control on the same seeds):
+
+| Pilot | With faults | Healthy sensors | Crashes (faults) |
+| --- | --- | --- | --- |
+| View-first planner | **80.0%** | 87.2% | 3/120 |
+| NBVP | 53.0% | 64.9% | 52/120 |
+| Nearest frontier | 47.0% | 57.5% | 61/120 |
+| BA* | 46.0% | 50.5% | 24/120 |
+| Planner + quad tracker | 30.7% | 40.8% | 42/120 |
+
+Every part of the goal holds: +27.0 points over NBVP (+21.7 to +32.2), 2.5% of flights crash, and the faults cost 7.2 points (−9.9 to −5.2). The price is the blanket slow-down: on the 40 m task with a sector dead from take-off the planner scores 47.1% against 65.3% with healthy sensors. The baselines fly the shared safety filter without `mapFill`, so part of the lead is this safety change, not exploration.
+
 ## Version 4: unmapped rooms compete from the start (the 40 m tie)
 
 Round 1 left one task where nearest frontier kept up: the kinematic 40 m building, a tie on fresh seeds (+0.6, −3.4
@@ -176,7 +198,7 @@ The test splits, rescored once for v4: hard 87.8% (v3 86.0%, paired +1.8, +1.0 t
 frontier's 73.3%, +9.9, +6.0 to +14.0), 3 crashes in 150 as before; return 75.5% (v3 74.0%, +1.5, +0.7 to +2.4), 120 of
 120 home, no crash, and the 30 s sprint's lead over nearest frontier is now +12.1 (+6.4 to +18.2) where it was within
 noise; FrontierBench v3 99.7% footprint and 67.6% flown (v3 99.1%, 67.4%), no crash in 240. The drift track is all
-quadrotor, so its results are v3's.
+quadrotor, and v4 leaves the quadrotor unchanged, so the drift, degraded-sensor and hard drift results stand as published.
 
 ## Results of version 1
 
