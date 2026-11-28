@@ -1,4 +1,4 @@
-import type { EntryCandidate, MissionBuilding, V3 } from '../contracts';
+import type { EntryCandidate, MissionBuilding, Phase, V3 } from '../contracts';
 import type { MeasuredOpening } from '../openingSensor';
 import { planApproach } from '../planner/approach';
 import { passageAxis, rankCandidates, scoreOpening } from '../planner/entry';
@@ -22,6 +22,18 @@ export const SURVEY_WAIT_SEC = 45;
 export const TEAM_HOP_LAYER_M = 1.5;
 /** Longest a drone holds for a teammate to get through the only opening left, s. */
 export const CLAIM_WAIT_SEC = 90;
+/** A teammate's route to its opening longer than this is flown at near-building speed, m. */
+export const TEAM_TRANSIT_M = 6;
+
+function routeLength(from: V3, route: readonly V3[]): number {
+  let total = 0;
+  let prev = from;
+  for (const p of route) {
+    total += Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]);
+    prev = p;
+  }
+  return total;
+}
 
 /** Where the entry phase hands over: back to the search, out and away, or into indoor exploration. */
 export interface EntryExits {
@@ -396,9 +408,12 @@ export class EntryPhase {
       this.tryCandidate();
       return;
     }
+    // On a team the opening may be on the far side of the building. The way round or over the roof is
+    // flown at near-building speed, and only the crossing itself at fly-through speed.
+    const transit: Phase = team && routeLength(this.c.vehicle.pos, leg) > TEAM_TRANSIT_M ? 'approach' : 'fly_through';
     this.c.setJob(
       this.pilot.followJob(
-        'fly_through',
+        transit,
         leg.map((p) => ({ pos: p })),
         () => this.crossIn(),
         0.25,
