@@ -102,6 +102,7 @@ export default defineConfig({
         atlas: resolve(root, 'atlas.html'),
         how: resolve(root, 'how.html'),
         joint: resolve(root, 'joint.html'),
+        swarm: resolve(root, 'swarm.html'),
       },
     },
   },
