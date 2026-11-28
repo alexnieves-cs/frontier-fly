@@ -223,7 +223,9 @@ class DuoPage {
       const card = this.root.querySelector<HTMLElement>(`[data-drone="${name}"]`)!;
       const snap = snaps[name];
       const waiting = name === 'B' && t < flight.launchGapSec;
-      card.querySelector('[data-phase]')!.textContent = waiting ? 'On its pad' : PHASE_LABELS[snap.phase];
+      // With its opening chosen, the way round to it is flown as an approach: say where it is going.
+      const toOpening = snap.phase === 'approach' && this.state[name].wayIn !== null && !snap.inside;
+      card.querySelector('[data-phase]')!.textContent = waiting ? 'On its pad' : toOpening ? 'To its way in' : PHASE_LABELS[snap.phase];
       card.querySelector('[data-way]')!.textContent = this.state[name].wayIn ?? 'Not chosen yet';
       card.querySelector('[data-battery]')!.textContent = `${Math.round(snap.batteryPct)}%`;
       card.querySelector('[data-line]')!.textContent = this.state[name].lastLine;
