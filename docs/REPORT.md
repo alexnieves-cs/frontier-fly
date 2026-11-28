@@ -763,6 +763,71 @@ Ablations, three drones:
 
 The live page (`team.html`) runs this code in the browser: the truth beside what the base sees, with the radio links drawn.
 
+### PX4 flying every drone
+
+The bench above flies the kinematic airframe. Here every drone of the team is flown by its own copy of PX4 v1.15.4, the autopilot firmware real drones run: EKF2 and the multicopter position, attitude and rate controllers, in software-in-the-loop on frontier-fly's rigid body, in lockstep (`src/px4/px4Dynamics.ts`, `scripts/px4/team.ts`). Up to four PX4 processes fly one building at once.
+
+- **Three airframes, the same buildings.** *PX4 in the loop* swaps each drone's airframe for PX4. *Quad model* flies the env's own rigid body and cascaded controller with the same pilot and spacing rule, so the difference between the two is PX4. *Kinematic* is the bench's airframe and plain planner.
+- **Pilot.** The quadrotor pilot from [Quadrotor dynamics](#quadrotor-dynamics-and-the-braking-filter): braking filter, tracker and learned goal picker. With the plain planner, PX4 drones oscillated on the tuning buildings and covered a third of them.
+- **No GNSS indoors.** Each drone boots its own PX4, arms and takes off at the entry on GNSS. Then the fix is cut and PX4 flies the search on external vision: the true pose with VIO-grade noise and drift, fused by EKF2. The team sends each PX4 a velocity setpoint every 50 ms; PX4 runs at 250 Hz.
+- **Spacing.** A braking-aware rule replaces the bench's: each drone keeps 0.6 m from the others, brakes on the closing speed of each pair (half each), and the wall braking filter runs after it. On the tuning buildings the bench's rule let two PX4 drones pass 0.13 m apart.
+- **What still reads the truth.** The planner, its maps and the spacing rule use the true pose, as the mission runner does; only PX4's controllers fly on the drifting estimate. Drones are not physics bodies to each other, so a close pass is counted (centres within 0.35 m), not simulated.
+- **Seeds.** The spacing rule and the pilot choice were tuned on dev buildings 83001–83010 and 83501–83510. The results are on the test split: hard 83101–83130 and large 83601–83630, every airframe and team size on every building, paired. A search stops at 95% of the floor.
+
+| Building | Airframe | Team | Searched (95% CI) | vs 1 drone | Median time to 50% | Median time to 80% | Reached 80% | Flights with a close pass (time under 0.35 m) | Wall hits | Flights ended by a crash |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hard 20 m | PX4 in the loop | 1 drone | 53.5% (51.3%–55.7%) | — | 105 s | not reached | 0 of 30 | 0 | 0 | 0 of 30 |
+| Hard 20 m | PX4 in the loop | 2 drones | 79.8% (77.7%–81.7%) | +26.3 pts | 56 s | 115 s | 20 of 30 | 0 | 0 | 0 of 60 |
+| Hard 20 m | PX4 in the loop | 3 drones | 91.7% (90.2%–93.1%) | +38.2 pts | 38 s | 83 s | 30 of 30 | 0 | 0 | 0 of 90 |
+| Hard 20 m | PX4 in the loop | 4 drones | 95.0% (94.9%–95.1%) | +41.5 pts | 32 s | 62 s | 30 of 30 | 1 of 30 (0.60 s) | 0 | 0 of 120 |
+| Hard 20 m | Quad model | 1 drone | 56.6% (53.7%–59.6%) | — | 98 s | not reached | 0 of 30 | 0 | 0 | 0 of 30 |
+| Hard 20 m | Quad model | 2 drones | 88.1% (85.5%–90.5%) | +31.5 pts | 54 s | 94 s | 23 of 30 | 0 | 0 | 0 of 60 |
+| Hard 20 m | Quad model | 3 drones | 94.8% (94.5%–95.1%) | +38.2 pts | 38 s | 65 s | 30 of 30 | 0 | 0 | 0 of 90 |
+| Hard 20 m | Quad model | 4 drones | 95.1% (95.1%–95.1%) | +38.4 pts | 30 s | 51 s | 30 of 30 | 0 | 0 | 0 of 120 |
+| Hard 20 m | Kinematic | 1 drone | 65.3% (62.4%–68.3%) | — | 88 s | not reached | 0 of 30 | 0 | 0 | 0 of 30 |
+| Hard 20 m | Kinematic | 2 drones | 94.0% (93.0%–94.8%) | +28.7 pts | 43 s | 75 s | 30 of 30 | 3 of 30 (0.40 s) | 0 | 0 of 60 |
+| Hard 20 m | Kinematic | 3 drones | 95.1% (95.1%–95.1%) | +29.8 pts | 31 s | 51 s | 30 of 30 | 8 of 30 (1.70 s) | 0 | 0 of 90 |
+| Hard 20 m | Kinematic | 4 drones | 95.1% (95.1%–95.1%) | +29.8 pts | 24 s | 40 s | 30 of 30 | 7 of 30 (1.70 s) | 0 | 0 of 120 |
+| Large 40 m | PX4 in the loop | 1 drone | 25.3% (24.3%–26.3%) | — | not reached | not reached | 0 of 30 | 0 | 0 | 0 of 30 |
+| Large 40 m | PX4 in the loop | 2 drones | 44.7% (42.5%–46.9%) | +19.4 pts | not reached | not reached | 0 of 30 | 0 | 0 | 0 of 60 |
+| Large 40 m | PX4 in the loop | 3 drones | 59.7% (57.7%–61.8%) | +34.5 pts | 189 s | not reached | 0 of 30 | 0 | 0 | 0 of 90 |
+| Large 40 m | PX4 in the loop | 4 drones | 70.8% (68.9%–72.7%) | +45.6 pts | 154 s | not reached | 1 of 30 | 0 | 0 | 0 of 120 |
+| Large 40 m | Quad model | 1 drone | 26.2% (25.4%–26.9%) | — | not reached | not reached | 0 of 30 | 0 | 0 | 0 of 30 |
+| Large 40 m | Quad model | 2 drones | 48.8% (47.6%–50.0%) | +22.6 pts | not reached | not reached | 0 of 30 | 0 | 0 | 0 of 60 |
+| Large 40 m | Quad model | 3 drones | 67.1% (65.2%–69.0%) | +41.0 pts | 170 s | not reached | 0 of 30 | 0 | 0 | 0 of 90 |
+| Large 40 m | Quad model | 4 drones | 81.5% (79.7%–83.3%) | +55.4 pts | 139 s | 235 s | 21 of 30 | 0 | 0 | 0 of 120 |
+| Large 40 m | Kinematic | 1 drone | 30.0% (29.1%–30.9%) | — | not reached | not reached | 0 of 30 | 0 | 0 | 0 of 30 |
+| Large 40 m | Kinematic | 2 drones | 56.5% (54.8%–58.2%) | +26.5 pts | 211 s | not reached | 0 of 30 | 2 of 30 (0.65 s) | 0 | 0 of 60 |
+| Large 40 m | Kinematic | 3 drones | 78.2% (76.2%–80.3%) | +48.2 pts | 144 s | not reached | 14 of 30 | 10 of 30 (2.15 s) | 0 | 0 of 90 |
+| Large 40 m | Kinematic | 4 drones | 93.0% (91.9%–94.0%) | +63.0 pts | 111 s | 188 s | 30 of 30 | 18 of 30 (4.45 s) | 1 | 0 of 120 |
+
+![Searched floor against team size for PX4, the quad model and the kinematic airframe, on hard and large buildings, with 95% intervals](report/px4-team.svg)
+
+PX4 in place of the quad model, same pilot and buildings, paired difference in searched floor:
+
+- Hard 20 m: 1 drone −3.2 pts (95% CI −5.2 pts to −1.3 pts); 2 drones −8.3 pts (95% CI −9.5 pts to −7.2 pts); 3 drones −3.1 pts (95% CI −4.5 pts to −1.8 pts); 4 drones −0.1 pts (95% CI −0.2 pts to +0.0 pts).
+- Large 40 m: 1 drone −0.9 pts (95% CI −1.8 pts to +0.1 pts); 2 drones −4.1 pts (95% CI −6.1 pts to −2.1 pts); 3 drones −7.4 pts (95% CI −9.2 pts to −5.5 pts); 4 drones −10.7 pts (95% CI −13.0 pts to −8.6 pts).
+
+- **A PX4 team splits a building.** On 30 hard buildings four PX4 drones search 95.0% and reach 80% in a median 62 s, where one PX4 drone searches 53.5% in its two minutes. On 30 large buildings four search 70.8% against 25.3% for one, +45.6 pts (95% CI +43.4 pts to +47.7 pts).
+- **PX4 is slower than the model, most where time binds.** With four drones on large buildings PX4 searches −10.7 pts (95% CI −13.0 pts to −8.6 pts) against the quad model (70.8% against 81.5%). On hard buildings both teams of four reach the 95% stop, but PX4's take a median 62 s to 80% against 51 s. PX4 follows the planner's velocity setpoints 0.92 to 0.94 m/s RMS off. Its default acceleration and jerk limits smooth every command, so it brakes and turns later than the model the pilot was tuned on; the pilot was not retuned for PX4.
+- **Close passes stay rare, and one is traced.** 1 of 180 PX4 team flights had two drones within 0.35 m, against 48 of 180 for the kinematic team on the bench's rule. On hard building 83102, drones 2 and 3 traded goals and flew at each other; PX4's lag carried them through the 0.6 m keep-out to 0.18 m apart for 0.6 s. The rule read true positions there, so the lag alone did it. A real team would space on estimates, which here are off by 0.22 m to 0.31 m RMS and up to 1.18 m, so its keep-out would need to grow by about that much.
+- **Nothing else went wrong.** 0 wall hits and 0 crashes in 600 PX4 drone flights, and 0 drops out of offboard control.
+
+| Building | Team | EKF2 error, RMS (mean over drones) | Worst drone, RMS | Worst instant | Velocity tracking error, RMS | Offboard drops | Not in offboard at the end | Lockstep steps without PX4's answer, per flight (worst) | Episodes that failed to run |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Hard 20 m | 1 drone | 0.24 m | 0.38 m | 0.63 m | 0.92 m/s | 0 | 0 | 8.5 (20) | 0 |
+| Hard 20 m | 2 drones | 0.24 m | 0.44 m | 0.78 m | 0.94 m/s | 0 | 0 | 8.1 (10) | 0 |
+| Hard 20 m | 3 drones | 0.24 m | 0.45 m | 0.78 m | 0.92 m/s | 0 | 0 | 8.1 (10) | 0 |
+| Hard 20 m | 4 drones | 0.22 m | 0.45 m | 0.79 m | 0.93 m/s | 0 | 0 | 8.0 (9) | 0 |
+| Large 40 m | 1 drone | 0.31 m | 0.58 m | 1.16 m | 0.93 m/s | 0 | 0 | 8.9 (14) | 0 |
+| Large 40 m | 2 drones | 0.31 m | 0.57 m | 1.18 m | 0.94 m/s | 0 | 0 | 8.9 (14) | 0 |
+| Large 40 m | 3 drones | 0.31 m | 0.68 m | 1.12 m | 0.94 m/s | 0 | 0 | 9.0 (16) | 0 |
+| Large 40 m | 4 drones | 0.30 m | 0.69 m | 1.13 m | 0.93 m/s | 0 | 0 | 9.1 (15) | 0 |
+
+On a few lockstep steps PX4's motor outputs did not come back within the bridge's 200 ms wait, and the bridge held the last ones for that 4 ms step: 8.0 to 8.5 per flight on hard buildings (worst 20) and 8.9 to 9.1 per flight on large buildings (worst 16), out of 30,000 steps in a 120 s flight and 60,000 in a 240 s one. About eight came in every flight, whatever its length or team size, which puts them at start-up; the rest came while the replay films were rendering on the same four-core machine.
+
+[`swarm.html`](https://alexnieves-cs.github.io/frontier-fly/swarm.html) replays three of these flights in 3D: four PX4 drones on hard building 83101 and large building 83601, against one PX4 drone on the same building, and the close pass on 83102 at true speed.
+
 ## Search by sight
 
 Every mission above detects with an *analytic* camera: a recall curve over distance, light and blur, and a dice roll, with no pixels (`src/perception/detector.ts`). This section replaces it with a camera and a learned detector and flies the same missions again.

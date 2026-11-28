@@ -13,6 +13,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { rlSection } from './rl.mjs';
 import { sarSection } from './sar.mjs';
 import { teamSection } from './team.mjs';
+import { px4TeamSection } from './px4team.mjs';
 import { speedSection } from './speed.mjs';
 import { footprintSection } from './footprint.mjs';
 import { benchPair, benchSection } from './bench.mjs';
@@ -1404,6 +1405,7 @@ const ablations = ablationTables(readJson('docs/ablations.json'));
 const rl = rlSection(readJson('docs/rl-finetune.json'));
 const sar = sarSection(readJson('docs/sar-bench.json'), readJson('docs/report/sar-belief.json'));
 const team = teamSection(readJson('docs/team-bench.json'));
+const px4Team = px4TeamSection(readJson('docs/px4-team.json'));
 const speed = speedSection(readJson('docs/speed-study.json'));
 const footprint = footprintSection(readJson('docs/study.json'), readJson('docs/speed-study.json'));
 const values = {
@@ -1412,6 +1414,7 @@ const values = {
   ...ablations.values,
   ...sar.values,
   ...team.values,
+  ...px4Team.values,
   ...speed.values,
   ...footprint.values,
   ...benchSection(ROOT),
@@ -1438,6 +1441,7 @@ const outputs = {
   ...ablations.files,
   ...sar.files,
   ...team.files,
+  ...px4Team.files,
   ...speed.files,
   ...rl.files,
   ...footprint.files,

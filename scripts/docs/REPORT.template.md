@@ -397,6 +397,36 @@ Ablations, three drones:
 
 The live page (`team.html`) runs this code in the browser: the truth beside what the base sees, with the radio links drawn.
 
+### PX4 flying every drone
+
+The bench above flies the kinematic airframe. Here every drone of the team is flown by its own copy of PX4 v1.15.4, the autopilot firmware real drones run: EKF2 and the multicopter position, attitude and rate controllers, in software-in-the-loop on frontier-fly's rigid body, in lockstep (`src/px4/px4Dynamics.ts`, `scripts/px4/team.ts`). Up to four PX4 processes fly one building at once.
+
+- **Three airframes, the same buildings.** *PX4 in the loop* swaps each drone's airframe for PX4. *Quad model* flies the env's own rigid body and cascaded controller with the same pilot and spacing rule, so the difference between the two is PX4. *Kinematic* is the bench's airframe and plain planner.
+- **Pilot.** The quadrotor pilot from [Quadrotor dynamics](#quadrotor-dynamics-and-the-braking-filter): braking filter, tracker and learned goal picker. With the plain planner, PX4 drones oscillated on the tuning buildings and covered a third of them.
+- **No GNSS indoors.** Each drone boots its own PX4, arms and takes off at the entry on GNSS. Then the fix is cut and PX4 flies the search on external vision: the true pose with VIO-grade noise and drift, fused by EKF2. The team sends each PX4 a velocity setpoint every 50 ms; PX4 runs at 250 Hz.
+- **Spacing.** A braking-aware rule replaces the bench's: each drone keeps 0.6 m from the others, brakes on the closing speed of each pair (half each), and the wall braking filter runs after it. On the tuning buildings the bench's rule let two PX4 drones pass 0.13 m apart.
+- **What still reads the truth.** The planner, its maps and the spacing rule use the true pose, as the mission runner does; only PX4's controllers fly on the drifting estimate. Drones are not physics bodies to each other, so a close pass is counted (centres within 0.35 m), not simulated.
+- **Seeds.** The spacing rule and the pilot choice were tuned on dev buildings 83001–83010 and 83501–83510. The results are on the test split: hard {{PXT_HARD_SEEDS}} and large {{PXT_LARGE_SEEDS}}, every airframe and team size on every building, paired. A search stops at 95% of the floor.
+
+{{PXT_TABLE}}
+
+{{PXT_FIGURE}}
+
+PX4 in place of the quad model, same pilot and buildings, paired difference in searched floor:
+
+{{PXT_SWAP}}
+
+- **A PX4 team splits a building.** On {{PXT_HARD_N}} hard buildings four PX4 drones search {{PXT_HARD_FOUR}} and reach 80% in a median {{PXT_HARD_FOUR_T80}}, where one PX4 drone searches {{PXT_HARD_SOLO}} in its two minutes. On {{PXT_LARGE_N}} large buildings four search {{PXT_LARGE_FOUR}} against {{PXT_LARGE_SOLO}} for one, {{PXT_LARGE_FOUR_D}}.
+- **PX4 is slower than the model, most where time binds.** With four drones on large buildings PX4 searches {{PXT_LARGE_SWAP_FOUR}} against the quad model ({{PXT_LARGE_FOUR}} against {{PXT_LARGE_QUAD_FOUR}}). On hard buildings both teams of four reach the 95% stop, but PX4's take a median {{PXT_HARD_FOUR_T80}} to 80% against {{PXT_HARD_QUAD_FOUR_T80}}. PX4 follows the planner's velocity setpoints {{PXT_TRACK}} RMS off. Its default acceleration and jerk limits smooth every command, so it brakes and turns later than the model the pilot was tuned on; the pilot was not retuned for PX4.
+- **Close passes stay rare, and one is traced.** {{PXT_CONTACT_EPS}} of {{PXT_CONTACT_FLIGHTS}} PX4 team flights had two drones within 0.35 m, against {{PXT_KIN_CONTACT_EPS}} of {{PXT_KIN_FLIGHTS}} for the kinematic team on the bench's rule. On hard building 83102, drones 2 and 3 traded goals and flew at each other; PX4's lag carried them through the 0.6 m keep-out to 0.18 m apart for 0.6 s. The rule read true positions there, so the lag alone did it. A real team would space on estimates, which here are off by {{PXT_EKF_MEAN}} RMS and up to {{PXT_EKF_WORST}}, so its keep-out would need to grow by about that much.
+{{PXT_SAFETY}}
+
+{{PXT_HEALTH}}
+
+{{PXT_LOCKSTEP}}
+
+[`swarm.html`](https://alexnieves-cs.github.io/frontier-fly/swarm.html) replays three of these flights in 3D: four PX4 drones on hard building 83101 and large building 83601, against one PX4 drone on the same building, and the close pass on 83102 at true speed.
+
 ## Search by sight
 
 Every mission above detects with an *analytic* camera: a recall curve over distance, light and blur, and a dice roll, with no pixels (`src/perception/detector.ts`). This section replaces it with a camera and a learned detector and flies the same missions again.

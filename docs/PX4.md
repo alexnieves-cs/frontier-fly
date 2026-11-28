@@ -118,6 +118,20 @@ npx vite-node scripts/px4/report.ts -- --sih test-results/px4/sih --bridge test-
 
 `PX4_SIM_SPEED_FACTOR` sets how much faster than real time the headless checks run. CI and the table above use 2.
 
+## A team of PX4 drones
+
+The search itself can be flown by PX4 too, one copy per drone. `scripts/px4/team.ts` boots up to four PX4 SITL instances on one building, takes each off on GNSS, cuts the fix and lets EKF2 fly the search on external vision while the team planner sends velocity setpoints. The results, against the same team flown by frontier-fly's own quadrotor model, are in the report under [PX4 flying every drone](REPORT.md#px4-flying-every-drone). [`swarm.html`](https://alexnieves-cs.github.io/frontier-fly/swarm.html) replays three of the flights in 3D.
+
+```bash
+export PX4_BUILD=/path/to/PX4-Autopilot/build/px4_sitl_default
+npx vite-node scripts/px4/team.ts -- --dir test-results/px4team/hard --cond hard --split test --count 30 \
+  --drones 1,2,3,4 --arms px4,quad,kinematic --film 83101:1 --film 83101:4 --instance-base 0
+npx vite-node scripts/px4/team-report.ts -- --dir test-results/px4team --out docs/px4-team.json
+npx vite-node scripts/px4/team-film.ts -- --dir test-results/px4team/hard --cond hard --seed 83101 --drones 4
+```
+
+`--instance-base` offsets the PX4 instance numbers (and so their ports), so two studies can run side by side. Each flight is lockstepped to its own PX4s, so a busy machine slows the study down rather than changing the flights, apart from the few steps where PX4 misses the 200 ms answer window and the bridge holds the last motor command (the report counts them).
+
 ## Limits
 
 - Only the pre-planned part of a mission is a plan. Confirming a contact, entering a building and searching indoors are decided in flight by frontier-fly's own autonomy, not by PX4.

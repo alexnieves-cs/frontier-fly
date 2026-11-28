@@ -30,7 +30,7 @@ policy is trained and the project's honest limits. The pages below go deeper on 
 | Page | What it covers |
 | --- | --- |
 | [CLI.md](CLI.md) | The headless CLI and the Docker image |
-| [PX4.md](PX4.md) | Exported missions flown by PX4 in software-in-the-loop |
+| [PX4.md](PX4.md) | Exported missions flown by PX4 in software-in-the-loop, and a team of up to four PX4 drones searching a building |
 | [QGC_EXPORT.md](QGC_EXPORT.md) | Exporting a planned mission to QGroundControl |
 | [CRAZYFLIE.md](CRAZYFLIE.md) | The plan for a real Crazyflie flight (simulated only so far) |
 | [../python/README.md](../python/README.md) | The Python package: a Gymnasium env and the FrontierBench scorer |
