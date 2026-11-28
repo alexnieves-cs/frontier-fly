@@ -58,6 +58,12 @@ const EXIT_EXTRA_SEC = 60;
 const CLIMB_CLEAR_TOL_M = 0.5;
 /** ...and does not apply this close to home, m. */
 const CLIMB_CLEAR_HOME_M = 8;
+/** Indoors, a drone that is not the lead backs off from the lead inside this distance, m. */
+const YIELD_M = 1.5;
+/** Speed it backs off at, m/s. */
+const YIELD_MPS = 0.7;
+/** Ticks between indoor coverage exchanges with a teammate (10 ticks = 0.5 s = 2 Hz, as in src/team). */
+const TEAM_EXCHANGE_TICKS = 10;
 /** A drone that cannot re-acquire its pose for this long lands where it is. */
 const LOC_LOST_LAND_SEC = 20;
 
@@ -238,11 +244,14 @@ class Runner implements MissionRunner {
       }
     }
     if (this.c.finished) return;
+    if (this.c.options.team) this.teamTick();
+    if (this.c.finished) return;
 
     let cmd = this.c.believed(() => this.climbClear(this.c.job.tick()));
     if (this.c.finished) return;
     if (this.c.loc) cmd = this.flyOnEstimate(cmd);
     cmd = this.headroom(cmd);
+    if (this.c.options.team) cmd = this.teamCommand(cmd);
     this.c.lastCmd = cmd;
     const wind: V3 = this.c.faults && !this.c.inside ? this.c.faults.wind() : (this.c.options.wind?.(this.c.t) ?? [0, 0, 0]);
     const step = this.c.vehicle.step(cmd, this.c.dt, this.c.limits(), { wind });
@@ -357,7 +366,9 @@ class Runner implements MissionRunner {
     const searchedAll = this.search.coverageDone && this.search.pending.length === 0;
     let out: RunOutcome;
     if (this.search.findMission()) {
-      out = requirementsMet(this.c.mission, this.c.confirmed) ? 'found' : searchedAll ? 'not_found' : 'incomplete';
+      // On a team the mission is the team's: a teammate's confirmed find completes it for both drones.
+      const team = this.c.options.team?.teamConfirmed().map((t) => t.contact) ?? [];
+      out = requirementsMet(this.c.mission, [...this.c.confirmed, ...team]) ? 'found' : searchedAll ? 'not_found' : 'incomplete';
     } else if (this.c.mission.missionType === 'safety_sweep') {
       if (this.c.confirmed.some((c) => c.classId === 'person')) out = 'found';
       else {
@@ -372,6 +383,60 @@ class Runner implements MissionRunner {
     }
     if (this.c.hardStopped && out !== 'found' && out !== 'clear') return 'incomplete';
     return out;
+  }
+
+  // ----------------------------------------------------------- team
+
+  /**
+   * Twice a second: pool indoor camera coverage with the teammate in the same building, so each
+   * drone's look phase goes where neither has looked. Every tick: once the team's confirmed contacts
+   * meet the mission, a drone still searching heads home.
+   */
+  private teamTick(): void {
+    const link = this.c.options.team!;
+    const v = this.c.visit;
+    if (v?.sensing && this.c.inside === v.b.id && this.c.ticks % TEAM_EXCHANGE_TICKS === 0) {
+      link.shareLooked(v.b.id, v.sensing.looked);
+      const theirs = link.looked(v.b.id);
+      if (theirs && theirs.length === v.sensing.looked.length) {
+        const mine = v.sensing.looked;
+        for (let i = 0; i < mine.length; i++) if (theirs[i]) mine[i] = 1;
+      }
+    }
+    if (this.c.returning || this.c.finished || !this.search.findMission()) return;
+    if (requirementsMet(this.c.mission, this.c.confirmed)) return;
+    const theirs = link.teamConfirmed();
+    if (!theirs.length) return;
+    if (!requirementsMet(this.c.mission, [...this.c.confirmed, ...theirs.map((t) => t.contact)])) return;
+    const who = [...new Set(theirs.map((t) => t.name))].join(', ');
+    this.c.log('action', `${who} confirmed what the mission needs. Stopping the search.`);
+    this.search.endTeamSearch();
+    this.home.startReturn('teammate confirmed all required targets');
+  }
+
+  /**
+   * A teammate is not a physics body in this drone's world. Two rules stand in for seeing it on
+   * lidar. Indoors the drone that is not the lead makes way: within YIELD_M of the lead it drops its
+   * own plan and backs straight off, through its own lidar filter so it never backs into a wall.
+   * Everywhere, each drone cuts the part of its velocity that closes on the other (src/team separate).
+   */
+  private teamCommand(cmd: VehicleCommand): VehicleCommand {
+    const link = this.c.options.team!;
+    const pos = this.c.vehicle.pos;
+    const mate = link.nearest(pos);
+    const v = this.c.visit;
+    // Indoors the second drone gives way; the lead gives way too while its teammate is in the opening, which cannot.
+    const yields = !link.lead || mate?.phase === 'fly_through';
+    if (yields && mate && this.c.inside && v?.sensing && Math.abs(mate.pos[2] - pos[2]) < 1) {
+      const dx = pos[0] - mate.pos[0];
+      const dy = pos[1] - mate.pos[1];
+      const d = Math.hypot(dx, dy);
+      if (d < YIELD_M && d > 1e-6) {
+        const [vx, vy] = v.sensing.filter((dx / d) * YIELD_MPS, (dy / d) * YIELD_MPS, this.c.navYaw);
+        return { ...cmd, vel: link.separate(pos, [vx, vy, 0]) };
+      }
+    }
+    return { ...cmd, vel: link.separate(pos, cmd.vel) };
   }
 
   // ----------------------------------------------------------- safety

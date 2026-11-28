@@ -82,22 +82,40 @@ function roofViewpoints(building: MissionBuilding, physics: OutdoorPhysics): Vie
  * retracing the route flown so far to an earlier viewpoint that has one. Without it such a
  * viewpoint is skipped, so the number of faces seen depends on where the orbit started.
  */
+/** Teammates' standoffs at the building, and whether this drone flies the roof viewpoints. */
+export interface InspectSplit {
+  teammates: readonly V3[];
+  lead: boolean;
+}
+
+/** Unsigned angle between two bearings, rad. */
+function arc(a: number, b: number): number {
+  const d = Math.abs((((a - b) % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+  return d;
+}
+
 export function planInspection(
   building: MissionBuilding,
   start: V3,
   physics: OutdoorPhysics,
   air: Airspace,
   backtrack = false,
+  split: InspectSplit | null = null,
 ): InspectStep[] {
   const box = buildingBox(building);
   const startAngle = Math.atan2(start[1] - box.cy, start[0] - box.cx);
   const tau = Math.PI * 2;
-  const faces = faceViewpoints(building, physics, air).sort((a, b) => {
+  let faces = faceViewpoints(building, physics, air).sort((a, b) => {
     const da = (((a.angle - startAngle) % tau) + tau) % tau;
     const db = (((b.angle - startAngle) % tau) + tau) % tau;
     return da - db;
   });
-  const views = [...faces, ...roofViewpoints(building, physics)];
+  // Split with teammates: a face viewpoint is this drone's when it is no farther round the building
+  // from this drone's start than from any teammate's standoff. Ties go to both.
+  const others = split?.teammates.map((t) => Math.atan2(t[1] - box.cy, t[0] - box.cx)) ?? [];
+  if (others.length) faces = faces.filter((f) => others.every((o) => arc(f.angle, startAngle) <= arc(f.angle, o) + 1e-6));
+  const roof = others.length && !split!.lead ? [] : roofViewpoints(building, physics);
+  const views = [...faces, ...roof];
   const steps: InspectStep[] = [];
   let cur = start;
   const hopZ = box.roofZ + 2.5;

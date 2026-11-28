@@ -309,9 +309,9 @@ export function buildMissionWorld(options: MissionWorldOptions): MissionWorld {
   if (options.buildings != null && highest >= options.buildings) {
     throw new RangeError(`Target building ${highest} does not exist in a ${options.buildings}-building world.`);
   }
-  let outdoor = generateOutdoor({ seed, buildings: options.buildings });
+  let outdoor = generateOutdoor({ seed, buildings: options.buildings, entrances: options.entrances });
   // An omitted count comes from the seed; grow it when a target names a later building.
-  if (outdoor.buildings.length <= highest) outdoor = generateOutdoor({ seed, buildings: highest + 1 });
+  if (outdoor.buildings.length <= highest) outdoor = generateOutdoor({ seed, buildings: highest + 1, entrances: options.entrances });
   const wants = options.targets ?? defaultWants(seed, outdoor.buildings.length);
   const labels = buildingLabels(outdoor, seed);
   const decoys = Math.max(0, Math.floor(options.decoys ?? 0));

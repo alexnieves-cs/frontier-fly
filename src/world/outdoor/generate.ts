@@ -90,7 +90,7 @@ function buildWorld(seed: number, params: OutdoorParams): OutdoorWorld | null {
 
   const ids = { next: 0 };
   for (const shell of placed) {
-    if (!furnishShell(shell, cx, cy, rng, ids)) return null;
+    if (!furnishShell(shell, cx, cy, rng, ids, params.entrances ?? 1)) return null;
   }
 
   const blocks: Block[] = placed.map((shell) => {
@@ -106,11 +106,15 @@ function buildWorld(seed: number, params: OutdoorParams): OutdoorWorld | null {
     by: shell.approach[1],
     halfWidth: 3.4,
   }));
-  const noFly = makeNoFlyZones(cx, cy, blocks, corridors, rng);
+  // A second way in gets its own short clear lane out from the wall, so trees and no-fly zones keep
+  // off its approach the way the trail keeps off the first. Not a trail: world.corridors is unchanged.
+  const lanes: Corridor[] = (params.entrances ?? 1) >= 2 ? placed.flatMap((shell) => sideLanes(shell)) : [];
+  const keepOut = lanes.length ? [...corridors, ...lanes] : corridors;
+  const noFly = makeNoFlyZones(cx, cy, blocks, keepOut, rng);
   const spawnZ = sampleHeight(terrain, cx, cy) + 1.7;
   const first = placed[0]!;
   const spawnYaw = Math.atan2(first.approach[1] - cy, first.approach[0] - cx);
-  const trees = scatterForest(terrain, placed, corridors, geofence, cx, cy, rng);
+  const trees = scatterForest(terrain, placed, keepOut, geofence, cx, cy, rng);
   const world: OutdoorWorld = {
     seed,
     size,
@@ -128,6 +132,22 @@ function buildWorld(seed: number, params: OutdoorParams): OutdoorWorld | null {
   world.colliders = planColliders(world);
   return world;
 }
+
+/** Clear lanes out from every passable wall opening but the first (the trail serves that one). */
+function sideLanes(shell: BuildingShell): Corridor[] {
+  // The first passable opening may be a roof hatch, so skip it before keeping wall openings only.
+  const doors = shell.openings.filter((opening) => opening.passable).slice(1).filter((opening) => opening.normal[2] === 0);
+  return doors.map((opening) => ({
+    ax: opening.center[0] + opening.normal[0] * 0.5,
+    ay: opening.center[1] + opening.normal[1] * 0.5,
+    bx: opening.center[0] + opening.normal[0] * SIDE_LANE_M,
+    by: opening.center[1] + opening.normal[1] * SIDE_LANE_M,
+    halfWidth: 1.8,
+  }));
+}
+
+/** Length of the clear lane out from a second way in, m. */
+const SIDE_LANE_M = 7;
 
 function makeInterior(seed: number, floors: number, w: number, d: number): BuildingSpec {
   if (floors > 1) {

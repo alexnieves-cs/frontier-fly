@@ -23,6 +23,7 @@ import type { PlannerConfig } from './sar/planner';
 import type { LocVisitRecord } from './localizer';
 import type { LocSensorHook } from './locSensors';
 import type { ActingPolicy } from './planner/indoor';
+import type { MeasuredOpening } from './openingSensor';
 
 export type V3 = [number, number, number];
 
@@ -69,6 +70,8 @@ export interface MissionWorldOptions {
   seed: number;
   /** 1..4. Omitted uses the outdoor generator's seeded count. */
   buildings?: number;
+  /** Passable openings per building, 1 (default) or 2. See OutdoorParams.entrances. */
+  entrances?: number;
   timeOfDay?: number;
   flashlightOn?: boolean;
   sensorMode?: SensorMode;
@@ -436,6 +439,51 @@ export interface RunnerOptions {
    * the hazard bench compares against.
    */
   hazardAware?: boolean;
+  /**
+   * A teammate on the same mission (src/mission/autonomy/duo.ts). Off by default: a drone flies alone.
+   * With it, the drones split the envelope inspection, pool the openings they measured, each take a
+   * different opening in, share where their cameras have looked indoors, and both head home once
+   * either confirms what the mission needs.
+   */
+  team?: TeamLink;
+}
+
+/**
+ * One drone's side of a shared mission: what a radio link between two drones would carry. Each drone
+ * keeps its own world, sensors, pose and decisions; nothing here reads the ground truth.
+ */
+export interface TeamLink {
+  /** This drone's call sign for the log, e.g. 'A'. */
+  readonly name: string;
+  /** The lead flies the roof viewpoints when an inspection is split. */
+  readonly lead: boolean;
+  /** Standoffs teammates published at this building. */
+  standoffs(buildingId: string): { name: string; pos: V3 }[];
+  publishStandoff(buildingId: string, pos: V3): void;
+  /** Openings teammates measured on this building from outside. */
+  openings(buildingId: string): { name: string; opening: MeasuredOpening }[];
+  shareOpening(buildingId: string, opening: MeasuredOpening): void;
+  /** True once every teammate that published a standoff here has flown its part of the inspection. */
+  surveyDone(buildingId: string): boolean;
+  finishSurvey(buildingId: string): void;
+  /** The teammate holding this opening, or null. */
+  claimedBy(buildingId: string, openingId: number): string | null;
+  /** Take an opening for this drone; null drops its claim on the building. */
+  claim(buildingId: string, openingId: number | null): void;
+  /** Indoor voxels teammates' cameras have looked at in this building, or null when none. */
+  looked(buildingId: string): Uint8Array | null;
+  shareLooked(buildingId: string, looked: Uint8Array): void;
+  /** Contacts teammates confirmed. */
+  teamConfirmed(): { name: string; contact: ConfirmedContact }[];
+  publishConfirmed(contact: ConfirmedContact): void;
+  /** A world-frame command velocity with the part that closes on a nearby teammate cut. */
+  separate(pos: V3, vel: V3): V3;
+  /** The nearest teammate's last reported position and phase, or null. */
+  nearest(pos: V3): { name: string; pos: V3; phase: string | null } | null;
+  /** Contacts teammates are confirming right now, by estimate. */
+  confirming(): { name: string; estimate: V3 }[];
+  /** Report the contact this drone is confirming (null when none). */
+  setConfirming(estimate: V3 | null): void;
 }
 
 /**

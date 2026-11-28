@@ -138,4 +138,10 @@ export interface OutdoorParams {
   seed: number;
   /** Building count. Clamped to 1..4. Omitted values come from the seed. */
   buildings?: number;
+  /**
+   * Passable openings per building, 1 or 2. The default 1 keeps every seed as it was.
+   * With 2, a second wall opening of a different kind goes on a different face,
+   * placed after the decoys so the first opening and decoys do not move.
+   */
+  entrances?: number;
 }

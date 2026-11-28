@@ -103,6 +103,7 @@ export default defineConfig({
         how: resolve(root, 'how.html'),
         joint: resolve(root, 'joint.html'),
         swarm: resolve(root, 'swarm.html'),
+        duo: resolve(root, 'duo.html'),
       },
     },
   },

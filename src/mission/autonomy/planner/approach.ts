@@ -41,6 +41,10 @@ export interface ApproachPlan {
   descent: V3[];
 }
 
+const TAU = Math.PI * 2;
+/** Cost per meter of arc a standoff falls short of the far side from a teammate's (planApproach). */
+const AVOID_ARC_WEIGHT = 2;
+
 /** Ring of candidate standoff points around the footprint. */
 export function standoffCandidates(box: BuildingBox, z: number, offsets = STANDOFFS): Standoff[] {
   const out: Standoff[] = [];
@@ -80,12 +84,22 @@ export function planApproach(
   physics: OutdoorPhysics,
   air: Airspace,
   agl = CRUISE_AGL,
+  avoid: readonly V3[] = [],
 ): ApproachPlan {
   const box = buildingBox(building);
   const z = box.baseZ + VIEW_HEIGHT;
   const cands = standoffCandidates(box, z);
-  // Nearer offsets first, then the side facing the arrival.
-  const scored = cands.map((s, i) => ({ s, i, cost: Math.hypot(s.pos[0] - from[0], s.pos[1] - from[1]) + i * 0.02 }));
+  // Nearer offsets first, then the side facing the arrival. With teammates already at the building,
+  // the side across from theirs wins: each meter of arc short of opposite costs AVOID_ARC_WEIGHT m.
+  const bearing = (p: readonly number[]) => Math.atan2(p[1]! - box.cy, p[0]! - box.cx);
+  const ring = Math.hypot(box.maxX - box.minX, box.maxY - box.minY) / 2;
+  const short = (s: Standoff) => {
+    if (!avoid.length) return 0;
+    const b = bearing(s.pos);
+    const nearest = Math.min(...avoid.map((p) => Math.abs((((b - bearing(p)) % TAU) + TAU * 1.5) % TAU - Math.PI)));
+    return (Math.PI - nearest) * ring * AVOID_ARC_WEIGHT;
+  };
+  const scored = cands.map((s, i) => ({ s, i, cost: Math.hypot(s.pos[0] - from[0], s.pos[1] - from[1]) + i * 0.02 + short(s) }));
   scored.sort((a, b) => a.cost - b.cost || a.i - b.i);
   for (const { s } of scored) {
     if (!standoffOpen(physics, air, s, agl)) continue;

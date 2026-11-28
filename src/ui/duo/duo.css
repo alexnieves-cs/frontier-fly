@@ -1,0 +1,125 @@
+:root {
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; height: 100%; background: var(--ff-bg); color: var(--ff-text); }
+
+#app {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  font-family: var(--ff-font);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ff-accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.duo { position: relative; min-height: 0; overflow: hidden; }
+
+.duo-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* Panels float over the scene on a dark glass so the 3D world stays the main thing on screen. */
+.duo-intro,
+.duo-card,
+.duo-log,
+.duo-controls,
+.duo-status {
+  background: rgba(5, 10, 14, 0.72);
+  border: 1px solid var(--ff-line);
+  border-radius: var(--ff-radius);
+  backdrop-filter: blur(8px);
+}
+
+.duo-intro {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  max-width: 420px;
+  padding: 14px 16px;
+}
+
+.duo-kicker { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ff-muted); }
+.duo-lede { margin: 6px 0 0; font-size: 16px; color: var(--ff-text); }
+.duo-honest { margin: 8px 0 0; font-size: 12px; color: var(--ff-muted); }
+
+.duo-side {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 290px;
+  display: grid;
+  gap: 10px;
+}
+
+.duo-card { padding: 12px 14px; border-left: 3px solid var(--c, var(--ff-line-strong)); }
+.duo-card header { display: flex; align-items: center; gap: 8px; }
+.duo-card h2 { margin: 0; font-size: 14px; font-weight: 600; }
+.duo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+.duo-phase { margin-left: auto; font-size: 12px; color: var(--c); font-weight: 600; }
+.duo-card dl { margin: 8px 0 0; display: grid; gap: 4px; }
+.duo-card dl div { display: flex; justify-content: space-between; gap: 12px; }
+.duo-card dt { color: var(--ff-muted); }
+.duo-card dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.duo-line { margin: 8px 0 0; font-size: 12px; color: var(--ff-text-2); min-height: 2.9em; }
+
+.duo-team { border-left-color: var(--ff-line-strong); }
+.duo-team dl { margin: 0; }
+
+.duo-log {
+  position: absolute;
+  left: 16px;
+  bottom: 72px;
+  width: min(640px, calc(100% - 340px));
+  margin: 0;
+  padding: 10px 14px;
+  list-style: none;
+  font-size: 12px;
+  display: grid;
+  gap: 3px;
+}
+.duo-log:empty { display: none; }
+.duo-log li { display: flex; gap: 8px; color: var(--ff-text-2); }
+.duo-t { font-family: var(--ff-mono); color: var(--ff-muted); min-width: 3.2em; }
+.duo-tag { font-weight: 700; color: var(--c); min-width: 1em; }
+
+.duo-controls {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 6px;
+}
+.duo-group { display: flex; gap: 2px; }
+.duo-group button {
+  border: 0;
+  background: transparent;
+  padding: 6px 12px;
+  border-radius: 7px;
+  color: var(--ff-text-2);
+}
+.duo-group button:hover { background: var(--ff-surface-3); }
+.duo-group button[aria-pressed='true'] { background: var(--ff-accent-soft); color: var(--ff-accent); }
+
+.duo-status {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  padding: 12px 16px;
+}
+
+@media (max-width: 860px) {
+  .duo-side { top: auto; bottom: 72px; right: 8px; left: 8px; width: auto; grid-template-columns: 1fr 1fr; }
+  .duo-team { grid-column: 1 / -1; }
+  .duo-log { display: none; }
+  .duo-intro { left: 8px; right: 8px; max-width: none; }
+  .duo-controls { left: 8px; right: 8px; bottom: 8px; }
+}

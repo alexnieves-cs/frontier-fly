@@ -48,7 +48,14 @@ const FACES: FaceInfo[] = [
   { face: 'e', normal: [1, 0, 0], tangent: [0, 1, 0], inward: [-1, 0] },
 ];
 
-export function furnishShell(shell: BuildingShell, spawnX: number, spawnY: number, rng: RNG, ids: { next: number }): boolean {
+export function furnishShell(
+  shell: BuildingShell,
+  spawnX: number,
+  spawnY: number,
+  rng: RNG,
+  ids: { next: number },
+  entrances = 1,
+): boolean {
   const floor = shell.spec.floors[0]!;
   const centerX = shell.origin[0] + (floor.w * shell.spec.cellSize) / 2;
   const centerY = shell.origin[1] + (floor.d * shell.spec.cellSize) / 2;
@@ -68,10 +75,46 @@ export function furnishShell(shell: BuildingShell, spawnX: number, spawnY: numbe
     }
     placeRecipe(shell, decoy, false, rotate(order, n + 1), used, rng, ids);
   }
+  // A second way in goes last, so the first opening and the decoys keep their seeded places.
+  if (entrances >= 2 && !placeSecondEntrance(shell, passable, toward, used, rng, ids)) return false;
   const entrance = shell.openings.find((opening) => opening.passable);
   if (!entrance) return false;
   shell.approach = approachPoint(shell, entrance, spawnX, spawnY);
-  return connectedToSpawn(shell.spec, entrance);
+  return shell.openings.filter((opening) => opening.passable).every((opening) => connectedToSpawn(shell.spec, opening));
+}
+
+/**
+ * A second passable wall opening: a different kind from the first, on a face the first
+ * does not use. Side faces come before the far face, so the two ways in are a short
+ * flight apart through the trees rather than a full lap of the house.
+ */
+function placeSecondEntrance(
+  shell: BuildingShell,
+  first: Opening,
+  toward: Face,
+  used: Set<string>,
+  rng: RNG,
+  ids: { next: number },
+): Opening | null {
+  const taken = new Set<Face>([toward]);
+  const firstFace = faceOf(first.normal);
+  if (firstFace) taken.add(firstFace);
+  const sides: Face[] = toward === 'n' || toward === 's' ? ['w', 'e'] : ['s', 'n'];
+  const far: Face = ({ n: 's', s: 'n', e: 'w', w: 'e' } as const)[toward];
+  const order = [...sides, far].filter((face) => !taken.has(face));
+  const kinds = PASSABLE.filter((recipe) => recipe.kind !== first.kind && recipe.kind !== 'roof_hatch');
+  const start = (shell.id + shell.spec.seed + 1) % kinds.length;
+  for (let k = 0; k < kinds.length; k++) {
+    const opening = placeRecipe(shell, kinds[(start + k) % kinds.length]!, true, order, used, rng, ids);
+    if (opening) return opening;
+  }
+  return null;
+}
+
+function faceOf(normal: Vec3): Face | null {
+  if (normal[2] !== 0) return null;
+  if (Math.abs(normal[0]) > Math.abs(normal[1])) return normal[0] > 0 ? 'e' : 'w';
+  return normal[1] > 0 ? 'n' : 's';
 }
 
 function placeRecipe(

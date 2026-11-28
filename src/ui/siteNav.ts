@@ -13,7 +13,7 @@ export const AUTHOR = {
   site: 'https://alexnieves.me',
 } as const;
 
-export type SitePage = 'home' | 'how' | 'film' | 'demo' | 'race' | 'team' | 'atlas' | 'sim' | 'outdoor' | 'mission' | 'px4';
+export type SitePage = 'home' | 'how' | 'film' | 'demo' | 'race' | 'team' | 'duo' | 'atlas' | 'sim' | 'outdoor' | 'mission' | 'px4';
 
 /**
  * Named for what a visitor does there. Pages with `tryIt` sit in the "Try it" menu, so the bar keeps five page
@@ -26,6 +26,7 @@ const PAGES: ReadonlyArray<{ id: SitePage; href: string; label: string; title: s
   { id: 'demo', href: './demo.html', label: 'Missions', title: 'Run a woods-to-building rescue mission', tryIt: true },
   { id: 'race', href: './race.html', label: 'Race', title: 'Four pilots search the same building live', tryIt: true },
   { id: 'team', href: './team.html', label: 'Team', title: 'Several drones search one building together', tryIt: true },
+  { id: 'duo', href: './duo.html', label: 'Two ways in', title: 'Two drones search a cabin, each taking its own way in', tryIt: true },
   { id: 'sim', href: './sim.html', label: 'Fly indoors', title: 'Fly or train the indoor drone yourself', tryIt: true, gap: true },
   { id: 'outdoor', href: './outdoor.html', label: 'Fly outdoors', title: 'Fly the procedural forest site', tryIt: true },
   { id: 'mission', href: './mission.html', label: 'Plan', title: 'Plan a mission and export it', tryIt: true },

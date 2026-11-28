@@ -8,6 +8,7 @@ import {
   columnClear,
   cruisePath,
   cruiseZ,
+  dist,
   headingTo,
   len,
   operable,
@@ -45,6 +46,10 @@ export const CLEAR_MIN_FLOOR_VOXELS = 16;
 
 /** A contact placed this close outside a footprint still counts as in the building: range error at a window. */
 const CONTACT_FOOTPRINT_MARGIN_M = 0.5;
+/** A teammate's confirmation within this distance of a track covers it: this drone searches on, m. */
+const TEAM_CONFIRM_RADIUS_M = 2.5;
+/** How long a drone leaves a contact to the teammate confirming it before it checks again, s. */
+const TEAM_CONFIRM_DEFER_SEC = 10;
 
 /** How far the last indoor look moves a contact placed in a wall to the nearest free point: about the range error at a wall. */
 const FINAL_LOOK_SNAP_M = 1;
@@ -387,6 +392,7 @@ export class SearchPhase {
         const had = v.observed.has(seen.id);
         const o = this.c.openingSensor.measure(seen, sensed, pose);
         v.observed.set(o.id, o);
+        this.c.options.team?.shareOpening(v.b.id, o);
         if (!had) {
           this.c.log(
             'info',
@@ -417,6 +423,7 @@ export class SearchPhase {
       if (this.c.tracker.evaluate(track) === 'confirmed') {
         const cc = this.c.tracker.toConfirmed(track, this.c.t);
         this.c.confirmed.push(cc);
+        this.c.options.team?.publishConfirmed(cc);
         this.c.log(
           'action',
           `Confirmed ${track.classId} at ${this.c.where(cc.estimate)} from ${cc.views} views, mean confidence ${fmt(cc.confidence, 2)}.`,
@@ -432,6 +439,13 @@ export class SearchPhase {
         const indoor = this.c.phase === 'indoor_explore';
         if (indoor && v && track.buildingId !== v.b.id) continue;
         if (!indoor && track.buildingId !== null) continue;
+        // A teammate already re-viewing this contact: leave it the bearings and keep searching.
+        const mate = this.c.options.team?.confirming().find((m) => dist(m.estimate, track.estimate) < TEAM_CONFIRM_RADIUS_M);
+        if (mate) {
+          if ((this.attempted.get(track.id) ?? 0) === 0) this.c.log('info', `${mate.name} is re-viewing this ${track.classId} contact. Searching on.`);
+          this.attempted.set(track.id, this.c.t + TEAM_CONFIRM_DEFER_SEC);
+          continue;
+        }
         this.startConfirm(track);
         break;
       }
@@ -442,6 +456,7 @@ export class SearchPhase {
 
   startConfirm(track: ConfirmTrack): void {
     this.attempted.set(track.id, Infinity);
+    this.c.options.team?.setConfirming(track.estimate);
     const need = Math.max(2, this.c.tracker.minViews - track.views.length + 1);
     const pos = this.c.vehicle.pos;
     const v = this.c.visit;
@@ -631,7 +646,15 @@ export class SearchPhase {
     return false;
   }
 
+  /** A teammate's find ended the search: drop any confirmation under way so it does not resume. */
+  endTeamSearch(): void {
+    this.c.options.team?.setConfirming(null);
+    this.confirmTrack = null;
+    this.resumeAfterConfirm = null;
+  }
+
   endConfirm(): void {
+    this.c.options.team?.setConfirming(null);
     this.confirmTrack = null;
     const resume = this.resumeAfterConfirm;
     this.resumeAfterConfirm = null;
