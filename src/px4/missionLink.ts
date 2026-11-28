@@ -13,6 +13,9 @@
  */
 
 /** Int32 control words. */
+/** The lockstep HIL step, µs (250 Hz). A link advance flies a whole number of these. */
+export const LINK_STEP_US = 4000;
+
 export const CTL = {
   /** Request counter, bumped by the runner for each command. */
   REQ: 0,

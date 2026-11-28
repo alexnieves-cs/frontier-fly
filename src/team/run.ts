@@ -1,9 +1,9 @@
 import { RNG } from '../shared/rng';
-import type { BuildingSpec, EpisodeConfig } from '../shared/types';
+import type { BuildingSpec, Dynamics, EpisodeConfig } from '../shared/types';
 import { sensorFrame } from '../sim/sensorPlanner';
 import { createEnv, type ExplorerEnv } from '../sim/env';
-import { commandToAction, SensorPlanner, type SensorCommand } from '../sim/sensorPlanner';
-import { descentClear, filterVelocity, QUAD_BRAKING } from '../sim/lidarSafety';
+import { commandToAction, SensorPlanner, type SensorCommand, type SensorPlannerOptions } from '../sim/sensorPlanner';
+import { brakingFilter, descentClear, filterVelocity, QUAD_BRAKING, safeSpeed, type BrakingModel } from '../sim/lidarSafety';
 import { OccupancyMap } from '../sim/sensorMap';
 import { initPhysics, PhysicsWorld } from '../sim/world';
 import { ClaimPenalty, DEFAULT_CLAIMS, type ClaimOptions } from './allocate';
@@ -49,6 +49,21 @@ export interface TeamOptions {
   packWh?: number;
   /** Safety factor on the estimated energy home (default 1.5). */
   returnReserve?: number;
+  /**
+   * Airframe per drone, swapped in after each env reset (ExplorerEnv.useDynamics): for example one
+   * PX4 SITL instance per drone (src/px4/px4Dynamics.ts). Default: the env's own kinematic model.
+   */
+  makeDynamics?: (drone: number) => Dynamics;
+  /**
+   * Braking model for the separation rule (separateBraking): for airframes that need room to stop.
+   * Default: the kinematic rule (separate), which the bench's results were flown with.
+   */
+  separationBraking?: BrakingModel;
+  /**
+   * Extra planner options per drone (src/sim/sensorPlanner.ts), e.g. the quadrotor pilot of
+   * src/sim/quadPilot.ts for drones flown by a real flight controller. Speed and claims stay the team's.
+   */
+  plannerOptions?: (drone: number) => SensorPlannerOptions;
 }
 
 export interface TeamResult {
@@ -112,6 +127,51 @@ export function separate(vx: number, vy: number, me: readonly number[], others: 
       vx -= (along - allowed) * ux;
       vy -= (along - allowed) * uy;
     }
+  }
+  return [vx, vy];
+}
+
+/** Keep-out between drone centers for airframes that need room to stop, meters (two 0.15 m airframes plus 0.3 m of air). */
+export const BRAKING_SEPARATION = 0.6;
+
+/**
+ * The separation rule for an airframe that cannot stop at once (a quadrotor under a flight
+ * controller): the brakingFilter barrier of src/sim/lidarSafety.ts against each teammate, on the
+ * closing speed of the pair. Each drone takes half of the pair's stopping budget and follows the
+ * other's own motion along the line between them, so two drones that use it close at most at the
+ * speed both can still stop from before BRAKING_SEPARATION. Closer than that, it backs away.
+ */
+export function separateBraking(
+  vx: number,
+  vy: number,
+  me: readonly number[],
+  myVel: readonly number[],
+  others: readonly { pos: readonly number[]; vel: readonly number[] }[],
+  model: BrakingModel,
+): [number, number] {
+  for (let pass = 0; pass < 2; pass++) {
+    let changed = false;
+    for (const o of others) {
+      if (Math.abs(o.pos[2]! - me[2]!) > 1) continue;
+      const dx = o.pos[0]! - me[0]!;
+      const dy = o.pos[1]! - me[1]!;
+      const d = Math.hypot(dx, dy);
+      if (d > 4 || d < 1e-6) continue;
+      const ux = dx / d;
+      const uy = dy / d;
+      const theirs = o.vel[0]! * ux + o.vel[1]! * uy;
+      const closing = (myVel[0]! - o.vel[0]!) * ux + (myVel[1]! - o.vel[1]!) * uy;
+      const cap = safeSpeed(d - BRAKING_SEPARATION, model);
+      const budget = closing > cap ? cap - (closing - cap) : cap;
+      const allowed = d < BRAKING_SEPARATION ? Math.min(theirs, 0) - 0.3 : theirs + budget / 2;
+      const along = vx * ux + vy * uy;
+      if (along > allowed) {
+        vx -= (along - allowed) * ux;
+        vy -= (along - allowed) * uy;
+        changed = true;
+      }
+    }
+    if (!changed) break;
   }
   return [vx, vy];
 }
@@ -205,6 +265,7 @@ export class TeamSim {
   private finished = false;
   private readonly packWh: number;
   private readonly returnReserve: number;
+  private readonly separationBraking: BrakingModel | null;
 
   private constructor(spec: BuildingSpec, cfg: EpisodeConfig & { maxSteps: number }, opts: TeamOptions, seed: number) {
     this.spec = spec;
@@ -218,6 +279,7 @@ export class TeamSim {
     this.maxSteps = cfg.maxSteps;
     this.packWh = opts.packWh ?? DEFAULT_BATTERY.capacityWh * DEFAULT_BATTERY.usableFraction;
     this.returnReserve = opts.returnReserve ?? 1.5;
+    this.separationBraking = opts.separationBraking ?? null;
     this.rng = new RNG(seed, 'team');
     this.radio = new RadioModel(spec, opts.radio);
     this.base = basePosition(spec);
@@ -241,11 +303,17 @@ export class TeamSim {
     for (let i = 0; i < n; i++) {
       const env = await createEnv();
       // Idle hovering is part of the job here (a parked relay, a drone with nothing left): no stall cut-off.
-      const obs = env.reset(spec, envSeed + i * 7919, { ...cfg, stallSteps: cfg.maxSteps + 1 }, sim.physics);
+      let obs = env.reset(spec, envSeed + i * 7919, { ...cfg, stallSteps: cfg.maxSteps + 1 }, sim.physics);
+      if (opts.makeDynamics) obs = env.useDynamics(opts.makeDynamics(i));
       const node = new MeshNode(i, sim.size, n + 1);
       const claimSource = { heard: node.heard, selfId: i, pos: [0, 0, 0] as [number, number, number], step: 0, floorHeight: spec.floorHeight, drones: n };
       const claim = new ClaimPenalty(claims ?? DEFAULT_CLAIMS, claimSource);
-      const planner = new SensorPlanner({ speed: opts.speed, braking: quad ? QUAD_BRAKING : undefined, penalty: claims && sim.comms !== 'none' ? claim : undefined });
+      const planner = new SensorPlanner({
+        braking: quad ? QUAD_BRAKING : undefined,
+        ...opts.plannerOptions?.(i),
+        speed: opts.speed,
+        penalty: claims && sim.comms !== 'none' ? claim : undefined,
+      });
       sim.drones.push({
         env,
         planner,
@@ -298,7 +366,9 @@ export class TeamSim {
     const drones = this.drones;
     const n = drones.length;
     const comms = this.comms;
-    const poses = drones.map((d) => d.env.snapshot().pos);
+    const snaps = drones.map((d) => d.env.snapshot());
+    const poses = snaps.map((x) => x.pos);
+    const vels = snaps.map((x) => x.vel);
     for (let i = 0; i < n; i++) {
       const d = drones[i]!;
       if (!d.launched && t >= i * this.launchGap) d.launched = true;
@@ -335,7 +405,12 @@ export class TeamSim {
       }
       d.node.goal = d.relay === 'explore' && d.home === 'search' ? d.planner.goalPoint : null;
       const others = poses.filter((_, j) => j !== i && drones[j]!.launched && !drones[j]!.done);
-      [cmd.vx, cmd.vy] = separate(cmd.vx, cmd.vy, poses[i]!, others);
+      if (this.separationBraking) {
+        const near = drones.flatMap((o, j) => (j !== i && o.launched && !o.done ? [{ pos: poses[j]!, vel: vels[j]! }] : []));
+        [cmd.vx, cmd.vy] = separateBraking(cmd.vx, cmd.vy, poses[i]!, vels[i]!, near, this.separationBraking);
+        // The walls still come first: a drone that gives way must not back into one.
+        [cmd.vx, cmd.vy] = brakingFilter(cmd.vx, cmd.vy, f.yaw, f.lidar, f.vel, d.planner.braking ?? this.separationBraking, d.planner.brakingMargin);
+      } else [cmd.vx, cmd.vy] = separate(cmd.vx, cmd.vy, poses[i]!, others);
       const step = d.env.step(commandToAction(cmd, f.yaw, this.out));
       d.obs = step.obs;
       d.collisions = step.info.collisions;

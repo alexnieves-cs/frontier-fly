@@ -335,6 +335,22 @@ export class ExplorerEnv implements Env {
     return this.physics;
   }
 
+  /**
+   * Swap the airframe after reset: `d` takes over the drone's state (it may move it, e.g. to where a
+   * flight controller's plant is hovering). For the kinematic step size only (one step per 50 ms
+   * policy tick), so an external flight controller such as src/px4/px4Dynamics.ts sees each command once.
+   * Returns the observation from the new pose.
+   */
+  useDynamics(d: Dynamics): Float32Array {
+    if (this.cfg.dynamics === 'quad') throw new Error('useDynamics needs the kinematic step (cfg.dynamics kinematic)');
+    this.dyn = d;
+    d.reset(this.state, this.cfg.dyn);
+    d.setSpeedLimit?.(this.speedH);
+    this.prevYaw = this.state.yaw;
+    for (let i = 0; i < 3; i++) this.prevVel[i] = this.state.vel[i]!;
+    return this.observe();
+  }
+
   /** Live drone position (not a copy). */
   get position(): readonly [number, number, number] {
     return this.state.pos;

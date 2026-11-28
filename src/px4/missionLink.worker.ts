@@ -20,7 +20,7 @@ import {
   MavlinkWriter,
   MSG,
 } from './mavlink';
-import { CMD, CTL, OP, PHASE, ST, px4Mode, type LinkEvent, type MissionLinkInit } from './missionLink';
+import { CMD, CTL, LINK_STEP_US, OP, PHASE, ST, px4Mode, type LinkEvent, type MissionLinkInit } from './missionLink';
 import { Px4SimSession } from './session';
 
 // workerData is { init, port }: events go out on `port` so the main thread, blocked in Atomics.wait
@@ -138,7 +138,7 @@ udp.on('message', (msg) => {
 });
 
 // ------------------------------------------------------------------ the sim loop
-const STEP_US = 4000;
+const STEP_US = LINK_STEP_US;
 const SETPOINT_EVERY = 5; // 50 Hz at 250 Hz physics
 const EV_EVERY = 8; // 31 Hz
 
